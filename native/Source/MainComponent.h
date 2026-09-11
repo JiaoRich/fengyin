@@ -28,6 +28,8 @@ private:
     void showPage(Page page);
     void updatePageVisibility();
     void applyTheme(Theme theme);
+    void setupWebInterface();
+    static std::optional<juce::WebBrowserComponent::Resource> getWebResource(const juce::String& path);
     juce::Rectangle<int> getContentBounds() const;
     void timerCallback() override;
     void startPluginScan();
@@ -140,6 +142,8 @@ private:
     juce::Colour themeAccent { 0xff43d9ff };
     juce::Colour themeAccent2 { 0xff9b63ff };
     juce::Colour themeMuted { 0xff8fa7bd };
+    std::unique_ptr<juce::WebBrowserComponent> webInterface;
+    bool webInterfaceReady = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };
