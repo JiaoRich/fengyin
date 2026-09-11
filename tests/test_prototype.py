@@ -22,13 +22,17 @@ class PrototypeStructureTests(unittest.TestCase):
     def test_required_first_milestone_controls_exist(self):
         for control_id in (
             "video-file", "play-button", "spectrum", "breath-bar",
-            "meter-l", "meter-r", "theme", "license-code", "activate"
+            "meter-l", "meter-r", "theme", "license-code", "activate", "scan-swam"
         ):
             self.assertIn(f'id="{control_id}"', HTML)
 
     def test_only_one_page_starts_active(self):
         active_pages = re.findall(r'<section class="page active"', HTML)
         self.assertEqual(1, len(active_pages))
+
+    def test_video_errors_use_non_blocking_toast(self):
+        self.assertIn("video.addEventListener('error'", JS)
+        self.assertNotIn("alert(", JS)
 
 
 if __name__ == "__main__":
