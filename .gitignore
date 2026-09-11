@@ -1,0 +1,13 @@
+build/
+build-windows/
+dist/
+构建结果/
+private/
+.DS_Store
+*.user
+*.suo
+*.VC.db
+*.VC.VC.opendb
+.vs/
+out/
+third_party/ffmpeg/windows/ffmpeg.exe
