@@ -14,7 +14,7 @@ bool RecordingService::start(double sampleRate, int channelCount)
         lastError = juce::String::fromUTF8("无法创建“风吟录音”文件夹");
         return false;
     }
-    return startToFile(folder.getNonexistentChildFile("风吟-" + juce::Time::getCurrentTime().formatted("%Y%m%d-%H%M%S"),
+    return startToFile(folder.getNonexistentChildFile(juce::String::fromUTF8("风吟-") + juce::Time::getCurrentTime().formatted("%Y%m%d-%H%M%S"),
                                                       ".wav", false), sampleRate, channelCount);
 }
 
