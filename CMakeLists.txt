@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 0.2.0 LANGUAGES C CXX)
+project(FengYin VERSION 0.3.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -24,6 +24,14 @@ juce_add_gui_app(FengYin
     PRODUCT_NAME "FengYin"
     COMPANY_NAME "FengYin"
     BUNDLE_ID "cn.fengyin.windstation"
+    ICON_BIG "${CMAKE_SOURCE_DIR}/assets/fengyin-app-icon.png"
+    NEEDS_WEBVIEW2 TRUE
+)
+
+juce_add_binary_data(FengYinWebAssets SOURCES
+    prototype/index.html
+    prototype/styles.css
+    prototype/app.js
 )
 
 target_sources(FengYin PRIVATE
@@ -65,7 +73,7 @@ target_compile_definitions(FengYin PRIVATE
     JUCE_APPLICATION_NAME_STRING="FengYin"
     JUCE_APPLICATION_VERSION_STRING="${PROJECT_VERSION}"
     JUCE_USE_CURL=0
-    JUCE_WEB_BROWSER=0
+    JUCE_WEB_BROWSER=1
     JUCE_PLUGINHOST_VST3=1
 )
 
@@ -78,6 +86,7 @@ target_link_libraries(FengYin PRIVATE
     juce::juce_cryptography
     juce::juce_dsp
     juce::juce_gui_extra
+    FengYinWebAssets
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags
