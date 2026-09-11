@@ -131,6 +131,7 @@ if(WIN32)
     target_compile_definitions(FengYin PRIVATE
         JUCE_ASIO=1
         JUCE_ASIO_USE_EXTERNAL_SDK=0
+        JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
         NOMINMAX
         WIN32_LEAN_AND_MEAN
     )
