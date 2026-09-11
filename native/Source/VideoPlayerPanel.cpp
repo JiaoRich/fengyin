@@ -69,7 +69,10 @@ VideoPlayerPanel::VideoPlayerPanel()
     };
     video.onErrorOccurred = [this](const juce::String& error)
     {
-        fileName.setText(utf8("视频播放失败：") + error, juce::dontSendNotification);
+        const auto message = utf8("视频播放失败。请优先使用 MP4（H.264 视频 + AAC 音频）。\n\n系统返回：") + error;
+        fileName.setText(utf8("视频播放失败 · 点击“选择视频”重试"), juce::dontSendNotification);
+        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
+                                               utf8("视频无法播放"), message);
     };
     startTimerHz(10);
 }
@@ -124,7 +127,8 @@ void VideoPlayerPanel::timerCallback()
 
 void VideoPlayerPanel::chooseVideo()
 {
-    chooser = std::make_unique<juce::FileChooser>(utf8("选择动态谱视频"), juce::File(), "*.mp4;*.mov;*.m4v");
+    chooser = std::make_unique<juce::FileChooser>(utf8("选择动态谱视频"), juce::File(),
+                                                  "*.mp4;*.mov;*.m4v;*.avi;*.wmv;*.mpeg;*.mpg");
     const auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
     chooser->launchAsync(flags, [safe = juce::Component::SafePointer<VideoPlayerPanel>(this)](const juce::FileChooser& dialog)
     {
@@ -184,8 +188,11 @@ void VideoPlayerPanel::loadFile(const juce::File& file)
                         }
                         else
                         {
-                            safe->fileName.setText(utf8("无法载入视频：") + result.getErrorMessage(),
-                                                   juce::dontSendNotification);
+                            const auto message = utf8("无法载入该视频。请优先使用 MP4（H.264 视频 + AAC 音频）。\n\n文件：")
+                                               + file.getFullPathName() + utf8("\n\n系统返回：") + result.getErrorMessage();
+                            safe->fileName.setText(utf8("无法载入视频 · 已显示处理建议"), juce::dontSendNotification);
+                            juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
+                                                                   utf8("视频无法载入"), message);
                         }
                         safe->repaint();
                     });
