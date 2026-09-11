@@ -16,6 +16,10 @@ let recording = false;
 let animationFrame;
 let videoUrl;
 
+function nativeEvent(name, payload = {}) {
+  if (window.__JUCE__?.backend?.emitEvent) window.__JUCE__.backend.emitEvent(name, payload);
+}
+
 function toast(message) {
   const el = $('#toast');
   el.textContent = message;
@@ -56,6 +60,11 @@ $('#video-file').addEventListener('change', event => {
   $('#video-name').textContent = file.name;
   toast('视频已载入');
 });
+video.addEventListener('error', () => {
+  const reason = video.error?.message || `浏览器错误代码 ${video.error?.code || '未知'}`;
+  toast(`视频无法播放：${reason}`);
+  $('#video-name').textContent = '视频编码不受支持，请转换为 H.264 + AAC';
+});
 
 function toggleVideo() {
   if (!video.src) return toast('请先选择一个本地视频');
@@ -87,6 +96,7 @@ $('#simulate').addEventListener('click', event => {
   event.target.textContent = simulating ? '暂停模拟吹奏' : '继续模拟吹奏';
 });
 $('#record').addEventListener('click', event => {
+  nativeEvent('toggleRecording');
   recording = !recording;
   event.target.textContent = recording ? '■ 停止录音' : '● 开始录音';
   event.target.style.color = recording ? 'var(--danger)' : '';
@@ -98,6 +108,10 @@ $('#low-performance').addEventListener('change', event => {
 });
 
 $('#activate').addEventListener('click', () => {
+  if (window.__JUCE__?.backend?.emitEvent) {
+    nativeEvent('showActivation');
+    return;
+  }
   const code = $('#license-code').value.trim();
   if (code.length < 8) return toast('请输入至少 8 位激活码');
   localStorage.setItem('fengyin-prototype-license','active');
@@ -105,6 +119,27 @@ $('#activate').addEventListener('click', () => {
   $('#license-title').classList.add('green');
   toast('原型激活成功');
 });
+
+$('#scan-swam').addEventListener('click', () => { nativeEvent('scanPlugins'); toast('正在扫描 SWAM 与 VST3 音源…'); });
+const windButtons = [...document.querySelectorAll('#page-wind button')];
+windButtons[0]?.addEventListener('click', () => nativeEvent('showMidiSetup'));
+windButtons[1]?.addEventListener('click', () => nativeEvent('showExpressionSettings'));
+document.querySelectorAll('#page-audio button').forEach(button => button.addEventListener('click', () => nativeEvent('showAudioSettings')));
+
+window.__JUCE__?.backend?.addEventListener('backendState', state => {
+  const connected = !!state.deviceConnected;
+  const sideTitle = document.querySelector('.sidebar-status b');
+  const sideText = document.querySelector('.sidebar-status small');
+  if (sideTitle) sideTitle.textContent = connected ? (state.deviceName || '电吹管已连接') : '尚未连接电吹管';
+  if (sideText) sideText.textContent = connected ? '气息与音高信号正常' : '当前显示模拟演奏效果';
+  const sound = $('#sound-name');
+  if (sound && state.pluginName) sound.textContent = state.pluginName;
+  if (state.activated) {
+    $('#license-title').textContent = '已永久激活';
+    $('#license-title').classList.add('green');
+  }
+});
+nativeEvent('webReady');
 if(localStorage.getItem('fengyin-prototype-license') === 'active') {
   $('#license-title').textContent = '已永久激活';
   $('#license-title').classList.add('green');
