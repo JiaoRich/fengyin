@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>风吟 · 电吹管演奏工作站</title>
   <link rel="stylesheet" href="styles.css">
+  <style>.chain button.chain-card{color:var(--text);font:inherit;text-align:left;padding:18px;cursor:pointer}</style>
 </head>
 <body data-theme="neon">
   <div class="ambient ambient-a"></div>
@@ -87,7 +88,7 @@
       </section>
 
       <section class="page" id="page-sounds"><div class="panel glass"><h2>音色方案</h2><p>点击音色即可应用完整的音源、效果器、气息曲线和视觉主题。</p><div class="preset-grid" id="preset-grid"></div></div></section>
-      <section class="page" id="page-chain"><div class="panel glass"><h2>音源与音效</h2><p>声音按照从左到右的顺序处理，拖动排序将在正式版开放。</p><div class="chain"><div class="chain-card"><b>电吹管</b><span>模拟 MIDI 输入</span></div><i>→</i><div class="chain-card accent"><b>SWAM 萨克斯</b><span>软音源</span></div><i>→</i><div class="chain-card"><b>均衡器</b><span>温暖明亮</span></div><i>→</i><div class="chain-card"><b>大厅混响</b><span>强度 28%</span></div><i>→</i><div class="chain-card"><b>安全限幅</b><span>防止爆音</span></div></div></div></section>
+      <section class="page" id="page-chain"><div class="panel glass"><h2>音源与音效</h2><p>声音按照从左到右的顺序处理。点击高亮的 SWAM 音源卡片可扫描音源。</p><div class="chain"><div class="chain-card"><b>电吹管</b><span>模拟 MIDI 输入</span></div><i>→</i><button class="chain-card accent" id="scan-swam"><b>SWAM 萨克斯</b><span>点击扫描音源</span></button><i>→</i><div class="chain-card"><b>均衡器</b><span>温暖明亮</span></div><i>→</i><div class="chain-card"><b>大厅混响</b><span>强度 28%</span></div><i>→</i><div class="chain-card"><b>安全限幅</b><span>防止爆音</span></div></div></div></section>
       <section class="page" id="page-wind"><div class="panel glass"><h2>电吹管设置</h2><div class="settings-grid"><div class="setting"><span>当前设备</span><b>模拟电吹管</b><button>重新检测</button></div><div class="setting"><span>气息控制</span><b>CC2 → 表情</b><button>自动识别</button></div><div class="setting"><span>气息曲线</span><b>自然</b><input type="range" value="55"></div><div class="setting"><span>弯音范围</span><b>±2 半音</b><input type="range" value="40"></div></div></div></section>
       <section class="page" id="page-audio"><div class="panel glass"><h2>声音设置</h2><div class="settings-grid"><div class="setting"><span>输出设备</span><b>系统默认扬声器</b><button>更改</button></div><div class="setting"><span>驱动模式</span><b>WASAPI（演示）</b><button>更改</button></div><div class="setting"><span>预计延迟</span><b class="green">7 ms · 良好</b><button>自动优化</button></div><div class="setting"><span>缓冲区</span><b>128 samples</b><input type="range" value="35"></div></div></div></section>
       <section class="page" id="page-settings"><div class="panel glass"><h2>软件设置</h2><div class="activation"><div><p>永久授权</p><h3 id="license-title">尚未激活</h3><span id="machine-code">本机识别码：FY-8K2M-4R7P</span></div><div><input id="license-code" placeholder="请输入唯一激活码"><button id="activate" class="primary-button">立即激活</button></div></div><div class="settings-grid"><label class="toggle-row">低性能电脑模式<input id="low-performance" type="checkbox"><i></i></label><label class="toggle-row">启动时进入演奏页面<input type="checkbox" checked><i></i></label><label class="toggle-row">自动保存设置<input type="checkbox" checked><i></i></label><label class="toggle-row">检查软件更新<input type="checkbox" checked><i></i></label></div><p class="prototype-note">当前为交互原型。正式版会使用数字签名验证真实激活码，不会保存或上传个人资料。</p></div></section>
