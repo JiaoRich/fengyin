@@ -91,8 +91,19 @@ if (-not $Iscc) {
 
 New-Item -ItemType Directory -Force -Path $InstallerDir | Out-Null
 Write-Host "[5/5] 生成中文安装程序..." -ForegroundColor Cyan
+$ChineseMessages = Join-Path $BuildDir "ChineseSimplified.isl"
+if (-not (Test-Path $ChineseMessages)) {
+    Write-Host "正在获取 Inno Setup 官方简体中文语言文件..." -ForegroundColor Cyan
+    Invoke-WebRequest -UseBasicParsing `
+        -Uri "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/ChineseSimplified.isl" `
+        -OutFile $ChineseMessages
+}
+if ((Get-Item $ChineseMessages).Length -lt 10000) {
+    throw "简体中文语言文件下载不完整，请检查网络后重试。"
+}
 Invoke-Checked "中文安装包生成" {
-    & $Iscc "/DSourceDir=$PackageDir" "/DOutputDir=$InstallerDir" "/DAppVersion=$Version" (Join-Path $ProjectRoot "installer\FengYin.iss")
+    & $Iscc "/DSourceDir=$PackageDir" "/DOutputDir=$InstallerDir" "/DAppVersion=$Version" `
+        "/DChineseMessages=$ChineseMessages" (Join-Path $ProjectRoot "installer\FengYin.iss")
 }
 
 Write-Host "完成：$InstallerDir\风吟-$Version-Windows-x64.exe" -ForegroundColor Green
