@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $ResultDir = Join-Path $ProjectRoot "构建结果"
 $LogFile = Join-Path $ResultDir "构建日志.txt"
@@ -36,6 +36,27 @@ try {
     if (-not $VsPath) {
         Stop-WithHelp "Visual Studio 缺少 C++ 编译组件。请在安装器中勾选‘使用 C++ 的桌面开发’。"
     }
+
+    if (-not (Get-Command git.exe -ErrorAction SilentlyContinue)) {
+        Write-Host "没有检测到 Git，正在自动安装免费组件 Git for Windows..." -ForegroundColor Yellow
+        $Winget = Get-Command winget.exe -ErrorAction SilentlyContinue
+        if (-not $Winget) {
+            Stop-WithHelp "电脑缺少 Git，且无法自动安装。请安装 Git for Windows 后重新双击构建文件。"
+        }
+        & $Winget.Source install --id Git.Git -e --source winget --accept-source-agreements --accept-package-agreements --silent
+        if ($LASTEXITCODE -ne 0) {
+            Stop-WithHelp "Git 自动安装没有成功。请手工安装 Git for Windows，然后重新运行。"
+        }
+        $GitPaths = @(
+            "$env:ProgramFiles\Git\cmd",
+            "${env:ProgramFiles(x86)}\Git\cmd",
+            "$env:LocalAppData\Programs\Git\cmd"
+        )
+        $GitDir = $GitPaths | Where-Object { Test-Path (Join-Path $_ "git.exe") } | Select-Object -First 1
+        if (-not $GitDir) { Stop-WithHelp "Git 已安装，但没有找到程序路径。请重启电脑后再运行。" }
+        $env:Path = "$GitDir;$env:Path"
+    }
+    Write-Host "Git 检查通过：$(& git.exe --version)" -ForegroundColor Green
 
     $InnoCandidates = @(
         "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
