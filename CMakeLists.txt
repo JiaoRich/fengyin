@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 0.1.0 LANGUAGES C CXX)
+project(FengYin VERSION 0.2.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,6 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Windows 安装包使用静态 MSVC 运行库，避免用户额外安装 VC++ 运行环境。
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    add_compile_options(/utf-8)
 endif()
 
 include(FetchContent)
@@ -109,6 +110,14 @@ target_link_libraries(FengYinActivator PRIVATE
     juce::juce_recommended_warning_flags
 )
 
+# 店主自动化使用的命令行生成器，同样不会进入客户安装包。
+add_executable(FengYinLicenseGenerator EXCLUDE_FROM_ALL
+    tools/license_generator.cpp
+    native/Source/LicenseService.cpp
+)
+target_include_directories(FengYinLicenseGenerator PRIVATE native/Source)
+target_link_libraries(FengYinLicenseGenerator PRIVATE juce::juce_cryptography)
+
 if(WIN32)
     target_compile_definitions(FengYin PRIVATE
         JUCE_ASIO=1
@@ -160,5 +169,9 @@ if(BUILD_TESTING)
     target_include_directories(FengYinRecordingTests PRIVATE native/Source)
     target_link_libraries(FengYinRecordingTests PRIVATE juce::juce_audio_formats juce::juce_audio_utils juce::juce_cryptography juce::juce_events juce::juce_dsp juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
     add_test(NAME wav_recording COMMAND FengYinRecordingTests)
+
+    add_executable(FengYinSwamClassifierTests tests/test_swam_classifier.cpp)
+    target_include_directories(FengYinSwamClassifierTests PRIVATE native/Source)
+    add_test(NAME swam_classifier COMMAND FengYinSwamClassifierTests)
 
 endif()
