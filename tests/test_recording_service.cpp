@@ -21,6 +21,13 @@ int main()
     std::array<float, fengyin::MasterOutputService::spectrumBands> spectrum {};
     assert(master.getSpectrum(spectrum));
     assert(*std::max_element(spectrum.begin(), spectrum.end()) > 0.2f);
+    master.setLimiterCeiling(0.7f);
+    juce::AudioBuffer<float> limited(2, 64);
+    limited.clear();
+    limited.setSample(0, 0, 2.0f);
+    limited.setSample(1, 0, -2.0f);
+    master.process(limited.getArrayOfWritePointers(), 2, limited.getNumSamples());
+    assert(limited.getSample(0, 0) <= 0.7f && limited.getSample(1, 0) >= -0.7f);
 
     const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory)
                             .getChildFile("fengyin-recording-test-" + juce::Uuid().toString());

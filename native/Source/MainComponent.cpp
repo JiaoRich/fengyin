@@ -13,7 +13,7 @@ juce::String utf8(const char* text) { return juce::String::fromUTF8(text); }
 const auto licensePublicKey = juce::String("5,d47f8d2272ed935eb504695cc78aa24a67e8b7a006c2e62e31c047727e7963e836cc0e36bf528b328e4eb0e73cacdc7a52160c961027a7fc7c77195d8a8e3568ca07e82303a9cb256b5627ea1ad8815a224801576ac89b548030474b1743f7e067cbd2ade4cc983a1973ca0a775b4c7c84e863ddf5cabb49ab5d684b8672fdad");
 }
 
-MainComponent::MainComponent() : license(licensePublicKey)
+MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.getMachineCode())
 {
     setOpaque(true);
     setSize(1440, 900);
@@ -210,16 +210,63 @@ void MainComponent::setupWebInterface()
             .withBackgroundColour(juce::Colour(0xff07101d)))
         .withNativeIntegrationEnabled()
         .withEventListener("webReady", [this](juce::var) { webInterfaceReady = true; })
-        .withEventListener("scanPlugins", [this](juce::var) { startPluginScan(); })
+        .withEventListener("scanPlugins", [this](juce::var) { if (isActivated) startPluginScan(); })
+        .withEventListener("loadPlugin", [this](juce::var payload)
+        {
+            const auto index = static_cast<int>(payload.getProperty("index", -1));
+            if (isActivated && juce::isPositiveAndBelow(index, cachedInstrumentPlugins.size()))
+            {
+                pluginSelector.setSelectedId(index + 1, juce::dontSendNotification);
+                loadSelectedPlugin();
+            }
+        })
+        .withEventListener("openPlugin", [this](juce::var) { if (isActivated) pluginHost.showPluginEditor(false); })
+        .withEventListener("loadEffect", [this](juce::var payload)
+        {
+            const auto index = static_cast<int>(payload.getProperty("index", -1));
+            if (isActivated && juce::isPositiveAndBelow(index, cachedEffectPlugins.size()))
+            {
+                effectSelector.setSelectedId(index + 1, juce::dontSendNotification);
+                loadSelectedEffect();
+            }
+        })
+        .withEventListener("removeEffect", [this](juce::var) { if (isActivated) removeEffect(); })
+        .withEventListener("openEffect", [this](juce::var) { if (isActivated) pluginHost.showPluginEditor(true); })
+        .withEventListener("savePreset", [this](juce::var) { if (isActivated && pluginHost.hasPlugin()) saveCurrentPreset(); })
+        .withEventListener("setMasterVolume", [this](juce::var payload)
+        {
+            masterOutput.setGain(static_cast<float>(static_cast<double>(payload.getProperty("value", 0.8))));
+        })
+        .withEventListener("setBuiltinEffects", [this](juce::var payload)
+        {
+            masterOutput.setEqTone(static_cast<float>(static_cast<double>(payload.getProperty("eq", 0.2))));
+            masterOutput.setReverbMix(static_cast<float>(static_cast<double>(payload.getProperty("reverb", 0.28))));
+            masterOutput.setLimiterCeiling(static_cast<float>(static_cast<double>(payload.getProperty("limiter", 0.95))));
+        })
         .withEventListener("showMidiSetup", [this](juce::var) { showMidiSetup(); })
         .withEventListener("showExpressionSettings", [this](juce::var) { showExpressionSettings(); })
         .withEventListener("showAudioSettings", [this](juce::var) { showDeviceSettings(); })
         .withEventListener("toggleRecording", [this](juce::var) { toggleRecording(); })
+        .withEventListener("activate", [this](juce::var payload)
+        {
+            const auto status = license.activate(payload.getProperty("code", juce::String()).toString());
+            refreshLicenseUi();
+            if (webInterface != nullptr)
+            {
+                auto result = std::make_unique<juce::DynamicObject>();
+                result->setProperty("activated", status.activated);
+                result->setProperty("message", status.message);
+                webInterface->emitEventIfBrowserIsVisible("activationResult", juce::var(result.release()));
+            }
+        })
         .withEventListener("showActivation", [this](juce::var) { showActivationDialog(); })
         .withResourceProvider([](const juce::String& path) { return getWebResource(path); });
 
     webInterface = std::make_unique<juce::WebBrowserComponent>(options);
     addAndMakeVisible(*webInterface);
+    // The component may have received its first resized() callback before the browser existed.
+    // Give WebView2 a real viewport immediately so the legacy native UI never appears at startup.
+    webInterface->setBounds(getLocalBounds());
     webInterface->goToURL(juce::WebBrowserComponent::getResourceProviderRoot());
     webInterface->toFront(false);
 }
@@ -233,6 +280,7 @@ std::optional<juce::WebBrowserComponent::Resource> MainComponent::getWebResource
     if (requested == "index.html") { data = BinaryData::index_html; size = BinaryData::index_htmlSize; mime = "text/html"; }
     else if (requested == "styles.css") { data = BinaryData::styles_css; size = BinaryData::styles_cssSize; mime = "text/css"; }
     else if (requested == "app.js") { data = BinaryData::app_js; size = BinaryData::app_jsSize; mime = "text/javascript"; }
+    else if (requested == "fengyin-app-icon.png") { data = BinaryData::fengyinappicon_png; size = BinaryData::fengyinappicon_pngSize; mime = "image/png"; }
     else return std::nullopt;
 
     std::vector<std::byte> bytes(static_cast<size_t>(size));
@@ -513,8 +561,9 @@ void MainComponent::timerCallback()
     displayedLeftPeak = juce::jmax(displayedLeftPeak * 0.88f, juce::jlimit(0.0f, 1.0f, masterOutput.getLeftPeak()));
     displayedRightPeak = juce::jmax(displayedRightPeak * 0.88f, juce::jlimit(0.0f, 1.0f, masterOutput.getRightPeak()));
     masterOutput.getSpectrum(spectrumLevels);
-    if (webInterface != nullptr && webInterfaceReady)
+    if (webInterface != nullptr && webInterfaceReady && ++webUpdateCounter >= 3)
     {
+        webUpdateCounter = 0;
         auto state = std::make_unique<juce::DynamicObject>();
         state->setProperty("deviceConnected", snapshot.deviceConnected);
         state->setProperty("deviceName", midi.getConnectedDeviceName());
@@ -523,9 +572,26 @@ void MainComponent::timerCallback()
         state->setProperty("audioDevice", currentAudio.deviceName);
         state->setProperty("latency", currentAudio.estimatedBufferLatencyMs);
         state->setProperty("activated", isActivated);
+        state->setProperty("machineCode", machineCode);
+        state->setProperty("recording", recorder.isRecording());
         state->setProperty("pluginName", pluginHost.hasPlugin() ? pluginHost.getPluginName() : utf8("安全测试音源"));
         state->setProperty("scanning", scanProgress.scanning);
         state->setProperty("scanProgress", scanProgress.fraction);
+        state->setProperty("pluginStatus", pluginStatus.getText());
+        state->setProperty("effectName", pluginHost.hasEffect() ? pluginHost.getEffectName() : juce::String());
+        juce::Array<juce::var> instruments;
+        for (const auto& plugin : cachedInstrumentPlugins)
+        {
+            auto item = std::make_unique<juce::DynamicObject>();
+            item->setProperty("name", plugin.name);
+            item->setProperty("label", utf8(fengyin::SwamPluginClassifier::instrumentChineseName(plugin.name.toStdString()))
+                                       + utf8(" · ") + plugin.name);
+            instruments.add(juce::var(item.release()));
+        }
+        juce::Array<juce::var> effects;
+        for (const auto& effect : cachedEffectPlugins) effects.add(effect.name);
+        state->setProperty("instruments", juce::var(instruments));
+        state->setProperty("effects", juce::var(effects));
         webInterface->emitEventIfBrowserIsVisible("backendState", juce::var(state.release()));
     }
     if (! autoGuideShown && autoGuideAtMs > 0.0 && juce::Time::getMillisecondCounterHiRes() >= autoGuideAtMs)

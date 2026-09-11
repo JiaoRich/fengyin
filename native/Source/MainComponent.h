@@ -69,6 +69,7 @@ private:
     fengyin::PluginHostEngine pluginHost;
     fengyin::SoundPresetStore presetStore;
     fengyin::LicenseService license;
+    juce::String machineCode;
     fengyin::MidiSnapshot snapshot;
     juce::TextButton detectButton;
     juce::TextButton settingsButton;
@@ -144,6 +145,7 @@ private:
     juce::Colour themeMuted { 0xff8fa7bd };
     std::unique_ptr<juce::WebBrowserComponent> webInterface;
     bool webInterfaceReady = false;
+    int webUpdateCounter = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };

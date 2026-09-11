@@ -15,6 +15,11 @@ let simulating = true;
 let recording = false;
 let animationFrame;
 let videoUrl;
+let selectedVideoFile;
+let triedVideoDataFallback = false;
+let availableInstruments = [];
+let availableEffects = [];
+let pluginListSignature = '';
 
 function nativeEvent(name, payload = {}) {
   if (window.__JUCE__?.backend?.emitEvent) window.__JUCE__.backend.emitEvent(name, payload);
@@ -28,16 +33,32 @@ function toast(message) {
   el.timer = setTimeout(() => el.classList.remove('show'), 2200);
 }
 
-$$('.nav-item').forEach(button => button.addEventListener('click', () => {
+function showPage(page) {
   $$('.nav-item,.page').forEach(el => el.classList.remove('active'));
+  const button = $(`.nav-item[data-page="${page}"]`);
   button.classList.add('active');
-  $(`#page-${button.dataset.page}`).classList.add('active');
-  $('#page-title').textContent = titles[button.dataset.page];
-}));
+  $(`#page-${page}`).classList.add('active');
+  $('#page-title').textContent = titles[page];
+}
+
+$$('.nav-item').forEach(button => button.addEventListener('click', () => showPage(button.dataset.page)));
 
 $('#preset-grid').innerHTML = presets.map(([name,plugin,desc],index) => `<button class="preset" data-index="${index}"><h3>${name}</h3><b>${plugin}</b><span>${desc}</span></button>`).join('');
 $$('.preset').forEach((button,index) => button.addEventListener('click', () => {
-  if(index === presets.length-1) return toast('正式版将在这里创建新音色');
+  if(index === presets.length-1) {
+    showPage('chain');
+    toast('请扫描并选择音源，调好效果后即可开始演奏');
+    if (!availableInstruments.length) nativeEvent('scanPlugins');
+    return;
+  }
+  const wanted = presets[index][1].replace('SWAM ', '');
+  const found = availableInstruments.findIndex(item => item.label?.includes(wanted));
+  if (found >= 0) nativeEvent('loadPlugin', {index: found});
+  else if (window.__JUCE__?.backend?.emitEvent) {
+    showPage('chain');
+    nativeEvent('scanPlugins');
+    return toast(`正在查找${wanted}，扫描完成后请选择加载`);
+  }
   $('#sound-name').textContent = presets[index][1];
   toast(`已应用：${presets[index][0]}`);
 }));
@@ -46,21 +67,43 @@ $$('.sound-chip').forEach(button => button.addEventListener('click', () => {
   $$('.sound-chip').forEach(el => el.classList.remove('active'));
   button.classList.add('active');
   $('#sound-name').textContent = button.dataset.sound;
+  const wanted = button.dataset.sound.replace('SWAM ', '');
+  const found = availableInstruments.findIndex(item => item.label?.includes(wanted));
+  if (found >= 0) nativeEvent('loadPlugin', {index: found});
+  else if (window.__JUCE__?.backend?.emitEvent) toast(`尚未找到${wanted}，请先到“音源与音效”扫描`);
 }));
 
 const video = $('#video');
 $('#video-file').addEventListener('change', event => {
   const file = event.target.files[0];
   if (!file) return;
+  selectedVideoFile = file;
+  triedVideoDataFallback = false;
+  video.pause();
+  video.style.display = 'none';
+  $('#video-empty').style.display = 'grid';
   if (videoUrl) URL.revokeObjectURL(videoUrl);
   videoUrl = URL.createObjectURL(file);
   video.src = videoUrl;
+  video.load();
+  $('#video-name').textContent = file.name;
+  toast('正在载入视频…');
+});
+video.addEventListener('loadedmetadata', () => {
   video.style.display = 'block';
   $('#video-empty').style.display = 'none';
-  $('#video-name').textContent = file.name;
-  toast('视频已载入');
+  $('#duration').textContent = formatTime(video.duration);
+  toast('视频已载入，可以播放');
 });
 video.addEventListener('error', () => {
+  if (!triedVideoDataFallback && selectedVideoFile && selectedVideoFile.size <= 300 * 1024 * 1024) {
+    triedVideoDataFallback = true;
+    const reader = new FileReader();
+    reader.onload = () => { video.src = reader.result; video.load(); };
+    reader.onerror = () => toast('无法读取这个视频文件，请确认文件没有损坏');
+    reader.readAsDataURL(selectedVideoFile);
+    return;
+  }
   const reason = video.error?.message || `浏览器错误代码 ${video.error?.code || '未知'}`;
   toast(`视频无法播放：${reason}`);
   $('#video-name').textContent = '视频编码不受支持，请转换为 H.264 + AAC';
@@ -74,14 +117,29 @@ $('#play-button').addEventListener('click', toggleVideo);
 $('#main-play').addEventListener('click', toggleVideo);
 video.addEventListener('play', () => { $('#play-button').textContent='Ⅱ'; $('#main-play').textContent='Ⅱ 暂停视频'; });
 video.addEventListener('pause', () => { $('#play-button').textContent='▶'; $('#main-play').textContent='▶ 播放视频'; });
-video.addEventListener('loadedmetadata', () => $('#duration').textContent = formatTime(video.duration));
 video.addEventListener('timeupdate', () => {
   $('#current-time').textContent = formatTime(video.currentTime);
   $('#seek').value = video.duration ? video.currentTime / video.duration * 100 : 0;
 });
 $('#seek').addEventListener('input', event => { if(video.duration) video.currentTime = event.target.value / 100 * video.duration; });
 $('#video-volume').addEventListener('input', event => video.volume = event.target.value / 100);
-$('#fullscreen').addEventListener('click', () => $('.video-card').requestFullscreen?.());
+const videoCard = $('.video-card');
+const fullscreenButton = $('#fullscreen');
+async function toggleFullscreen() {
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else if (videoCard.requestFullscreen) await videoCard.requestFullscreen();
+    else return toast('当前系统不支持视频全屏');
+  } catch (error) {
+    toast(`无法切换全屏：${error?.message || '请重试'}`);
+  }
+}
+fullscreenButton.addEventListener('click', toggleFullscreen);
+document.addEventListener('fullscreenchange', () => {
+  const active = document.fullscreenElement === videoCard;
+  fullscreenButton.textContent = active ? '退出全屏' : '全屏';
+  fullscreenButton.setAttribute('aria-label', active ? '退出视频全屏' : '视频全屏');
+});
 
 function formatTime(seconds) {
   if(!Number.isFinite(seconds)) return '00:00';
@@ -91,6 +149,7 @@ function formatTime(seconds) {
 }
 
 $('#theme').addEventListener('change', event => document.body.dataset.theme = event.target.value);
+$('#master-volume').addEventListener('input', event => nativeEvent('setMasterVolume', {value:Number(event.target.value)/100}));
 $('#simulate').addEventListener('click', event => {
   simulating = !simulating;
   event.target.textContent = simulating ? '暂停模拟吹奏' : '继续模拟吹奏';
@@ -109,7 +168,10 @@ $('#low-performance').addEventListener('change', event => {
 
 $('#activate').addEventListener('click', () => {
   if (window.__JUCE__?.backend?.emitEvent) {
-    nativeEvent('showActivation');
+    const code = $('#license-code').value.trim();
+    if (code.length < 8) return toast('请输入完整激活码');
+    nativeEvent('activate', {code});
+    toast('正在验证激活码…');
     return;
   }
   const code = $('#license-code').value.trim();
@@ -120,7 +182,33 @@ $('#activate').addEventListener('click', () => {
   toast('原型激活成功');
 });
 
-$('#scan-swam').addEventListener('click', () => { nativeEvent('scanPlugins'); toast('正在扫描 SWAM 与 VST3 音源…'); });
+$('#scan-swam').addEventListener('click', () => { nativeEvent('scanPlugins'); $('#scan-title').textContent='正在扫描…'; $('#scan-label').textContent='请稍候，扫描不会阻塞演奏'; toast('正在扫描 SWAM 与 VST3 音源…'); });
+$('#load-instrument').addEventListener('click', () => {
+  const index = Number($('#instrument-select').value);
+  if (!Number.isInteger(index) || index < 0) return toast('请先扫描并选择一个乐器音源');
+  nativeEvent('loadPlugin', {index}); toast('正在加载所选音源…');
+});
+$('#open-instrument').addEventListener('click', () => nativeEvent('openPlugin'));
+$('#load-effect').addEventListener('click', () => {
+  const index = Number($('#effect-select').value);
+  if (!Number.isInteger(index) || index < 0) return toast('请先选择一个外部效果器');
+  nativeEvent('loadEffect', {index}); toast('正在加载效果器…');
+});
+$('#remove-effect').addEventListener('click', () => { nativeEvent('removeEffect'); toast('已移除外部效果器'); });
+$('#open-effect').addEventListener('click', () => nativeEvent('openEffect'));
+$('#save-custom').addEventListener('click', () => { nativeEvent('savePreset'); toast('请输入音色方案名称并保存'); });
+
+function updateBuiltinEffects() {
+  const eq = Number($('#eq-tone').value);
+  const reverb = Number($('#reverb-mix').value);
+  const limiter = Number($('#limiter-ceiling').value);
+  $('#eq-label').textContent = eq === 0 ? '自然' : `${eq > 0 ? '明亮度 +' : '温暖度 +'}${Math.abs(eq)}`;
+  $('#reverb-label').textContent = `强度 ${reverb}%`;
+  $('#limiter-label').textContent = `上限 ${limiter}%`;
+  nativeEvent('setBuiltinEffects', {eq:eq/100,reverb:reverb/100,limiter:limiter/100});
+}
+['#eq-tone','#reverb-mix','#limiter-ceiling'].forEach(id => $(id).addEventListener('input', updateBuiltinEffects));
+updateBuiltinEffects();
 const windButtons = [...document.querySelectorAll('#page-wind button')];
 windButtons[0]?.addEventListener('click', () => nativeEvent('showMidiSetup'));
 windButtons[1]?.addEventListener('click', () => nativeEvent('showExpressionSettings'));
@@ -134,10 +222,39 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   if (sideText) sideText.textContent = connected ? '气息与音高信号正常' : '当前显示模拟演奏效果';
   const sound = $('#sound-name');
   if (sound && state.pluginName) sound.textContent = state.pluginName;
+  const progress = Math.round((Number(state.scanProgress) || 0) * 100);
+  $('#scan-title').textContent = state.scanning ? `正在扫描 ${progress}%` : '重新扫描音源';
+  $('#scan-label').textContent = state.scanning ? '请稍候，找到后自动分类' : '点击查找 SWAM / VST3';
+  $('#scan-swam').disabled = !!state.scanning;
+  if (state.pluginStatus) $('#plugin-status').textContent = state.pluginStatus;
+  availableInstruments = Array.isArray(state.instruments) ? state.instruments : [];
+  availableEffects = Array.isArray(state.effects) ? state.effects : [];
+  const signature = JSON.stringify([availableInstruments,availableEffects]);
+  if (signature !== pluginListSignature) {
+    pluginListSignature = signature;
+    $('#instrument-select').innerHTML = availableInstruments.length
+      ? availableInstruments.map((item,index) => `<option value="${index}">${item.label || item.name}</option>`).join('')
+      : '<option value="">未找到乐器音源</option>';
+    $('#effect-select').innerHTML = availableEffects.length
+      ? availableEffects.map((name,index) => `<option value="${index}">${name}</option>`).join('')
+      : '<option value="">未找到外部效果器（可不选）</option>';
+  }
   if (state.activated) {
     $('#license-title').textContent = '已永久激活';
     $('#license-title').classList.add('green');
   }
+  if (state.machineCode) $('#machine-code').textContent = `本机识别码：${state.machineCode}`;
+  recording = !!state.recording;
+  $('#record').textContent = recording ? '■ 停止录音' : '● 开始录音';
+  $('#record').style.color = recording ? 'var(--danger)' : '';
+});
+window.__JUCE__?.backend?.addEventListener('activationResult', result => {
+  if (result.activated) {
+    $('#license-title').textContent = '已永久激活';
+    $('#license-title').classList.add('green');
+    $('#license-code').value = '';
+  }
+  toast(result.message || (result.activated ? '激活成功' : '无法激活'));
 });
 nativeEvent('webReady');
 if(localStorage.getItem('fengyin-prototype-license') === 'active') {

@@ -6,18 +6,32 @@ void MasterOutputService::process(float* const* outputs, int channels, int sampl
 {
     if (outputs == nullptr || channels <= 0 || samples <= 0) return;
     const auto currentGain = gain.load(std::memory_order_relaxed);
+    const auto tone = eqTone.load(std::memory_order_relaxed);
+    const auto wetMix = reverbMix.load(std::memory_order_relaxed);
+    const auto ceiling = limiterCeiling.load(std::memory_order_relaxed);
+    const auto delayLength = juce::jlimit<std::size_t>(1, reverbCapacity,
+        static_cast<std::size_t>(sampleRate.load(std::memory_order_relaxed) * 0.115));
+    reverbWriteIndex %= delayLength;
     float peaks[2] {};
-    for (int channel = 0; channel < channels; ++channel)
+    for (int sample = 0; sample < samples; ++sample)
     {
-        auto* data = outputs[channel];
-        if (data == nullptr) continue;
-        float peak = 0.0f;
-        for (int sample = 0; sample < samples; ++sample)
+        for (int channel = 0; channel < channels; ++channel)
         {
-            data[sample] *= currentGain;
-            peak = juce::jmax(peak, std::abs(data[sample]));
+            auto* data = outputs[channel];
+            if (data == nullptr) continue;
+            const auto lane = static_cast<std::size_t>(juce::jmin(channel, 1));
+            auto value = data[sample] * currentGain;
+            lowPassState[lane] += 0.08f * (value - lowPassState[lane]);
+            value += tone >= 0.0f ? tone * 0.35f * (value - lowPassState[lane])
+                                  : (-tone) * 0.25f * lowPassState[lane];
+            const auto delayed = reverbDelay[lane][reverbWriteIndex];
+            reverbDelay[lane][reverbWriteIndex] = value + delayed * 0.34f;
+            value = value * (1.0f - wetMix) + delayed * wetMix;
+            value = juce::jlimit(-ceiling, ceiling, value);
+            data[sample] = value;
+            peaks[lane] = juce::jmax(peaks[lane], std::abs(value));
         }
-        peaks[juce::jmin(channel, 1)] = juce::jmax(peaks[juce::jmin(channel, 1)], peak);
+        reverbWriteIndex = (reverbWriteIndex + 1) % delayLength;
     }
     leftPeak.store(peaks[0], std::memory_order_relaxed);
     rightPeak.store(channels > 1 ? peaks[1] : peaks[0], std::memory_order_relaxed);
