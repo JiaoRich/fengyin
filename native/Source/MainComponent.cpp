@@ -1,5 +1,7 @@
 #include "MainComponent.h"
+#include "BinaryData.h"
 #include <algorithm>
+#include <cstring>
 
 namespace
 {
@@ -180,16 +182,62 @@ MainComponent::MainComponent() : license(licensePublicKey)
     if (! pluginCatalog.getPlugins().isEmpty()) refreshPluginChoices();
     applyTheme(Theme::neon);
     showPage(Page::play);
+    setupWebInterface();
     startTimerHz(30);
-    autoGuideAtMs = juce::Time::getMillisecondCounterHiRes() + 900.0;
+    // 网页主界面本身包含完整引导，不再启动会遮挡演奏页面的原生模态窗口。
+    autoGuideShown = true;
+    autoGuideAtMs = 0.0;
 }
 
 MainComponent::~MainComponent()
 {
+    stopTimer();
+    webInterface.reset();
     recorder.stop();
     midi.setPerformanceSink(nullptr);
     pluginHost.detach();
     audio.getDeviceManager().removeAudioCallback(&testSynth);
+}
+
+void MainComponent::setupWebInterface()
+{
+    auto options = juce::WebBrowserComponent::Options{}
+        .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
+        .withWinWebView2Options(juce::WebBrowserComponent::Options::WinWebView2{}
+            .withUserDataFolder(juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+                .getChildFile("FengYin").getChildFile("WebView2"))
+            .withStatusBarDisabled()
+            .withBackgroundColour(juce::Colour(0xff07101d)))
+        .withNativeIntegrationEnabled()
+        .withEventListener("webReady", [this](juce::var) { webInterfaceReady = true; })
+        .withEventListener("scanPlugins", [this](juce::var) { startPluginScan(); })
+        .withEventListener("showMidiSetup", [this](juce::var) { showMidiSetup(); })
+        .withEventListener("showExpressionSettings", [this](juce::var) { showExpressionSettings(); })
+        .withEventListener("showAudioSettings", [this](juce::var) { showDeviceSettings(); })
+        .withEventListener("toggleRecording", [this](juce::var) { toggleRecording(); })
+        .withEventListener("showActivation", [this](juce::var) { showActivationDialog(); })
+        .withResourceProvider([](const juce::String& path) { return getWebResource(path); });
+
+    webInterface = std::make_unique<juce::WebBrowserComponent>(options);
+    addAndMakeVisible(*webInterface);
+    webInterface->goToURL(juce::WebBrowserComponent::getResourceProviderRoot());
+    webInterface->toFront(false);
+}
+
+std::optional<juce::WebBrowserComponent::Resource> MainComponent::getWebResource(const juce::String& path)
+{
+    const auto requested = path == "/" ? juce::String("index.html") : path.trimCharactersAtStart("/");
+    const void* data = nullptr;
+    int size = 0;
+    juce::String mime;
+    if (requested == "index.html") { data = BinaryData::index_html; size = BinaryData::index_htmlSize; mime = "text/html"; }
+    else if (requested == "styles.css") { data = BinaryData::styles_css; size = BinaryData::styles_cssSize; mime = "text/css"; }
+    else if (requested == "app.js") { data = BinaryData::app_js; size = BinaryData::app_jsSize; mime = "text/javascript"; }
+    else return std::nullopt;
+
+    std::vector<std::byte> bytes(static_cast<size_t>(size));
+    std::memcpy(bytes.data(), data, static_cast<size_t>(size));
+    return juce::WebBrowserComponent::Resource { std::move(bytes), mime };
 }
 
 juce::Rectangle<int> MainComponent::getContentBounds() const
@@ -373,6 +421,11 @@ void MainComponent::paint(juce::Graphics& g)
 
 void MainComponent::resized()
 {
+    if (webInterface != nullptr)
+    {
+        webInterface->setBounds(getLocalBounds());
+        return;
+    }
     {
         auto sidebar = getLocalBounds().removeFromLeft(238).reduced(18);
         sidebar.removeFromTop(92);
@@ -460,6 +513,21 @@ void MainComponent::timerCallback()
     displayedLeftPeak = juce::jmax(displayedLeftPeak * 0.88f, juce::jlimit(0.0f, 1.0f, masterOutput.getLeftPeak()));
     displayedRightPeak = juce::jmax(displayedRightPeak * 0.88f, juce::jlimit(0.0f, 1.0f, masterOutput.getRightPeak()));
     masterOutput.getSpectrum(spectrumLevels);
+    if (webInterface != nullptr && webInterfaceReady)
+    {
+        auto state = std::make_unique<juce::DynamicObject>();
+        state->setProperty("deviceConnected", snapshot.deviceConnected);
+        state->setProperty("deviceName", midi.getConnectedDeviceName());
+        state->setProperty("breath", snapshot.breath);
+        state->setProperty("note", snapshot.lastNote);
+        state->setProperty("audioDevice", currentAudio.deviceName);
+        state->setProperty("latency", currentAudio.estimatedBufferLatencyMs);
+        state->setProperty("activated", isActivated);
+        state->setProperty("pluginName", pluginHost.hasPlugin() ? pluginHost.getPluginName() : utf8("安全测试音源"));
+        state->setProperty("scanning", scanProgress.scanning);
+        state->setProperty("scanProgress", scanProgress.fraction);
+        webInterface->emitEventIfBrowserIsVisible("backendState", juce::var(state.release()));
+    }
     if (! autoGuideShown && autoGuideAtMs > 0.0 && juce::Time::getMillisecondCounterHiRes() >= autoGuideAtMs)
     {
         autoGuideShown = true;
