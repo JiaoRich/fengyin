@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: 获取源代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: 安装中文安装包工具
         shell: powershell
@@ -38,7 +38,7 @@ jobs:
 
       - name: 上传 Windows 安装包
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: 风吟-Windows-x64-安装包
           path: dist/installer/*.exe
@@ -47,7 +47,7 @@ jobs:
 
       - name: 上传失败诊断资料
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: Windows-失败诊断资料
           path: |
