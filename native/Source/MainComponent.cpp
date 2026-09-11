@@ -14,7 +14,32 @@ const auto licensePublicKey = juce::String("5,d47f8d2272ed935eb504695cc78aa24a67
 MainComponent::MainComponent() : license(licensePublicKey)
 {
     setOpaque(true);
-    setSize(1280, 800);
+    setSize(1440, 900);
+
+    const auto setupNav = [this](juce::TextButton& button, const char* text, Page page)
+    {
+        button.setButtonText(utf8(text));
+        button.setClickingTogglesState(false);
+        button.onClick = [this, page] { showPage(page); };
+        addAndMakeVisible(button);
+    };
+    setupNav(playNav, "◉  开始演奏", Page::play);
+    setupNav(soundsNav, "♫  音色方案", Page::sounds);
+    setupNav(chainNav, "◇  音源与音效", Page::chain);
+    setupNav(windNav, "⌁  电吹管设置", Page::wind);
+    setupNav(audioNav, "▣  声音设置", Page::audio);
+    setupNav(softwareNav, "⚙  软件设置", Page::settings);
+
+    themeSelector.addItem(utf8("霓虹舞台"), static_cast<int>(Theme::neon));
+    themeSelector.addItem(utf8("金色大厅"), static_cast<int>(Theme::gold));
+    themeSelector.addItem(utf8("极简专业"), static_cast<int>(Theme::minimal));
+    themeSelector.setSelectedId(static_cast<int>(Theme::neon), juce::dontSendNotification);
+    themeSelector.onChange = [this] { applyTheme(static_cast<Theme>(themeSelector.getSelectedId())); };
+    addAndMakeVisible(themeSelector);
+
+    lowPerformanceToggle.setButtonText(utf8("低性能电脑模式"));
+    lowPerformanceToggle.onClick = [this] { repaint(); };
+    addAndMakeVisible(lowPerformanceToggle);
 
     title.setText(utf8("风吟 · 开始演奏"), juce::dontSendNotification);
     title.setFont(juce::FontOptions(28.0f, juce::Font::bold));
@@ -153,6 +178,8 @@ MainComponent::MainComponent() : license(licensePublicKey)
     refreshPresetChoices();
     refreshLicenseUi();
     if (! pluginCatalog.getPlugins().isEmpty()) refreshPluginChoices();
+    applyTheme(Theme::neon);
+    showPage(Page::play);
     startTimerHz(30);
     autoGuideAtMs = juce::Time::getMillisecondCounterHiRes() + 900.0;
 }
@@ -165,39 +192,153 @@ MainComponent::~MainComponent()
     audio.getDeviceManager().removeAudioCallback(&testSynth);
 }
 
+juce::Rectangle<int> MainComponent::getContentBounds() const
+{
+    return getLocalBounds().withTrimmedLeft(238).reduced(28, 22);
+}
+
+void MainComponent::showPage(Page page)
+{
+    currentPage = page;
+    const juce::String names[] { utf8("开始演奏"), utf8("音色方案"), utf8("音源与音效"),
+                                utf8("电吹管设置"), utf8("声音设置"), utf8("软件设置") };
+    title.setText(utf8("风吟 · ") + names[static_cast<int>(page)], juce::dontSendNotification);
+    updatePageVisibility();
+    resized();
+    repaint();
+}
+
+void MainComponent::updatePageVisibility()
+{
+    const auto play = currentPage == Page::play;
+    const auto sounds = currentPage == Page::sounds;
+    const auto chain = currentPage == Page::chain;
+    const auto wind = currentPage == Page::wind;
+    const auto audioPage = currentPage == Page::audio;
+    const auto software = currentPage == Page::settings;
+
+    for (auto* component : std::array<juce::Component*, 8> { &videoPlayer, &noteLabel, &breathLabel, &recordButton,
+                             &recordingStatus, &masterVolume, &masterVolumeLabel, &recordingManagerButton })
+        component->setVisible(play);
+    for (auto* component : std::array<juce::Component*, 6> { &presetSelector, &savePresetButton, &loadPresetButton,
+                             &favoritePresetButton, &defaultPresetButton, &deletePresetButton })
+        component->setVisible(sounds);
+    for (auto* component : std::array<juce::Component*, 10> { &scanPluginsButton, &pluginSelector, &loadPluginButton,
+                             &pluginEditorButton, &effectSelector, &loadEffectButton, &removeEffectButton,
+                             &effectEditorButton, &bypassEffectButton, &effectStatus })
+        component->setVisible(chain);
+    pluginStatus.setVisible(chain || sounds);
+    detectButton.setVisible(wind);
+    expressionButton.setVisible(wind);
+    settingsButton.setVisible(audioPage);
+    themeSelector.setVisible(software);
+    lowPerformanceToggle.setVisible(software);
+    helpButton.setVisible(software);
+    licenseButton.setVisible(software);
+
+    const std::array<std::pair<juce::TextButton*, Page>, 6> navigation {{
+        { &playNav, Page::play }, { &soundsNav, Page::sounds }, { &chainNav, Page::chain },
+        { &windNav, Page::wind }, { &audioNav, Page::audio }, { &softwareNav, Page::settings }
+    }};
+    for (const auto& [button, navPage] : navigation)
+    {
+        const auto selected = navPage == currentPage;
+        button->setColour(juce::TextButton::buttonColourId,
+                          selected ? themeAccent.withAlpha(0.22f) : themeBackground.darker(0.15f));
+        button->setColour(juce::TextButton::textColourOffId, selected ? juce::Colours::white : themeMuted);
+    }
+}
+
+void MainComponent::applyTheme(Theme theme)
+{
+    currentTheme = theme;
+    if (theme == Theme::gold)
+    {
+        themeBackground = juce::Colour(0xff160e08); themePanel = juce::Colour(0xff28180d);
+        themePanelBright = juce::Colour(0xff372210); themeAccent = juce::Colour(0xffffc85a);
+        themeAccent2 = juce::Colour(0xffe76e32); themeMuted = juce::Colour(0xffc5a982);
+    }
+    else if (theme == Theme::minimal)
+    {
+        themeBackground = juce::Colour(0xff11151b); themePanel = juce::Colour(0xff1b2028);
+        themePanelBright = juce::Colour(0xff1f262f); themeAccent = juce::Colour(0xff75a9dc);
+        themeAccent2 = juce::Colour(0xff8b98a8); themeMuted = juce::Colour(0xff9caab8);
+    }
+    else
+    {
+        themeBackground = juce::Colour(0xff07101d); themePanel = juce::Colour(0xff102238);
+        themePanelBright = juce::Colour(0xff142b46); themeAccent = juce::Colour(0xff43d9ff);
+        themeAccent2 = juce::Colour(0xff9b63ff); themeMuted = juce::Colour(0xff8fa7bd);
+    }
+    title.setColour(juce::Label::textColourId, juce::Colours::white);
+    deviceStatus.setColour(juce::Label::textColourId, themeMuted);
+    audioStatus.setColour(juce::Label::textColourId, themeMuted);
+    breathLabel.setColour(juce::Label::textColourId, themeAccent);
+    updatePageVisibility();
+    repaint();
+}
+
 void MainComponent::paint(juce::Graphics& g)
 {
-    g.fillAll(background);
+    g.fillAll(themeBackground);
+    g.setColour(themeBackground.darker(0.3f));
+    g.fillRect(getLocalBounds().removeFromLeft(238));
+    g.setGradientFill({ themeAccent, 26.0f, 26.0f, themeAccent2, 76.0f, 76.0f, false });
+    g.fillRoundedRectangle(26.0f, 24.0f, 48.0f, 48.0f, 14.0f);
+    g.setColour(juce::Colours::white);
+    g.setFont(juce::FontOptions(24.0f, juce::Font::bold));
+    g.drawText(utf8("风"), 26, 24, 48, 48, juce::Justification::centred);
+    g.drawText(utf8("风吟"), 86, 24, 120, 28, juce::Justification::centredLeft);
+    g.setColour(themeMuted);
+    g.setFont(juce::FontOptions(12.0f));
+    g.drawText(utf8("电吹管演奏工作站"), 86, 50, 135, 22, juce::Justification::centredLeft);
 
-    auto area = getLocalBounds().toFloat().reduced(28.0f);
+    if (currentPage != Page::play)
+    {
+        auto pagePanel = getContentBounds().withTrimmedTop(80).toFloat();
+        g.setColour(themePanel);
+        g.fillRoundedRectangle(pagePanel, 22.0f);
+        g.setColour(themeMuted);
+        g.setFont(juce::FontOptions(16.0f));
+        const juce::String descriptions[] { {}, utf8("收藏、命名并快速恢复完整的演奏音色。"),
+            utf8("按从左到右的顺序管理音源、效果器和最终输出。"),
+            utf8("连接电吹管并调整气息、起音与弯音手感。"),
+            utf8("选择驱动与输出设备，推荐 ASIO、48000 Hz、128 缓冲区。"),
+            utf8("选择视觉主题、性能模式、使用向导和永久授权。") };
+        g.drawText(descriptions[static_cast<int>(currentPage)], pagePanel.toNearestInt().reduced(28).removeFromTop(36),
+                   juce::Justification::centredLeft);
+        return;
+    }
+
+    auto area = getContentBounds().toFloat();
     auto stage = area.withTrimmedTop(78.0f).withTrimmedBottom(185.0f);
-    g.setColour(panel);
+    g.setColour(themePanel);
     g.fillRoundedRectangle(stage, 22.0f);
 
     stage.removeFromTop(104.0f);
     const auto centre = stage.removeFromRight(350.0f).getCentre();
     const auto breath = juce::jlimit(0.0f, 1.0f, snapshot.breath);
     const auto radius = 105.0f + breath * 18.0f;
-    g.setColour(cyan.withAlpha(0.18f + breath * 0.35f));
+    g.setColour(themeAccent.withAlpha(0.18f + breath * 0.35f));
     g.fillEllipse(centre.x - radius, centre.y - radius, radius * 2.0f, radius * 2.0f);
-    g.setColour(cyan);
+    g.setColour(themeAccent);
     g.drawEllipse(centre.x - radius, centre.y - radius, radius * 2.0f, radius * 2.0f, 2.0f);
-    g.setColour(violet.withAlpha(0.75f));
+    g.setColour(themeAccent2.withAlpha(0.75f));
     g.drawEllipse(centre.x - radius + 17.0f, centre.y - radius + 17.0f,
                   radius * 2.0f - 34.0f, radius * 2.0f - 34.0f, 1.0f);
 
     auto visual = area.removeFromBottom(160.0f);
-    g.setColour(panel);
+    g.setColour(themePanel);
     g.fillRoundedRectangle(visual, 18.0f);
-    g.setGradientFill(juce::ColourGradient(cyan, visual.getX(), visual.getBottom(),
-                                           violet, visual.getRight(), visual.getY(), false));
+    g.setGradientFill(juce::ColourGradient(themeAccent, visual.getX(), visual.getBottom(),
+                                           themeAccent2, visual.getRight(), visual.getY(), false));
     const auto bars = 54;
     auto meterArea = visual.removeFromRight(34.0f).reduced(7.0f, 12.0f);
     const auto meterWidth = 7.0f;
     g.setColour(juce::Colour(0xff203346));
     g.fillRoundedRectangle(meterArea.getX(), meterArea.getY(), meterWidth, meterArea.getHeight(), 3.0f);
     g.fillRoundedRectangle(meterArea.getRight() - meterWidth, meterArea.getY(), meterWidth, meterArea.getHeight(), 3.0f);
-    g.setColour(displayedLeftPeak > 0.9f || displayedRightPeak > 0.9f ? juce::Colour(0xffff526b) : cyan);
+    g.setColour(displayedLeftPeak > 0.9f || displayedRightPeak > 0.9f ? juce::Colour(0xffff526b) : themeAccent);
     g.fillRoundedRectangle(meterArea.getX(), meterArea.getBottom() - meterArea.getHeight() * displayedLeftPeak,
                            meterWidth, meterArea.getHeight() * displayedLeftPeak, 3.0f);
     g.fillRoundedRectangle(meterArea.getRight() - meterWidth, meterArea.getBottom() - meterArea.getHeight() * displayedRightPeak,
@@ -213,68 +354,101 @@ void MainComponent::paint(juce::Graphics& g)
                                visual.getBottom() - height - 12.0f,
                                juce::jmax(2.0f, width - 5.0f), height, 2.0f);
     }
+    if (! lowPerformanceToggle.getToggleState())
+    {
+        auto lights = visual.removeFromBottom(12.0f).reduced(6.0f, 1.0f);
+        constexpr int lightCount = 34;
+        const auto lightWidth = lights.getWidth() / static_cast<float>(lightCount);
+        const auto leading = static_cast<int>(simulatedPhase * 4.0f) % lightCount;
+        for (int i = 0; i < lightCount; ++i)
+        {
+            const auto distance = (i - leading + lightCount) % lightCount;
+            const auto glow = distance < 6 ? 1.0f - static_cast<float>(distance) / 7.0f : 0.12f;
+            g.setColour((i % 2 == 0 ? themeAccent : themeAccent2).withAlpha(glow));
+            g.fillRoundedRectangle(lights.getX() + static_cast<float>(i) * lightWidth, lights.getY(),
+                                   juce::jmax(3.0f, lightWidth - 5.0f), lights.getHeight(), 3.0f);
+        }
+    }
 }
 
 void MainComponent::resized()
 {
-    auto area = getLocalBounds().reduced(28);
-    auto header = area.removeFromTop(68);
-    title.setBounds(header.removeFromLeft(360));
-    detectButton.setBounds(header.removeFromRight(110).reduced(4, 12));
-    settingsButton.setBounds(header.removeFromRight(110).reduced(4, 12));
-    expressionButton.setBounds(header.removeFromRight(110).reduced(4, 12));
-    helpButton.setBounds(header.removeFromRight(98).reduced(4, 12));
-    licenseButton.setBounds(header.removeFromRight(118).reduced(4, 12));
-    audioStatus.setBounds(header.removeFromRight(220));
-    deviceStatus.setBounds(header);
+    {
+        auto sidebar = getLocalBounds().removeFromLeft(238).reduced(18);
+        sidebar.removeFromTop(92);
+        for (auto* button : { &playNav, &soundsNav, &chainNav, &windNav, &audioNav, &softwareNav })
+        {
+            button->setBounds(sidebar.removeFromTop(50).reduced(0, 4));
+            sidebar.removeFromTop(3);
+        }
 
-    auto stage = area.withTrimmedBottom(178);
-    auto pluginRow = stage.removeFromTop(54).reduced(18, 7);
-    scanPluginsButton.setBounds(pluginRow.removeFromLeft(116));
-    pluginRow.removeFromLeft(8);
-    loadPluginButton.setBounds(pluginRow.removeFromRight(116));
-    pluginRow.removeFromRight(8);
-    pluginEditorButton.setBounds(pluginRow.removeFromRight(106));
-    pluginRow.removeFromRight(8);
-    pluginSelector.setBounds(pluginRow.removeFromLeft(330));
-    pluginRow.removeFromLeft(10);
-    pluginStatus.setBounds(pluginRow);
-    auto presetRow = stage.removeFromTop(50).reduced(18, 5);
-    presetSelector.setBounds(presetRow.removeFromLeft(330));
-    presetRow.removeFromLeft(8);
-    loadPresetButton.setBounds(presetRow.removeFromLeft(110));
-    presetRow.removeFromLeft(8);
-    savePresetButton.setBounds(presetRow.removeFromLeft(140));
-    presetRow.removeFromLeft(12);
-    favoritePresetButton.setBounds(presetRow.removeFromLeft(76));
-    presetRow.removeFromLeft(6);
-    defaultPresetButton.setBounds(presetRow.removeFromLeft(94));
-    presetRow.removeFromLeft(6);
-    deletePresetButton.setBounds(presetRow.removeFromLeft(70));
-    presetRow.removeFromLeft(10);
-    recordButton.setBounds(presetRow.removeFromLeft(132));
-    presetRow.removeFromLeft(8);
-    recordingStatus.setBounds(presetRow);
-    auto effectRow = stage.removeFromTop(48).reduced(18, 5);
-    effectSelector.setBounds(effectRow.removeFromLeft(330));
-    effectRow.removeFromLeft(8);
-    loadEffectButton.setBounds(effectRow.removeFromLeft(110));
-    effectRow.removeFromLeft(8);
-    removeEffectButton.setBounds(effectRow.removeFromLeft(110));
-    effectRow.removeFromLeft(10);
-    effectEditorButton.setBounds(effectRow.removeFromLeft(104));
-    effectRow.removeFromLeft(8);
-    bypassEffectButton.setBounds(effectRow.removeFromLeft(88));
-    effectRow.removeFromLeft(10);
-    effectStatus.setBounds(effectRow);
-    auto masterRow = stage.removeFromBottom(38).reduced(18, 2);
-    masterVolumeLabel.setBounds(masterRow.removeFromLeft(66));
-    masterVolume.setBounds(masterRow.removeFromLeft(290));
-    recordingManagerButton.setBounds(masterRow.removeFromRight(110));
-    auto performanceArea = stage.removeFromRight(350);
-    videoPlayer.setBounds(stage.reduced(18, 8));
-    noteLabel.setBounds(performanceArea.withSizeKeepingCentre(250, 110).translated(0, -14));
-    breathLabel.setBounds(performanceArea.withSizeKeepingCentre(330, 38).translated(0, 70));
+        auto content = getContentBounds();
+        auto header = content.removeFromTop(72);
+        title.setBounds(header.removeFromLeft(365));
+        audioStatus.setBounds(header.removeFromRight(250));
+        deviceStatus.setBounds(header);
+        auto page = content.withTrimmedTop(8);
+
+        if (currentPage == Page::play)
+        {
+            auto stage = page.withTrimmedBottom(178);
+            auto performanceArea = stage.removeFromRight(350);
+            videoPlayer.setBounds(stage.reduced(18, 8));
+            noteLabel.setBounds(performanceArea.withSizeKeepingCentre(250, 110).translated(0, -14));
+            breathLabel.setBounds(performanceArea.withSizeKeepingCentre(330, 38).translated(0, 70));
+            auto actions = page.removeFromBottom(48).reduced(12, 3);
+            recordButton.setBounds(actions.removeFromLeft(140)); actions.removeFromLeft(8);
+            recordingManagerButton.setBounds(actions.removeFromLeft(116)); actions.removeFromLeft(12);
+            recordingStatus.setBounds(actions.removeFromLeft(320));
+            masterVolume.setBounds(actions.removeFromRight(260));
+            masterVolumeLabel.setBounds(actions.removeFromRight(70));
+        }
+        else
+        {
+            auto inner = page.reduced(30).withTrimmedTop(62);
+            if (currentPage == Page::sounds)
+            {
+                presetSelector.setBounds(inner.removeFromTop(48)); inner.removeFromTop(16);
+                auto row = inner.removeFromTop(46);
+                loadPresetButton.setBounds(row.removeFromLeft(130)); row.removeFromLeft(10);
+                savePresetButton.setBounds(row.removeFromLeft(160)); row.removeFromLeft(10);
+                favoritePresetButton.setBounds(row.removeFromLeft(100)); row.removeFromLeft(10);
+                defaultPresetButton.setBounds(row.removeFromLeft(120)); row.removeFromLeft(10);
+                deletePresetButton.setBounds(row.removeFromLeft(90));
+                pluginStatus.setBounds(inner.removeFromTop(52));
+            }
+            else if (currentPage == Page::chain)
+            {
+                auto row = inner.removeFromTop(52);
+                scanPluginsButton.setBounds(row.removeFromLeft(130)); row.removeFromLeft(12);
+                pluginSelector.setBounds(row.removeFromLeft(380)); row.removeFromLeft(12);
+                loadPluginButton.setBounds(row.removeFromLeft(116)); row.removeFromLeft(10);
+                pluginEditorButton.setBounds(row.removeFromLeft(116));
+                pluginStatus.setBounds(inner.removeFromTop(58)); inner.removeFromTop(26);
+                row = inner.removeFromTop(52);
+                effectSelector.setBounds(row.removeFromLeft(380)); row.removeFromLeft(12);
+                loadEffectButton.setBounds(row.removeFromLeft(112)); row.removeFromLeft(10);
+                effectEditorButton.setBounds(row.removeFromLeft(112)); row.removeFromLeft(10);
+                bypassEffectButton.setBounds(row.removeFromLeft(92)); row.removeFromLeft(10);
+                removeEffectButton.setBounds(row.removeFromLeft(112));
+                effectStatus.setBounds(inner.removeFromTop(58));
+            }
+            else if (currentPage == Page::wind)
+            {
+                detectButton.setBounds(inner.removeFromTop(56).removeFromLeft(230)); inner.removeFromTop(18);
+                expressionButton.setBounds(inner.removeFromTop(56).removeFromLeft(230));
+            }
+            else if (currentPage == Page::audio)
+                settingsButton.setBounds(inner.removeFromTop(56).removeFromLeft(230));
+            else if (currentPage == Page::settings)
+            {
+                themeSelector.setBounds(inner.removeFromTop(48).removeFromLeft(300)); inner.removeFromTop(14);
+                lowPerformanceToggle.setBounds(inner.removeFromTop(46).removeFromLeft(300)); inner.removeFromTop(16);
+                helpButton.setBounds(inner.removeFromTop(54).removeFromLeft(210)); inner.removeFromTop(14);
+                licenseButton.setBounds(inner.removeFromTop(54).removeFromLeft(210));
+            }
+        }
+    }
 }
 
 void MainComponent::timerCallback()
@@ -388,12 +562,26 @@ void MainComponent::refreshPluginChoices()
     const auto plugins = pluginCatalog.getPlugins();
     const auto swamPlugins = pluginCatalog.getSwamPlugins();
     int itemId = 1;
-    for (const auto& plugin : swamPlugins)
-        if (plugin.isInstrument)
-        {
-            cachedInstrumentPlugins.add(plugin);
-            pluginSelector.addItem(utf8("SWAM · ") + plugin.name, itemId++);
-        }
+    const fengyin::SwamFamily familyOrder[] { fengyin::SwamFamily::saxophone, fengyin::SwamFamily::brass,
+        fengyin::SwamFamily::woodwind, fengyin::SwamFamily::strings, fengyin::SwamFamily::other };
+    for (const auto family : familyOrder)
+    {
+        bool headingAdded = false;
+        for (const auto& plugin : swamPlugins)
+            if (plugin.isInstrument
+                && fengyin::SwamPluginClassifier::classify(plugin.name.toStdString(), plugin.manufacturerName.toStdString()) == family)
+            {
+                if (! headingAdded)
+                {
+                    pluginSelector.addSectionHeading(utf8(fengyin::SwamPluginClassifier::familyChineseName(family)));
+                    headingAdded = true;
+                }
+                cachedInstrumentPlugins.add(plugin);
+                pluginSelector.addItem(utf8(fengyin::SwamPluginClassifier::instrumentChineseName(plugin.name.toStdString()))
+                                       + utf8(" · ") + plugin.name, itemId++);
+            }
+    }
+    bool otherHeadingAdded = false;
     for (const auto& plugin : plugins)
     {
         bool isSwam = false;
@@ -402,6 +590,11 @@ void MainComponent::refreshPluginChoices()
                 isSwam = true;
         if (! isSwam && plugin.isInstrument)
         {
+            if (! otherHeadingAdded)
+            {
+                pluginSelector.addSectionHeading(utf8("其他 VST3 音源"));
+                otherHeadingAdded = true;
+            }
             cachedInstrumentPlugins.add(plugin);
             pluginSelector.addItem(plugin.name, itemId++);
         }
@@ -873,10 +1066,10 @@ void MainComponent::showDeviceSettings()
     deviceDialog->addComboBox("output", audio.getAvailableOutputDevices(current.deviceType), utf8("输出设备"));
     auto* outputBox = deviceDialog->getComboBoxComponent("output");
     outputBox->setText(current.deviceName, juce::dontSendNotification);
-    deviceDialog->addComboBox("rate", { "44100 Hz", "48000 Hz（推荐）", "96000 Hz" }, utf8("采样率"));
+    deviceDialog->addComboBox("rate", { utf8("44100 Hz"), utf8("48000 Hz（推荐）"), utf8("96000 Hz") }, utf8("采样率"));
     auto* rateBox = deviceDialog->getComboBoxComponent("rate");
     rateBox->setSelectedId(current.sampleRate >= 88000.0 ? 3 : (current.sampleRate >= 46000.0 ? 2 : 1), juce::dontSendNotification);
-    deviceDialog->addComboBox("buffer", { "64（低延迟）", "128（推荐）", "256（更稳定）", "512（最稳定）" }, utf8("缓冲区"));
+    deviceDialog->addComboBox("buffer", { utf8("64（低延迟）"), utf8("128（推荐）"), utf8("256（更稳定）"), utf8("512（最稳定）") }, utf8("缓冲区"));
     auto* bufferBox = deviceDialog->getComboBoxComponent("buffer");
     const auto bufferId = current.bufferSize <= 64 ? 1 : current.bufferSize <= 128 ? 2 : current.bufferSize <= 256 ? 3 : 4;
     bufferBox->setSelectedId(bufferId, juce::dontSendNotification);
@@ -933,7 +1126,7 @@ void MainComponent::showMidiSetup()
     for (int i = 0; i < static_cast<int>(midiDialogDevices.size()); ++i)
         if (midiDialogDevices[static_cast<size_t>(i)].name == midi.getConnectedDeviceName())
             deviceBox->setSelectedId(i + 1, juce::dontSendNotification);
-    midiDialog->addComboBox("breathCC", { "CC2（大多数电吹管）", "CC11（表情）", "CC1（调制）" }, utf8("气息控制器"));
+    midiDialog->addComboBox("breathCC", { utf8("CC2（大多数电吹管）"), utf8("CC11（表情）"), utf8("CC1（调制）") }, utf8("气息控制器"));
     auto* ccBox = midiDialog->getComboBoxComponent("breathCC");
     const auto currentCc = midi.getBreathController();
     ccBox->setSelectedId(currentCc == 11 ? 2 : currentCc == 1 ? 3 : 1, juce::dontSendNotification);
@@ -978,16 +1171,16 @@ void MainComponent::showExpressionSettings()
     expressionDialog = std::make_unique<juce::AlertWindow>(utf8("吹奏手感调节"),
         utf8("推荐先使用“自然、均衡、标准”。气息抖动时调得更稳定，轻吹不响时调得更灵敏。"),
         juce::MessageBoxIconType::QuestionIcon);
-    expressionDialog->addComboBox("response", { "灵敏（轻吹更容易响）", "自然（推荐）", "稳重（强吹变化更明显）" }, utf8("气息响应"));
+    expressionDialog->addComboBox("response", { utf8("灵敏（轻吹更容易响）"), utf8("自然（推荐）"), utf8("稳重（强吹变化更明显）") }, utf8("气息响应"));
     expressionDialog->getComboBoxComponent("response")->setSelectedId(current.curve < 0.8f ? 1 : current.curve > 1.2f ? 3 : 2,
                                                                         juce::dontSendNotification);
-    expressionDialog->addComboBox("smooth", { "快速（变化最灵敏）", "均衡（推荐）", "稳定（减少气息抖动）" }, utf8("平滑程度"));
+    expressionDialog->addComboBox("smooth", { utf8("快速（变化最灵敏）"), utf8("均衡（推荐）"), utf8("稳定（减少气息抖动）") }, utf8("平滑程度"));
     expressionDialog->getComboBoxComponent("smooth")->setSelectedId(current.smoothing > 0.38f ? 1 : current.smoothing < 0.2f ? 3 : 2,
                                                                       juce::dontSendNotification);
-    expressionDialog->addComboBox("threshold", { "灵敏（适合轻吹）", "均衡（推荐）", "防误触（过滤微弱气流）" }, utf8("起音门槛"));
+    expressionDialog->addComboBox("threshold", { utf8("灵敏（适合轻吹）"), utf8("均衡（推荐）"), utf8("防误触（过滤微弱气流）") }, utf8("起音门槛"));
     expressionDialog->getComboBoxComponent("threshold")->setSelectedId(current.threshold < 0.018f ? 1 : current.threshold > 0.045f ? 3 : 2,
                                                                          juce::dontSendNotification);
-    expressionDialog->addComboBox("pitch", { "轻柔（弯音幅度较小）", "标准（推荐）", "宽广（弯音幅度更大）" }, utf8("弯音灵敏度"));
+    expressionDialog->addComboBox("pitch", { utf8("轻柔（弯音幅度较小）"), utf8("标准（推荐）"), utf8("宽广（弯音幅度更大）") }, utf8("弯音灵敏度"));
     expressionDialog->getComboBoxComponent("pitch")->setSelectedId(current.pitchSensitivity < 0.75f ? 1 : current.pitchSensitivity > 1.25f ? 3 : 2,
                                                                      juce::dontSendNotification);
     expressionDialog->addButton(utf8("应用"), 1, juce::KeyPress(juce::KeyPress::returnKey));
