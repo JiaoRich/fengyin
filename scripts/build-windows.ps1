@@ -9,6 +9,7 @@ $BuildDir = Join-Path $ProjectRoot "build-windows"
 $PackageDir = Join-Path $ProjectRoot "dist\FengYin"
 $InstallerDir = Join-Path $ProjectRoot "dist\installer"
 $FfmpegPath = Join-Path $ProjectRoot "third_party\ffmpeg\windows\ffmpeg.exe"
+$NugetPackageDir = Join-Path $ProjectRoot "third_party\nuget-packages"
 
 function Invoke-Checked([string]$StepName, [scriptblock]$Command) {
     & $Command
@@ -26,7 +27,19 @@ if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host "[1/5] 配置 Windows x64 Release 工程..." -ForegroundColor Cyan
-Invoke-Checked "CMake 配置" { cmake -S $ProjectRoot -B $BuildDir -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTING=ON }
+if (-not (Get-ChildItem $NugetPackageDir -Directory -Filter "*Microsoft.Web.WebView2*" -ErrorAction SilentlyContinue)) {
+    if (-not (Get-Command nuget -ErrorAction SilentlyContinue)) {
+        throw "没有找到 NuGet，无法安装视频界面所需的 Microsoft WebView2 编译组件。"
+    }
+    Write-Host "正在安装 Microsoft WebView2 编译组件..." -ForegroundColor Cyan
+    Invoke-Checked "WebView2 组件安装" {
+        nuget install Microsoft.Web.WebView2 -Version 1.0.3485.44 -OutputDirectory $NugetPackageDir -NonInteractive
+    }
+}
+Invoke-Checked "CMake 配置" {
+    cmake -S $ProjectRoot -B $BuildDir -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTING=ON `
+        "-DJUCE_WEBVIEW2_PACKAGE_LOCATION=$NugetPackageDir"
+}
 
 Write-Host "[2/5] 编译风吟和自动测试..." -ForegroundColor Cyan
 Invoke-Checked "主程序编译" { cmake --build $BuildDir --config Release --parallel }
