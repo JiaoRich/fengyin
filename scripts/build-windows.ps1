@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "0.3.0",
+    [string]$Version = "0.3.1",
     [switch]$SkipInstaller
 )
 
@@ -10,6 +10,7 @@ $PackageDir = Join-Path $ProjectRoot "dist\FengYin"
 $InstallerDir = Join-Path $ProjectRoot "dist\installer"
 $FfmpegPath = Join-Path $ProjectRoot "third_party\ffmpeg\windows\ffmpeg.exe"
 $NugetPackageDir = Join-Path $ProjectRoot "third_party\nuget-packages"
+$WebViewBootstrapperPath = Join-Path $PackageDir "MicrosoftEdgeWebview2Setup.exe"
 
 function Invoke-Checked([string]$StepName, [scriptblock]$Command) {
     & $Command
@@ -60,6 +61,14 @@ Copy-Item (Join-Path $ProjectRoot "README.md") $PackageDir -Force
 Copy-Item (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES.md") $PackageDir -Force
 if (Test-Path $FfmpegPath) {
     Copy-Item $FfmpegPath (Join-Path $PackageDir "ffmpeg.exe") -Force
+}
+
+Write-Host "正在准备 Microsoft Edge WebView2 运行环境安装程序..." -ForegroundColor Cyan
+Invoke-WebRequest -UseBasicParsing `
+    -Uri "https://go.microsoft.com/fwlink/p/?LinkId=2124703" `
+    -OutFile $WebViewBootstrapperPath
+if ((Get-Item $WebViewBootstrapperPath).Length -lt 1MB) {
+    throw "WebView2 运行环境安装程序下载不完整。"
 }
 
 $ExePath = Join-Path $PackageDir "FengYin.exe"
