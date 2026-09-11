@@ -4,7 +4,7 @@
 )
 
 $ErrorActionPreference = "Stop"
-$RequiredFiles = @("FengYin.exe", "README.md", "THIRD_PARTY_NOTICES.md")
+$RequiredFiles = @("FengYin.exe", "README.md", "THIRD_PARTY_NOTICES.md", "MicrosoftEdgeWebview2Setup.exe")
 foreach ($Name in $RequiredFiles) {
     $Path = Join-Path $PackageDir $Name
     if (-not (Test-Path $Path)) { throw "发布检查失败，缺少：$Name" }
