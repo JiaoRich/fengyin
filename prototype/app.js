@@ -7,8 +7,7 @@ const presets = [
   ['明亮小号','SWAM 小号','清晰、有穿透力'],
   ['清澈长笛','SWAM 长笛','柔和、通透'],
   ['深情单簧管','SWAM 单簧管','温暖而细腻'],
-  ['电影感小提琴','SWAM 小提琴','宽广的大厅混响'],
-  ['我的新音色','点击开始配置','自定义音源和效果']
+  ['电影感小提琴','SWAM 小提琴','宽广的大厅混响']
 ];
 
 let simulating = true;
@@ -20,6 +19,8 @@ let triedVideoDataFallback = false;
 let availableInstruments = [];
 let availableEffects = [];
 let pluginListSignature = '';
+let savedPresets = [];
+let presetListSignature = '';
 
 function nativeEvent(name, payload = {}) {
   if (window.__JUCE__?.backend?.emitEvent) window.__JUCE__.backend.emitEvent(name, payload);
@@ -43,25 +44,39 @@ function showPage(page) {
 
 $$('.nav-item').forEach(button => button.addEventListener('click', () => showPage(button.dataset.page)));
 
-$('#preset-grid').innerHTML = presets.map(([name,plugin,desc],index) => `<button class="preset" data-index="${index}"><h3>${name}</h3><b>${plugin}</b><span>${desc}</span></button>`).join('');
-$$('.preset').forEach((button,index) => button.addEventListener('click', () => {
-  if(index === presets.length-1) {
-    showPage('chain');
-    toast('请扫描并选择音源，调好效果后即可开始演奏');
-    if (!availableInstruments.length) nativeEvent('scanPlugins');
-    return;
-  }
-  const wanted = presets[index][1].replace('SWAM ', '');
-  const found = availableInstruments.findIndex(item => item.label?.includes(wanted));
-  if (found >= 0) nativeEvent('loadPlugin', {index: found});
-  else if (window.__JUCE__?.backend?.emitEvent) {
-    showPage('chain');
-    nativeEvent('scanPlugins');
-    return toast(`正在查找${wanted}，扫描完成后请选择加载`);
-  }
-  $('#sound-name').textContent = presets[index][1];
-  toast(`已应用：${presets[index][0]}`);
-}));
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
+}
+
+function renderPresets() {
+  const starters = presets.map(([name,plugin,desc],index) => `<button class="preset" data-kind="starter" data-index="${index}"><h3>${name}</h3><b>${plugin}</b><span>${desc}</span></button>`).join('');
+  const saved = savedPresets.map((preset,index) => `<button class="preset" data-kind="saved" data-index="${index}"><h3>${preset.favorite ? '★ ' : ''}${escapeHtml(preset.name)}</h3><b>我的音色方案</b><span>点击恢复已保存的音源与设置</span></button>`).join('');
+  $('#preset-grid').innerHTML = starters + saved + '<button class="preset" data-kind="create"><h3>我的新音色</h3><b>点击开始配置</b><span>自定义音源和效果</span></button>';
+  $$('#preset-grid .preset').forEach(button => button.addEventListener('click', () => {
+    if (button.dataset.kind === 'create') {
+      showPage('chain');
+      toast('请扫描并选择音源，调好效果后即可开始演奏');
+      if (!availableInstruments.length) nativeEvent('scanPlugins');
+      return;
+    }
+    const index = Number(button.dataset.index);
+    if (button.dataset.kind === 'saved') {
+      nativeEvent('loadPreset', {index});
+      return toast(`正在载入：${savedPresets[index]?.name || '我的音色'}`);
+    }
+    const wanted = presets[index][1].replace('SWAM ', '');
+    const found = availableInstruments.findIndex(item => item.label?.includes(wanted));
+    if (found >= 0) nativeEvent('loadPlugin', {index: found});
+    else if (window.__JUCE__?.backend?.emitEvent) {
+      showPage('chain');
+      nativeEvent('scanPlugins');
+      return toast(`正在查找${wanted}，扫描完成后请选择加载`);
+    }
+    $('#sound-name').textContent = presets[index][1];
+    toast(`已应用：${presets[index][0]}`);
+  }));
+}
+renderPresets();
 
 $$('.sound-chip').forEach(button => button.addEventListener('click', () => {
   $$('.sound-chip').forEach(el => el.classList.remove('active'));
@@ -229,15 +244,21 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   if (state.pluginStatus) $('#plugin-status').textContent = state.pluginStatus;
   availableInstruments = Array.isArray(state.instruments) ? state.instruments : [];
   availableEffects = Array.isArray(state.effects) ? state.effects : [];
+  savedPresets = Array.isArray(state.presets) ? state.presets : [];
   const signature = JSON.stringify([availableInstruments,availableEffects]);
   if (signature !== pluginListSignature) {
     pluginListSignature = signature;
     $('#instrument-select').innerHTML = availableInstruments.length
-      ? availableInstruments.map((item,index) => `<option value="${index}">${item.label || item.name}</option>`).join('')
+      ? availableInstruments.map((item,index) => `<option value="${index}">${escapeHtml(item.label || item.name)}</option>`).join('')
       : '<option value="">未找到乐器音源</option>';
     $('#effect-select').innerHTML = availableEffects.length
-      ? availableEffects.map((name,index) => `<option value="${index}">${name}</option>`).join('')
+      ? availableEffects.map((name,index) => `<option value="${index}">${escapeHtml(name)}</option>`).join('')
       : '<option value="">未找到外部效果器（可不选）</option>';
+  }
+  const nextPresetSignature = JSON.stringify(savedPresets);
+  if (nextPresetSignature !== presetListSignature) {
+    presetListSignature = nextPresetSignature;
+    renderPresets();
   }
   if (state.activated) {
     $('#license-title').textContent = '已永久激活';

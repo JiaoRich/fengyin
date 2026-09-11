@@ -233,6 +233,15 @@ void MainComponent::setupWebInterface()
         .withEventListener("removeEffect", [this](juce::var) { if (isActivated) removeEffect(); })
         .withEventListener("openEffect", [this](juce::var) { if (isActivated) pluginHost.showPluginEditor(true); })
         .withEventListener("savePreset", [this](juce::var) { if (isActivated && pluginHost.hasPlugin()) saveCurrentPreset(); })
+        .withEventListener("loadPreset", [this](juce::var payload)
+        {
+            const auto index = static_cast<int>(payload.getProperty("index", -1));
+            if (isActivated && juce::isPositiveAndBelow(index, cachedPresets.size()))
+            {
+                presetSelector.setSelectedId(index + 1, juce::dontSendNotification);
+                loadSelectedPreset();
+            }
+        })
         .withEventListener("setMasterVolume", [this](juce::var payload)
         {
             masterOutput.setGain(static_cast<float>(static_cast<double>(payload.getProperty("value", 0.8))));
@@ -592,6 +601,15 @@ void MainComponent::timerCallback()
         for (const auto& effect : cachedEffectPlugins) effects.add(effect.name);
         state->setProperty("instruments", juce::var(instruments));
         state->setProperty("effects", juce::var(effects));
+        juce::Array<juce::var> presets;
+        for (const auto& preset : cachedPresets)
+        {
+            auto item = std::make_unique<juce::DynamicObject>();
+            item->setProperty("name", preset.name);
+            item->setProperty("favorite", preset.favorite);
+            presets.add(juce::var(item.release()));
+        }
+        state->setProperty("presets", juce::var(presets));
         webInterface->emitEventIfBrowserIsVisible("backendState", juce::var(state.release()));
     }
     if (! autoGuideShown && autoGuideAtMs > 0.0 && juce::Time::getMillisecondCounterHiRes() >= autoGuideAtMs)
