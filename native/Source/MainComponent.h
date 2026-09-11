@@ -23,6 +23,12 @@ public:
     void resized() override;
 
 private:
+    enum class Page { play, sounds, chain, wind, audio, settings };
+    enum class Theme { neon = 1, gold, minimal };
+    void showPage(Page page);
+    void updatePageVisibility();
+    void applyTheme(Theme theme);
+    juce::Rectangle<int> getContentBounds() const;
     void timerCallback() override;
     void startPluginScan();
     void refreshPluginChoices();
@@ -67,6 +73,14 @@ private:
     juce::TextButton expressionButton;
     juce::TextButton helpButton;
     juce::Label title;
+    juce::TextButton playNav;
+    juce::TextButton soundsNav;
+    juce::TextButton chainNav;
+    juce::TextButton windNav;
+    juce::TextButton audioNav;
+    juce::TextButton softwareNav;
+    juce::ComboBox themeSelector;
+    juce::ToggleButton lowPerformanceToggle;
     juce::Label deviceStatus;
     juce::Label audioStatus;
     juce::TextButton licenseButton;
@@ -118,6 +132,14 @@ private:
     float displayedLeftPeak = 0.0f;
     float displayedRightPeak = 0.0f;
     std::array<float, fengyin::MasterOutputService::spectrumBands> spectrumLevels {};
+    Page currentPage = Page::play;
+    Theme currentTheme = Theme::neon;
+    juce::Colour themeBackground { 0xff07101d };
+    juce::Colour themePanel { 0xff102238 };
+    juce::Colour themePanelBright { 0xff142b46 };
+    juce::Colour themeAccent { 0xff43d9ff };
+    juce::Colour themeAccent2 { 0xff9b63ff };
+    juce::Colour themeMuted { 0xff8fa7bd };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };
