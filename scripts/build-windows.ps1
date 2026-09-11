@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Version = "0.1.0",
     [switch]$SkipInstaller
 )
@@ -10,6 +10,13 @@ $PackageDir = Join-Path $ProjectRoot "dist\FengYin"
 $InstallerDir = Join-Path $ProjectRoot "dist\installer"
 $FfmpegPath = Join-Path $ProjectRoot "third_party\ffmpeg\windows\ffmpeg.exe"
 
+function Invoke-Checked([string]$StepName, [scriptblock]$Command) {
+    & $Command
+    if ($LASTEXITCODE -ne 0) {
+        throw "$StepName 失败，错误代码：$LASTEXITCODE"
+    }
+}
+
 if (-not $IsWindows -and $PSVersionTable.PSEdition -eq "Core") {
     throw "此脚本只能在 Windows 电脑上运行。"
 }
@@ -19,17 +26,17 @@ if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host "[1/5] 配置 Windows x64 Release 工程..." -ForegroundColor Cyan
-cmake -S $ProjectRoot -B $BuildDir -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTING=ON
+Invoke-Checked "CMake 配置" { cmake -S $ProjectRoot -B $BuildDir -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTING=ON }
 
 Write-Host "[2/5] 编译风吟和自动测试..." -ForegroundColor Cyan
-cmake --build $BuildDir --config Release --parallel
-cmake --build $BuildDir --config Release --target FengYinActivator --parallel
+Invoke-Checked "主程序编译" { cmake --build $BuildDir --config Release --parallel }
+Invoke-Checked "激活工具编译" { cmake --build $BuildDir --config Release --target FengYinActivator --parallel }
 
 Write-Host "[3/5] 运行自动测试..." -ForegroundColor Cyan
-ctest --test-dir $BuildDir -C Release --output-on-failure
+Invoke-Checked "自动测试" { ctest --test-dir $BuildDir -C Release --output-on-failure }
 
 Write-Host "[4/5] 整理安装文件..." -ForegroundColor Cyan
-cmake --install $BuildDir --config Release --prefix $PackageDir
+Invoke-Checked "安装文件整理" { cmake --install $BuildDir --config Release --prefix $PackageDir }
 
 $ExePath = Join-Path $PackageDir "FengYin.exe"
 if (-not (Test-Path $ExePath)) {
@@ -73,6 +80,8 @@ if (-not $Iscc) {
 
 New-Item -ItemType Directory -Force -Path $InstallerDir | Out-Null
 Write-Host "[5/5] 生成中文安装程序..." -ForegroundColor Cyan
-& $Iscc "/DSourceDir=$PackageDir" "/DOutputDir=$InstallerDir" "/DAppVersion=$Version" (Join-Path $ProjectRoot "installer\FengYin.iss")
+Invoke-Checked "中文安装包生成" {
+    & $Iscc "/DSourceDir=$PackageDir" "/DOutputDir=$InstallerDir" "/DAppVersion=$Version" (Join-Path $ProjectRoot "installer\FengYin.iss")
+}
 
 Write-Host "完成：$InstallerDir\风吟-$Version-Windows-x64.exe" -ForegroundColor Green
