@@ -1,0 +1,58 @@
+name: Windows 编译与安装包
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  windows-release:
+    name: Windows x64 Release
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - name: 获取源代码
+        uses: actions/checkout@v4
+
+      - name: 安装中文安装包工具
+        shell: powershell
+        run: choco install innosetup --yes --no-progress
+
+      - name: 编译、测试并生成安装包
+        shell: powershell
+        run: ./scripts/build-windows.ps1
+
+      - name: 保存自动测试结果
+        if: always()
+        shell: powershell
+        run: |
+          if (Test-Path build-windows/Testing) {
+            Compress-Archive -Path build-windows/Testing -DestinationPath windows-test-results.zip -Force
+          }
+
+      - name: 上传 Windows 安装包
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 风吟-Windows-x64-安装包
+          path: dist/installer/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: 上传失败诊断资料
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-失败诊断资料
+          path: |
+            build-windows/CMakeCache.txt
+            build-windows/CMakeFiles/CMakeConfigureLog.yaml
+            windows-test-results.zip
+          if-no-files-found: ignore
+          retention-days: 7
