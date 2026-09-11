@@ -7,6 +7,9 @@
 #ifndef AppVersion
   #define AppVersion "0.1.0"
 #endif
+#ifndef ChineseMessages
+  #define ChineseMessages "compiler:Languages\ChineseSimplified.isl"
+#endif
 
 [Setup]
 AppId={{BA041761-FF1B-4F84-B055-AE70EC8C883B}
@@ -28,7 +31,7 @@ SetupLogging=yes
 UninstallDisplayName=风吟
 
 [Languages]
-Name: "chinesesimp"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+Name: "chinesesimp"; MessagesFile: "{#ChineseMessages}"
 
 [Tasks]
 Name: "desktopicon"; Description: "在桌面创建快捷方式"; GroupDescription: "快捷方式："; Flags: unchecked
