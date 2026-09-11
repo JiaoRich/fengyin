@@ -36,7 +36,18 @@ Write-Host "[3/5] 运行自动测试..." -ForegroundColor Cyan
 Invoke-Checked "自动测试" { ctest --test-dir $BuildDir -C Release --output-on-failure }
 
 Write-Host "[4/5] 整理安装文件..." -ForegroundColor Cyan
-Invoke-Checked "安装文件整理" { cmake --install $BuildDir --config Release --prefix $PackageDir }
+if (Test-Path $PackageDir) {
+    Remove-Item -Path $PackageDir -Recurse -Force
+}
+New-Item -ItemType Directory -Force -Path $PackageDir | Out-Null
+$BuiltExe = Join-Path $BuildDir "FengYin_artefacts\Release\FengYin.exe"
+if (-not (Test-Path $BuiltExe)) { throw "未找到主程序编译结果：$BuiltExe" }
+Copy-Item $BuiltExe (Join-Path $PackageDir "FengYin.exe") -Force
+Copy-Item (Join-Path $ProjectRoot "README.md") $PackageDir -Force
+Copy-Item (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES.md") $PackageDir -Force
+if (Test-Path $FfmpegPath) {
+    Copy-Item $FfmpegPath (Join-Path $PackageDir "ffmpeg.exe") -Force
+}
 
 $ExePath = Join-Path $PackageDir "FengYin.exe"
 if (-not (Test-Path $ExePath)) {
