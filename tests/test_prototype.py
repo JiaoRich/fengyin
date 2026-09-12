@@ -83,6 +83,12 @@ class PrototypeStructureTests(unittest.TestCase):
     def test_html_container_tags_are_balanced(self):
         self.assertEqual(len(re.findall(r'<div(?:\s|>)', HTML)), HTML.count('</div>'))
 
+    def test_plugin_manager_rows_have_explicit_layout(self):
+        self.assertIn('.plugin-manager>#instrument-load-state{grid-area:2/2/3/4}', HTML)
+        self.assertIn('.plugin-manager>label[for="effect-select"]{grid-area:3/1}', HTML)
+        self.assertIn('.plugin-manager>#effect-load-state{grid-area:4/2/5/4}', HTML)
+        self.assertEqual(HTML.count('{'), HTML.count('}'))
+
 
 if __name__ == "__main__":
     unittest.main()
