@@ -80,6 +80,9 @@ class PrototypeStructureTests(unittest.TestCase):
     def test_only_one_lower_stage_container_exists(self):
         self.assertEqual(1, HTML.count('id="lower-stage"'))
 
+    def test_html_container_tags_are_balanced(self):
+        self.assertEqual(len(re.findall(r'<div(?:\s|>)', HTML)), HTML.count('</div>'))
+
 
 if __name__ == "__main__":
     unittest.main()
