@@ -249,7 +249,14 @@ void MainComponent::setupWebInterface()
             if (isActivated && juce::isPositiveAndBelow(index, cachedPresets.size()))
             {
                 presetSelector.setSelectedId(index + 1, juce::dontSendNotification);
-                loadSelectedPreset();
+                loadSelectedPreset([this](bool success, const juce::String& message)
+                {
+                    if (webInterface == nullptr) return;
+                    auto result = std::make_unique<juce::DynamicObject>();
+                    result->setProperty("success", success);
+                    result->setProperty("message", message);
+                    webInterface->emitEventIfBrowserIsVisible("presetLoadResult", juce::var(result.release()));
+                });
             }
         })
         .withEventListener("setMasterVolume", [this](juce::var payload)
@@ -309,15 +316,45 @@ std::optional<juce::WebBrowserComponent::Resource> MainComponent::getWebResource
     {
         data = BinaryData::fengyinappicon_png; size = BinaryData::fengyinappicon_pngSize; mime = "image/png";
     }
-    else if (requested == "instrument-saxophones.png" || requested == "assets/instrument-saxophones.png")
-    { data = BinaryData::instrumentsaxophones_png; size = BinaryData::instrumentsaxophones_pngSize; mime = "image/png"; }
-    else if (requested == "instrument-woodwinds.png" || requested == "assets/instrument-woodwinds.png")
-    { data = BinaryData::instrumentwoodwinds_png; size = BinaryData::instrumentwoodwinds_pngSize; mime = "image/png"; }
-    else if (requested == "instrument-trumpets-trombones.png" || requested == "assets/instrument-trumpets-trombones.png")
-    { data = BinaryData::instrumenttrumpetstrombones_png; size = BinaryData::instrumenttrumpetstrombones_pngSize; mime = "image/png"; }
-    else if (requested == "instrument-horns-strings.png" || requested == "assets/instrument-horns-strings.png")
-    { data = BinaryData::instrumenthornsstrings_png; size = BinaryData::instrumenthornsstrings_pngSize; mime = "image/png"; }
-    else return std::nullopt;
+    else
+    {
+        struct ImageResource { const char* file; const char* data; int size; };
+        const ImageResource images[] {
+            { "instrument_soprano_sax.png", BinaryData::instrument_soprano_sax_png, BinaryData::instrument_soprano_sax_pngSize },
+            { "instrument_alto_sax.png", BinaryData::instrument_alto_sax_png, BinaryData::instrument_alto_sax_pngSize },
+            { "instrument_tenor_sax.png", BinaryData::instrument_tenor_sax_png, BinaryData::instrument_tenor_sax_pngSize },
+            { "instrument_baritone_sax.png", BinaryData::instrument_baritone_sax_png, BinaryData::instrument_baritone_sax_pngSize },
+            { "instrument_flugelhorn.png", BinaryData::instrument_flugelhorn_png, BinaryData::instrument_flugelhorn_pngSize },
+            { "instrument_trumpet.png", BinaryData::instrument_trumpet_png, BinaryData::instrument_trumpet_pngSize },
+            { "instrument_piccolo_trumpet.png", BinaryData::instrument_piccolo_trumpet_png, BinaryData::instrument_piccolo_trumpet_pngSize },
+            { "instrument_tenor_trombone.png", BinaryData::instrument_tenor_trombone_png, BinaryData::instrument_tenor_trombone_pngSize },
+            { "instrument_bass_trombone.png", BinaryData::instrument_bass_trombone_png, BinaryData::instrument_bass_trombone_pngSize },
+            { "instrument_tuba.png", BinaryData::instrument_tuba_png, BinaryData::instrument_tuba_pngSize },
+            { "instrument_euphonium.png", BinaryData::instrument_euphonium_png, BinaryData::instrument_euphonium_pngSize },
+            { "instrument_horn.png", BinaryData::instrument_horn_png, BinaryData::instrument_horn_pngSize },
+            { "instrument_piccolo.png", BinaryData::instrument_piccolo_png, BinaryData::instrument_piccolo_pngSize },
+            { "instrument_flute.png", BinaryData::instrument_flute_png, BinaryData::instrument_flute_pngSize },
+            { "instrument_alto_flute.png", BinaryData::instrument_alto_flute_png, BinaryData::instrument_alto_flute_pngSize },
+            { "instrument_bass_flute.png", BinaryData::instrument_bass_flute_png, BinaryData::instrument_bass_flute_pngSize },
+            { "instrument_clarinet.png", BinaryData::instrument_clarinet_png, BinaryData::instrument_clarinet_pngSize },
+            { "instrument_bass_clarinet.png", BinaryData::instrument_bass_clarinet_png, BinaryData::instrument_bass_clarinet_pngSize },
+            { "instrument_oboe.png", BinaryData::instrument_oboe_png, BinaryData::instrument_oboe_pngSize },
+            { "instrument_english_horn.png", BinaryData::instrument_english_horn_png, BinaryData::instrument_english_horn_pngSize },
+            { "instrument_bassoon.png", BinaryData::instrument_bassoon_png, BinaryData::instrument_bassoon_pngSize },
+            { "instrument_contrabassoon.png", BinaryData::instrument_contrabassoon_png, BinaryData::instrument_contrabassoon_pngSize },
+            { "instrument_violin.png", BinaryData::instrument_violin_png, BinaryData::instrument_violin_pngSize },
+            { "instrument_viola.png", BinaryData::instrument_viola_png, BinaryData::instrument_viola_pngSize },
+            { "instrument_cello.png", BinaryData::instrument_cello_png, BinaryData::instrument_cello_pngSize },
+            { "instrument_double_bass.png", BinaryData::instrument_double_bass_png, BinaryData::instrument_double_bass_pngSize }
+        };
+        for (const auto& image : images)
+            if (requested.endsWith(image.file))
+            {
+                data = image.data; size = image.size; mime = "image/png";
+                break;
+            }
+        if (data == nullptr) return std::nullopt;
+    }
 
     std::vector<std::byte> bytes(static_cast<size_t>(size));
     std::memcpy(bytes.data(), data, static_cast<size_t>(size));
@@ -612,12 +649,16 @@ void MainComponent::timerCallback()
         state->setProperty("recording", recorder.isRecording());
         const auto currentPluginName = pluginHost.hasPlugin() ? pluginHost.getPluginName() : utf8("SWAM Soprano Sax");
         state->setProperty("pluginName", pluginHost.hasPlugin() ? currentPluginName : utf8("安全测试音源"));
+        state->setProperty("pluginLoaded", pluginHost.hasPlugin());
+        state->setProperty("pluginLoading", pluginLoading);
         state->setProperty("instrumentChineseName", utf8(fengyin::SwamPluginClassifier::instrumentChineseName(currentPluginName.toStdString())));
         state->setProperty("instrumentKey", utf8(fengyin::SwamPluginClassifier::instrumentKey(currentPluginName.toStdString())));
         state->setProperty("scanning", scanProgress.scanning);
         state->setProperty("scanProgress", scanProgress.fraction);
         state->setProperty("pluginStatus", pluginStatus.getText());
         state->setProperty("effectName", pluginHost.hasEffect() ? pluginHost.getEffectName() : juce::String());
+        state->setProperty("effectLoaded", pluginHost.hasEffect());
+        state->setProperty("effectLoading", effectLoading);
         juce::Array<juce::var> instruments;
         for (const auto& plugin : cachedInstrumentPlugins)
         {
@@ -807,21 +848,37 @@ void MainComponent::loadSelectedPlugin()
 
     const auto status = audio.getStatus();
     pluginStatus.setText(utf8("正在加载：") + chosen.name, juce::dontSendNotification);
+    pluginLoading = true;
     loadPluginButton.setEnabled(false);
     pluginHost.loadAsync(chosen,
                          status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
                          status.bufferSize > 0 ? status.bufferSize : 128,
                          [this](bool success, const juce::String& message)
                          {
+                             pluginLoading = false;
                              loadPluginButton.setEnabled(true);
                              if (! success)
                              {
                                  useTestSynth();
                                  pluginStatus.setText(utf8("加载失败，已恢复测试音源：") + message,
                                                       juce::dontSendNotification);
+                                 if (webInterface != nullptr)
+                                 {
+                                     auto result = std::make_unique<juce::DynamicObject>();
+                                     result->setProperty("success", false);
+                                     result->setProperty("message", message);
+                                     webInterface->emitEventIfBrowserIsVisible("pluginLoadResult", juce::var(result.release()));
+                                 }
                                  return;
                              }
                              activatePluginOutput(message);
+                             if (webInterface != nullptr)
+                             {
+                                 auto result = std::make_unique<juce::DynamicObject>();
+                                 result->setProperty("success", true);
+                                 result->setProperty("message", message);
+                                 webInterface->emitEventIfBrowserIsVisible("pluginLoadResult", juce::var(result.release()));
+                             }
                          });
 }
 
@@ -832,11 +889,13 @@ void MainComponent::loadSelectedEffect()
     const auto chosen = cachedEffectPlugins.getReference(index);
     const auto status = audio.getStatus();
     effectStatus.setText(utf8("正在加载效果器：") + chosen.name, juce::dontSendNotification);
+    effectLoading = true;
     loadEffectButton.setEnabled(false);
     pluginHost.loadEffectAsync(chosen, status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
         status.bufferSize > 0 ? status.bufferSize : 128,
         [this](bool success, const juce::String& message)
         {
+            effectLoading = false;
             loadEffectButton.setEnabled(true);
             if (success)
             {
@@ -850,6 +909,7 @@ void MainComponent::loadSelectedEffect()
 
 void MainComponent::removeEffect()
 {
+    effectLoading = false;
     pluginHost.unloadEffect();
     bypassEffectButton.setToggleState(false, juce::dontSendNotification);
     bypassEffectButton.setButtonText(utf8("旁通"));
@@ -1088,11 +1148,14 @@ void MainComponent::showSetupGuide(bool automatic)
     }), false);
 }
 
-void MainComponent::loadSelectedPreset()
+void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::String&)> completion)
 {
     const auto index = presetSelector.getSelectedId() - 1;
     if (! juce::isPositiveAndBelow(index, cachedPresets.size()))
+    {
+        if (completion) completion(false, utf8("请选择一个音色方案"));
         return;
+    }
     const auto preset = cachedPresets.getReference(index);
 
     juce::PluginDescription chosen;
@@ -1108,21 +1171,26 @@ void MainComponent::loadSelectedPreset()
     }
     if (! found)
     {
-        pluginStatus.setText(utf8("找不到此方案需要的音源，请重新扫描"), juce::dontSendNotification);
+        const auto message = utf8("找不到此方案需要的音源，请重新扫描");
+        pluginStatus.setText(message, juce::dontSendNotification);
+        if (completion) completion(false, message);
         return;
     }
 
     const auto status = audio.getStatus();
     pluginStatus.setText(utf8("正在恢复音色方案……"), juce::dontSendNotification);
+    pluginLoading = true;
     pluginHost.loadAsync(chosen,
                          status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
                          status.bufferSize > 0 ? status.bufferSize : 128,
-                         [this, preset](bool success, const juce::String& message)
+                         [this, preset, completion](bool success, const juce::String& message)
                          {
+                             pluginLoading = false;
                              if (! success)
                              {
                                  useTestSynth();
                                  pluginStatus.setText(utf8("方案载入失败：") + message, juce::dontSendNotification);
+                                 if (completion) completion(false, utf8("方案载入失败：") + message);
                                  return;
                              }
                              pluginHost.restorePluginState(preset.pluginState.getData(), preset.pluginState.getSize());
@@ -1132,7 +1200,9 @@ void MainComponent::loadSelectedPreset()
                              pluginStatus.setText(utf8("已恢复音色：") + preset.name, juce::dontSendNotification);
                              if (preset.effectIdentifier.isEmpty())
                              {
+                                 pluginHost.unloadEffect();
                                  effectStatus.setText(utf8("效果器：未使用"), juce::dontSendNotification);
+                                 if (completion) completion(true, utf8("音色方案已载入"));
                                  return;
                              }
                              juce::PluginDescription effect;
@@ -1142,15 +1212,19 @@ void MainComponent::loadSelectedPreset()
                                  { effect = candidate; foundEffect = true; break; }
                              if (! foundEffect)
                              {
-                                 effectStatus.setText(utf8("找不到方案中的效果器，音源已正常恢复"), juce::dontSendNotification);
+                                 const auto error = utf8("找不到方案中的效果器；音源已恢复，但方案未完整载入");
+                                 effectStatus.setText(error, juce::dontSendNotification);
+                                 if (completion) completion(false, error);
                                  return;
                              }
                              const auto audioStatusNow = audio.getStatus();
+                             effectLoading = true;
                              pluginHost.loadEffectAsync(effect,
                                  audioStatusNow.sampleRate > 0.0 ? audioStatusNow.sampleRate : 48000.0,
                                  audioStatusNow.bufferSize > 0 ? audioStatusNow.bufferSize : 128,
-                                 [this, preset](bool effectLoaded, const juce::String& effectMessage)
+                                 [this, preset, completion](bool effectLoaded, const juce::String& effectMessage)
                                  {
+                                     effectLoading = false;
                                      if (effectLoaded)
                                      {
                                          pluginHost.restoreEffectState(preset.effectState.getData(), preset.effectState.getSize());
@@ -1158,9 +1232,13 @@ void MainComponent::loadSelectedPreset()
                                          bypassEffectButton.setToggleState(preset.effectBypassed, juce::dontSendNotification);
                                          bypassEffectButton.setButtonText(preset.effectBypassed ? utf8("已旁通") : utf8("旁通"));
                                          effectStatus.setText(utf8("已恢复效果器：") + effectMessage, juce::dontSendNotification);
+                                         if (completion) completion(true, utf8("音色方案已完整载入"));
                                      }
                                      else
+                                     {
                                          effectStatus.setText(utf8("效果器恢复失败：") + effectMessage, juce::dontSendNotification);
+                                         if (completion) completion(false, utf8("效果器恢复失败：") + effectMessage);
+                                     }
                                  });
                          });
 }

@@ -57,9 +57,28 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertIn('id="recording-manager"', HTML)
         self.assertIn("nativeEvent('showRecordings')", JS)
         self.assertIn('id="wind-status-text">未连接电吹管', HTML)
-        self.assertNotIn('class="favorite"', HTML)
+        self.assertIn('id="favorite-current"', HTML)
+        self.assertIn('id="favorite-instruments"', HTML)
+        self.assertIn("fengyin-favorite-instruments-v1", JS)
+        self.assertIn("slice(0, 3)", JS)
         self.assertIn("document.body.classList.add('video-playing')", JS)
         self.assertIn("document.body.classList.remove('video-playing')", JS)
+
+    def test_instrument_art_uses_independent_images_without_distortion(self):
+        self.assertIn('object-fit:contain', HTML)
+        self.assertIn('assets/instruments/instrument_soprano_sax.png', HTML)
+        self.assertNotIn('instrument-saxophones.png', JS)
+        for filename in ("instrument_soprano_sax.png", "instrument_trumpet.png",
+                         "instrument_flute.png", "instrument_violin.png"):
+            self.assertTrue((ROOT / "assets" / "instruments" / filename).is_file())
+
+    def test_preset_navigation_waits_for_success(self):
+        self.assertIn("presetLoadResult", JS)
+        self.assertIn("pluginLoadResult", JS)
+        self.assertIn("if (!result.success)", JS)
+
+    def test_only_one_lower_stage_container_exists(self):
+        self.assertEqual(1, HTML.count('id="lower-stage"'))
 
 
 if __name__ == "__main__":

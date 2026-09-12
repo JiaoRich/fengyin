@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 0.4.1 LANGUAGES C CXX)
+project(FengYin VERSION 0.4.2 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -33,10 +33,32 @@ juce_add_binary_data(FengYinWebAssets SOURCES
     prototype/styles.css
     prototype/app.js
     assets/fengyin-app-icon.png
-    assets/instrument-saxophones.png
-    assets/instrument-woodwinds.png
-    assets/instrument-trumpets-trombones.png
-    assets/instrument-horns-strings.png
+    assets/instruments/instrument_soprano_sax.png
+    assets/instruments/instrument_alto_sax.png
+    assets/instruments/instrument_tenor_sax.png
+    assets/instruments/instrument_baritone_sax.png
+    assets/instruments/instrument_flugelhorn.png
+    assets/instruments/instrument_trumpet.png
+    assets/instruments/instrument_piccolo_trumpet.png
+    assets/instruments/instrument_tenor_trombone.png
+    assets/instruments/instrument_bass_trombone.png
+    assets/instruments/instrument_tuba.png
+    assets/instruments/instrument_euphonium.png
+    assets/instruments/instrument_horn.png
+    assets/instruments/instrument_piccolo.png
+    assets/instruments/instrument_flute.png
+    assets/instruments/instrument_alto_flute.png
+    assets/instruments/instrument_bass_flute.png
+    assets/instruments/instrument_clarinet.png
+    assets/instruments/instrument_bass_clarinet.png
+    assets/instruments/instrument_oboe.png
+    assets/instruments/instrument_english_horn.png
+    assets/instruments/instrument_bassoon.png
+    assets/instruments/instrument_contrabassoon.png
+    assets/instruments/instrument_violin.png
+    assets/instruments/instrument_viola.png
+    assets/instruments/instrument_cello.png
+    assets/instruments/instrument_double_bass.png
 )
 
 target_sources(FengYin PRIVATE

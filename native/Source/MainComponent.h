@@ -41,7 +41,7 @@ private:
     void refreshPresetChoices();
     void saveCurrentPreset();
     void commitCurrentPreset(const juce::String& name);
-    void loadSelectedPreset();
+    void loadSelectedPreset(std::function<void(bool, const juce::String&)> completion = {});
     void togglePresetFavorite();
     void makePresetDefault();
     void deleteSelectedPreset();
@@ -116,6 +116,8 @@ private:
     juce::Array<juce::PluginDescription> cachedEffectPlugins;
     fengyin::VideoPlayerPanel videoPlayer;
     bool pluginChoicesLoaded = false;
+    bool pluginLoading = false;
+    bool effectLoading = false;
     bool attemptedDefaultPreset = false;
     bool isActivated = false;
     std::unique_ptr<juce::AlertWindow> activationDialog;

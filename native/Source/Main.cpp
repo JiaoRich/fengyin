@@ -5,7 +5,7 @@ class FengYinApplication final : public juce::JUCEApplication
 {
 public:
     const juce::String getApplicationName() override { return juce::String::fromUTF8("风吟"); }
-    const juce::String getApplicationVersion() override { return "0.4.1"; }
+    const juce::String getApplicationVersion() override { return "0.4.2"; }
     bool moreThanOneInstanceAllowed() override { return false; }
 
     void initialise(const juce::String&) override
@@ -26,12 +26,12 @@ private:
             setUsingNativeTitleBar(true);
             setContentOwned(new MainComponent(), true);
             setResizable(true, true);
-            setResizeLimits(960, 620, 2560, 1600);
+            setResizeLimits(1120, 700, 2560, 1600);
             const auto display = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay();
             const auto available = display != nullptr ? display->userBounds.toNearestInt()
                                                       : juce::Rectangle<int>(0, 0, 1366, 768);
-            centreWithSize(juce::jmin(1440, juce::jmax(960, available.getWidth() - 32)),
-                           juce::jmin(900, juce::jmax(620, available.getHeight() - 32)));
+            centreWithSize(juce::jmin(1440, juce::jmax(1120, available.getWidth() - 32)),
+                           juce::jmin(900, juce::jmax(700, available.getHeight() - 32)));
             setVisible(true);
         }
 

@@ -23,43 +23,31 @@ let savedPresets = [];
 let presetListSignature = '';
 let hardwareBreath = null;
 let currentArtworkKey = '';
+let currentInstrument = null;
+let currentPluginLoaded = false;
+let favoriteInstruments = [];
+let pendingPresetNavigation = null;
 let appFocused = document.hasFocus();
 let unfocusedFrame = 0;
 
 const instrumentArtwork = {
-  'soprano-sax':['instrument-saxophones.png','400% 100%','0% 50%'],
-  'alto-sax':['instrument-saxophones.png','400% 100%','33.333% 50%'],
-  'tenor-sax':['instrument-saxophones.png','400% 100%','66.667% 50%'],
-  'baritone-sax':['instrument-saxophones.png','400% 100%','100% 50%'],
-  'flugelhorn-eb':['instrument-trumpets-trombones.png','500% 200%','0% 0%'],
-  'flugelhorn':['instrument-trumpets-trombones.png','500% 200%','25% 0%'],
-  'trumpet':['instrument-trumpets-trombones.png','500% 200%','50% 0%'],
-  'trumpet-c':['instrument-trumpets-trombones.png','500% 200%','75% 0%'],
-  'piccolo-trumpet':['instrument-trumpets-trombones.png','500% 200%','100% 0%'],
-  'double-bass-trombone':['instrument-trumpets-trombones.png','500% 200%','0% 100%'],
-  'bass-trombone':['instrument-trumpets-trombones.png','500% 200%','25% 100%'],
-  'tenor-bass-trombone':['instrument-trumpets-trombones.png','500% 200%','50% 100%'],
-  'tenor-trombone':['instrument-trumpets-trombones.png','500% 200%','75% 100%'],
-  'alto-trombone':['instrument-trumpets-trombones.png','500% 200%','100% 100%'],
-  'bass-tuba':['instrument-horns-strings.png','500% 200%','0% 0%'],
-  'tuba-eb':['instrument-horns-strings.png','500% 200%','25% 0%'],
-  'euphonium':['instrument-horns-strings.png','500% 200%','50% 0%'],
-  'horn-f':['instrument-horns-strings.png','500% 200%','75% 0%'],
-  'horn-bb':['instrument-horns-strings.png','500% 200%','100% 0%'],
-  'violin':['instrument-horns-strings.png','500% 200%','0% 100%'],
-  'viola':['instrument-horns-strings.png','500% 200%','25% 100%'],
-  'cello':['instrument-horns-strings.png','500% 200%','50% 100%'],
-  'double-bass':['instrument-horns-strings.png','500% 200%','75% 100%'],
-  'piccolo':['instrument-woodwinds.png','500% 200%','0% 0%'],
-  'flute':['instrument-woodwinds.png','500% 200%','25% 0%'],
-  'alto-flute':['instrument-woodwinds.png','500% 200%','50% 0%'],
-  'bass-flute':['instrument-woodwinds.png','500% 200%','75% 0%'],
-  'clarinet':['instrument-woodwinds.png','500% 200%','100% 0%'],
-  'bass-clarinet':['instrument-woodwinds.png','500% 200%','0% 100%'],
-  'oboe':['instrument-woodwinds.png','500% 200%','25% 100%'],
-  'english-horn':['instrument-woodwinds.png','500% 200%','50% 100%'],
-  'bassoon':['instrument-woodwinds.png','500% 200%','75% 100%'],
-  'contrabassoon':['instrument-woodwinds.png','500% 200%','100% 100%']
+  'soprano-sax':'instrument_soprano_sax.png', 'alto-sax':'instrument_alto_sax.png',
+  'tenor-sax':'instrument_tenor_sax.png', 'baritone-sax':'instrument_baritone_sax.png',
+  'flugelhorn-eb':'instrument_flugelhorn.png', 'flugelhorn':'instrument_flugelhorn.png',
+  'trumpet':'instrument_trumpet.png', 'trumpet-c':'instrument_trumpet.png',
+  'piccolo-trumpet':'instrument_piccolo_trumpet.png',
+  'double-bass-trombone':'instrument_bass_trombone.png', 'bass-trombone':'instrument_bass_trombone.png',
+  'tenor-bass-trombone':'instrument_tenor_trombone.png', 'tenor-trombone':'instrument_tenor_trombone.png',
+  'alto-trombone':'instrument_tenor_trombone.png', 'bass-tuba':'instrument_tuba.png',
+  'tuba-eb':'instrument_tuba.png', 'euphonium':'instrument_euphonium.png',
+  'horn-f':'instrument_horn.png', 'horn-bb':'instrument_horn.png',
+  'piccolo':'instrument_piccolo.png', 'flute':'instrument_flute.png',
+  'alto-flute':'instrument_alto_flute.png', 'bass-flute':'instrument_bass_flute.png',
+  'clarinet':'instrument_clarinet.png', 'bass-clarinet':'instrument_bass_clarinet.png',
+  'oboe':'instrument_oboe.png', 'english-horn':'instrument_english_horn.png',
+  'bassoon':'instrument_bassoon.png', 'contrabassoon':'instrument_contrabassoon.png',
+  'violin':'instrument_violin.png', 'viola':'instrument_viola.png',
+  'cello':'instrument_cello.png', 'double-bass':'instrument_double_bass.png'
 };
 
 function inferInstrumentKey(name = '') {
@@ -86,13 +74,11 @@ function showInstrumentArtwork(key, chineseName = '') {
   const picture = $('#instrument-picture');
   const artwork = instrumentArtwork[key] || instrumentArtwork['alto-sax'];
   if (chineseName) $('#save-custom').textContent = `保存为“${chineseName}”`;
-  picture.setAttribute('aria-label', `当前乐器：${chineseName || 'SWAM 乐器'}`);
+  picture.alt = `当前乐器：${chineseName || 'SWAM 乐器'}`;
   if (currentArtworkKey === key) return;
   currentArtworkKey = key;
   picture.classList.add('changing');
-  picture.style.backgroundImage = `url("../assets/${artwork[0]}")`;
-  picture.style.backgroundSize = artwork[1];
-  picture.style.backgroundPosition = artwork[2];
+  picture.src = `../assets/instruments/${artwork}`;
   window.setTimeout(() => picture.classList.remove('changing'), 130);
 }
 
@@ -122,6 +108,56 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
 }
 
+function loadFavoriteInstruments() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('fengyin-favorite-instruments-v1') || '[]');
+    favoriteInstruments = Array.isArray(saved) ? saved.filter(item => item?.name).slice(0, 3) : [];
+  } catch (_) {
+    favoriteInstruments = [];
+  }
+}
+
+function saveFavoriteInstruments() {
+  localStorage.setItem('fengyin-favorite-instruments-v1', JSON.stringify(favoriteInstruments.slice(0, 3)));
+}
+
+function renderFavoriteInstruments() {
+  const container = $('#favorite-instruments');
+  container.classList.toggle('empty', favoriteInstruments.length === 0);
+  container.innerHTML = favoriteInstruments.length
+    ? favoriteInstruments.map(item => `<button class="sound-chip" data-plugin-name="${escapeHtml(item.name)}">${escapeHtml(item.chineseName || item.name)}</button>`).join('')
+    : '<span class="favorite-empty">尚未收藏常用乐器</span>';
+  $$('#favorite-instruments .sound-chip').forEach(button => button.addEventListener('click', () => {
+    const index = availableInstruments.findIndex(item => item.name === button.dataset.pluginName);
+    if (index < 0) return toast('当前扫描结果中找不到这个乐器，请先重新扫描音源');
+    nativeEvent('loadPlugin', {index});
+    toast(`正在加载：${button.textContent}`);
+  }));
+  const star = $('#favorite-current');
+  const isFavorite = !!currentInstrument && favoriteInstruments.some(item => item.name === currentInstrument.name);
+  star.textContent = isFavorite ? '★' : '☆';
+  star.classList.toggle('active', isFavorite);
+  star.disabled = !currentPluginLoaded || !currentInstrument;
+  star.setAttribute('aria-label', isFavorite ? '取消收藏当前乐器' : '收藏当前乐器');
+}
+
+loadFavoriteInstruments();
+renderFavoriteInstruments();
+$('#favorite-current').addEventListener('click', () => {
+  if (!currentPluginLoaded || !currentInstrument) return toast('请先加载一个乐器音源');
+  const index = favoriteInstruments.findIndex(item => item.name === currentInstrument.name);
+  if (index >= 0) {
+    favoriteInstruments.splice(index, 1);
+    toast(`已取消收藏：${currentInstrument.chineseName}`);
+  } else {
+    if (favoriteInstruments.length >= 3) return toast('最多收藏三个常用乐器，请先取消一个');
+    favoriteInstruments.push({...currentInstrument});
+    toast(`已收藏：${currentInstrument.chineseName}`);
+  }
+  saveFavoriteInstruments();
+  renderFavoriteInstruments();
+});
+
 function renderPresets() {
   const starters = presets.map(([name,plugin,desc],index) => `<button class="preset" data-kind="starter" data-index="${index}"><h3>${name}</h3><b>${plugin}</b><span>${desc}</span></button>`).join('');
   const saved = savedPresets.map((preset,index) => `<button class="preset" data-kind="saved" data-index="${index}"><h3>${preset.favorite ? '★ ' : ''}${escapeHtml(preset.name)}</h3><b>我的音色方案</b><span>点击恢复已保存的音源与设置</span></button>`).join('');
@@ -135,34 +171,30 @@ function renderPresets() {
     }
     const index = Number(button.dataset.index);
     if (button.dataset.kind === 'saved') {
+      pendingPresetNavigation = {kind:'preset', name:savedPresets[index]?.name || '我的音色'};
       nativeEvent('loadPreset', {index});
       return toast(`正在载入：${savedPresets[index]?.name || '我的音色'}`);
     }
     const wanted = presets[index][1].replace('SWAM ', '');
     const found = availableInstruments.findIndex(item => item.label?.includes(wanted));
-    if (found >= 0) nativeEvent('loadPlugin', {index: found});
+    if (found >= 0) {
+      pendingPresetNavigation = {kind:'plugin', name:presets[index][0]};
+      nativeEvent('loadPlugin', {index: found});
+    }
     else if (window.__JUCE__?.backend?.emitEvent) {
       showPage('chain');
       nativeEvent('scanPlugins');
       return toast(`正在查找${wanted}，扫描完成后请选择加载`);
     }
-    $('#sound-name').textContent = presets[index][1];
-    showInstrumentArtwork(inferInstrumentKey(presets[index][1]), wanted);
-    toast(`已应用：${presets[index][0]}`);
+    if (!window.__JUCE__?.backend?.emitEvent) {
+      $('#sound-name').textContent = wanted;
+      showInstrumentArtwork(inferInstrumentKey(presets[index][1]), wanted);
+      showPage('play');
+      toast(`已应用：${presets[index][0]}`);
+    } else if (found >= 0) toast(`正在载入：${presets[index][0]}`);
   }));
 }
 renderPresets();
-
-$$('.sound-chip').forEach(button => button.addEventListener('click', () => {
-  $$('.sound-chip').forEach(el => el.classList.remove('active'));
-  button.classList.add('active');
-  $('#sound-name').textContent = button.dataset.sound;
-  const wanted = button.dataset.sound.replace('SWAM ', '');
-  showInstrumentArtwork(inferInstrumentKey(button.dataset.sound), wanted);
-  const found = availableInstruments.findIndex(item => item.label?.includes(wanted));
-  if (found >= 0) nativeEvent('loadPlugin', {index: found});
-  else if (window.__JUCE__?.backend?.emitEvent) toast(`尚未找到${wanted}，请先到“音源与音效”扫描`);
-}));
 
 const video = $('#video');
 $('#video-file').addEventListener('change', event => {
@@ -348,8 +380,15 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   if (sideText) sideText.textContent = connected ? '气息与音高信号正常' : '当前显示模拟演奏效果';
   if (windStatusText) windStatusText.textContent = connected ? '电吹管已连接' : '未连接电吹管';
   if (windStatusPill) windStatusPill.classList.toggle('disconnected', !connected);
+  currentPluginLoaded = !!state.pluginLoaded;
   const sound = $('#sound-name');
-  if (sound && state.pluginName) sound.textContent = state.pluginName;
+  if (sound) sound.textContent = currentPluginLoaded ? (state.instrumentChineseName || state.pluginName) : '安全测试音源';
+  $('#source-plugin-name').textContent = currentPluginLoaded ? (state.pluginName || '') : '尚未加载 SWAM 音源';
+  currentInstrument = currentPluginLoaded ? {
+    name:state.pluginName,
+    chineseName:state.instrumentChineseName || state.pluginName,
+    instrumentKey:state.instrumentKey || inferInstrumentKey(state.pluginName)
+  } : null;
   if (state.instrumentKey || state.pluginName)
     showInstrumentArtwork(state.instrumentKey || inferInstrumentKey(state.pluginName), state.instrumentChineseName || state.pluginName);
   const progress = Math.round((Number(state.scanProgress) || 0) * 100);
@@ -357,6 +396,14 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   $('#scan-label').textContent = state.scanning ? '请稍候，找到后自动分类' : '点击查找 SWAM / VST3';
   $('#scan-swam').disabled = !!state.scanning;
   if (state.pluginStatus) $('#plugin-status').textContent = state.pluginStatus;
+  const instrumentState = currentPluginLoaded ? `已加载：${state.instrumentChineseName || state.pluginName}` : (state.pluginLoading ? '正在加载乐器音源…' : '当前未加载乐器音源');
+  $('#instrument-load-state').textContent = instrumentState;
+  $('#instrument-load-state').classList.toggle('loaded', currentPluginLoaded);
+  $('#load-instrument').classList.toggle('loaded', currentPluginLoaded);
+  $('#load-instrument').textContent = state.pluginLoading ? '正在加载…' : (currentPluginLoaded ? '✓ 更换音源' : '加载音源');
+  const effectLoaded = !!state.effectLoaded;
+  $('#load-effect').classList.toggle('loaded', effectLoaded);
+  $('#load-effect').textContent = state.effectLoading ? '正在加载…' : (effectLoaded ? `✓ ${state.effectName || '已加载'}` : '加载效果');
   availableInstruments = Array.isArray(state.instruments) ? state.instruments : [];
   availableEffects = Array.isArray(state.effects) ? state.effects : [];
   savedPresets = Array.isArray(state.presets) ? state.presets : [];
@@ -370,6 +417,7 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
       ? availableEffects.map((name,index) => `<option value="${index}">${escapeHtml(name)}</option>`).join('')
       : '<option value="">未找到外部效果器（可不选）</option>';
   }
+  renderFavoriteInstruments();
   const nextPresetSignature = JSON.stringify(savedPresets);
   if (nextPresetSignature !== presetListSignature) {
     presetListSignature = nextPresetSignature;
@@ -383,6 +431,22 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   recording = !!state.recording;
   $('#record').textContent = recording ? '■ 停止录音' : '● 开始录音';
   $('#record').style.color = recording ? 'var(--danger)' : '';
+});
+window.__JUCE__?.backend?.addEventListener('pluginLoadResult', result => {
+  if (!pendingPresetNavigation || pendingPresetNavigation.kind !== 'plugin') return;
+  const pending = pendingPresetNavigation;
+  pendingPresetNavigation = null;
+  if (!result.success) return toast(result.message || '音色载入失败');
+  showPage('play');
+  toast(`已应用：${pending.name}`);
+});
+window.__JUCE__?.backend?.addEventListener('presetLoadResult', result => {
+  if (!pendingPresetNavigation || pendingPresetNavigation.kind !== 'preset') return;
+  const pending = pendingPresetNavigation;
+  pendingPresetNavigation = null;
+  if (!result.success) return toast(result.message || '音色方案载入失败');
+  showPage('play');
+  toast(`已载入：${pending.name}`);
 });
 window.__JUCE__?.backend?.addEventListener('activationResult', result => {
   if (result.activated) {
