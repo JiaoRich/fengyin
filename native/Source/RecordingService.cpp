@@ -5,7 +5,22 @@ namespace fengyin
 RecordingService::RecordingService() { writerThread.startThread(); }
 RecordingService::~RecordingService() { stop(); writerThread.stopThread(2000); }
 
-bool RecordingService::start(double sampleRate, int channelCount)
+juce::File RecordingService::nextRecordingFile(const juce::File& folder,
+                                                const juce::String& instrumentChineseName,
+                                                const juce::String& date)
+{
+    auto safeName = instrumentChineseName.trim().replaceCharacters("\\/:*?\"<>|", "_________");
+    if (safeName.isEmpty()) safeName = juce::String::fromUTF8("风吟");
+    const auto day = date.isNotEmpty() ? date : juce::Time::getCurrentTime().formatted("%Y%m%d");
+    for (int sequence = 1; sequence < 10000; ++sequence)
+    {
+        const auto candidate = folder.getChildFile(safeName + "-" + day + "-" + juce::String(sequence) + ".wav");
+        if (! candidate.exists()) return candidate;
+    }
+    return folder.getChildFile(safeName + "-" + day + "-" + juce::Uuid().toString() + ".wav");
+}
+
+bool RecordingService::start(double sampleRate, int channelCount, const juce::String& instrumentChineseName)
 {
     auto folder = getRecordingsFolder();
     if (! folder.createDirectory())
@@ -14,8 +29,7 @@ bool RecordingService::start(double sampleRate, int channelCount)
         lastError = juce::String::fromUTF8("无法创建“风吟录音”文件夹");
         return false;
     }
-    return startToFile(folder.getNonexistentChildFile(juce::String::fromUTF8("风吟-") + juce::Time::getCurrentTime().formatted("%Y%m%d-%H%M%S"),
-                                                      ".wav", false), sampleRate, channelCount);
+    return startToFile(nextRecordingFile(folder, instrumentChineseName), sampleRate, channelCount);
 }
 
 bool RecordingService::startToFile(const juce::File& destination, double sampleRate, int channelCount)

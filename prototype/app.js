@@ -22,6 +22,79 @@ let pluginListSignature = '';
 let savedPresets = [];
 let presetListSignature = '';
 let hardwareBreath = null;
+let currentArtworkKey = '';
+let appFocused = document.hasFocus();
+let unfocusedFrame = 0;
+
+const instrumentArtwork = {
+  'soprano-sax':['instrument-saxophones.png','400% 100%','0% 50%'],
+  'alto-sax':['instrument-saxophones.png','400% 100%','33.333% 50%'],
+  'tenor-sax':['instrument-saxophones.png','400% 100%','66.667% 50%'],
+  'baritone-sax':['instrument-saxophones.png','400% 100%','100% 50%'],
+  'flugelhorn-eb':['instrument-trumpets-trombones.png','500% 200%','0% 0%'],
+  'flugelhorn':['instrument-trumpets-trombones.png','500% 200%','25% 0%'],
+  'trumpet':['instrument-trumpets-trombones.png','500% 200%','50% 0%'],
+  'trumpet-c':['instrument-trumpets-trombones.png','500% 200%','75% 0%'],
+  'piccolo-trumpet':['instrument-trumpets-trombones.png','500% 200%','100% 0%'],
+  'double-bass-trombone':['instrument-trumpets-trombones.png','500% 200%','0% 100%'],
+  'bass-trombone':['instrument-trumpets-trombones.png','500% 200%','25% 100%'],
+  'tenor-bass-trombone':['instrument-trumpets-trombones.png','500% 200%','50% 100%'],
+  'tenor-trombone':['instrument-trumpets-trombones.png','500% 200%','75% 100%'],
+  'alto-trombone':['instrument-trumpets-trombones.png','500% 200%','100% 100%'],
+  'bass-tuba':['instrument-horns-strings.png','500% 200%','0% 0%'],
+  'tuba-eb':['instrument-horns-strings.png','500% 200%','25% 0%'],
+  'euphonium':['instrument-horns-strings.png','500% 200%','50% 0%'],
+  'horn-f':['instrument-horns-strings.png','500% 200%','75% 0%'],
+  'horn-bb':['instrument-horns-strings.png','500% 200%','100% 0%'],
+  'violin':['instrument-horns-strings.png','500% 200%','0% 100%'],
+  'viola':['instrument-horns-strings.png','500% 200%','25% 100%'],
+  'cello':['instrument-horns-strings.png','500% 200%','50% 100%'],
+  'double-bass':['instrument-horns-strings.png','500% 200%','75% 100%'],
+  'piccolo':['instrument-woodwinds.png','500% 200%','0% 0%'],
+  'flute':['instrument-woodwinds.png','500% 200%','25% 0%'],
+  'alto-flute':['instrument-woodwinds.png','500% 200%','50% 0%'],
+  'bass-flute':['instrument-woodwinds.png','500% 200%','75% 0%'],
+  'clarinet':['instrument-woodwinds.png','500% 200%','100% 0%'],
+  'bass-clarinet':['instrument-woodwinds.png','500% 200%','0% 100%'],
+  'oboe':['instrument-woodwinds.png','500% 200%','25% 100%'],
+  'english-horn':['instrument-woodwinds.png','500% 200%','50% 100%'],
+  'bassoon':['instrument-woodwinds.png','500% 200%','75% 100%'],
+  'contrabassoon':['instrument-woodwinds.png','500% 200%','100% 100%']
+};
+
+function inferInstrumentKey(name = '') {
+  const text = String(name).toLowerCase();
+  const rules = [
+    ['倍低音长号|double bass trombone','double-bass-trombone'],['次中低音长号|tenor bass trombone','tenor-bass-trombone'],
+    ['低音长号|bass trombone','bass-trombone'],['中音长号|alto trombone','alto-trombone'],['长号|trombone','tenor-trombone'],
+    ['降e调柔音号|flugelhorn.*eb','flugelhorn-eb'],['柔音号|flugelhorn','flugelhorn'],
+    ['高音小号|piccolo trumpet','piccolo-trumpet'],['c调小号|trumpet.*\(c\)|trumpet c','trumpet-c'],['小号|trumpet','trumpet'],
+    ['低音大号|bass tuba','bass-tuba'],['降e调大号|tuba.*eb','tuba-eb'],['上低音号|euphonium','euphonium'],
+    ['降b调圆号|french horn.*bb','horn-bb'],['圆号|french horn|horn','horn-f'],
+    ['高音萨克斯|soprano sax','soprano-sax'],['中音萨克斯|alto sax','alto-sax'],
+    ['次中音萨克斯|tenor sax','tenor-sax'],['上低音萨克斯|baritone sax','baritone-sax'],
+    ['低音长笛|bass flute','bass-flute'],['中音长笛|alto flute','alto-flute'],['短笛|piccolo','piccolo'],['长笛|flute','flute'],
+    ['低音单簧管|bass clarinet','bass-clarinet'],['单簧管|clarinet','clarinet'],
+    ['英国管|english horn|cor anglais','english-horn'],['双簧管|oboe','oboe'],
+    ['倍低音巴松管|contrabassoon','contrabassoon'],['巴松管|bassoon','bassoon'],
+    ['低音提琴|double bass','double-bass'],['小提琴|violin','violin'],['中提琴|viola','viola'],['大提琴|cello','cello']
+  ];
+  return rules.find(([pattern]) => new RegExp(pattern).test(text))?.[1] || 'alto-sax';
+}
+
+function showInstrumentArtwork(key, chineseName = '') {
+  const picture = $('#instrument-picture');
+  const artwork = instrumentArtwork[key] || instrumentArtwork['alto-sax'];
+  if (chineseName) $('#save-custom').textContent = `保存为“${chineseName}”`;
+  picture.setAttribute('aria-label', `当前乐器：${chineseName || 'SWAM 乐器'}`);
+  if (currentArtworkKey === key) return;
+  currentArtworkKey = key;
+  picture.classList.add('changing');
+  picture.style.backgroundImage = `url("../assets/${artwork[0]}")`;
+  picture.style.backgroundSize = artwork[1];
+  picture.style.backgroundPosition = artwork[2];
+  window.setTimeout(() => picture.classList.remove('changing'), 130);
+}
 
 function nativeEvent(name, payload = {}) {
   if (window.__JUCE__?.backend?.emitEvent) window.__JUCE__.backend.emitEvent(name, payload);
@@ -74,6 +147,7 @@ function renderPresets() {
       return toast(`正在查找${wanted}，扫描完成后请选择加载`);
     }
     $('#sound-name').textContent = presets[index][1];
+    showInstrumentArtwork(inferInstrumentKey(presets[index][1]), wanted);
     toast(`已应用：${presets[index][0]}`);
   }));
 }
@@ -84,6 +158,7 @@ $$('.sound-chip').forEach(button => button.addEventListener('click', () => {
   button.classList.add('active');
   $('#sound-name').textContent = button.dataset.sound;
   const wanted = button.dataset.sound.replace('SWAM ', '');
+  showInstrumentArtwork(inferInstrumentKey(button.dataset.sound), wanted);
   const found = availableInstruments.findIndex(item => item.label?.includes(wanted));
   if (found >= 0) nativeEvent('loadPlugin', {index: found});
   else if (window.__JUCE__?.backend?.emitEvent) toast(`尚未找到${wanted}，请先到“音源与音效”扫描`);
@@ -131,8 +206,9 @@ function toggleVideo() {
 }
 $('#play-button').addEventListener('click', toggleVideo);
 $('#main-play').addEventListener('click', toggleVideo);
-video.addEventListener('play', () => { $('#play-button').textContent='Ⅱ'; $('#main-play').textContent='Ⅱ 暂停视频'; });
-video.addEventListener('pause', () => { $('#play-button').textContent='▶'; $('#main-play').textContent='▶ 播放视频'; });
+video.addEventListener('play', () => { document.body.classList.add('video-playing'); $('#play-button').textContent='Ⅱ'; $('#main-play').textContent='Ⅱ 暂停视频'; });
+video.addEventListener('pause', () => { document.body.classList.remove('video-playing'); $('#play-button').textContent='▶'; $('#main-play').textContent='▶ 播放视频'; });
+video.addEventListener('ended', () => document.body.classList.remove('video-playing'));
 video.addEventListener('timeupdate', () => {
   $('#current-time').textContent = formatTime(video.currentTime);
   $('#seek').value = video.duration ? video.currentTime / video.duration * 100 : 0;
@@ -168,10 +244,13 @@ $('#theme').addEventListener('change', event => document.body.dataset.theme = ev
 const playPage = $('#page-play');
 const stageGrid = $('.stage-grid');
 const layoutResizer = $('#layout-resizer');
+const lowerStage = $('#lower-stage');
 function setStageHeight(clientY) {
   const bounds = playPage.getBoundingClientRect();
-  const minimum = window.innerHeight <= 850 ? 300 : 320;
-  const maximum = Math.max(minimum, bounds.height - 205);
+  const minimum = window.innerHeight <= 850 ? 280 : 300;
+  const dividerHeight = layoutResizer.getBoundingClientRect().height;
+  const lowerMinimum = parseFloat(getComputedStyle(lowerStage).minHeight) || 180;
+  const maximum = Math.max(minimum, bounds.height - dividerHeight - lowerMinimum);
   const next = Math.max(minimum, Math.min(maximum, clientY - bounds.top));
   stageGrid.style.flexBasis = `${next}px`;
 }
@@ -186,9 +265,11 @@ layoutResizer.addEventListener('keydown', event => {
   if (!['ArrowUp','ArrowDown'].includes(event.key)) return;
   event.preventDefault();
   const bounds = playPage.getBoundingClientRect();
-  const minimum = window.innerHeight <= 850 ? 300 : 320;
+  const minimum = window.innerHeight <= 850 ? 280 : 300;
+  const dividerHeight = layoutResizer.getBoundingClientRect().height;
+  const lowerMinimum = parseFloat(getComputedStyle(lowerStage).minHeight) || 180;
   const next = stageGrid.getBoundingClientRect().height + (event.key === 'ArrowDown' ? 16 : -16);
-  stageGrid.style.flexBasis = `${Math.max(minimum,Math.min(bounds.height - 205,next))}px`;
+  stageGrid.style.flexBasis = `${Math.max(minimum,Math.min(bounds.height - dividerHeight - lowerMinimum,next))}px`;
 });
 $('#master-volume').addEventListener('input', event => nativeEvent('setMasterVolume', {value:Number(event.target.value)/100}));
 $('#simulate').addEventListener('click', event => {
@@ -202,6 +283,7 @@ $('#record').addEventListener('click', event => {
   event.target.style.color = recording ? 'var(--danger)' : '';
   toast(recording ? '已开始模拟录音' : '模拟录音已保存');
 });
+$('#recording-manager').addEventListener('click', () => nativeEvent('showRecordings'));
 $('#low-performance').addEventListener('change', event => {
   document.body.classList.toggle('low-performance', event.target.checked);
   toast(event.target.checked ? '已开启流畅模式' : '已恢复精美动画');
@@ -229,14 +311,14 @@ $('#load-instrument').addEventListener('click', () => {
   if (!Number.isInteger(index) || index < 0) return toast('请先扫描并选择一个乐器音源');
   nativeEvent('loadPlugin', {index}); toast('正在加载所选音源…');
 });
-$('#open-instrument').addEventListener('click', () => nativeEvent('openPlugin'));
+$('#open-instrument').addEventListener('click', () => { toast('正在打开音源界面…'); nativeEvent('openPlugin'); });
 $('#load-effect').addEventListener('click', () => {
   const index = Number($('#effect-select').value);
   if (!Number.isInteger(index) || index < 0) return toast('请先选择一个外部效果器');
   nativeEvent('loadEffect', {index}); toast('正在加载效果器…');
 });
 $('#remove-effect').addEventListener('click', () => { nativeEvent('removeEffect'); toast('已移除外部效果器'); });
-$('#open-effect').addEventListener('click', () => nativeEvent('openEffect'));
+$('#open-effect').addEventListener('click', () => { toast('正在打开效果器界面…'); nativeEvent('openEffect'); });
 $('#save-custom').addEventListener('click', () => { nativeEvent('savePreset'); toast('请输入音色方案名称并保存'); });
 
 function updateBuiltinEffects() {
@@ -260,10 +342,16 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   hardwareBreath = connected ? Math.max(0,Math.min(100,Number(state.breath || 0)*100)) : null;
   const sideTitle = document.querySelector('.sidebar-status b');
   const sideText = document.querySelector('.sidebar-status small');
+  const windStatusPill = $('#wind-status-pill');
+  const windStatusText = $('#wind-status-text');
   if (sideTitle) sideTitle.textContent = connected ? (state.deviceName || '电吹管已连接') : '尚未连接电吹管';
   if (sideText) sideText.textContent = connected ? '气息与音高信号正常' : '当前显示模拟演奏效果';
+  if (windStatusText) windStatusText.textContent = connected ? '电吹管已连接' : '未连接电吹管';
+  if (windStatusPill) windStatusPill.classList.toggle('disconnected', !connected);
   const sound = $('#sound-name');
   if (sound && state.pluginName) sound.textContent = state.pluginName;
+  if (state.instrumentKey || state.pluginName)
+    showInstrumentArtwork(state.instrumentKey || inferInstrumentKey(state.pluginName), state.instrumentChineseName || state.pluginName);
   const progress = Math.round((Number(state.scanProgress) || 0) * 100);
   $('#scan-title').textContent = state.scanning ? `正在扫描 ${progress}%` : '重新扫描音源';
   $('#scan-label').textContent = state.scanning ? '请稍候，找到后自动分类' : '点击查找 SWAM / VST3';
@@ -304,7 +392,9 @@ window.__JUCE__?.backend?.addEventListener('activationResult', result => {
   }
   toast(result.message || (result.activated ? '激活成功' : '无法激活'));
 });
+window.__JUCE__?.backend?.addEventListener('editorResult', message => toast(String(message || '')));
 nativeEvent('webReady');
+showInstrumentArtwork('soprano-sax', '高音萨克斯');
 if(localStorage.getItem('fengyin-prototype-license') === 'active') {
   $('#license-title').textContent = '已永久激活';
   $('#license-title').classList.add('green');
@@ -343,7 +433,7 @@ function drawLotus(x, baseY, scale, time, accent, accent2) {
   atmosphereContext.translate(x,baseY);
   atmosphereContext.strokeStyle = accent;
   atmosphereContext.lineWidth = 1.5;
-  atmosphereContext.globalAlpha = .12;
+  atmosphereContext.globalAlpha = .24;
   atmosphereContext.beginPath();
   atmosphereContext.moveTo(0,22*scale);
   atmosphereContext.quadraticCurveTo(sway,0,sway*.7,-34*scale);
@@ -385,16 +475,16 @@ function drawThemeAtmosphere(ratio, accent, accent2) {
     for(let index=0;index<3;index++) {
       const y = height*(.23+index*.22)+Math.sin(time*.28+index)*14;
       atmosphereContext.strokeStyle = accent;
-      atmosphereContext.globalAlpha = .07;
-      atmosphereContext.lineWidth = 1.2;
+      atmosphereContext.globalAlpha = .16;
+      atmosphereContext.lineWidth = 1.7;
       atmosphereContext.beginPath();
       atmosphereContext.moveTo(-40,y);
       atmosphereContext.bezierCurveTo(width*.26,y-36,width*.62,y+35,width+40,y-8);
       atmosphereContext.stroke();
     }
     atmosphereContext.setLineDash([]);
-    atmosphereContext.globalAlpha = .16;
-    for(let index=0;index<13;index++) {
+    atmosphereContext.globalAlpha = .34;
+    for(let index=0;index<18;index++) {
       const x = (seeded(index,1)*width+time*(5+seeded(index,2)*6))%(width+50)-25;
       const y = (seeded(index,3)*height+time*(8+seeded(index,4)*7))%(height+40)-20;
       drawPetal(x+Math.sin(time*.5+index)*18,y,3+seeded(index,5)*3,time*.25+index,accent2);
@@ -403,8 +493,8 @@ function drawThemeAtmosphere(ratio, accent, accent2) {
     for(let index=0;index<4;index++) {
       const radius = (time*7+index*37)%145;
       atmosphereContext.strokeStyle = index%2 ? accent2 : accent;
-      atmosphereContext.globalAlpha = .09*(1-radius/145);
-      atmosphereContext.lineWidth = 1.2;
+      atmosphereContext.globalAlpha = .21*(1-radius/145);
+      atmosphereContext.lineWidth = 1.7;
       atmosphereContext.beginPath();
       atmosphereContext.ellipse(width*(.18+index*.21),height*(.32+(index%2)*.38),radius,radius*.32,0,0,Math.PI*2);
       atmosphereContext.stroke();
@@ -413,9 +503,9 @@ function drawThemeAtmosphere(ratio, accent, accent2) {
     drawLotus(width*.87,height*.74,.72,time+1.7,accent,accent2);
   } else if (theme === 'autumn') {
     atmosphereContext.strokeStyle = accent2;
-    atmosphereContext.lineWidth = .9;
-    atmosphereContext.globalAlpha = .12;
-    for(let index=0;index<30;index++) {
+    atmosphereContext.lineWidth = 1.2;
+    atmosphereContext.globalAlpha = .25;
+    for(let index=0;index<38;index++) {
       const speed = 20+seeded(index,2)*16;
       const y = (seeded(index,3)*height+time*speed)%(height+35)-20;
       const x = (seeded(index,1)*width-time*6+height-y*.1)%(width+40)-20;
@@ -426,8 +516,8 @@ function drawThemeAtmosphere(ratio, accent, accent2) {
     }
   } else if (theme === 'winter') {
     atmosphereContext.fillStyle = accent;
-    atmosphereContext.globalAlpha = .15;
-    for(let index=0;index<30;index++) {
+    atmosphereContext.globalAlpha = .3;
+    for(let index=0;index<38;index++) {
       const y = (seeded(index,3)*height+time*(7+seeded(index,4)*8))%(height+24)-12;
       const x = seeded(index,1)*width+Math.sin(time*.3+index)*14;
       atmosphereContext.beginPath();
@@ -436,7 +526,7 @@ function drawThemeAtmosphere(ratio, accent, accent2) {
     }
     const snowX = width-78;
     const snowY = height-28;
-    atmosphereContext.globalAlpha = .11;
+    atmosphereContext.globalAlpha = .24;
     atmosphereContext.fillStyle = accent;
     atmosphereContext.beginPath(); atmosphereContext.arc(snowX,snowY-18,25,0,Math.PI*2); atmosphereContext.fill();
     atmosphereContext.beginPath(); atmosphereContext.arc(snowX,snowY-54,17,0,Math.PI*2); atmosphereContext.fill();
@@ -447,7 +537,7 @@ function drawThemeAtmosphere(ratio, accent, accent2) {
     for(let index=0;index<5;index++) {
       const center = width*(.33+index*.085)+Math.sin(time*.18+index)*16;
       atmosphereContext.fillStyle = accent;
-      atmosphereContext.globalAlpha = .022+Math.sin(time*.35+index)*.007;
+      atmosphereContext.globalAlpha = .055+Math.sin(time*.35+index)*.014;
       atmosphereContext.beginPath();
       atmosphereContext.moveTo(center-16,0);
       atmosphereContext.lineTo(center+18,0);
@@ -457,8 +547,8 @@ function drawThemeAtmosphere(ratio, accent, accent2) {
       atmosphereContext.fill();
     }
     atmosphereContext.fillStyle = accent2;
-    atmosphereContext.globalAlpha = .12;
-    for(let index=0;index<18;index++) {
+    atmosphereContext.globalAlpha = .25;
+    for(let index=0;index<24;index++) {
       const x = seeded(index,1)*width+Math.sin(time*.2+index)*9;
       const y = (seeded(index,2)*height-time*(3+seeded(index,3)*4)+height)%height;
       atmosphereContext.fillRect(x,y,1.5,1.5);
@@ -467,8 +557,8 @@ function drawThemeAtmosphere(ratio, accent, accent2) {
     for(let index=0;index<3;index++) {
       const x = (width*(.2+index*.3)+Math.sin(time*.2+index)*80);
       atmosphereContext.strokeStyle = index%2 ? accent2 : accent;
-      atmosphereContext.globalAlpha = .045;
-      atmosphereContext.lineWidth = 34;
+      atmosphereContext.globalAlpha = .1;
+      atmosphereContext.lineWidth = 42;
       atmosphereContext.beginPath();
       atmosphereContext.moveTo(x,-30);
       atmosphereContext.lineTo(x+Math.sin(time*.16+index)*210,height+30);
@@ -478,12 +568,12 @@ function drawThemeAtmosphere(ratio, accent, accent2) {
       const barWidth = width/22;
       const barHeight = 10+Math.abs(Math.sin(index*.48+time*.72))*42;
       atmosphereContext.fillStyle = index%2 ? accent2 : accent;
-      atmosphereContext.globalAlpha = .055;
+      atmosphereContext.globalAlpha = .13;
       atmosphereContext.fillRect(index*barWidth+2,height-barHeight,Math.max(4,barWidth-7),barHeight);
     }
   } else if (theme === 'china-red') {
     atmosphereContext.strokeStyle = accent2;
-    atmosphereContext.globalAlpha = .07;
+    atmosphereContext.globalAlpha = .16;
     atmosphereContext.lineWidth = 2;
     for(let index=0;index<2;index++) {
       atmosphereContext.beginPath();
@@ -492,8 +582,8 @@ function drawThemeAtmosphere(ratio, accent, accent2) {
       atmosphereContext.stroke();
     }
     atmosphereContext.fillStyle = accent2;
-    atmosphereContext.globalAlpha = .13;
-    for(let index=0;index<14;index++) {
+    atmosphereContext.globalAlpha = .27;
+    for(let index=0;index<19;index++) {
       const x = seeded(index,2)*width+Math.sin(time*.2+index)*10;
       const y = (seeded(index,4)*height-time*(4+seeded(index,5)*3)+height)%height;
       atmosphereContext.beginPath(); atmosphereContext.arc(x,y,1+seeded(index,1)*1.4,0,Math.PI*2); atmosphereContext.fill();
@@ -539,6 +629,10 @@ function drawBreathWave(ratio, breath, accent, accent2) {
 }
 
 function draw() {
+  if (!appFocused && ++unfocusedFrame % 4 !== 0) {
+    animationFrame = requestAnimationFrame(draw);
+    return;
+  }
   const ratio = window.devicePixelRatio || 1;
   const bounds = canvas.getBoundingClientRect();
   if(canvas.width !== Math.round(bounds.width*ratio) || canvas.height !== Math.round(bounds.height*ratio)) {
@@ -574,6 +668,9 @@ function draw() {
   animationFrame = requestAnimationFrame(draw);
 }
 draw();
+
+window.addEventListener('focus', () => { appFocused = true; unfocusedFrame = 0; });
+window.addEventListener('blur', () => { appFocused = false; });
 
 window.addEventListener('beforeunload', () => {
   cancelAnimationFrame(animationFrame);

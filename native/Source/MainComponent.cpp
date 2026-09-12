@@ -220,7 +220,12 @@ void MainComponent::setupWebInterface()
                 loadSelectedPlugin();
             }
         })
-        .withEventListener("openPlugin", [this](juce::var) { if (isActivated) pluginHost.showPluginEditor(false); })
+        .withEventListener("openPlugin", [this](juce::var)
+        {
+            const auto opened = isActivated && pluginHost.showPluginEditor(false);
+            if (webInterface != nullptr)
+                webInterface->emitEventIfBrowserIsVisible("editorResult", opened ? utf8("音源界面已打开") : utf8("请先加载一个音源"));
+        })
         .withEventListener("loadEffect", [this](juce::var payload)
         {
             const auto index = static_cast<int>(payload.getProperty("index", -1));
@@ -231,7 +236,12 @@ void MainComponent::setupWebInterface()
             }
         })
         .withEventListener("removeEffect", [this](juce::var) { if (isActivated) removeEffect(); })
-        .withEventListener("openEffect", [this](juce::var) { if (isActivated) pluginHost.showPluginEditor(true); })
+        .withEventListener("openEffect", [this](juce::var)
+        {
+            const auto opened = isActivated && pluginHost.showPluginEditor(true);
+            if (webInterface != nullptr)
+                webInterface->emitEventIfBrowserIsVisible("editorResult", opened ? utf8("效果器界面已打开") : utf8("请先加载一个外部效果器"));
+        })
         .withEventListener("savePreset", [this](juce::var) { if (isActivated && pluginHost.hasPlugin()) saveCurrentPreset(); })
         .withEventListener("loadPreset", [this](juce::var payload)
         {
@@ -256,6 +266,12 @@ void MainComponent::setupWebInterface()
         .withEventListener("showExpressionSettings", [this](juce::var) { showExpressionSettings(); })
         .withEventListener("showAudioSettings", [this](juce::var) { showDeviceSettings(); })
         .withEventListener("toggleRecording", [this](juce::var) { toggleRecording(); })
+        .withEventListener("showRecordings", [](juce::var)
+        {
+            const auto folder = fengyin::RecordingService::getRecordingsFolder();
+            folder.createDirectory();
+            folder.revealToUser();
+        })
         .withEventListener("activate", [this](juce::var payload)
         {
             const auto status = license.activate(payload.getProperty("code", juce::String()).toString());
@@ -293,10 +309,14 @@ std::optional<juce::WebBrowserComponent::Resource> MainComponent::getWebResource
     {
         data = BinaryData::fengyinappicon_png; size = BinaryData::fengyinappicon_pngSize; mime = "image/png";
     }
-    else if (requested == "swam-alto-sax-concept.svg" || requested == "assets/swam-alto-sax-concept.svg")
-    {
-        data = BinaryData::swamaltosaxconcept_svg; size = BinaryData::swamaltosaxconcept_svgSize; mime = "image/svg+xml";
-    }
+    else if (requested == "instrument-saxophones.png" || requested == "assets/instrument-saxophones.png")
+    { data = BinaryData::instrumentsaxophones_png; size = BinaryData::instrumentsaxophones_pngSize; mime = "image/png"; }
+    else if (requested == "instrument-woodwinds.png" || requested == "assets/instrument-woodwinds.png")
+    { data = BinaryData::instrumentwoodwinds_png; size = BinaryData::instrumentwoodwinds_pngSize; mime = "image/png"; }
+    else if (requested == "instrument-trumpets-trombones.png" || requested == "assets/instrument-trumpets-trombones.png")
+    { data = BinaryData::instrumenttrumpetstrombones_png; size = BinaryData::instrumenttrumpetstrombones_pngSize; mime = "image/png"; }
+    else if (requested == "instrument-horns-strings.png" || requested == "assets/instrument-horns-strings.png")
+    { data = BinaryData::instrumenthornsstrings_png; size = BinaryData::instrumenthornsstrings_pngSize; mime = "image/png"; }
     else return std::nullopt;
 
     std::vector<std::byte> bytes(static_cast<size_t>(size));
@@ -590,7 +610,10 @@ void MainComponent::timerCallback()
         state->setProperty("activated", isActivated);
         state->setProperty("machineCode", machineCode);
         state->setProperty("recording", recorder.isRecording());
-        state->setProperty("pluginName", pluginHost.hasPlugin() ? pluginHost.getPluginName() : utf8("安全测试音源"));
+        const auto currentPluginName = pluginHost.hasPlugin() ? pluginHost.getPluginName() : utf8("SWAM Soprano Sax");
+        state->setProperty("pluginName", pluginHost.hasPlugin() ? currentPluginName : utf8("安全测试音源"));
+        state->setProperty("instrumentChineseName", utf8(fengyin::SwamPluginClassifier::instrumentChineseName(currentPluginName.toStdString())));
+        state->setProperty("instrumentKey", utf8(fengyin::SwamPluginClassifier::instrumentKey(currentPluginName.toStdString())));
         state->setProperty("scanning", scanProgress.scanning);
         state->setProperty("scanProgress", scanProgress.fraction);
         state->setProperty("pluginStatus", pluginStatus.getText());
@@ -600,6 +623,8 @@ void MainComponent::timerCallback()
         {
             auto item = std::make_unique<juce::DynamicObject>();
             item->setProperty("name", plugin.name);
+            item->setProperty("chineseName", utf8(fengyin::SwamPluginClassifier::instrumentChineseName(plugin.name.toStdString())));
+            item->setProperty("instrumentKey", utf8(fengyin::SwamPluginClassifier::instrumentKey(plugin.name.toStdString())));
             item->setProperty("label", utf8(fengyin::SwamPluginClassifier::instrumentChineseName(plugin.name.toStdString()))
                                        + utf8(" · ") + plugin.name);
             instruments.add(juce::var(item.release()));
@@ -866,7 +891,9 @@ void MainComponent::saveCurrentPreset()
 
     savePresetDialog = std::make_unique<juce::AlertWindow>(utf8("保存音色方案"), utf8("给这套音源和效果器起一个容易记住的名字。"),
                                                            juce::MessageBoxIconType::QuestionIcon);
-    savePresetDialog->addTextEditor("name", pluginHost.getPluginName() + utf8(" · 我的音色"), utf8("方案名称"));
+    savePresetDialog->addTextEditor("name",
+        utf8(fengyin::SwamPluginClassifier::instrumentChineseName(pluginHost.getPluginName().toStdString())),
+        utf8("方案名称"));
     savePresetDialog->addButton(utf8("保存"), 1, juce::KeyPress(juce::KeyPress::returnKey));
     savePresetDialog->addButton(utf8("取消"), 0, juce::KeyPress(juce::KeyPress::escapeKey));
     savePresetDialog->enterModalState(true, juce::ModalCallbackFunction::create([this](int result)
@@ -1202,7 +1229,10 @@ void MainComponent::toggleRecording()
     const auto status = audio.getStatus();
     auto* device = audio.getDeviceManager().getCurrentAudioDevice();
     const auto channels = device != nullptr ? device->getActiveOutputChannels().countNumberOfSetBits() : 0;
-    if (! recorder.start(status.sampleRate, juce::jmax(1, channels)))
+    const auto recordingName = pluginHost.hasPlugin()
+        ? utf8(fengyin::SwamPluginClassifier::instrumentChineseName(pluginHost.getPluginName().toStdString()))
+        : utf8("测试音源");
+    if (! recorder.start(status.sampleRate, juce::jmax(1, channels), recordingName))
     {
         recordingStatus.setText(recorder.getLastError(), juce::dontSendNotification);
         return;

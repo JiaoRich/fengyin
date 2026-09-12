@@ -36,11 +36,30 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertNotIn("alert(", JS)
 
     def test_confirmed_visual_features_are_present(self):
-        for element_id in ("theme-atmosphere", "breath-wave", "layout-resizer"):
+        for element_id in ("theme-atmosphere", "breath-wave", "layout-resizer", "lower-stage", "instrument-picture"):
             self.assertIn(f'id="{element_id}"', HTML)
         for theme in ("spring", "summer", "autumn", "winter", "china-red", "gold", "neon", "minimal"):
             self.assertIn(f'value="{theme}"', HTML)
         self.assertIn("drawThemeAtmosphere", JS)
+
+    def test_instrument_artwork_covers_every_swam_family(self):
+        for key in (
+            "soprano-sax", "alto-sax", "tenor-sax", "baritone-sax",
+            "piccolo-trumpet", "double-bass-trombone", "euphonium", "horn-bb",
+            "piccolo", "bass-flute", "bass-clarinet", "english-horn", "contrabassoon",
+            "violin", "viola", "cello", "double-bass",
+        ):
+            self.assertIn(f"'{key}'", JS)
+        self.assertIn("showInstrumentArtwork", JS)
+        self.assertIn("lowerMinimum", JS)
+
+    def test_live_controls_have_real_behaviour(self):
+        self.assertIn('id="recording-manager"', HTML)
+        self.assertIn("nativeEvent('showRecordings')", JS)
+        self.assertIn('id="wind-status-text">未连接电吹管', HTML)
+        self.assertNotIn('class="favorite"', HTML)
+        self.assertIn("document.body.classList.add('video-playing')", JS)
+        self.assertIn("document.body.classList.remove('video-playing')", JS)
 
 
 if __name__ == "__main__":

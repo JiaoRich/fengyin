@@ -15,11 +15,12 @@
     .plugin-manager label{color:var(--muted)}.plugin-manager select{min-width:0;background:#11243a;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px}
     .plugin-actions{display:flex;gap:8px}.plugin-actions button{white-space:nowrap}.plugin-status{grid-column:2/-1;color:var(--muted);font-size:13px;min-height:20px}.save-custom{grid-column:2/-1;justify-self:start}
     .video-card:fullscreen{width:100vw;height:100vh;border-radius:0;background:#000}.video-card:fullscreen video{object-fit:contain}
-    #page-play.active{height:calc(100vh - 119px);min-height:650px;display:flex;flex-direction:column}.stage-grid{flex:0 0 53%;min-height:320px;max-height:calc(100% - 205px)}.stage-grid>.video-card,.stage-grid>.performance-card{height:100%}.layout-resizer{position:relative;flex:0 0 14px;border:0;background:transparent;cursor:row-resize;padding:0}.layout-resizer:after{content:"";position:absolute;left:50%;top:5px;width:72px;height:4px;transform:translateX(-50%);border-radius:5px;background:rgba(143,167,189,.38);box-shadow:0 0 12px var(--glow);transition:.2s}.layout-resizer:hover:after,.layout-resizer:focus-visible:after{background:var(--accent)}.visualizer{flex:1;min-height:115px;height:auto;margin-top:0}.action-bar{flex:0 0 auto;margin-top:10px}
-    .instrument-art{isolation:isolate;overflow:hidden}.instrument-aura{position:absolute;z-index:0;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,var(--accent-soft),var(--accent-2-soft) 48%,transparent 72%);filter:blur(5px)}.instrument-picture{position:relative;z-index:2;width:190px;height:100%;max-height:255px;object-fit:contain;filter:drop-shadow(0 14px 24px rgba(0,0,0,.48)) drop-shadow(0 0 13px var(--glow))}.breath-wave{position:absolute;z-index:3;inset:0;width:100%;height:100%;pointer-events:none}
-    #theme-atmosphere{position:fixed;z-index:0;inset:0;width:100%;height:100%;pointer-events:none;opacity:.58}.ambient{z-index:0}.app-shell{position:relative;z-index:1}body[data-theme=minimal] #theme-atmosphere,body.low-performance #theme-atmosphere{display:none}
+    #page-play.active{height:calc(100vh - 119px);min-height:650px;display:flex;flex-direction:column;overflow:hidden}.stage-grid{flex:0 0 53%;min-height:280px;max-height:none}.stage-grid>.video-card,.stage-grid>.performance-card{height:100%;min-height:0}.layout-resizer{position:relative;z-index:4;flex:0 0 14px;border:0;background:transparent;cursor:row-resize;padding:0}.layout-resizer:after{content:"";position:absolute;left:50%;top:5px;width:72px;height:4px;transform:translateX(-50%);border-radius:5px;background:rgba(143,167,189,.5);box-shadow:0 0 16px var(--glow);transition:.2s}.layout-resizer:hover:after,.layout-resizer:focus-visible:after{background:var(--accent)}.lower-stage{flex:1 1 auto;min-height:180px;display:flex;flex-direction:column;overflow:hidden}.visualizer{flex:1 1 auto;min-height:108px;height:auto;margin-top:0}.action-bar{flex:0 0 auto;margin-top:10px}
+    .instrument-art{isolation:isolate;overflow:hidden}.instrument-aura{position:absolute;z-index:0;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,var(--accent-soft),var(--accent-2-soft) 48%,transparent 72%);filter:blur(5px)}.instrument-picture{position:absolute;z-index:2;left:50%;top:2px;bottom:2px;width:min(230px,84%);transform:translateX(-50%);background-repeat:no-repeat;background-color:transparent;background-image:url("../assets/instrument-saxophones.png");background-size:400% 100%;background-position:0 50%;mix-blend-mode:screen;filter:drop-shadow(0 13px 18px rgba(0,0,0,.5)) drop-shadow(0 0 9px var(--glow));transition:opacity .18s,transform .25s}.instrument-picture.changing{opacity:.28;transform:translateX(-50%) scale(.94)}.breath-wave{position:absolute;z-index:3;inset:0;width:100%;height:100%;pointer-events:none}
+    #theme-atmosphere{position:fixed;z-index:0;inset:0;width:100%;height:100%;pointer-events:none;opacity:.88}.ambient{z-index:0}.app-shell{position:relative;z-index:1}body[data-theme=minimal] #theme-atmosphere,body.low-performance #theme-atmosphere{display:none}
     @media(max-height:850px){main{padding:14px 20px 16px}header{margin-bottom:10px}.top-brand-message strong{font-size:13px}.top-brand-message span{font-size:11px}#page-play.active{height:calc(100vh - 88px);min-height:610px}.stage-grid{min-height:300px}.instrument-art{min-height:0}.visualizer{min-height:105px;padding:10px 16px}.visualizer-head p{display:none}#spectrum{inset:40px 125px 8px 16px;height:calc(100% - 48px)}.meters{top:50px}.action-bar{padding:8px 12px}.panel{min-height:calc(100vh - 90px);padding:22px}.chain{margin:28px 0 22px}}
     @media(max-width:1180px){body{min-width:900px}.app-shell{grid-template-columns:210px 1fr}.sidebar{padding-left:12px;padding-right:12px}.top-brand-message{width:38%}.top-brand-message strong{font-size:12px}.top-brand-message span{font-size:10px}.stage-grid{grid-template-columns:minmax(0,1.4fr) minmax(230px,.8fr)}.chain{gap:7px}.chain-card{width:130px;padding:13px}.plugin-manager{grid-template-columns:90px minmax(180px,1fr) auto}.plugin-actions{flex-wrap:wrap}}
+    .marquee{animation-play-state:paused}body.video-playing .marquee{animation-play-state:running}.system-pills .disconnected{color:var(--muted)}.system-pills .disconnected .ok{background:var(--danger);box-shadow:0 0 10px var(--danger)}
   </style>
 </head>
 <body data-theme="neon">
@@ -42,7 +43,7 @@
       </nav>
       <div class="sidebar-status">
         <span class="status-dot"></span>
-        <div><b>模拟设备已连接</b><small>气息与音高信号正常</small></div>
+        <div><b>尚未连接电吹管</b><small>当前显示模拟演奏效果</small></div>
       </div>
     </aside>
 
@@ -51,7 +52,7 @@
         <div><p class="eyebrow">晚上好</p><h1 id="page-title">开始演奏</h1></div>
         <div class="top-brand-message" aria-label="风吟品牌说明"><strong>专为电吹管设计，让中国管友轻松玩转软音源</strong><span>（各大平台搜：风吟软音源）·</span></div>
         <div class="system-pills">
-          <span><i class="ok"></i>电吹管正常</span><span>延迟 <b>7 ms</b></span><span>CPU <b id="cpu">18%</b></span>
+          <span id="wind-status-pill" class="disconnected"><i class="ok"></i><b id="wind-status-text">未连接电吹管</b></span><span>延迟 <b>7 ms</b></span><span>CPU <b id="cpu">18%</b></span>
         </div>
       </header>
 
@@ -76,10 +77,10 @@
           </article>
 
           <aside class="performance-card glass">
-            <div class="instrument-heading"><div><p>当前音色</p><h2 id="sound-name">SWAM 高音萨克斯</h2></div><button class="favorite" aria-label="收藏">★</button></div>
+            <div class="instrument-heading"><div><p>当前音色</p><h2 id="sound-name">SWAM 高音萨克斯</h2></div></div>
             <div class="instrument-art">
               <div class="instrument-aura"></div>
-              <img class="instrument-picture" src="../assets/swam-alto-sax-concept.svg" alt="当前乐器：金色高音萨克斯">
+              <div class="instrument-picture" id="instrument-picture" role="img" aria-label="当前乐器：高音萨克斯"></div>
               <canvas class="breath-wave" id="breath-wave" aria-label="随演奏气息变化的波纹"></canvas>
             </div>
             <div class="breath-label"><span>气息强度</span><b id="breath-value">68%</b></div>
@@ -94,6 +95,8 @@
 
         <button class="layout-resizer" id="layout-resizer" type="button" aria-label="上下拖动调节视频演奏区和气息动态区高度"></button>
 
+        <div class="lower-stage" id="lower-stage">
+        <div class="lower-stage" id="lower-stage">
         <article class="visualizer glass">
           <div class="visualizer-head"><div><p>实时演奏动态</p><h3>气息与声音</h3></div><div class="legend"><span>左声道</span><span>右声道</span></div></div>
           <canvas id="spectrum"></canvas>
@@ -105,8 +108,11 @@
           <button id="main-play" class="primary-button">▶ 播放视频</button>
           <button id="simulate">暂停模拟吹奏</button>
           <button id="record">● 开始录音</button>
+          <button id="recording-manager">我的录音</button>
           <label>主音量 <input id="master-volume" type="range" min="0" max="100" value="78"></label>
           <select id="theme" aria-label="视觉主题"><option value="neon">霓虹舞台</option><option value="spring">春风</option><option value="summer">夏荷</option><option value="autumn">秋雨</option><option value="winter">冬雪</option><option value="china-red">中国红</option><option value="gold">金色大厅</option><option value="minimal">极简专业</option></select>
+        </div>
+        </div>
         </div>
       </section>
 
@@ -114,7 +120,7 @@
       <section class="page" id="page-chain"><div class="panel glass"><h2>音源与音效</h2><p>声音按照从左到右的顺序处理。扫描后选择并加载 SWAM 或其他 VST3 音源。</p><div class="chain"><div class="chain-card"><b>电吹管</b><span>真实 MIDI 输入</span></div><i>→</i><button class="chain-card accent" id="scan-swam"><b id="scan-title">扫描音源</b><span id="scan-label">点击查找 SWAM / VST3</span></button><i>→</i><div class="chain-card"><b>均衡器</b><span id="eq-label">明亮度 +20</span><input id="eq-tone" aria-label="均衡器明亮度" type="range" min="-100" max="100" value="20"></div><i>→</i><div class="chain-card"><b>大厅混响</b><span id="reverb-label">强度 28%</span><input id="reverb-mix" aria-label="大厅混响强度" type="range" min="0" max="60" value="28"></div><i>→</i><div class="chain-card"><b>安全限幅</b><span id="limiter-label">上限 95%</span><input id="limiter-ceiling" aria-label="安全限幅上限" type="range" min="60" max="100" value="95"></div></div><div class="plugin-manager"><label for="instrument-select">乐器音源</label><select id="instrument-select"><option value="">请先扫描音源</option></select><div class="plugin-actions"><button id="load-instrument">加载音源</button><button id="open-instrument">打开界面</button></div><label for="effect-select">外部效果器</label><select id="effect-select"><option value="">可选：请先扫描</option></select><div class="plugin-actions"><button id="load-effect">加载效果</button><button id="open-effect">打开界面</button><button id="remove-effect">移除效果</button></div><span class="plugin-status" id="plugin-status">尚未扫描；点击上方“扫描音源”开始。</span><button id="save-custom" class="primary-button save-custom">保存为“我的音色”</button></div></div></section>
       <section class="page" id="page-wind"><div class="panel glass"><h2>电吹管设置</h2><div class="settings-grid"><div class="setting"><span>当前设备</span><b>模拟电吹管</b><button>重新检测</button></div><div class="setting"><span>气息控制</span><b>CC2 → 表情</b><button>自动识别</button></div><div class="setting"><span>气息曲线</span><b>自然</b><input type="range" value="55"></div><div class="setting"><span>弯音范围</span><b>±2 半音</b><input type="range" value="40"></div></div></div></section>
       <section class="page" id="page-audio"><div class="panel glass"><h2>声音设置</h2><div class="settings-grid"><div class="setting"><span>输出设备</span><b>系统默认扬声器</b><button>更改</button></div><div class="setting"><span>驱动模式</span><b>WASAPI（演示）</b><button>更改</button></div><div class="setting"><span>预计延迟</span><b class="green">7 ms · 良好</b><button>自动优化</button></div><div class="setting"><span>缓冲区</span><b>128 samples</b><input type="range" value="35"></div></div></div></section>
-      <section class="page" id="page-settings"><div class="panel glass"><h2>软件设置</h2><div class="activation"><div><p>永久授权</p><h3 id="license-title">尚未激活</h3><span id="machine-code">本机识别码：FY-8K2M-4R7P</span></div><div><input id="license-code" placeholder="请输入唯一激活码"><button id="activate" class="primary-button">立即激活</button></div></div><div class="settings-grid"><label class="toggle-row">低性能电脑模式<input id="low-performance" type="checkbox"><i></i></label><label class="toggle-row">启动时进入演奏页面<input type="checkbox" checked><i></i></label><label class="toggle-row">自动保存设置<input type="checkbox" checked><i></i></label><label class="toggle-row">检查软件更新<input type="checkbox" checked><i></i></label></div><p class="prototype-note">风吟 0.4.0 · 本地运行，不会保存或上传个人资料。</p></div></section>
+      <section class="page" id="page-settings"><div class="panel glass"><h2>软件设置</h2><div class="activation"><div><p>永久授权</p><h3 id="license-title">尚未激活</h3><span id="machine-code">本机识别码：FY-8K2M-4R7P</span></div><div><input id="license-code" placeholder="请输入唯一激活码"><button id="activate" class="primary-button">立即激活</button></div></div><div class="settings-grid"><label class="toggle-row">低性能电脑模式<input id="low-performance" type="checkbox"><i></i></label><label class="toggle-row">启动时进入演奏页面<input type="checkbox" checked><i></i></label><label class="toggle-row">自动保存设置<input type="checkbox" checked><i></i></label><label class="toggle-row">检查软件更新<input type="checkbox" checked><i></i></label></div><p class="prototype-note">风吟 0.4.1 · 本地运行，不会保存或上传个人资料。</p></div></section>
     </main>
   </div>
   <div class="toast" id="toast"></div>

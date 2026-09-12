@@ -11,11 +11,17 @@ public:
     PluginEditorWindow(const juce::String& title, std::unique_ptr<juce::AudioProcessorEditor> editor)
         : DocumentWindow(title, juce::Colour(0xff101d2c), closeButton)
     {
+        const auto editorAllowsResize = editor->isResizable();
         setUsingNativeTitleBar(true);
         setContentOwned(editor.release(), true);
-        setResizable(true, true);
-        centreWithSize(juce::jmax(520, getWidth()), juce::jmax(420, getHeight()));
+        // Respect fixed-size third-party editors; forcing them to relayout continuously
+        // is a common source of sluggish VST3 windows on Windows.
+        setResizable(editorAllowsResize, false);
+        centreWithSize(juce::jmax(320, getWidth()), juce::jmax(240, getHeight()));
+        setAlwaysOnTop(true);
         setVisible(true);
+        toFront(true);
+        grabKeyboardFocus();
     }
     void closeButtonPressed() override { setVisible(false); }
 };

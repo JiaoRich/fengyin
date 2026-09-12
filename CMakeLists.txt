@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 0.4.0 LANGUAGES C CXX)
+project(FengYin VERSION 0.4.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -33,7 +33,10 @@ juce_add_binary_data(FengYinWebAssets SOURCES
     prototype/styles.css
     prototype/app.js
     assets/fengyin-app-icon.png
-    assets/swam-alto-sax-concept.svg
+    assets/instrument-saxophones.png
+    assets/instrument-woodwinds.png
+    assets/instrument-trumpets-trombones.png
+    assets/instrument-horns-strings.png
 )
 
 target_sources(FengYin PRIVATE

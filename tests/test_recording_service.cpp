@@ -32,6 +32,11 @@ int main()
     const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory)
                             .getChildFile("fengyin-recording-test-" + juce::Uuid().toString());
     const auto file = folder.getChildFile("test.wav");
+    const auto namedFirst = fengyin::RecordingService::nextRecordingFile(folder, juce::String::fromUTF8("高音萨克斯"), "20260911");
+    assert(namedFirst.getFileName() == juce::String::fromUTF8("高音萨克斯-20260911-1.wav"));
+    assert(namedFirst.create().wasOk());
+    const auto namedSecond = fengyin::RecordingService::nextRecordingFile(folder, juce::String::fromUTF8("高音萨克斯"), "20260911");
+    assert(namedSecond.getFileName() == juce::String::fromUTF8("高音萨克斯-20260911-2.wav"));
     fengyin::RecordingService recorder;
     assert(recorder.startToFile(file, 48000.0, 2));
     juce::AudioBuffer<float> audio(2, 4800);

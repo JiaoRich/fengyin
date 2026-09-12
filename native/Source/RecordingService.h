@@ -10,7 +10,10 @@ class RecordingService
 public:
     RecordingService();
     ~RecordingService();
-    bool start(double sampleRate, int channelCount);
+    bool start(double sampleRate, int channelCount, const juce::String& instrumentChineseName = {});
+    [[nodiscard]] static juce::File nextRecordingFile(const juce::File& folder,
+                                                      const juce::String& instrumentChineseName,
+                                                      const juce::String& date = {});
     bool startToFile(const juce::File& destination, double sampleRate, int channelCount);
     void stop();
     void push(float* const* channels, int channelCount, int sampleCount) noexcept;

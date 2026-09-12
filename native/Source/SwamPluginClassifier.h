@@ -21,12 +21,15 @@ public:
             return SwamFamily::notSwam;
         if (contains(text, "sax"))
             return SwamFamily::saxophone;
-        if (contains(text, "trumpet") || contains(text, "trombone")
-            || contains(text, "horn") || contains(text, "tuba") || contains(text, "brass"))
-            return SwamFamily::brass;
         if (contains(text, "flute") || contains(text, "clarinet")
-            || contains(text, "oboe") || contains(text, "bassoon") || contains(text, "woodwind"))
+            || contains(text, "oboe") || contains(text, "bassoon")
+            || contains(text, "english horn") || contains(text, "cor anglais")
+            || contains(text, "woodwind"))
             return SwamFamily::woodwind;
+        if (contains(text, "trumpet") || contains(text, "trombone")
+            || contains(text, "horn") || contains(text, "tuba") || contains(text, "euphonium")
+            || contains(text, "flugelhorn") || contains(text, "brass"))
+            return SwamFamily::brass;
         if (contains(text, "violin") || contains(text, "viola")
             || contains(text, "cello") || contains(text, "double bass") || contains(text, "strings"))
             return SwamFamily::strings;
@@ -55,20 +58,78 @@ public:
         if (contains(text, "tenor sax")) return "次中音萨克斯";
         if (contains(text, "baritone sax")) return "上低音萨克斯";
         if (contains(text, "sax")) return "萨克斯";
+        if (contains(text, "flugelhorn") && contains(text, "eb")) return "降E调柔音号";
+        if (contains(text, "flugelhorn")) return "柔音号";
+        if (contains(text, "piccolo trumpet")) return "高音小号";
+        if (contains(text, "trumpet") && contains(text, "(c)")) return "C调小号";
+        if (contains(text, "trumpet c")) return "C调小号";
         if (contains(text, "trumpet")) return "小号";
-        if (contains(text, "trombone")) return "长号";
-        if (contains(text, "french horn") || contains(text, "horn")) return "圆号";
+        if (contains(text, "double bass trombone")) return "倍低音长号";
+        if (contains(text, "tenor bass trombone")) return "次中低音长号";
+        if (contains(text, "bass trombone")) return "低音长号";
+        if (contains(text, "alto trombone")) return "中音长号";
+        if (contains(text, "trombone")) return "次中音长号";
+        if (contains(text, "euphonium")) return "上低音号";
+        if (contains(text, "bass tuba")) return "低音大号";
+        if (contains(text, "tuba") && contains(text, "eb")) return "降E调大号";
         if (contains(text, "tuba")) return "大号";
+        if (contains(text, "french horn") && contains(text, "bb")) return "降B调圆号";
+        if (contains(text, "french horn") || contains(text, "horn")) return "F调圆号";
         if (contains(text, "piccolo")) return "短笛";
+        if (contains(text, "bass flute")) return "低音长笛";
+        if (contains(text, "alto flute")) return "中音长笛";
         if (contains(text, "flute")) return "长笛";
+        if (contains(text, "bass clarinet")) return "低音单簧管";
         if (contains(text, "clarinet")) return "单簧管";
+        if (contains(text, "english horn") || contains(text, "cor anglais")) return "英国管";
         if (contains(text, "oboe")) return "双簧管";
+        if (contains(text, "contrabassoon")) return "倍低音巴松管";
         if (contains(text, "bassoon")) return "巴松管";
         if (contains(text, "double bass")) return "低音提琴";
         if (contains(text, "violin")) return "小提琴";
         if (contains(text, "viola")) return "中提琴";
         if (contains(text, "cello")) return "大提琴";
         return "SWAM 乐器";
+    }
+
+    // Stable UI key used by the web front-end to select the matching instrument artwork.
+    [[nodiscard]] static const char* instrumentKey(std::string_view name)
+    {
+        const auto text = lower(std::string(name));
+        if (contains(text, "soprano sax")) return "soprano-sax";
+        if (contains(text, "alto sax")) return "alto-sax";
+        if (contains(text, "tenor sax")) return "tenor-sax";
+        if (contains(text, "baritone sax")) return "baritone-sax";
+        if (contains(text, "flugelhorn") && contains(text, "eb")) return "flugelhorn-eb";
+        if (contains(text, "flugelhorn")) return "flugelhorn";
+        if (contains(text, "piccolo trumpet")) return "piccolo-trumpet";
+        if (contains(text, "trumpet") && (contains(text, "(c)") || contains(text, "trumpet c"))) return "trumpet-c";
+        if (contains(text, "trumpet")) return "trumpet";
+        if (contains(text, "double bass trombone")) return "double-bass-trombone";
+        if (contains(text, "tenor bass trombone")) return "tenor-bass-trombone";
+        if (contains(text, "bass trombone")) return "bass-trombone";
+        if (contains(text, "alto trombone")) return "alto-trombone";
+        if (contains(text, "trombone")) return "tenor-trombone";
+        if (contains(text, "bass tuba")) return "bass-tuba";
+        if (contains(text, "tuba") && contains(text, "eb")) return "tuba-eb";
+        if (contains(text, "euphonium")) return "euphonium";
+        if (contains(text, "french horn") && contains(text, "bb")) return "horn-bb";
+        if (contains(text, "french horn") || contains(text, "horn")) return "horn-f";
+        if (contains(text, "piccolo")) return "piccolo";
+        if (contains(text, "bass flute")) return "bass-flute";
+        if (contains(text, "alto flute")) return "alto-flute";
+        if (contains(text, "flute")) return "flute";
+        if (contains(text, "bass clarinet")) return "bass-clarinet";
+        if (contains(text, "clarinet")) return "clarinet";
+        if (contains(text, "english horn") || contains(text, "cor anglais")) return "english-horn";
+        if (contains(text, "oboe")) return "oboe";
+        if (contains(text, "contrabassoon")) return "contrabassoon";
+        if (contains(text, "bassoon")) return "bassoon";
+        if (contains(text, "double bass")) return "double-bass";
+        if (contains(text, "violin")) return "violin";
+        if (contains(text, "viola")) return "viola";
+        if (contains(text, "cello")) return "cello";
+        return "alto-sax";
     }
 
 private:
