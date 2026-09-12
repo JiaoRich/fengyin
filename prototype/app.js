@@ -21,6 +21,7 @@ let availableEffects = [];
 let pluginListSignature = '';
 let savedPresets = [];
 let presetListSignature = '';
+let hardwareBreath = null;
 
 function nativeEvent(name, payload = {}) {
   if (window.__JUCE__?.backend?.emitEvent) window.__JUCE__.backend.emitEvent(name, payload);
@@ -164,6 +165,31 @@ function formatTime(seconds) {
 }
 
 $('#theme').addEventListener('change', event => document.body.dataset.theme = event.target.value);
+const playPage = $('#page-play');
+const stageGrid = $('.stage-grid');
+const layoutResizer = $('#layout-resizer');
+function setStageHeight(clientY) {
+  const bounds = playPage.getBoundingClientRect();
+  const minimum = window.innerHeight <= 850 ? 300 : 320;
+  const maximum = Math.max(minimum, bounds.height - 205);
+  const next = Math.max(minimum, Math.min(maximum, clientY - bounds.top));
+  stageGrid.style.flexBasis = `${next}px`;
+}
+layoutResizer.addEventListener('pointerdown', event => {
+  layoutResizer.setPointerCapture(event.pointerId);
+  setStageHeight(event.clientY);
+});
+layoutResizer.addEventListener('pointermove', event => {
+  if (layoutResizer.hasPointerCapture(event.pointerId)) setStageHeight(event.clientY);
+});
+layoutResizer.addEventListener('keydown', event => {
+  if (!['ArrowUp','ArrowDown'].includes(event.key)) return;
+  event.preventDefault();
+  const bounds = playPage.getBoundingClientRect();
+  const minimum = window.innerHeight <= 850 ? 300 : 320;
+  const next = stageGrid.getBoundingClientRect().height + (event.key === 'ArrowDown' ? 16 : -16);
+  stageGrid.style.flexBasis = `${Math.max(minimum,Math.min(bounds.height - 205,next))}px`;
+});
 $('#master-volume').addEventListener('input', event => nativeEvent('setMasterVolume', {value:Number(event.target.value)/100}));
 $('#simulate').addEventListener('click', event => {
   simulating = !simulating;
@@ -231,6 +257,7 @@ document.querySelectorAll('#page-audio button').forEach(button => button.addEven
 
 window.__JUCE__?.backend?.addEventListener('backendState', state => {
   const connected = !!state.deviceConnected;
+  hardwareBreath = connected ? Math.max(0,Math.min(100,Number(state.breath || 0)*100)) : null;
   const sideTitle = document.querySelector('.sidebar-status b');
   const sideText = document.querySelector('.sidebar-status small');
   if (sideTitle) sideTitle.textContent = connected ? (state.deviceName || '电吹管已连接') : '尚未连接电吹管';
@@ -285,8 +312,231 @@ if(localStorage.getItem('fengyin-prototype-license') === 'active') {
 
 const canvas = $('#spectrum');
 const ctx = canvas.getContext('2d');
-const notes = [['1','C4'],['2','D4'],['3','E4'],['5','G4'],['6','A4'],['1̇','C5']];
+const breathWaveCanvas = $('#breath-wave');
+const breathWaveContext = breathWaveCanvas.getContext('2d');
+const atmosphereCanvas = $('#theme-atmosphere');
+const atmosphereContext = atmosphereCanvas.getContext('2d');
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 let tick = 0;
+
+function seeded(index, salt = 0) {
+  const value = Math.sin((index + 1) * 91.173 + salt * 47.77) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+function drawPetal(x, y, size, rotation, color) {
+  atmosphereContext.save();
+  atmosphereContext.translate(x,y);
+  atmosphereContext.rotate(rotation);
+  atmosphereContext.fillStyle = color;
+  atmosphereContext.beginPath();
+  atmosphereContext.moveTo(0,-size);
+  atmosphereContext.bezierCurveTo(size*.85,-size*.45,size*.72,size*.62,0,size);
+  atmosphereContext.bezierCurveTo(-size*.72,size*.62,-size*.85,-size*.45,0,-size);
+  atmosphereContext.fill();
+  atmosphereContext.restore();
+}
+
+function drawLotus(x, baseY, scale, time, accent, accent2) {
+  const sway = Math.sin(time*.42+x*.003)*5;
+  atmosphereContext.save();
+  atmosphereContext.translate(x,baseY);
+  atmosphereContext.strokeStyle = accent;
+  atmosphereContext.lineWidth = 1.5;
+  atmosphereContext.globalAlpha = .12;
+  atmosphereContext.beginPath();
+  atmosphereContext.moveTo(0,22*scale);
+  atmosphereContext.quadraticCurveTo(sway,0,sway*.7,-34*scale);
+  atmosphereContext.stroke();
+  atmosphereContext.translate(sway*.7,-36*scale);
+  atmosphereContext.rotate(sway*.008);
+  atmosphereContext.fillStyle = accent2;
+  [-1,0,1].forEach(index => {
+    atmosphereContext.save();
+    atmosphereContext.rotate(index*.55);
+    atmosphereContext.beginPath();
+    atmosphereContext.ellipse(0,-7*scale,6*scale,13*scale,0,0,Math.PI*2);
+    atmosphereContext.fill();
+    atmosphereContext.restore();
+  });
+  atmosphereContext.restore();
+}
+
+function drawThemeAtmosphere(ratio, accent, accent2) {
+  const bounds = atmosphereCanvas.getBoundingClientRect();
+  const pixelWidth = Math.max(1,Math.round(bounds.width*ratio));
+  const pixelHeight = Math.max(1,Math.round(bounds.height*ratio));
+  if (atmosphereCanvas.width !== pixelWidth || atmosphereCanvas.height !== pixelHeight) {
+    atmosphereCanvas.width = pixelWidth;
+    atmosphereCanvas.height = pixelHeight;
+  }
+  atmosphereContext.setTransform(ratio,0,0,ratio,0,0);
+  atmosphereContext.clearRect(0,0,bounds.width,bounds.height);
+  const theme = document.body.dataset.theme;
+  if (theme === 'minimal' || reducedMotion || document.body.classList.contains('low-performance')) return;
+  const time = performance.now()/1000;
+  const width = bounds.width;
+  const height = bounds.height;
+  atmosphereContext.lineCap = 'round';
+  atmosphereContext.globalCompositeOperation = 'screen';
+
+  if (theme === 'spring') {
+    atmosphereContext.setLineDash([38,28]);
+    for(let index=0;index<3;index++) {
+      const y = height*(.23+index*.22)+Math.sin(time*.28+index)*14;
+      atmosphereContext.strokeStyle = accent;
+      atmosphereContext.globalAlpha = .07;
+      atmosphereContext.lineWidth = 1.2;
+      atmosphereContext.beginPath();
+      atmosphereContext.moveTo(-40,y);
+      atmosphereContext.bezierCurveTo(width*.26,y-36,width*.62,y+35,width+40,y-8);
+      atmosphereContext.stroke();
+    }
+    atmosphereContext.setLineDash([]);
+    atmosphereContext.globalAlpha = .16;
+    for(let index=0;index<13;index++) {
+      const x = (seeded(index,1)*width+time*(5+seeded(index,2)*6))%(width+50)-25;
+      const y = (seeded(index,3)*height+time*(8+seeded(index,4)*7))%(height+40)-20;
+      drawPetal(x+Math.sin(time*.5+index)*18,y,3+seeded(index,5)*3,time*.25+index,accent2);
+    }
+  } else if (theme === 'summer') {
+    for(let index=0;index<4;index++) {
+      const radius = (time*7+index*37)%145;
+      atmosphereContext.strokeStyle = index%2 ? accent2 : accent;
+      atmosphereContext.globalAlpha = .09*(1-radius/145);
+      atmosphereContext.lineWidth = 1.2;
+      atmosphereContext.beginPath();
+      atmosphereContext.ellipse(width*(.18+index*.21),height*(.32+(index%2)*.38),radius,radius*.32,0,0,Math.PI*2);
+      atmosphereContext.stroke();
+    }
+    drawLotus(width*.17,height*.82,.95,time,accent,accent2);
+    drawLotus(width*.87,height*.74,.72,time+1.7,accent,accent2);
+  } else if (theme === 'autumn') {
+    atmosphereContext.strokeStyle = accent2;
+    atmosphereContext.lineWidth = .9;
+    atmosphereContext.globalAlpha = .12;
+    for(let index=0;index<30;index++) {
+      const speed = 20+seeded(index,2)*16;
+      const y = (seeded(index,3)*height+time*speed)%(height+35)-20;
+      const x = (seeded(index,1)*width-time*6+height-y*.1)%(width+40)-20;
+      atmosphereContext.beginPath();
+      atmosphereContext.moveTo(x,y);
+      atmosphereContext.lineTo(x-7,y+18+seeded(index,4)*9);
+      atmosphereContext.stroke();
+    }
+  } else if (theme === 'winter') {
+    atmosphereContext.fillStyle = accent;
+    atmosphereContext.globalAlpha = .15;
+    for(let index=0;index<30;index++) {
+      const y = (seeded(index,3)*height+time*(7+seeded(index,4)*8))%(height+24)-12;
+      const x = seeded(index,1)*width+Math.sin(time*.3+index)*14;
+      atmosphereContext.beginPath();
+      atmosphereContext.arc(x,y,1.1+seeded(index,5)*2.2,0,Math.PI*2);
+      atmosphereContext.fill();
+    }
+    const snowX = width-78;
+    const snowY = height-28;
+    atmosphereContext.globalAlpha = .11;
+    atmosphereContext.fillStyle = accent;
+    atmosphereContext.beginPath(); atmosphereContext.arc(snowX,snowY-18,25,0,Math.PI*2); atmosphereContext.fill();
+    atmosphereContext.beginPath(); atmosphereContext.arc(snowX,snowY-54,17,0,Math.PI*2); atmosphereContext.fill();
+    atmosphereContext.fillStyle = accent2;
+    atmosphereContext.fillRect(snowX-21,snowY-76,42,6);
+    atmosphereContext.fillRect(snowX-14,snowY-91,28,17);
+  } else if (theme === 'gold') {
+    for(let index=0;index<5;index++) {
+      const center = width*(.33+index*.085)+Math.sin(time*.18+index)*16;
+      atmosphereContext.fillStyle = accent;
+      atmosphereContext.globalAlpha = .022+Math.sin(time*.35+index)*.007;
+      atmosphereContext.beginPath();
+      atmosphereContext.moveTo(center-16,0);
+      atmosphereContext.lineTo(center+18,0);
+      atmosphereContext.lineTo(center+190,height);
+      atmosphereContext.lineTo(center-150,height);
+      atmosphereContext.closePath();
+      atmosphereContext.fill();
+    }
+    atmosphereContext.fillStyle = accent2;
+    atmosphereContext.globalAlpha = .12;
+    for(let index=0;index<18;index++) {
+      const x = seeded(index,1)*width+Math.sin(time*.2+index)*9;
+      const y = (seeded(index,2)*height-time*(3+seeded(index,3)*4)+height)%height;
+      atmosphereContext.fillRect(x,y,1.5,1.5);
+    }
+  } else if (theme === 'neon') {
+    for(let index=0;index<3;index++) {
+      const x = (width*(.2+index*.3)+Math.sin(time*.2+index)*80);
+      atmosphereContext.strokeStyle = index%2 ? accent2 : accent;
+      atmosphereContext.globalAlpha = .045;
+      atmosphereContext.lineWidth = 34;
+      atmosphereContext.beginPath();
+      atmosphereContext.moveTo(x,-30);
+      atmosphereContext.lineTo(x+Math.sin(time*.16+index)*210,height+30);
+      atmosphereContext.stroke();
+    }
+    for(let index=0;index<22;index++) {
+      const barWidth = width/22;
+      const barHeight = 10+Math.abs(Math.sin(index*.48+time*.72))*42;
+      atmosphereContext.fillStyle = index%2 ? accent2 : accent;
+      atmosphereContext.globalAlpha = .055;
+      atmosphereContext.fillRect(index*barWidth+2,height-barHeight,Math.max(4,barWidth-7),barHeight);
+    }
+  } else if (theme === 'china-red') {
+    atmosphereContext.strokeStyle = accent2;
+    atmosphereContext.globalAlpha = .07;
+    atmosphereContext.lineWidth = 2;
+    for(let index=0;index<2;index++) {
+      atmosphereContext.beginPath();
+      atmosphereContext.moveTo(-30,height*(.35+index*.32));
+      atmosphereContext.bezierCurveTo(width*.28,height*(.22+index*.28),width*.66,height*(.55+index*.18),width+40,height*(.3+index*.28));
+      atmosphereContext.stroke();
+    }
+    atmosphereContext.fillStyle = accent2;
+    atmosphereContext.globalAlpha = .13;
+    for(let index=0;index<14;index++) {
+      const x = seeded(index,2)*width+Math.sin(time*.2+index)*10;
+      const y = (seeded(index,4)*height-time*(4+seeded(index,5)*3)+height)%height;
+      atmosphereContext.beginPath(); atmosphereContext.arc(x,y,1+seeded(index,1)*1.4,0,Math.PI*2); atmosphereContext.fill();
+    }
+  }
+  atmosphereContext.globalAlpha = 1;
+  atmosphereContext.globalCompositeOperation = 'source-over';
+}
+
+function drawBreathWave(ratio, breath, accent, accent2) {
+  const bounds = breathWaveCanvas.getBoundingClientRect();
+  const pixelWidth = Math.max(1,Math.round(bounds.width*ratio));
+  const pixelHeight = Math.max(1,Math.round(bounds.height*ratio));
+  if (breathWaveCanvas.width !== pixelWidth || breathWaveCanvas.height !== pixelHeight) {
+    breathWaveCanvas.width = pixelWidth;
+    breathWaveCanvas.height = pixelHeight;
+  }
+  breathWaveContext.setTransform(ratio,0,0,ratio,0,0);
+  breathWaveContext.clearRect(0,0,bounds.width,bounds.height);
+  const centerX = bounds.width/2;
+  const centerY = bounds.height/2+3;
+  const energy = breath/100;
+  [[78,accent,.48,0],[97,accent2,.34,1.7],[117,accent,.2,3.4]].forEach(([base,color,alpha,offset],ring) => {
+    breathWaveContext.beginPath();
+    for(let index=0;index<=120;index++) {
+      const angle = index/120*Math.PI*2;
+      const wobble = (2+energy*(7+ring*2))*Math.sin(angle*5+tick*2.1+offset) + Math.sin(angle*9-tick*1.25)*energy*3;
+      const distance = base+energy*(9+ring*7)+wobble;
+      const x = centerX+Math.cos(angle)*distance;
+      const y = centerY+Math.sin(angle)*distance*.84;
+      if(index===0) breathWaveContext.moveTo(x,y); else breathWaveContext.lineTo(x,y);
+    }
+    breathWaveContext.closePath();
+    breathWaveContext.strokeStyle = color;
+    breathWaveContext.globalAlpha = alpha+energy*.22;
+    breathWaveContext.lineWidth = 1.2+energy*1.5;
+    breathWaveContext.shadowColor = color;
+    breathWaveContext.shadowBlur = 8+energy*14;
+    breathWaveContext.stroke();
+  });
+  breathWaveContext.globalAlpha = 1;
+  breathWaveContext.shadowBlur = 0;
+}
 
 function draw() {
   const ratio = window.devicePixelRatio || 1;
@@ -297,11 +547,13 @@ function draw() {
   ctx.setTransform(ratio,0,0,ratio,0,0);
   ctx.clearRect(0,0,bounds.width,bounds.height);
   tick += simulating ? .045 : .008;
-  const breath = simulating ? 42 + Math.sin(tick*1.7)*20 + Math.sin(tick*.41)*13 : 3;
+  const breath = hardwareBreath ?? (simulating ? 42 + Math.sin(tick*1.7)*20 + Math.sin(tick*.41)*13 : 3);
   const safeBreath = Math.max(2,Math.min(96,breath));
   const styles = getComputedStyle(document.body);
   const a = styles.getPropertyValue('--accent').trim();
   const b = styles.getPropertyValue('--accent-2').trim();
+  drawThemeAtmosphere(ratio,a,b);
+  drawBreathWave(ratio,safeBreath,a,b);
   const bars = 66;
   for(let i=0;i<bars;i++) {
     const x = i*bounds.width/bars;
@@ -319,8 +571,6 @@ function draw() {
   $('#meter-l').style.width = `${Math.min(97,safeBreath+12)}%`;
   $('#meter-r').style.width = `${Math.min(95,safeBreath+7+Math.sin(tick)*6)}%`;
   $('#cpu').textContent = `${Math.round(14+Math.abs(Math.sin(tick*.3))*9)}%`;
-  const note = notes[Math.floor(tick*.75)%notes.length];
-  $('#note').textContent = note[0]; $('#note-name').textContent = note[1];
   animationFrame = requestAnimationFrame(draw);
 }
 draw();

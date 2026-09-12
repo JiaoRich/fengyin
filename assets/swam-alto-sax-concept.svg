@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 360" role="img" aria-labelledby="title desc">
+  <title id="title">金色高音萨克斯</title>
+  <desc id="desc">以金属渐变、按键和弯曲管身绘制的萨克斯乐器插画</desc>
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7b430d"/>
+      <stop offset=".22" stop-color="#ffd873"/>
+      <stop offset=".47" stop-color="#b66b16"/>
+      <stop offset=".7" stop-color="#fff0a4"/>
+      <stop offset="1" stop-color="#8a4b0c"/>
+    </linearGradient>
+    <linearGradient id="darkGold" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#603008"/>
+      <stop offset=".48" stop-color="#efb94c"/>
+      <stop offset="1" stop-color="#7d420c"/>
+    </linearGradient>
+    <radialGradient id="bell" cx="43%" cy="35%" r="65%">
+      <stop offset="0" stop-color="#2a1405"/>
+      <stop offset=".5" stop-color="#7f430d"/>
+      <stop offset=".77" stop-color="#f2b849"/>
+      <stop offset="1" stop-color="#fff0a1"/>
+    </radialGradient>
+    <filter id="shadow" x="-50%" y="-30%" width="200%" height="190%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="blur"/>
+      <feOffset dy="9" result="offset"/>
+      <feColorMatrix in="offset" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .48 0"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)" transform="rotate(-8 120 180)">
+    <path d="M153 41c18 5 28 15 34 31l-13 8c-5-9-11-15-22-18l-24-7 5-19z" fill="url(#darkGold)" stroke="#ffe99a" stroke-width="2"/>
+    <path d="M151 52c-17 36-31 69-28 111 3 43 24 76 20 111-3 27-17 46-42 49-31 4-54-18-50-46 3-21 20-35 41-34 18 1 29 14 28 29-1 13-11 22-24 21-9-1-15-7-15-15" fill="none" stroke="url(#gold)" stroke-width="28" stroke-linecap="round"/>
+    <path d="M149 57c-15 39-24 74-20 107 5 41 24 73 19 112" fill="none" stroke="#fff0a1" stroke-opacity=".6" stroke-width="4" stroke-linecap="round"/>
+    <path d="M143 275c25 5 41 18 48 41-24 24-60 30-91 10 3-24 18-43 43-51z" fill="url(#gold)" stroke="#ffe68b" stroke-width="2"/>
+    <ellipse cx="145" cy="320" rx="48" ry="25" fill="url(#bell)" stroke="#ffe794" stroke-width="4"/>
+    <ellipse cx="145" cy="319" rx="29" ry="13" fill="#2c1505" opacity=".72"/>
+    <g fill="#ffe68a" stroke="#7f470d" stroke-width="2">
+      <circle cx="112" cy="107" r="8"/><circle cx="108" cy="138" r="8"/><circle cx="111" cy="171" r="8"/>
+      <circle cx="121" cy="201" r="8"/><circle cx="132" cy="230" r="8"/><circle cx="79" cy="259" r="7"/>
+    </g>
+    <g fill="none" stroke="#e9aa3d" stroke-width="4" stroke-linecap="round">
+      <path d="M111 107l-28 11v82"/><path d="M108 138l-37 12v71"/><path d="M111 171l-31 9v63"/>
+      <path d="M121 201l31-8 18 14"/><path d="M132 230l29-7 17 12"/>
+    </g>
+    <g fill="#fff2ad">
+      <circle cx="83" cy="119" r="4"/><circle cx="71" cy="150" r="4"/><circle cx="80" cy="181" r="4"/>
+      <circle cx="152" cy="193" r="4"/><circle cx="161" cy="223" r="4"/>
+    </g>
+    <path d="M157 42l27-9 27 9-2 10-36 5z" fill="#1b2230" stroke="#79859b" stroke-width="2"/>
+    <path d="M181 36l27 6" stroke="#d9e0ec" stroke-width="2" opacity=".55"/>
+  </g>
+</svg>

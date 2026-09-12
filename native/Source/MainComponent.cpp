@@ -289,7 +289,14 @@ std::optional<juce::WebBrowserComponent::Resource> MainComponent::getWebResource
     if (requested == "index.html") { data = BinaryData::index_html; size = BinaryData::index_htmlSize; mime = "text/html"; }
     else if (requested == "styles.css") { data = BinaryData::styles_css; size = BinaryData::styles_cssSize; mime = "text/css"; }
     else if (requested == "app.js") { data = BinaryData::app_js; size = BinaryData::app_jsSize; mime = "text/javascript"; }
-    else if (requested == "fengyin-app-icon.png") { data = BinaryData::fengyinappicon_png; size = BinaryData::fengyinappicon_pngSize; mime = "image/png"; }
+    else if (requested == "fengyin-app-icon.png" || requested == "assets/fengyin-app-icon.png")
+    {
+        data = BinaryData::fengyinappicon_png; size = BinaryData::fengyinappicon_pngSize; mime = "image/png";
+    }
+    else if (requested == "swam-alto-sax-concept.svg" || requested == "assets/swam-alto-sax-concept.svg")
+    {
+        data = BinaryData::swamaltosaxconcept_svg; size = BinaryData::swamaltosaxconcept_svgSize; mime = "image/svg+xml";
+    }
     else return std::nullopt;
 
     std::vector<std::byte> bytes(static_cast<size_t>(size));
