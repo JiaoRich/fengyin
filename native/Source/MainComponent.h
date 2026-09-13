@@ -112,6 +112,7 @@ private:
     juce::Label masterVolumeLabel;
     juce::TextButton recordingManagerButton;
     juce::Array<fengyin::SoundPreset> cachedPresets;
+    juce::String editingPresetId;
     juce::Array<juce::PluginDescription> cachedInstrumentPlugins;
     juce::Array<juce::PluginDescription> cachedEffectPlugins;
     fengyin::VideoPlayerPanel videoPlayer;

@@ -248,6 +248,7 @@ void MainComponent::setupWebInterface()
             const auto index = static_cast<int>(payload.getProperty("index", -1));
             if (isActivated && juce::isPositiveAndBelow(index, cachedPresets.size()))
             {
+                editingPresetId.clear();
                 presetSelector.setSelectedId(index + 1, juce::dontSendNotification);
                 loadSelectedPreset([this](bool success, const juce::String& message)
                 {
@@ -257,6 +258,34 @@ void MainComponent::setupWebInterface()
                     result->setProperty("message", message);
                     webInterface->emitEventIfBrowserIsVisible("presetLoadResult", juce::var(result.release()));
                 });
+            }
+        })
+        .withEventListener("editPreset", [this](juce::var payload)
+        {
+            const auto index = static_cast<int>(payload.getProperty("index", -1));
+            if (isActivated && juce::isPositiveAndBelow(index, cachedPresets.size()))
+            {
+                editingPresetId = cachedPresets.getReference(index).id;
+                presetSelector.setSelectedId(index + 1, juce::dontSendNotification);
+                loadSelectedPreset([this](bool success, const juce::String& message)
+                {
+                    if (! success) editingPresetId.clear();
+                    if (webInterface == nullptr) return;
+                    auto result = std::make_unique<juce::DynamicObject>();
+                    result->setProperty("success", success);
+                    result->setProperty("message", message);
+                    webInterface->emitEventIfBrowserIsVisible("presetLoadResult", juce::var(result.release()));
+                });
+            }
+        })
+        .withEventListener("cancelPresetEdit", [this](juce::var) { editingPresetId.clear(); })
+        .withEventListener("deletePreset", [this](juce::var payload)
+        {
+            const auto index = static_cast<int>(payload.getProperty("index", -1));
+            if (isActivated && juce::isPositiveAndBelow(index, cachedPresets.size()))
+            {
+                presetSelector.setSelectedId(index + 1, juce::dontSendNotification);
+                deleteSelectedPreset();
             }
         })
         .withEventListener("setMasterVolume", [this](juce::var payload)
@@ -659,6 +688,7 @@ void MainComponent::timerCallback()
         state->setProperty("effectName", pluginHost.hasEffect() ? pluginHost.getEffectName() : juce::String());
         state->setProperty("effectLoaded", pluginHost.hasEffect());
         state->setProperty("effectLoading", effectLoading);
+        state->setProperty("presetEditing", editingPresetId.isNotEmpty());
         juce::Array<juce::var> instruments;
         for (const auto& plugin : cachedInstrumentPlugins)
         {
@@ -949,10 +979,16 @@ void MainComponent::saveCurrentPreset()
         return;
     }
 
-    savePresetDialog = std::make_unique<juce::AlertWindow>(utf8("保存音色方案"), utf8("给这套音源和效果器起一个容易记住的名字。"),
+    juce::String initialName = utf8(fengyin::SwamPluginClassifier::instrumentChineseName(pluginHost.getPluginName().toStdString()));
+    for (const auto& existing : cachedPresets)
+        if (existing.id == editingPresetId) initialName = existing.name;
+    const auto isEditing = editingPresetId.isNotEmpty();
+    savePresetDialog = std::make_unique<juce::AlertWindow>(isEditing ? utf8("保存方案修改") : utf8("保存音色方案"),
+                                                           isEditing ? utf8("修改名称或直接保存，将覆盖原来的方案。")
+                                                                     : utf8("给这套音源和效果器起一个容易记住的名字。"),
                                                            juce::MessageBoxIconType::QuestionIcon);
     savePresetDialog->addTextEditor("name",
-        utf8(fengyin::SwamPluginClassifier::instrumentChineseName(pluginHost.getPluginName().toStdString())),
+        initialName,
         utf8("方案名称"));
     savePresetDialog->addButton(utf8("保存"), 1, juce::KeyPress(juce::KeyPress::returnKey));
     savePresetDialog->addButton(utf8("取消"), 0, juce::KeyPress(juce::KeyPress::escapeKey));
@@ -960,6 +996,8 @@ void MainComponent::saveCurrentPreset()
     {
         if (result == 1 && savePresetDialog != nullptr)
             commitCurrentPreset(savePresetDialog->getTextEditorContents("name").trim());
+        else
+            editingPresetId.clear();
         savePresetDialog.reset();
     }), false);
 }
@@ -968,7 +1006,10 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
 {
     if (name.isEmpty()) return;
     fengyin::SoundPreset preset;
-    preset.id = juce::Uuid().toString();
+    if (editingPresetId.isNotEmpty())
+        for (const auto& existing : cachedPresets)
+            if (existing.id == editingPresetId) { preset = existing; break; }
+    preset.id = editingPresetId.isNotEmpty() ? editingPresetId : juce::Uuid().toString();
     preset.name = name;
     preset.pluginIdentifier = pluginHost.getPluginIdentifier();
     preset.pluginState = pluginHost.savePluginState();
@@ -982,11 +1023,13 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
 
     if (presetStore.save(preset))
     {
+        const auto savedId = preset.id;
+        editingPresetId.clear();
         refreshPresetChoices();
         for (int i = 0; i < cachedPresets.size(); ++i)
-            if (cachedPresets.getReference(i).id == preset.id)
+            if (cachedPresets.getReference(i).id == savedId)
                 presetSelector.setSelectedId(i + 1, juce::dontSendNotification);
-        pluginStatus.setText(utf8("音色方案已保存"), juce::dontSendNotification);
+        pluginStatus.setText(utf8("音色方案已保存或更新"), juce::dontSendNotification);
     }
     else
     {
@@ -1031,6 +1074,7 @@ void MainComponent::deleteSelectedPreset()
         {
             if (result == 1 && safe != nullptr && safe->presetStore.remove(id))
             {
+                if (safe->editingPresetId == id) safe->editingPresetId.clear();
                 safe->refreshPresetChoices();
                 safe->pluginStatus.setText(utf8("音色方案已删除"), juce::dontSendNotification);
             }

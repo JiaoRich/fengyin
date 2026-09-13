@@ -27,6 +27,7 @@ let currentInstrument = null;
 let currentPluginLoaded = false;
 let favoriteInstruments = [];
 let pendingPresetNavigation = null;
+let editingPresetName = '';
 let appFocused = document.hasFocus();
 let unfocusedFrame = 0;
 
@@ -73,7 +74,7 @@ function inferInstrumentKey(name = '') {
 function showInstrumentArtwork(key, chineseName = '') {
   const picture = $('#instrument-picture');
   const artwork = instrumentArtwork[key] || instrumentArtwork['alto-sax'];
-  if (chineseName) $('#save-custom').textContent = `保存为“${chineseName}”`;
+  if (chineseName && !editingPresetName) $('#save-custom').textContent = `保存为“${chineseName}”`;
   picture.alt = `当前乐器：${chineseName || 'SWAM 乐器'}`;
   if (currentArtworkKey === key) return;
   currentArtworkKey = key;
@@ -159,11 +160,16 @@ $('#favorite-current').addEventListener('click', () => {
 });
 
 function renderPresets() {
+  const create = '<button class="preset preset-create" data-kind="create"><i aria-hidden="true">＋</i><h3>创建我的方案</h3><b>从当前设置开始</b><span>选择音源和效果后保存</span></button>';
   const starters = presets.map(([name,plugin,desc],index) => `<button class="preset" data-kind="starter" data-index="${index}"><h3>${name}</h3><b>${plugin}</b><span>${desc}</span></button>`).join('');
-  const saved = savedPresets.map((preset,index) => `<button class="preset" data-kind="saved" data-index="${index}"><h3>${preset.favorite ? '★ ' : ''}${escapeHtml(preset.name)}</h3><b>我的音色方案</b><span>点击恢复已保存的音源与设置</span></button>`).join('');
-  $('#preset-grid').innerHTML = starters + saved + '<button class="preset" data-kind="create"><h3>我的新音色</h3><b>点击开始配置</b><span>自定义音源和效果</span></button>';
+  const scanned = availableInstruments.map((instrument,index) => `<button class="preset preset-scanned" data-kind="scanned" data-index="${index}"><h3>${escapeHtml(instrument.chineseName || instrument.name)}</h3><b>${escapeHtml(instrument.name)}</b><span>扫描生成 · 点击即可载入</span></button>`).join('');
+  const saved = savedPresets.map((preset,index) => `<div class="preset-shell"><button class="preset preset-saved" data-kind="saved" data-index="${index}"><h3>${preset.favorite ? '★ ' : ''}${escapeHtml(preset.name)}</h3><b>我的音色方案</b><span>点击恢复已保存的音源与设置</span></button><div class="preset-tools"><button class="preset-edit" type="button" data-index="${index}" aria-label="编辑方案：${escapeHtml(preset.name)}" title="编辑这个方案">编辑</button><button class="preset-delete" type="button" data-index="${index}" aria-label="删除方案：${escapeHtml(preset.name)}" title="删除这个方案">删除</button></div></div>`).join('');
+  $('#preset-grid').innerHTML = create + (availableInstruments.length ? scanned : starters) + saved;
   $$('#preset-grid .preset').forEach(button => button.addEventListener('click', () => {
     if (button.dataset.kind === 'create') {
+      editingPresetName = '';
+      $('#save-custom').textContent = currentInstrument ? `保存为“${currentInstrument.chineseName}”` : '保存为“我的音色”';
+      nativeEvent('cancelPresetEdit');
       showPage('chain');
       toast('请扫描并选择音源，调好效果后即可开始演奏');
       if (!availableInstruments.length) nativeEvent('scanPlugins');
@@ -175,9 +181,19 @@ function renderPresets() {
       nativeEvent('loadPreset', {index});
       return toast(`正在载入：${savedPresets[index]?.name || '我的音色'}`);
     }
+    if (button.dataset.kind === 'scanned') {
+      const instrument = availableInstruments[index];
+      editingPresetName = '';
+      nativeEvent('cancelPresetEdit');
+      pendingPresetNavigation = {kind:'plugin', name:instrument?.chineseName || instrument?.name || '扫描音源'};
+      nativeEvent('loadPlugin', {index});
+      return toast(`正在载入：${instrument?.chineseName || instrument?.name || '扫描音源'}`);
+    }
     const wanted = presets[index][1].replace('SWAM ', '');
     const found = availableInstruments.findIndex(item => item.label?.includes(wanted));
     if (found >= 0) {
+      editingPresetName = '';
+      nativeEvent('cancelPresetEdit');
       pendingPresetNavigation = {kind:'plugin', name:presets[index][0]};
       nativeEvent('loadPlugin', {index: found});
     }
@@ -192,6 +208,31 @@ function renderPresets() {
       showPage('play');
       toast(`已应用：${presets[index][0]}`);
     } else if (found >= 0) toast(`正在载入：${presets[index][0]}`);
+  }));
+  $$('#preset-grid .preset-edit').forEach(button => button.addEventListener('click', event => {
+    event.stopPropagation();
+    const index = Number(button.dataset.index);
+    const name = savedPresets[index]?.name || '我的音色';
+    pendingPresetNavigation = {kind:'edit', name};
+    nativeEvent('editPreset', {index});
+    if (!window.__JUCE__?.backend?.emitEvent) {
+      editingPresetName = name;
+      $('#save-custom').textContent = `保存对“${name}”的修改`;
+      showPage('chain');
+    }
+    toast(`正在打开：${name}`);
+  }));
+  $$('#preset-grid .preset-delete').forEach(button => button.addEventListener('click', event => {
+    event.stopPropagation();
+    const index = Number(button.dataset.index);
+    const name = savedPresets[index]?.name || '这个音色方案';
+    nativeEvent('deletePreset', {index});
+    if (window.__JUCE__?.backend?.emitEvent) toast(`请确认是否删除“${name}”`);
+    else {
+      savedPresets.splice(index, 1);
+      renderPresets();
+      toast(`已删除：${name}`);
+    }
   }));
 }
 renderPresets();
@@ -407,6 +448,10 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   availableInstruments = Array.isArray(state.instruments) ? state.instruments : [];
   availableEffects = Array.isArray(state.effects) ? state.effects : [];
   savedPresets = Array.isArray(state.presets) ? state.presets : [];
+  if (!state.presetEditing && editingPresetName) {
+    editingPresetName = '';
+    $('#save-custom').textContent = currentInstrument ? `保存为“${currentInstrument.chineseName}”` : '保存为“我的音色”';
+  }
   const signature = JSON.stringify([availableInstruments,availableEffects]);
   if (signature !== pluginListSignature) {
     pluginListSignature = signature;
@@ -418,7 +463,7 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
       : '<option value="">未找到外部效果器（可不选）</option>';
   }
   renderFavoriteInstruments();
-  const nextPresetSignature = JSON.stringify(savedPresets);
+  const nextPresetSignature = JSON.stringify([savedPresets, availableInstruments]);
   if (nextPresetSignature !== presetListSignature) {
     presetListSignature = nextPresetSignature;
     renderPresets();
@@ -441,12 +486,19 @@ window.__JUCE__?.backend?.addEventListener('pluginLoadResult', result => {
   toast(`已应用：${pending.name}`);
 });
 window.__JUCE__?.backend?.addEventListener('presetLoadResult', result => {
-  if (!pendingPresetNavigation || pendingPresetNavigation.kind !== 'preset') return;
+  if (!pendingPresetNavigation || !['preset','edit'].includes(pendingPresetNavigation.kind)) return;
   const pending = pendingPresetNavigation;
   pendingPresetNavigation = null;
   if (!result.success) return toast(result.message || '音色方案载入失败');
-  showPage('play');
-  toast(`已载入：${pending.name}`);
+  if (pending.kind === 'edit') {
+    editingPresetName = pending.name;
+    $('#save-custom').textContent = `保存对“${pending.name}”的修改`;
+    showPage('chain');
+    toast(`可以修改“${pending.name}”，完成后点击保存修改`);
+  } else {
+    showPage('play');
+    toast(`已载入：${pending.name}`);
+  }
 });
 window.__JUCE__?.backend?.addEventListener('activationResult', result => {
   if (result.activated) {

@@ -77,6 +77,21 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertIn("pluginLoadResult", JS)
         self.assertIn("if (!result.success)", JS)
 
+    def test_saved_presets_can_be_deleted_without_hiding_create_action(self):
+        render_body = JS.split("function renderPresets()", 1)[1].split("renderPresets();", 1)[0]
+        self.assertIn("innerHTML = create +", render_body)
+        self.assertIn("nativeEvent('deletePreset', {index})", JS)
+        self.assertIn('class="preset preset-create"', JS)
+        self.assertIn('class="preset-delete"', JS)
+        self.assertIn('.preset-create{', HTML)
+
+    def test_scanned_plugins_become_editable_preset_catalog(self):
+        self.assertIn("availableInstruments.map((instrument,index)", JS)
+        self.assertIn('data-kind="scanned"', JS)
+        self.assertIn('class="preset-edit"', JS)
+        self.assertIn("nativeEvent('editPreset', {index})", JS)
+        self.assertIn("保存对“${pending.name}”的修改", JS)
+
     def test_only_one_lower_stage_container_exists(self):
         self.assertEqual(1, HTML.count('id="lower-stage"'))
 
