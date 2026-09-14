@@ -18,9 +18,8 @@ struct SoundPreset
     int breathController = 2;
     float breathCurve = 0.9f;
     float breathSmoothing = 0.28f;
-    float masterVolume = 0.8f;
+    float eqTone = 0.2f;
     float reverbMix = 0.28f;
-    int transposeSemitones = 0;
     juce::Array<TechniqueMapping> techniqueMappings;
     juce::String visualTheme = "neon";
     bool favorite = false;

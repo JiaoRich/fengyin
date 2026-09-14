@@ -300,6 +300,10 @@ void MainComponent::setupWebInterface()
         {
             masterOutput.setReverbMix(static_cast<float>(static_cast<double>(payload.getProperty("value", 0.28))));
         })
+        .withEventListener("setSmartOptimisation", [this](juce::var payload)
+        {
+            masterOutput.setSmartOptimisationEnabled(static_cast<bool>(payload.getProperty("enabled", true)));
+        })
         .withEventListener("beginTechniqueLearn", [this](juce::var payload)
         {
             const auto technique = juce::jlimit(0, static_cast<int>(fengyin::PerformanceTechnique::count) - 1,
@@ -765,6 +769,9 @@ void MainComponent::timerCallback()
         state->setProperty("recording", recorder.isRecording());
         state->setProperty("transposeSemitones", midi.getTransposeSemitones());
         state->setProperty("reverbMix", masterOutput.getReverbMix());
+        state->setProperty("eqTone", masterOutput.getEqTone());
+        state->setProperty("limiterCeiling", masterOutput.getLimiterCeiling());
+        state->setProperty("smartOptimisation", masterOutput.isSmartOptimisationEnabled());
         const auto currentPluginName = pluginHost.hasPlugin() ? pluginHost.getPluginName() : utf8("SWAM Soprano Sax");
         state->setProperty("pluginName", pluginHost.hasPlugin() ? currentPluginName : utf8("安全测试音源"));
         state->setProperty("pluginLoaded", pluginHost.hasPlugin());
@@ -1064,6 +1071,7 @@ void MainComponent::useTestSynth()
     audio.getDeviceManager().removeAudioCallback(&testSynth);
     audio.getDeviceManager().addAudioCallback(&testSynth);
     midi.setPerformanceSink(&testSynth);
+    masterOutput.setInstrumentProfile(fengyin::InstrumentMixProfile::generic);
 }
 
 void MainComponent::refreshPresetChoices()
@@ -1129,9 +1137,8 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
     preset.breathController = midi.getActiveProfile().breathController;
     preset.breathCurve = midi.getActiveProfile().breathCurve;
     preset.breathSmoothing = midi.getActiveProfile().smoothing;
-    preset.masterVolume = masterOutput.getGain();
+    preset.eqTone = masterOutput.getEqTone();
     preset.reverbMix = masterOutput.getReverbMix();
-    preset.transposeSemitones = midi.getTransposeSemitones();
     preset.techniqueMappings = midi.getTechniqueMappings();
 
     if (presetStore.save(preset))
@@ -1352,10 +1359,9 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                              }
                              pluginHost.restorePluginState(preset.pluginState.getData(), preset.pluginState.getSize());
                              midi.setBreathController(preset.breathController);
-                             midi.setTransposeSemitones(preset.transposeSemitones);
                              midi.setTechniqueMappings(preset.techniqueMappings);
+                             masterOutput.setEqTone(preset.eqTone);
                              masterOutput.setReverbMix(preset.reverbMix);
-                             masterVolume.setValue(preset.masterVolume, juce::sendNotificationSync);
                              activatePluginOutput(message);
                              pluginStatus.setText(utf8("已恢复音色：") + preset.name, juce::dontSendNotification);
                              if (preset.effectIdentifier.isEmpty())
@@ -1408,6 +1414,15 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName)
     audio.getDeviceManager().removeAudioCallback(&testSynth);
     pluginHost.attachTo(audio.getDeviceManager());
     midi.setPerformanceSink(&pluginHost);
+    switch (fengyin::SwamPluginClassifier::classify(pluginName.toStdString(), {}))
+    {
+        case fengyin::SwamFamily::saxophone: masterOutput.setInstrumentProfile(fengyin::InstrumentMixProfile::saxophone); break;
+        case fengyin::SwamFamily::brass:     masterOutput.setInstrumentProfile(fengyin::InstrumentMixProfile::brass); break;
+        case fengyin::SwamFamily::woodwind:  masterOutput.setInstrumentProfile(fengyin::InstrumentMixProfile::woodwind); break;
+        case fengyin::SwamFamily::strings:   masterOutput.setInstrumentProfile(fengyin::InstrumentMixProfile::strings); break;
+        case fengyin::SwamFamily::notSwam:
+        case fengyin::SwamFamily::other:     masterOutput.setInstrumentProfile(fengyin::InstrumentMixProfile::generic); break;
+    }
     pluginStatus.setText(utf8("当前音源：") + pluginName, juce::dontSendNotification);
     if (! pluginHost.hasEffect())
         effectStatus.setText(utf8("效果器：未使用"), juce::dontSendNotification);

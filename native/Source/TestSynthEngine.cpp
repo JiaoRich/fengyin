@@ -53,10 +53,13 @@ void TestSynthEngine::audioDeviceIOCallbackWithContext(const float* const*,
                 outputs[channel][sample] = value;
     }
 
-    if (accompaniment != nullptr)
-        accompaniment->mixInto(outputs, numOutputs, numSamples);
     if (masterOutput != nullptr)
-        masterOutput->process(outputs, numOutputs, numSamples);
+        masterOutput->processInstrument(outputs, numOutputs, numSamples);
+    if (accompaniment != nullptr)
+        accompaniment->mixInto(outputs, numOutputs, numSamples,
+            masterOutput != nullptr ? masterOutput->getAccompanimentDuckGain() : 1.0f);
+    if (masterOutput != nullptr)
+        masterOutput->processMaster(outputs, numOutputs, numSamples);
     leftPeak.store(peak, std::memory_order_relaxed);
     rightPeak.store(peak * 0.96f, std::memory_order_relaxed);
     if (recorder != nullptr)

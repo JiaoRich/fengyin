@@ -93,7 +93,7 @@ juce::File SoundPresetStore::getFile() const
 std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<SoundPreset>& presets)
 {
     auto root = std::make_unique<juce::XmlElement>("FENGYIN_SOUND_PRESETS");
-    root->setAttribute("version", 3);
+    root->setAttribute("version", 4);
     for (const auto& preset : presets)
     {
         auto* child = root->createNewChildElement("PRESET");
@@ -105,9 +105,8 @@ std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<Soun
         child->setAttribute("breathController", preset.breathController);
         child->setAttribute("breathCurve", static_cast<double>(preset.breathCurve));
         child->setAttribute("breathSmoothing", static_cast<double>(preset.breathSmoothing));
-        child->setAttribute("masterVolume", static_cast<double>(preset.masterVolume));
+        child->setAttribute("eqTone", static_cast<double>(preset.eqTone));
         child->setAttribute("reverbMix", static_cast<double>(preset.reverbMix));
-        child->setAttribute("transposeSemitones", preset.transposeSemitones);
         child->setAttribute("visualTheme", preset.visualTheme);
         child->setAttribute("favorite", preset.favorite);
         child->createNewChildElement("PLUGIN_STATE")->addTextElement(preset.pluginState.toBase64Encoding());
@@ -143,9 +142,8 @@ juce::Array<SoundPreset> SoundPresetStore::fromXml(const juce::XmlElement& root)
         preset.breathController = child->getIntAttribute("breathController", 2);
         preset.breathCurve = static_cast<float>(child->getDoubleAttribute("breathCurve", 0.9));
         preset.breathSmoothing = static_cast<float>(child->getDoubleAttribute("breathSmoothing", 0.28));
-        preset.masterVolume = static_cast<float>(child->getDoubleAttribute("masterVolume", 0.8));
+        preset.eqTone = static_cast<float>(child->getDoubleAttribute("eqTone", 0.2));
         preset.reverbMix = static_cast<float>(child->getDoubleAttribute("reverbMix", 0.28));
-        preset.transposeSemitones = child->getIntAttribute("transposeSemitones", 0);
         preset.visualTheme = child->getStringAttribute("visualTheme", "neon");
         preset.favorite = child->getBoolAttribute("favorite", false);
         if (auto* pluginState = child->getChildByName("PLUGIN_STATE"))

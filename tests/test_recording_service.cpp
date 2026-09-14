@@ -12,6 +12,7 @@ int main()
     fengyin::MasterOutputService master;
     master.setGain(0.5f);
     master.setSampleRate(48000.0);
+    master.setSmartOptimisationEnabled(false);
     juce::AudioBuffer<float> analysisAudio(2, 4096);
     for (int i = 0; i < analysisAudio.getNumSamples(); ++i)
         analysisAudio.setSample(0, i, std::sin(static_cast<float>(i) * 0.13f));
@@ -28,6 +29,26 @@ int main()
     limited.setSample(1, 0, -2.0f);
     master.process(limited.getArrayOfWritePointers(), 2, limited.getNumSamples());
     assert(limited.getSample(0, 0) <= 0.7f && limited.getSample(1, 0) >= -0.7f);
+
+    master.setGain(1.0f);
+    master.setLimiterCeiling(1.0f);
+    master.setReverbMix(0.0f);
+    master.setSmartOptimisationEnabled(true);
+    master.setInstrumentProfile(fengyin::InstrumentMixProfile::saxophone);
+    juce::AudioBuffer<float> performance(2, 8192);
+    performance.clear();
+    for (int i = 0; i < performance.getNumSamples(); ++i)
+    {
+        performance.setSample(0, i, 0.38f);
+        performance.setSample(1, i, 0.38f);
+    }
+    master.processInstrument(performance.getArrayOfWritePointers(), 2, performance.getNumSamples());
+    assert(master.getAccompanimentDuckGain() < 0.98f);
+    master.setSmartOptimisationEnabled(false);
+    performance.clear();
+    for (int block = 0; block < 30; ++block)
+        master.processInstrument(performance.getArrayOfWritePointers(), 2, performance.getNumSamples());
+    assert(master.getAccompanimentDuckGain() > 0.99f);
 
     const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory)
                             .getChildFile("fengyin-recording-test-" + juce::Uuid().toString());

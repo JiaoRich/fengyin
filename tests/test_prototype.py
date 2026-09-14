@@ -73,6 +73,16 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertIn("nativeEvent('setPerformanceReverb'", JS)
         self.assertIn("nativeEvent('beginTechniqueLearn'", JS)
         self.assertIn("nativeEvent('removeTechniqueMapping'", JS)
+        action_bar = HTML.split('<div class="action-bar glass">', 1)[1].split('</div>\n        </div>', 1)[0]
+        self.assertIn('id="transpose-key"', action_bar)
+        self.assertIn('id="performance-reverb"', action_bar)
+        instrument_heading = HTML.split('<div class="instrument-heading">', 1)[1].split('</div></div>', 1)[0]
+        self.assertNotIn('id="transpose-key"', instrument_heading)
+
+    def test_smart_audio_optimisation_is_user_controllable(self):
+        self.assertIn('id="smart-audio"', HTML)
+        self.assertIn("nativeEvent('setSmartOptimisation'", JS)
+        self.assertIn('class="smart-badge"', HTML)
 
     def test_instrument_art_uses_independent_images_without_distortion(self):
         self.assertIn('object-fit:contain', HTML)

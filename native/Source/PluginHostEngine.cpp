@@ -32,10 +32,13 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
                                                                      const juce::AudioIODeviceCallbackContext& context)
 {
     juce::AudioProcessorPlayer::audioDeviceIOCallbackWithContext(inputs, numInputs, outputs, numOutputs, numSamples, context);
-    if (accompaniment != nullptr)
-        accompaniment->mixInto(outputs, numOutputs, numSamples);
     if (masterOutput != nullptr)
-        masterOutput->process(outputs, numOutputs, numSamples);
+        masterOutput->processInstrument(outputs, numOutputs, numSamples);
+    if (accompaniment != nullptr)
+        accompaniment->mixInto(outputs, numOutputs, numSamples,
+            masterOutput != nullptr ? masterOutput->getAccompanimentDuckGain() : 1.0f);
+    if (masterOutput != nullptr)
+        masterOutput->processMaster(outputs, numOutputs, numSamples);
     if (recorder != nullptr)
         recorder->push(outputs, numOutputs, numSamples);
 }

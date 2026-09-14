@@ -431,6 +431,11 @@ $('#low-performance').addEventListener('change', event => {
   document.body.classList.toggle('low-performance', event.target.checked);
   toast(event.target.checked ? '已开启流畅模式' : '已恢复精美动画');
 });
+$('#smart-audio').addEventListener('change', event => {
+  nativeEvent('setSmartOptimisation', {enabled:event.target.checked});
+  document.querySelector('.smart-badge')?.classList.toggle('off', !event.target.checked);
+  toast(event.target.checked ? '智能音频优化已开启' : '智能音频优化已关闭');
+});
 
 $('#activate').addEventListener('click', () => {
   if (window.__JUCE__?.backend?.emitEvent) {
@@ -494,6 +499,19 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
     $('#reverb-mix').value = String(backendReverb);
     $('#reverb-label').textContent = `强度 ${backendReverb}%`;
   }
+  const backendEq = Math.round(Math.max(-1,Math.min(1,Number(state.eqTone ?? .2)))*100);
+  if (document.activeElement !== $('#eq-tone')) {
+    $('#eq-tone').value = String(backendEq);
+    $('#eq-label').textContent = backendEq === 0 ? '自然' : `${backendEq > 0 ? '明亮度 +' : '温暖度 +'}${Math.abs(backendEq)}`;
+  }
+  const backendLimiter = Math.round(Math.max(.6,Math.min(1,Number(state.limiterCeiling ?? .95)))*100);
+  if (document.activeElement !== $('#limiter-ceiling')) {
+    $('#limiter-ceiling').value = String(backendLimiter);
+    $('#limiter-label').textContent = `上限 ${backendLimiter}%`;
+  }
+  const smartEnabled = state.smartOptimisation !== false;
+  if (document.activeElement !== $('#smart-audio')) $('#smart-audio').checked = smartEnabled;
+  document.querySelector('.smart-badge')?.classList.toggle('off', !smartEnabled);
   techniqueMappings = Array.isArray(state.techniqueMappings) ? state.techniqueMappings : [];
   window.fengyinTechniqueLearning = Number(state.techniqueLearning ?? -1);
   if (!techniqueDialog.hidden) renderTechniqueMappings();

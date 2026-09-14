@@ -19,7 +19,8 @@ public:
     void stopAndRewind();
     void setPosition(double seconds);
     void setVolume(float volume);
-    void mixInto(float* const* outputs, int outputChannels, int sampleCount) noexcept;
+    void mixInto(float* const* outputs, int outputChannels, int sampleCount,
+                 float gainMultiplier = 1.0f) noexcept;
     [[nodiscard]] bool isReady() const noexcept { return ready.load(std::memory_order_acquire); }
     [[nodiscard]] double getPosition() const;
     [[nodiscard]] juce::File getAudioFile() const;

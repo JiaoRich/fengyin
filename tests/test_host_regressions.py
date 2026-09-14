@@ -7,6 +7,8 @@ HOST = (ROOT / "native" / "Source" / "PluginHostEngine.cpp").read_text(encoding=
 MIDI = (ROOT / "native" / "Source" / "MidiInputService.cpp").read_text(encoding="utf-8")
 MAIN = (ROOT / "native" / "Source" / "MainComponent.cpp").read_text(encoding="utf-8")
 JS = (ROOT / "prototype" / "app.js").read_text(encoding="utf-8")
+MASTER = (ROOT / "native" / "Source" / "MasterOutputService.cpp").read_text(encoding="utf-8")
+PRESET = (ROOT / "native" / "Source" / "SoundPresetStore.cpp").read_text(encoding="utf-8")
 
 
 class HostRegressionTests(unittest.TestCase):
@@ -37,6 +39,23 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('name.contains("growl")', HOST)
         self.assertIn('name.contains("flutter")', HOST)
         self.assertIn("setValueNotifyingHost", HOST)
+
+    def test_smart_mix_separates_instrument_and_accompaniment(self):
+        instrument = HOST.index("masterOutput->processInstrument")
+        accompaniment = HOST.index("accompaniment->mixInto", instrument)
+        master = HOST.index("masterOutput->processMaster", accompaniment)
+        self.assertLess(instrument, accompaniment)
+        self.assertLess(accompaniment, master)
+        self.assertIn("getAccompanimentDuckGain", HOST)
+        self.assertIn("instrumentReverb.processStereo", MASTER)
+        self.assertIn("glueReverb.processStereo", MASTER)
+
+    def test_transpose_is_global_and_not_part_of_sound_presets(self):
+        self.assertNotIn("transposeSemitones", PRESET)
+        self.assertNotIn("masterVolume", PRESET)
+        commit = MAIN.split("void MainComponent::commitCurrentPreset", 1)[1].split("void MainComponent::", 1)[0]
+        self.assertNotIn("transposeSemitones", commit)
+        self.assertNotIn("masterVolume", commit)
 
 
 if __name__ == "__main__":
