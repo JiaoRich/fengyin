@@ -4,6 +4,7 @@ namespace fengyin
 {
 MidiInputService::MidiInputService()
 {
+    activeOutputNotes.fill(-1);
     juce::PropertiesFile::Options options;
     options.applicationName = "FengYinMidi";
     options.filenameSuffix = ".settings";
@@ -72,11 +73,22 @@ void MidiInputService::disconnect()
     if (input != nullptr)
         input->stop();
     input.reset();
+    {
+        const juce::SpinLock::ScopedLockType lock(noteMapLock);
+        if (auto* sink = performanceSink.load(std::memory_order_acquire))
+            for (auto& outputNote : activeOutputNotes)
+                if (outputNote >= 0) sink->noteOff(outputNote);
+        activeOutputNotes.fill(-1);
+    }
+    if (auto* sink = performanceSink.load(std::memory_order_acquire))
+        for (int technique = 0; technique < static_cast<int>(PerformanceTechnique::count); ++technique)
+            sink->techniqueChanged(static_cast<PerformanceTechnique>(technique), 0.0f);
     connectedName.clear();
     connectedIdentifier.clear();
     lastNote.store(-1, std::memory_order_relaxed);
     velocity.store(0.0f, std::memory_order_relaxed);
     breath.store(0.0f, std::memory_order_relaxed);
+    pitchBend.store(0.0f, std::memory_order_relaxed);
 }
 
 void MidiInputService::refreshAndConnectFirstAvailable()
@@ -211,38 +223,173 @@ int MidiInputService::finishBreathDetection() noexcept
     return detected;
 }
 
+void MidiInputService::setTransposeSemitones(int semitones)
+{
+    const auto next = juce::jlimit(-12, 12, semitones);
+    if (transposeSemitones.exchange(next, std::memory_order_relaxed) == next)
+        return;
+
+    const juce::SpinLock::ScopedLockType lock(noteMapLock);
+    if (auto* sink = performanceSink.load(std::memory_order_acquire))
+        for (auto& outputNote : activeOutputNotes)
+            if (outputNote >= 0)
+            {
+                sink->noteOff(outputNote);
+                outputNote = -1;
+            }
+    lastNote.store(-1, std::memory_order_relaxed);
+    velocity.store(0.0f, std::memory_order_relaxed);
+}
+
+void MidiInputService::setTechniqueMappings(const juce::Array<TechniqueMapping>& mappings)
+{
+    {
+        const juce::SpinLock::ScopedLockType lock(techniqueLock);
+        techniqueMappings = mappings;
+        techniquePreviousInput.fill(0.0f);
+        techniqueToggleState.fill(false);
+    }
+    if (auto* sink = performanceSink.load(std::memory_order_acquire))
+        for (int technique = 0; technique < static_cast<int>(PerformanceTechnique::count); ++technique)
+            sink->techniqueChanged(static_cast<PerformanceTechnique>(technique), 0.0f);
+}
+
+juce::Array<TechniqueMapping> MidiInputService::getTechniqueMappings() const
+{
+    const juce::SpinLock::ScopedLockType lock(techniqueLock);
+    return techniqueMappings;
+}
+
+void MidiInputService::beginTechniqueLearn(PerformanceTechnique technique) noexcept
+{
+    learnedSourceReady.store(false, std::memory_order_relaxed);
+    learnedSourceNumber.store(-1, std::memory_order_relaxed);
+    learningTechniqueId.store(static_cast<int>(technique), std::memory_order_relaxed);
+    learningTechnique.store(true, std::memory_order_release);
+}
+
+void MidiInputService::cancelTechniqueLearn() noexcept
+{
+    learningTechnique.store(false, std::memory_order_release);
+    learnedSourceReady.store(false, std::memory_order_relaxed);
+}
+
+TechniqueLearnResult MidiInputService::consumeTechniqueLearnResult() noexcept
+{
+    if (! learnedSourceReady.exchange(false, std::memory_order_acq_rel))
+        return {};
+    TechniqueLearnResult result;
+    result.ready = true;
+    result.mapping.technique = static_cast<PerformanceTechnique>(learningTechniqueId.load(std::memory_order_relaxed));
+    result.mapping.sourceType = static_cast<TechniqueSourceType>(learnedSourceType.load(std::memory_order_relaxed));
+    result.mapping.sourceNumber = learnedSourceNumber.load(std::memory_order_relaxed);
+    return result;
+}
+
+float MidiInputService::techniqueMessageValue(const juce::MidiMessage& message) noexcept
+{
+    if (message.isController()) return static_cast<float>(message.getControllerValue()) / 127.0f;
+    if (message.isChannelPressure()) return static_cast<float>(message.getChannelPressureValue()) / 127.0f;
+    if (message.isPitchWheel()) return static_cast<float>(message.getPitchWheelValue()) / 16383.0f;
+    if (message.isNoteOn()) return message.getFloatVelocity();
+    if (message.isNoteOff()) return 0.0f;
+    return 0.0f;
+}
+
+bool MidiInputService::handleTechniqueMessage(const juce::MidiMessage& message, MidiPerformanceSink* sink)
+{
+    TechniqueSourceType sourceType = TechniqueSourceType::none;
+    int sourceNumber = -1;
+    if (message.isController())
+    {
+        sourceType = TechniqueSourceType::controller;
+        sourceNumber = message.getControllerNumber();
+    }
+    else if (message.isChannelPressure()) sourceType = TechniqueSourceType::channelPressure;
+    else if (message.isPitchWheel()) sourceType = TechniqueSourceType::pitchWheel;
+    else if (message.isNoteOnOrOff())
+    {
+        sourceType = TechniqueSourceType::note;
+        sourceNumber = message.getNoteNumber();
+    }
+
+    if (sourceType == TechniqueSourceType::none)
+        return false;
+
+    bool capturedByLearn = false;
+    if (learningTechnique.load(std::memory_order_acquire)
+        && ! (sourceType == TechniqueSourceType::controller && sourceNumber == breathController.load()))
+    {
+        learnedSourceType.store(static_cast<int>(sourceType), std::memory_order_relaxed);
+        learnedSourceNumber.store(sourceNumber, std::memory_order_relaxed);
+        learningTechnique.store(false, std::memory_order_release);
+        learnedSourceReady.store(true, std::memory_order_release);
+        capturedByLearn = true;
+    }
+
+    const auto inputValue = techniqueMessageValue(message);
+    bool consumedMessage = false;
+    const juce::SpinLock::ScopedTryLockType lock(techniqueLock);
+    if (! lock.isLocked()) return false;
+    for (const auto& mapping : techniqueMappings)
+    {
+        if (mapping.sourceType != sourceType || (sourceType == TechniqueSourceType::controller && mapping.sourceNumber != sourceNumber)
+            || (sourceType == TechniqueSourceType::note && mapping.sourceNumber != sourceNumber))
+            continue;
+        const auto index = static_cast<size_t>(mapping.technique);
+        auto outputValue = inputValue;
+        if (mapping.toggle)
+        {
+            if (inputValue > 0.5f && techniquePreviousInput[index] <= 0.5f)
+                techniqueToggleState[index] = ! techniqueToggleState[index];
+            outputValue = techniqueToggleState[index] ? 1.0f : 0.0f;
+        }
+        techniquePreviousInput[index] = inputValue;
+        if (sink != nullptr) sink->techniqueChanged(mapping.technique, outputValue);
+        consumedMessage = true;
+    }
+    return consumedMessage || capturedByLearn;
+}
+
 void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::MidiMessage& message)
 {
     messageCount.fetch_add(1, std::memory_order_relaxed);
+    auto* sink = performanceSink.load(std::memory_order_acquire);
+    if (handleTechniqueMessage(message, sink))
+        return;
 
     if (message.isNoteOn())
     {
-        lastNote.store(message.getNoteNumber(), std::memory_order_relaxed);
+        const auto sourceNote = message.getNoteNumber();
+        const auto outputNote = juce::jlimit(0, 127, sourceNote + transposeSemitones.load(std::memory_order_relaxed));
+        { const juce::SpinLock::ScopedLockType lock(noteMapLock); activeOutputNotes[static_cast<size_t>(sourceNote)] = outputNote; }
+        lastNote.store(outputNote, std::memory_order_relaxed);
         velocity.store(message.getFloatVelocity(), std::memory_order_relaxed);
-        if (auto* sink = performanceSink.load(std::memory_order_acquire))
-            sink->noteOn(message.getNoteNumber(), message.getFloatVelocity());
+        if (sink != nullptr) sink->noteOn(outputNote, message.getFloatVelocity());
     }
     else if (message.isNoteOff())
     {
+        auto outputNote = juce::jlimit(0, 127, message.getNoteNumber() + transposeSemitones.load(std::memory_order_relaxed));
+        { const juce::SpinLock::ScopedLockType lock(noteMapLock);
+          const auto sourceNote = static_cast<size_t>(message.getNoteNumber());
+          if (activeOutputNotes[sourceNote] >= 0) outputNote = activeOutputNotes[sourceNote];
+          activeOutputNotes[sourceNote] = -1; }
         velocity.store(0.0f, std::memory_order_relaxed);
-        if (auto* sink = performanceSink.load(std::memory_order_acquire))
-            sink->noteOff(message.getNoteNumber());
+        if (sink != nullptr) sink->noteOff(outputNote);
     }
     else if (message.isController() && message.getControllerNumber() == breathController.load())
     {
         float mappedBreath = 0.0f;
         { const juce::SpinLock::ScopedLockType lock(breathMapperLock); mappedBreath = breathMapper.processMidiValue(message.getControllerValue()); }
         breath.store(mappedBreath, std::memory_order_relaxed);
-        if (auto* sink = performanceSink.load(std::memory_order_acquire))
-            sink->breathChanged(mappedBreath);
+        if (sink != nullptr) sink->breathChanged(mappedBreath);
     }
     else if (message.isPitchWheel())
     {
         const auto centred = static_cast<float>(message.getPitchWheelValue() - 8192) / 8192.0f
                            * pitchSensitivity.load(std::memory_order_relaxed);
         pitchBend.store(juce::jlimit(-1.0f, 1.0f, centred), std::memory_order_relaxed);
-        if (auto* sink = performanceSink.load(std::memory_order_acquire))
-            sink->pitchBendChanged(juce::jlimit(-1.0f, 1.0f, centred));
+        if (sink != nullptr) sink->pitchBendChanged(juce::jlimit(-1.0f, 1.0f, centred));
     }
     if (message.isController() && detectingBreath.load(std::memory_order_acquire))
     {

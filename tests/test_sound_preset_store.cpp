@@ -21,6 +21,14 @@ int main()
     preset.effectState.append(state, sizeof(state));
     preset.effectBypassed = true;
     preset.favorite = true;
+    preset.reverbMix = 0.42f;
+    preset.transposeSemitones = -2;
+    fengyin::TechniqueMapping technique;
+    technique.technique = fengyin::PerformanceTechnique::growl;
+    technique.sourceType = fengyin::TechniqueSourceType::controller;
+    technique.sourceNumber = 21;
+    technique.toggle = true;
+    preset.techniqueMappings.add(technique);
 
     assert(store.save(preset));
     const auto loaded = store.findById("test-id");
@@ -33,6 +41,11 @@ int main()
     assert(loaded->effectState == preset.effectState);
     assert(loaded->effectBypassed);
     assert(loaded->favorite);
+    assert(std::abs(loaded->reverbMix - 0.42f) < 0.001f);
+    assert(loaded->transposeSemitones == -2);
+    assert(loaded->techniqueMappings.size() == 1);
+    assert(loaded->techniqueMappings[0].sourceNumber == 21);
+    assert(loaded->techniqueMappings[0].toggle);
     assert(store.setDefaultId("test-id"));
     assert(store.getDefaultId() == "test-id");
 

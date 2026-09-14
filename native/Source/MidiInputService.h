@@ -3,6 +3,7 @@
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_data_structures/juce_data_structures.h>
 #include <atomic>
+#include <array>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -32,6 +33,12 @@ struct ExpressionSettings
     float pitchSensitivity = 1.0f;
 };
 
+struct TechniqueLearnResult
+{
+    bool ready = false;
+    TechniqueMapping mapping;
+};
+
 class MidiInputService final : private juce::MidiInputCallback
 {
 public:
@@ -53,11 +60,20 @@ public:
     void setPerformanceSink(MidiPerformanceSink* sink) noexcept;
     void beginBreathDetection() noexcept;
     [[nodiscard]] int finishBreathDetection() noexcept;
+    void setTransposeSemitones(int semitones);
+    [[nodiscard]] int getTransposeSemitones() const noexcept { return transposeSemitones.load(std::memory_order_relaxed); }
+    void setTechniqueMappings(const juce::Array<TechniqueMapping>& mappings);
+    [[nodiscard]] juce::Array<TechniqueMapping> getTechniqueMappings() const;
+    void beginTechniqueLearn(PerformanceTechnique technique) noexcept;
+    void cancelTechniqueLearn() noexcept;
+    [[nodiscard]] TechniqueLearnResult consumeTechniqueLearnResult() noexcept;
 
 private:
     void handleIncomingMidiMessage(juce::MidiInput*, const juce::MidiMessage&) override;
     juce::String controllerSettingKey() const;
     void savePreferences();
+    bool handleTechniqueMessage(const juce::MidiMessage& message, MidiPerformanceSink* sink);
+    static float techniqueMessageValue(const juce::MidiMessage& message) noexcept;
 
     std::unique_ptr<juce::MidiInput> input;
     juce::String connectedName;
@@ -77,5 +93,17 @@ private:
     std::atomic<float> pitchBend { 0.0f };
     std::atomic<float> pitchSensitivity { 1.0f };
     std::atomic<uint64_t> messageCount { 0 };
+    std::atomic<int> transposeSemitones { 0 };
+    mutable juce::SpinLock noteMapLock;
+    std::array<int, 128> activeOutputNotes {};
+    mutable juce::SpinLock techniqueLock;
+    juce::Array<TechniqueMapping> techniqueMappings;
+    std::array<float, static_cast<size_t>(PerformanceTechnique::count)> techniquePreviousInput {};
+    std::array<bool, static_cast<size_t>(PerformanceTechnique::count)> techniqueToggleState {};
+    std::atomic<bool> learningTechnique { false };
+    std::atomic<int> learningTechniqueId { 0 };
+    std::atomic<int> learnedSourceType { 0 };
+    std::atomic<int> learnedSourceNumber { -1 };
+    std::atomic<bool> learnedSourceReady { false };
 };
 }

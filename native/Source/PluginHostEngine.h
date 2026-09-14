@@ -5,6 +5,7 @@
 #include <functional>
 #include <memory>
 #include <atomic>
+#include <array>
 
 #include "MidiPerformanceSink.h"
 #include "RecordingService.h"
@@ -71,10 +72,14 @@ public:
     void noteOff(int noteNumber) noexcept override;
     void breathChanged(float value) noexcept override;
     void pitchBendChanged(float bipolarValue) noexcept override;
+    void techniqueChanged(PerformanceTechnique technique, float value) noexcept override;
+    void flushTechniqueValues();
+    [[nodiscard]] bool supportsTechnique(PerformanceTechnique technique) const noexcept;
 
 private:
     void queue(juce::MidiMessage message) noexcept;
     bool rebuildConnections();
+    void resolveTechniqueParameters();
 
     juce::AudioPluginFormatManager formatManager;
     RecordingAudioProcessorPlayer player;
@@ -90,6 +95,9 @@ private:
     std::unique_ptr<PluginEditorWindow> effectEditorWindow;
     juce::AudioDeviceManager* attachedManager = nullptr;
     std::shared_ptr<std::atomic_bool> lifetime = std::make_shared<std::atomic_bool>(true);
+    std::array<juce::AudioProcessorParameter*, static_cast<size_t>(PerformanceTechnique::count)> techniqueParameters {};
+    std::array<std::atomic<float>, static_cast<size_t>(PerformanceTechnique::count)> techniqueValues {};
+    std::array<std::atomic<bool>, static_cast<size_t>(PerformanceTechnique::count)> techniqueDirty {};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginHostEngine)
 };

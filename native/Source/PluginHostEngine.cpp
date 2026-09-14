@@ -114,6 +114,7 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                 juce::AudioProcessorGraph::AudioGraphIOProcessor::midiInputNode));
             instrumentNode = graph->addNode(std::move(instance));
             currentDescription = description;
+            resolveTechniqueParameters();
             if (! rebuildConnections())
             {
                 unload();
@@ -139,6 +140,8 @@ void PluginHostEngine::unload()
     graph.reset();
     currentDescription = {};
     currentEffectDescription = {};
+    techniqueParameters.fill(nullptr);
+    for (auto& dirty : techniqueDirty) dirty.store(false, std::memory_order_relaxed);
 }
 
 bool PluginHostEngine::hasPlugin() const noexcept
@@ -340,6 +343,47 @@ void PluginHostEngine::pitchBendChanged(float bipolarValue) noexcept
     const auto pitch = juce::jlimit(0, 16383,
         juce::roundToInt(8192.0f + juce::jlimit(-1.0f, 1.0f, bipolarValue) * 8191.0f));
     queue(juce::MidiMessage::pitchWheel(1, pitch));
+}
+
+void PluginHostEngine::techniqueChanged(PerformanceTechnique technique, float value) noexcept
+{
+    const auto index = static_cast<size_t>(technique);
+    if (index >= techniqueValues.size()) return;
+    techniqueValues[index].store(juce::jlimit(0.0f, 1.0f, value), std::memory_order_relaxed);
+    techniqueDirty[index].store(true, std::memory_order_release);
+}
+
+void PluginHostEngine::flushTechniqueValues()
+{
+    for (size_t index = 0; index < techniqueParameters.size(); ++index)
+        if (techniqueDirty[index].exchange(false, std::memory_order_acq_rel))
+            if (auto* parameter = techniqueParameters[index])
+                parameter->setValueNotifyingHost(techniqueValues[index].load(std::memory_order_relaxed));
+}
+
+bool PluginHostEngine::supportsTechnique(PerformanceTechnique technique) const noexcept
+{
+    const auto index = static_cast<size_t>(technique);
+    return index < techniqueParameters.size() && techniqueParameters[index] != nullptr;
+}
+
+void PluginHostEngine::resolveTechniqueParameters()
+{
+    techniqueParameters.fill(nullptr);
+    if (instrumentNode == nullptr) return;
+    for (auto* parameter : instrumentNode->getProcessor()->getParameters())
+    {
+        const auto name = parameter->getName(128).toLowerCase().removeCharacters(" ._-");
+        if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::growl)] == nullptr
+            && name.contains("growl"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::growl)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::vibrato)] == nullptr
+                 && (name.contains("vibratodepth") || name.contains("vibrdepth")))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::vibrato)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::flutter)] == nullptr
+                 && name.contains("flutter"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::flutter)] = parameter;
+    }
 }
 
 void PluginHostEngine::queue(juce::MidiMessage message) noexcept

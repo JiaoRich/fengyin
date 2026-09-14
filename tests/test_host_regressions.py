@@ -24,6 +24,20 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("lastNote.store(-1", MIDI)
         self.assertIn("'已收到气息，尚未收到音符'", JS)
 
+    def test_transpose_releases_active_notes_and_uses_note_map(self):
+        self.assertIn("void MidiInputService::setTransposeSemitones", MIDI)
+        self.assertIn("activeOutputNotes", MIDI)
+        self.assertIn("sourceNote + transposeSemitones.load", MIDI)
+        self.assertIn("sink->noteOff(outputNote)", MIDI)
+
+    def test_technique_learning_and_swam_parameter_control_are_connected(self):
+        self.assertIn("beginTechniqueLearn", MIDI)
+        self.assertIn("handleTechniqueMessage", MIDI)
+        self.assertIn("resolveTechniqueParameters", HOST)
+        self.assertIn('name.contains("growl")', HOST)
+        self.assertIn('name.contains("flutter")', HOST)
+        self.assertIn("setValueNotifyingHost", HOST)
+
 
 if __name__ == "__main__":
     unittest.main()

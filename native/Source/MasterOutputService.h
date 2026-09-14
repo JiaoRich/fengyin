@@ -13,6 +13,9 @@ public:
     void setReverbMix(float value) noexcept { reverbMix.store(juce::jlimit(0.0f, 0.6f, value)); }
     void setLimiterCeiling(float value) noexcept { limiterCeiling.store(juce::jlimit(0.6f, 1.0f, value)); }
     float getGain() const noexcept { return gain.load(); }
+    float getEqTone() const noexcept { return eqTone.load(); }
+    float getReverbMix() const noexcept { return reverbMix.load(); }
+    float getLimiterCeiling() const noexcept { return limiterCeiling.load(); }
     float getLeftPeak() const noexcept { return leftPeak.load(); }
     float getRightPeak() const noexcept { return rightPeak.load(); }
     void setSampleRate(double value) noexcept { sampleRate.store(value > 0.0 ? value : 48000.0); }

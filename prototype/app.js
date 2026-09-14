@@ -28,6 +28,7 @@ let currentPluginLoaded = false;
 let favoriteInstruments = [];
 let pendingPresetNavigation = null;
 let editingPresetName = '';
+let techniqueMappings = [];
 let appFocused = document.hasFocus();
 let unfocusedFrame = 0;
 
@@ -345,6 +346,75 @@ layoutResizer.addEventListener('keydown', event => {
   stageGrid.style.flexBasis = `${Math.max(minimum,Math.min(bounds.height - dividerHeight - lowerMinimum,next))}px`;
 });
 $('#master-volume').addEventListener('input', event => nativeEvent('setMasterVolume', {value:Number(event.target.value)/100}));
+const transposeNames = new Map([...$('#transpose-key').options].map(option => [Number(option.value), option.textContent]));
+$('#transpose-key').addEventListener('change', event => {
+  const semitones = Number(event.target.value);
+  nativeEvent('setTranspose', {semitones});
+  const direction = semitones === 0 ? '原调' : `${semitones > 0 ? '升高' : '降低'} ${Math.abs(semitones)} 个半音`;
+  toast(`已切换为${transposeNames.get(semitones) || '所选调性'} · ${direction}`);
+});
+const performanceReverb = $('#performance-reverb');
+performanceReverb.addEventListener('input', event => {
+  const value = Number(event.target.value);
+  $('#performance-reverb-value').textContent = `${value}%`;
+  $('#reverb-mix').value = String(value);
+  $('#reverb-label').textContent = `强度 ${value}%`;
+  nativeEvent('setPerformanceReverb', {value:value/100});
+});
+
+const techniqueDialog = $('#technique-dialog');
+const techniqueHint = $('#technique-learn-hint');
+function sourceDescription(mapping) {
+  if (!mapping || !Number(mapping.sourceType)) return '未设置';
+  if (Number(mapping.sourceType) === 1) return `控制器 CC${mapping.sourceNumber}`;
+  if (Number(mapping.sourceType) === 2) return '吹嘴/按键压力（Aftertouch）';
+  if (Number(mapping.sourceType) === 3) return '弯音摇杆';
+  if (Number(mapping.sourceType) === 4) return `功能按键（音符 ${mapping.sourceNumber}）`;
+  return '已设置';
+}
+function renderTechniqueMappings() {
+  $$('.technique-row').forEach(row => {
+    const technique = Number(row.dataset.technique);
+    const mapping = techniqueMappings.find(item => Number(item.technique) === technique);
+    const mapped = !!mapping && Number(mapping.sourceType) !== 0;
+    row.querySelector('.mapping-status').textContent = mapped ? sourceDescription(mapping) : '未设置';
+    row.querySelector('select').value = mapping?.toggle ? 'toggle' : 'hold';
+    row.querySelector('.remove-technique').hidden = !mapped;
+    row.classList.toggle('unsupported', mapping?.supported === false);
+    row.querySelector('.learn-technique').textContent = Number(mapping?.technique) === Number(row.dataset.technique)
+      && Number(window.fengyinTechniqueLearning) === technique ? '等待操作…' : (mapped ? '重新识别' : '开始识别');
+  });
+}
+$('#technique-settings').addEventListener('click', () => {
+  techniqueDialog.hidden = false;
+  techniqueHint.textContent = '映射会随“音色方案”保存，不同品牌电吹管无需手工查找 CC 编号。';
+  renderTechniqueMappings();
+});
+$('#close-technique-dialog').addEventListener('click', () => {
+  nativeEvent('cancelTechniqueLearn');
+  techniqueDialog.hidden = true;
+});
+techniqueDialog.addEventListener('click', event => {
+  if (event.target === techniqueDialog) {
+    nativeEvent('cancelTechniqueLearn');
+    techniqueDialog.hidden = true;
+  }
+});
+$$('.learn-technique').forEach(button => button.addEventListener('click', () => {
+  const row = button.closest('.technique-row');
+  const technique = Number(row.dataset.technique);
+  window.fengyinTechniqueLearning = technique;
+  techniqueHint.textContent = '正在识别：请在 10 秒内操作希望使用的电吹管按键、吹嘴或摇杆……';
+  nativeEvent('beginTechniqueLearn', {technique, toggle:row.querySelector('select').value === 'toggle'});
+  renderTechniqueMappings();
+}));
+$$('.remove-technique').forEach(button => button.addEventListener('click', () => {
+  const technique = Number(button.closest('.technique-row').dataset.technique);
+  nativeEvent('removeTechniqueMapping', {technique});
+  techniqueMappings = techniqueMappings.filter(item => Number(item.technique) !== technique);
+  renderTechniqueMappings();
+  toast('已取消这项技巧映射');
+}));
 $('#simulate').addEventListener('click', event => {
   simulating = !simulating;
   event.target.textContent = simulating ? '暂停模拟吹奏' : '继续模拟吹奏';
@@ -400,6 +470,8 @@ function updateBuiltinEffects() {
   const limiter = Number($('#limiter-ceiling').value);
   $('#eq-label').textContent = eq === 0 ? '自然' : `${eq > 0 ? '明亮度 +' : '温暖度 +'}${Math.abs(eq)}`;
   $('#reverb-label').textContent = `强度 ${reverb}%`;
+  performanceReverb.value = String(reverb);
+  $('#performance-reverb-value').textContent = `${reverb}%`;
   $('#limiter-label').textContent = `上限 ${limiter}%`;
   nativeEvent('setBuiltinEffects', {eq:eq/100,reverb:reverb/100,limiter:limiter/100});
 }
@@ -413,6 +485,18 @@ document.querySelectorAll('#page-audio button').forEach(button => button.addEven
 window.__JUCE__?.backend?.addEventListener('backendState', state => {
   const connected = !!state.deviceConnected;
   hardwareBreath = connected ? Math.max(0,Math.min(100,Number(state.breath || 0)*100)) : null;
+  const transpose = Number(state.transposeSemitones || 0);
+  if ($('#transpose-key').value !== String(transpose)) $('#transpose-key').value = String(transpose);
+  const backendReverb = Math.round(Math.max(0,Math.min(.6,Number(state.reverbMix ?? .28)))*100);
+  if (document.activeElement !== performanceReverb && document.activeElement !== $('#reverb-mix')) {
+    performanceReverb.value = String(backendReverb);
+    $('#performance-reverb-value').textContent = `${backendReverb}%`;
+    $('#reverb-mix').value = String(backendReverb);
+    $('#reverb-label').textContent = `强度 ${backendReverb}%`;
+  }
+  techniqueMappings = Array.isArray(state.techniqueMappings) ? state.techniqueMappings : [];
+  window.fengyinTechniqueLearning = Number(state.techniqueLearning ?? -1);
+  if (!techniqueDialog.hidden) renderTechniqueMappings();
   const sideTitle = document.querySelector('.sidebar-status b');
   const sideText = document.querySelector('.sidebar-status small');
   const windStatusPill = $('#wind-status-pill');
@@ -511,6 +595,12 @@ window.__JUCE__?.backend?.addEventListener('activationResult', result => {
   toast(result.message || (result.activated ? '激活成功' : '无法激活'));
 });
 window.__JUCE__?.backend?.addEventListener('editorResult', message => toast(String(message || '')));
+window.__JUCE__?.backend?.addEventListener('techniqueLearnResult', result => {
+  window.fengyinTechniqueLearning = -1;
+  techniqueHint.textContent = result.message || (result.success ? '识别成功' : '没有识别到控制信号');
+  toast(techniqueHint.textContent);
+  renderTechniqueMappings();
+});
 nativeEvent('webReady');
 showInstrumentArtwork('soprano-sax', '高音萨克斯');
 if(localStorage.getItem('fengyin-prototype-license') === 'active') {

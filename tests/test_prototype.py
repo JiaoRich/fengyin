@@ -64,6 +64,16 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertIn("document.body.classList.add('video-playing')", JS)
         self.assertIn("document.body.classList.remove('video-playing')", JS)
 
+    def test_performance_transpose_reverb_and_technique_controls_are_live(self):
+        for control_id in ("transpose-key", "performance-reverb", "technique-settings", "technique-dialog"):
+            self.assertIn(f'id="{control_id}"', HTML)
+        for key_name in ("C调（原调）", "降E调", "升F调", "降B调"):
+            self.assertIn(key_name, HTML)
+        self.assertIn("nativeEvent('setTranspose'", JS)
+        self.assertIn("nativeEvent('setPerformanceReverb'", JS)
+        self.assertIn("nativeEvent('beginTechniqueLearn'", JS)
+        self.assertIn("nativeEvent('removeTechniqueMapping'", JS)
+
     def test_instrument_art_uses_independent_images_without_distortion(self):
         self.assertIn('object-fit:contain', HTML)
         self.assertIn('assets/instruments/instrument_soprano_sax.png', HTML)

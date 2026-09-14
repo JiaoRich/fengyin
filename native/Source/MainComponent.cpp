@@ -292,6 +292,49 @@ void MainComponent::setupWebInterface()
         {
             masterOutput.setGain(static_cast<float>(static_cast<double>(payload.getProperty("value", 0.8))));
         })
+        .withEventListener("setTranspose", [this](juce::var payload)
+        {
+            midi.setTransposeSemitones(static_cast<int>(payload.getProperty("semitones", 0)));
+        })
+        .withEventListener("setPerformanceReverb", [this](juce::var payload)
+        {
+            masterOutput.setReverbMix(static_cast<float>(static_cast<double>(payload.getProperty("value", 0.28))));
+        })
+        .withEventListener("beginTechniqueLearn", [this](juce::var payload)
+        {
+            const auto technique = juce::jlimit(0, static_cast<int>(fengyin::PerformanceTechnique::count) - 1,
+                                                static_cast<int>(payload.getProperty("technique", 0)));
+            if (! midi.getSnapshot().deviceConnected)
+            {
+                if (webInterface != nullptr)
+                {
+                    auto result = std::make_unique<juce::DynamicObject>();
+                    result->setProperty("success", false);
+                    result->setProperty("message", utf8("请先连接电吹管"));
+                    webInterface->emitEventIfBrowserIsVisible("techniqueLearnResult", juce::var(result.release()));
+                }
+                return;
+            }
+            activeTechniqueLearn = technique;
+            pendingTechniqueToggle = static_cast<bool>(payload.getProperty("toggle", false));
+            techniqueLearnEndsAtMs = juce::Time::getMillisecondCounterHiRes() + 10000.0;
+            midi.beginTechniqueLearn(static_cast<fengyin::PerformanceTechnique>(technique));
+        })
+        .withEventListener("cancelTechniqueLearn", [this](juce::var)
+        {
+            midi.cancelTechniqueLearn();
+            activeTechniqueLearn = -1;
+            techniqueLearnEndsAtMs = 0.0;
+        })
+        .withEventListener("removeTechniqueMapping", [this](juce::var payload)
+        {
+            const auto technique = static_cast<int>(payload.getProperty("technique", 0));
+            auto mappings = midi.getTechniqueMappings();
+            for (int index = mappings.size(); --index >= 0;)
+                if (static_cast<int>(mappings.getReference(index).technique) == technique)
+                    mappings.remove(index);
+            midi.setTechniqueMappings(mappings);
+        })
         .withEventListener("setBuiltinEffects", [this](juce::var payload)
         {
             masterOutput.setEqTone(static_cast<float>(static_cast<double>(payload.getProperty("eq", 0.2))));
@@ -662,6 +705,44 @@ void MainComponent::timerCallback()
         midi.pollConnection();
     }
     snapshot = midi.getSnapshot();
+    pluginHost.flushTechniqueValues();
+    if (activeTechniqueLearn >= 0)
+    {
+        const auto learned = midi.consumeTechniqueLearnResult();
+        if (learned.ready)
+        {
+            auto mappings = midi.getTechniqueMappings();
+            for (int index = mappings.size(); --index >= 0;)
+                if (mappings.getReference(index).technique == learned.mapping.technique)
+                    mappings.remove(index);
+            auto mapping = learned.mapping;
+            mapping.toggle = pendingTechniqueToggle;
+            mappings.add(mapping);
+            midi.setTechniqueMappings(mappings);
+            activeTechniqueLearn = -1;
+            techniqueLearnEndsAtMs = 0.0;
+            if (webInterface != nullptr)
+            {
+                auto result = std::make_unique<juce::DynamicObject>();
+                result->setProperty("success", true);
+                result->setProperty("message", utf8("识别成功；保存音色方案后会永久保留"));
+                webInterface->emitEventIfBrowserIsVisible("techniqueLearnResult", juce::var(result.release()));
+            }
+        }
+        else if (juce::Time::getMillisecondCounterHiRes() >= techniqueLearnEndsAtMs)
+        {
+            midi.cancelTechniqueLearn();
+            activeTechniqueLearn = -1;
+            techniqueLearnEndsAtMs = 0.0;
+            if (webInterface != nullptr)
+            {
+                auto result = std::make_unique<juce::DynamicObject>();
+                result->setProperty("success", false);
+                result->setProperty("message", utf8("10 秒内没有识别到控制信号，请重试"));
+                webInterface->emitEventIfBrowserIsVisible("techniqueLearnResult", juce::var(result.release()));
+            }
+        }
+    }
     const auto currentAudio = audio.getStatus();
     const auto scanProgress = pluginCatalog.getProgress();
     simulatedPhase += 0.09f;
@@ -682,6 +763,8 @@ void MainComponent::timerCallback()
         state->setProperty("activated", isActivated);
         state->setProperty("machineCode", machineCode);
         state->setProperty("recording", recorder.isRecording());
+        state->setProperty("transposeSemitones", midi.getTransposeSemitones());
+        state->setProperty("reverbMix", masterOutput.getReverbMix());
         const auto currentPluginName = pluginHost.hasPlugin() ? pluginHost.getPluginName() : utf8("SWAM Soprano Sax");
         state->setProperty("pluginName", pluginHost.hasPlugin() ? currentPluginName : utf8("安全测试音源"));
         state->setProperty("pluginLoaded", pluginHost.hasPlugin());
@@ -695,6 +778,27 @@ void MainComponent::timerCallback()
         state->setProperty("effectLoaded", pluginHost.hasEffect());
         state->setProperty("effectLoading", effectLoading);
         state->setProperty("presetEditing", editingPresetId.isNotEmpty());
+        state->setProperty("techniqueLearning", activeTechniqueLearn);
+        juce::Array<juce::var> techniqueMappings;
+        for (int technique = 0; technique < static_cast<int>(fengyin::PerformanceTechnique::count); ++technique)
+        {
+            auto item = std::make_unique<juce::DynamicObject>();
+            item->setProperty("technique", technique);
+            item->setProperty("supported", pluginHost.supportsTechnique(static_cast<fengyin::PerformanceTechnique>(technique)));
+            item->setProperty("sourceType", 0);
+            item->setProperty("sourceNumber", -1);
+            item->setProperty("toggle", false);
+            for (const auto& mapping : midi.getTechniqueMappings())
+                if (static_cast<int>(mapping.technique) == technique)
+                {
+                    item->setProperty("sourceType", static_cast<int>(mapping.sourceType));
+                    item->setProperty("sourceNumber", mapping.sourceNumber);
+                    item->setProperty("toggle", mapping.toggle);
+                    break;
+                }
+            techniqueMappings.add(juce::var(item.release()));
+        }
+        state->setProperty("techniqueMappings", juce::var(techniqueMappings));
         juce::Array<juce::var> instruments;
         for (const auto& plugin : cachedInstrumentPlugins)
         {
@@ -1026,6 +1130,9 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
     preset.breathCurve = midi.getActiveProfile().breathCurve;
     preset.breathSmoothing = midi.getActiveProfile().smoothing;
     preset.masterVolume = masterOutput.getGain();
+    preset.reverbMix = masterOutput.getReverbMix();
+    preset.transposeSemitones = midi.getTransposeSemitones();
+    preset.techniqueMappings = midi.getTechniqueMappings();
 
     if (presetStore.save(preset))
     {
@@ -1245,6 +1352,9 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                              }
                              pluginHost.restorePluginState(preset.pluginState.getData(), preset.pluginState.getSize());
                              midi.setBreathController(preset.breathController);
+                             midi.setTransposeSemitones(preset.transposeSemitones);
+                             midi.setTechniqueMappings(preset.techniqueMappings);
+                             masterOutput.setReverbMix(preset.reverbMix);
                              masterVolume.setValue(preset.masterVolume, juce::sendNotificationSync);
                              activatePluginOutput(message);
                              pluginStatus.setText(utf8("已恢复音色：") + preset.name, juce::dontSendNotification);
