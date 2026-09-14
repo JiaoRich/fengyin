@@ -74,6 +74,9 @@ void MidiInputService::disconnect()
     input.reset();
     connectedName.clear();
     connectedIdentifier.clear();
+    lastNote.store(-1, std::memory_order_relaxed);
+    velocity.store(0.0f, std::memory_order_relaxed);
+    breath.store(0.0f, std::memory_order_relaxed);
 }
 
 void MidiInputService::refreshAndConnectFirstAvailable()
@@ -89,6 +92,33 @@ void MidiInputService::refreshAndConnectFirstAvailable()
             if (device.identifier == preferred && connect(preferred)) return;
     }
     connect(devices.getFirst().identifier);
+}
+
+void MidiInputService::pollConnection()
+{
+    const auto devices = juce::MidiInput::getAvailableDevices();
+    if (input != nullptr)
+    {
+        for (const auto& device : devices)
+            if (device.identifier == connectedIdentifier)
+                return;
+        disconnect();
+    }
+
+    const auto preferred = properties.getUserSettings() != nullptr
+        ? properties.getUserSettings()->getValue("preferredDevice") : juce::String();
+    if (preferred.isNotEmpty())
+    {
+        for (const auto& device : devices)
+            if (device.identifier == preferred)
+            {
+                connect(preferred);
+                return;
+            }
+        return;
+    }
+    if (! devices.isEmpty())
+        connect(devices.getFirst().identifier);
 }
 
 MidiSnapshot MidiInputService::getSnapshot() const noexcept

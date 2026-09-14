@@ -656,6 +656,11 @@ void MainComponent::resized()
 
 void MainComponent::timerCallback()
 {
+    if (++midiConnectionPollCounter >= 30)
+    {
+        midiConnectionPollCounter = 0;
+        midi.pollConnection();
+    }
     snapshot = midi.getSnapshot();
     const auto currentAudio = audio.getStatus();
     const auto scanProgress = pluginCatalog.getProgress();
@@ -671,6 +676,7 @@ void MainComponent::timerCallback()
         state->setProperty("deviceName", midi.getConnectedDeviceName());
         state->setProperty("breath", snapshot.breath);
         state->setProperty("note", snapshot.lastNote);
+        state->setProperty("noteReceived", snapshot.lastNote >= 0);
         state->setProperty("audioDevice", currentAudio.deviceName);
         state->setProperty("latency", currentAudio.estimatedBufferLatencyMs);
         state->setProperty("activated", isActivated);

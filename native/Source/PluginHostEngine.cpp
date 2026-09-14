@@ -92,8 +92,8 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
     unload();
     formatManager.createPluginInstanceAsync(
         description, sampleRate, bufferSize,
-        [this, description, guard = lifetime, completion = std::move(callback)](std::unique_ptr<juce::AudioPluginInstance> instance,
-                                                                                const juce::String& error) mutable
+        [this, description, sampleRate, bufferSize, guard = lifetime, completion = std::move(callback)]
+        (std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error) mutable
         {
             if (! guard->load(std::memory_order_acquire))
                 return;
@@ -104,13 +104,23 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                 return;
             }
             graph = std::make_unique<juce::AudioProcessorGraph>();
+            // Configure the graph's output buses before adding the IO node. Without this,
+            // the output node initially has zero input channels and silently rejects every
+            // instrument-to-output connection while accompaniment audio still remains audible.
+            graph->setPlayConfigDetails(0, 2, sampleRate, bufferSize);
             audioOutputNode = graph->addNode(std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(
                 juce::AudioProcessorGraph::AudioGraphIOProcessor::audioOutputNode));
             midiInputNode = graph->addNode(std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(
                 juce::AudioProcessorGraph::AudioGraphIOProcessor::midiInputNode));
             instrumentNode = graph->addNode(std::move(instance));
             currentDescription = description;
-            rebuildConnections();
+            if (! rebuildConnections())
+            {
+                unload();
+                if (completion)
+                    completion(false, juce::String::fromUTF8("音源已打开，但无法连接到声音输出，请重新选择声音设备"));
+                return;
+            }
             player.setProcessor(graph.get());
             if (completion)
                 completion(true, instrumentNode->getProcessor()->getName());
@@ -217,7 +227,16 @@ void PluginHostEngine::loadEffectAsync(const juce::PluginDescription& descriptio
             if (effectNode != nullptr) graph->removeNode(effectNode->nodeID);
             effectNode = graph->addNode(std::move(instance));
             currentEffectDescription = description;
-            rebuildConnections();
+            if (! rebuildConnections())
+            {
+                graph->removeNode(effectNode->nodeID);
+                effectNode = nullptr;
+                currentEffectDescription = {};
+                rebuildConnections();
+                player.setProcessor(graph.get());
+                if (completion) completion(false, juce::String::fromUTF8("效果器音频通道不兼容，已恢复直接输出"));
+                return;
+            }
             player.setProcessor(graph.get());
             if (completion) completion(true, effectNode->getProcessor()->getName());
         });
@@ -268,27 +287,34 @@ bool PluginHostEngine::showPluginEditor(bool effect)
     return true;
 }
 
-void PluginHostEngine::rebuildConnections()
+bool PluginHostEngine::rebuildConnections()
 {
-    if (graph == nullptr || instrumentNode == nullptr || audioOutputNode == nullptr || midiInputNode == nullptr) return;
+    if (graph == nullptr || instrumentNode == nullptr || audioOutputNode == nullptr || midiInputNode == nullptr) return false;
     for (const auto& connection : graph->getConnections())
         graph->removeConnection(connection);
-    graph->addConnection({ { midiInputNode->nodeID, juce::AudioProcessorGraph::midiChannelIndex },
-                           { instrumentNode->nodeID, juce::AudioProcessorGraph::midiChannelIndex } });
+    const auto midiConnected = graph->addConnection(
+        { { midiInputNode->nodeID, juce::AudioProcessorGraph::midiChannelIndex },
+          { instrumentNode->nodeID, juce::AudioProcessorGraph::midiChannelIndex } });
     auto source = instrumentNode;
     if (effectNode != nullptr)
     {
         const auto sourceChannels = juce::jmax(1, instrumentNode->getProcessor()->getTotalNumOutputChannels());
         const auto destinationChannels = juce::jmax(1, effectNode->getProcessor()->getTotalNumInputChannels());
+        int effectConnections = 0;
         for (int channel = 0; channel < juce::jmin(2, destinationChannels); ++channel)
-            graph->addConnection({ { instrumentNode->nodeID, juce::jmin(channel, sourceChannels - 1) },
-                                   { effectNode->nodeID, channel } });
+            if (graph->addConnection({ { instrumentNode->nodeID, juce::jmin(channel, sourceChannels - 1) },
+                                        { effectNode->nodeID, channel } }))
+                ++effectConnections;
+        if (effectConnections == 0) return false;
         source = effectNode;
     }
     const auto sourceChannels = juce::jmax(1, source->getProcessor()->getTotalNumOutputChannels());
+    int audioConnections = 0;
     for (int channel = 0; channel < 2; ++channel)
-        graph->addConnection({ { source->nodeID, juce::jmin(channel, sourceChannels - 1) },
-                               { audioOutputNode->nodeID, channel } });
+        if (graph->addConnection({ { source->nodeID, juce::jmin(channel, sourceChannels - 1) },
+                                    { audioOutputNode->nodeID, channel } }))
+            ++audioConnections;
+    return midiConnected && audioConnections > 0;
 }
 
 void PluginHostEngine::noteOn(int noteNumber, float velocity) noexcept

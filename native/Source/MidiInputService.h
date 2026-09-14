@@ -42,6 +42,7 @@ public:
     bool connect(const juce::String& identifier);
     void disconnect();
     void refreshAndConnectFirstAvailable();
+    void pollConnection();
     [[nodiscard]] MidiSnapshot getSnapshot() const noexcept;
     [[nodiscard]] juce::String getConnectedDeviceName() const;
     [[nodiscard]] DeviceProfile getActiveProfile() const;

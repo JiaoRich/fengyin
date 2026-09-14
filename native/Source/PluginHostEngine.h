@@ -74,7 +74,7 @@ public:
 
 private:
     void queue(juce::MidiMessage message) noexcept;
-    void rebuildConnections();
+    bool rebuildConnections();
 
     juce::AudioPluginFormatManager formatManager;
     RecordingAudioProcessorPlayer player;

@@ -418,7 +418,9 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   const windStatusPill = $('#wind-status-pill');
   const windStatusText = $('#wind-status-text');
   if (sideTitle) sideTitle.textContent = connected ? (state.deviceName || '电吹管已连接') : '尚未连接电吹管';
-  if (sideText) sideText.textContent = connected ? '气息与音高信号正常' : '当前显示模拟演奏效果';
+  if (sideText) sideText.textContent = !connected ? '当前显示模拟演奏效果'
+    : state.noteReceived ? '气息与音符信号正常'
+    : Number(state.breath || 0) > 0.02 ? '已收到气息，尚未收到音符' : '已连接，等待吹奏信号';
   if (windStatusText) windStatusText.textContent = connected ? '电吹管已连接' : '未连接电吹管';
   if (windStatusPill) windStatusPill.classList.toggle('disconnected', !connected);
   currentPluginLoaded = !!state.pluginLoaded;

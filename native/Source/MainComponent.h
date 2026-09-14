@@ -149,6 +149,7 @@ private:
     std::unique_ptr<juce::WebBrowserComponent> webInterface;
     bool webInterfaceReady = false;
     int webUpdateCounter = 0;
+    int midiConnectionPollCounter = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };
