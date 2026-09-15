@@ -28,7 +28,7 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
     setupNav(playNav, "◉  开始演奏", Page::play);
     setupNav(soundsNav, "♫  音色方案", Page::sounds);
     setupNav(chainNav, "◇  音源与音效", Page::chain);
-    setupNav(windNav, "⌁  电吹管设置", Page::wind);
+    setupNav(windNav, "✦  智能适配", Page::wind);
     setupNav(audioNav, "▣  声音设置", Page::audio);
     setupNav(softwareNav, "⚙  软件设置", Page::settings);
 
@@ -315,6 +315,23 @@ void MainComponent::setupWebInterface()
                     auto result = std::make_unique<juce::DynamicObject>();
                     result->setProperty("success", false);
                     result->setProperty("message", utf8("请先连接电吹管"));
+                    webInterface->emitEventIfBrowserIsVisible("techniqueLearnResult", juce::var(result.release()));
+                }
+                return;
+            }
+            const auto family = pluginHost.hasPlugin()
+                ? fengyin::SwamPluginClassifier::classify(pluginHost.getPluginName().toStdString(), {})
+                : fengyin::SwamFamily::notSwam;
+            const auto target = static_cast<fengyin::PerformanceTechnique>(technique);
+            const auto advice = fengyin::TechniqueAdvisor::advise(midi.getActiveProfile(), family, target);
+            if (! pluginHost.hasPlugin() || ! advice.relevantToInstrument || ! pluginHost.supportsTechnique(target))
+            {
+                if (webInterface != nullptr)
+                {
+                    auto result = std::make_unique<juce::DynamicObject>();
+                    result->setProperty("success", false);
+                    result->setProperty("message", ! advice.relevantToInstrument ? utf8("当前乐器不需要这项技巧")
+                                                                                : utf8("当前音源没有开放这项技巧参数"));
                     webInterface->emitEventIfBrowserIsVisible("techniqueLearnResult", juce::var(result.release()));
                 }
                 return;
@@ -759,6 +776,16 @@ void MainComponent::timerCallback()
         auto state = std::make_unique<juce::DynamicObject>();
         state->setProperty("deviceConnected", snapshot.deviceConnected);
         state->setProperty("deviceName", midi.getConnectedDeviceName());
+        const auto deviceProfile = midi.getActiveProfile();
+        state->setProperty("deviceProfileName", utf8(deviceProfile.displayName.c_str()));
+        state->setProperty("deviceProfileId", utf8(deviceProfile.id.c_str()));
+        state->setProperty("deviceRecognized", deviceProfile.id != "generic-wind-controller");
+        state->setProperty("breathController", deviceProfile.breathController);
+        state->setProperty("safeOnsetProtection", deviceProfile.safeOnsetProtection);
+        state->setProperty("hasBiteSensor", deviceProfile.hasBiteSensor);
+        state->setProperty("hasThumbController", deviceProfile.hasThumbController);
+        state->setProperty("hasAssignableButtons", deviceProfile.hasAssignableButtons);
+        state->setProperty("hasMotionController", deviceProfile.hasMotionController);
         state->setProperty("breath", snapshot.breath);
         state->setProperty("note", snapshot.lastNote);
         state->setProperty("noteReceived", snapshot.lastNote >= 0);
@@ -786,12 +813,23 @@ void MainComponent::timerCallback()
         state->setProperty("effectLoading", effectLoading);
         state->setProperty("presetEditing", editingPresetId.isNotEmpty());
         state->setProperty("techniqueLearning", activeTechniqueLearn);
+        const auto currentFamily = pluginHost.hasPlugin()
+            ? fengyin::SwamPluginClassifier::classify(currentPluginName.toStdString(), {})
+            : fengyin::SwamFamily::notSwam;
+        state->setProperty("instrumentFamily", utf8(fengyin::SwamPluginClassifier::familyChineseName(currentFamily)));
         juce::Array<juce::var> techniqueMappings;
         for (int technique = 0; technique < static_cast<int>(fengyin::PerformanceTechnique::count); ++technique)
         {
+            const auto target = static_cast<fengyin::PerformanceTechnique>(technique);
+            const auto advice = fengyin::TechniqueAdvisor::advise(deviceProfile, currentFamily, target);
             auto item = std::make_unique<juce::DynamicObject>();
             item->setProperty("technique", technique);
-            item->setProperty("supported", pluginHost.supportsTechnique(static_cast<fengyin::PerformanceTechnique>(technique)));
+            item->setProperty("relevant", advice.relevantToInstrument);
+            item->setProperty("pluginSupported", pluginHost.supportsTechnique(target));
+            item->setProperty("hardwareAvailable", advice.hardwareAvailable);
+            item->setProperty("supported", advice.relevantToInstrument && pluginHost.supportsTechnique(target));
+            item->setProperty("recommendedSource", utf8(advice.recommendedSource));
+            item->setProperty("recommendationReason", utf8(advice.reason));
             item->setProperty("sourceType", 0);
             item->setProperty("sourceNumber", -1);
             item->setProperty("toggle", false);
@@ -1134,12 +1172,13 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
     preset.effectIdentifier = pluginHost.getEffectIdentifier();
     preset.effectState = pluginHost.saveEffectState();
     preset.effectBypassed = pluginHost.isEffectBypassed();
-    preset.breathController = midi.getActiveProfile().breathController;
-    preset.breathCurve = midi.getActiveProfile().breathCurve;
-    preset.breathSmoothing = midi.getActiveProfile().smoothing;
     preset.eqTone = masterOutput.getEqTone();
     preset.reverbMix = masterOutput.getReverbMix();
-    preset.techniqueMappings = midi.getTechniqueMappings();
+    // 设备手感和技巧映射独立按设备保存，不进入音色方案。
+    preset.breathController = 2;
+    preset.breathCurve = 0.9f;
+    preset.breathSmoothing = 0.28f;
+    preset.techniqueMappings.clear();
 
     if (presetStore.save(preset))
     {
@@ -1358,8 +1397,6 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                                  return;
                              }
                              pluginHost.restorePluginState(preset.pluginState.getData(), preset.pluginState.getSize());
-                             midi.setBreathController(preset.breathController);
-                             midi.setTechniqueMappings(preset.techniqueMappings);
                              masterOutput.setEqTone(preset.eqTone);
                              masterOutput.setReverbMix(preset.reverbMix);
                              activatePluginOutput(message);
@@ -1413,8 +1450,10 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName)
 {
     audio.getDeviceManager().removeAudioCallback(&testSynth);
     pluginHost.attachTo(audio.getDeviceManager());
+    const auto family = fengyin::SwamPluginClassifier::classify(pluginName.toStdString(), {});
+    midi.setTechniqueContext(fengyin::SwamPluginClassifier::familyKey(family));
     midi.setPerformanceSink(&pluginHost);
-    switch (fengyin::SwamPluginClassifier::classify(pluginName.toStdString(), {}))
+    switch (family)
     {
         case fengyin::SwamFamily::saxophone: masterOutput.setInstrumentProfile(fengyin::InstrumentMixProfile::saxophone); break;
         case fengyin::SwamFamily::brass:     masterOutput.setInstrumentProfile(fengyin::InstrumentMixProfile::brass); break;

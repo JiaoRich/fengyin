@@ -64,6 +64,7 @@ public:
     [[nodiscard]] int getTransposeSemitones() const noexcept { return transposeSemitones.load(std::memory_order_relaxed); }
     void setTechniqueMappings(const juce::Array<TechniqueMapping>& mappings);
     [[nodiscard]] juce::Array<TechniqueMapping> getTechniqueMappings() const;
+    void setTechniqueContext(const juce::String& instrumentFamily);
     void beginTechniqueLearn(PerformanceTechnique technique) noexcept;
     void cancelTechniqueLearn() noexcept;
     [[nodiscard]] TechniqueLearnResult consumeTechniqueLearnResult() noexcept;
@@ -71,7 +72,10 @@ public:
 private:
     void handleIncomingMidiMessage(juce::MidiInput*, const juce::MidiMessage&) override;
     juce::String controllerSettingKey() const;
+    juce::String techniqueSettingKey() const;
     void savePreferences();
+    void saveTechniqueMappings();
+    void loadTechniqueMappings();
     bool handleTechniqueMessage(const juce::MidiMessage& message, MidiPerformanceSink* sink);
     static float techniqueMessageValue(const juce::MidiMessage& message) noexcept;
 
@@ -98,6 +102,7 @@ private:
     std::array<int, 128> activeOutputNotes {};
     mutable juce::SpinLock techniqueLock;
     juce::Array<TechniqueMapping> techniqueMappings;
+    juce::String techniqueContext { "other" };
     std::array<float, static_cast<size_t>(PerformanceTechnique::count)> techniquePreviousInput {};
     std::array<bool, static_cast<size_t>(PerformanceTechnique::count)> techniqueToggleState {};
     std::atomic<bool> learningTechnique { false };

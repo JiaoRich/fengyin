@@ -28,6 +28,14 @@ void TestSynthEngine::pitchBendChanged(float bipolarValue) noexcept
     push({ CommandType::pitchBend, 0, std::clamp(bipolarValue, -1.0f, 1.0f) });
 }
 
+void TestSynthEngine::resetPerformance() noexcept
+{
+    for (int note = 0; note < 128; ++note)
+        push({ CommandType::noteOff, note, 0.0f });
+    push({ CommandType::breath, 0, 0.0f });
+    push({ CommandType::pitchBend, 0, 0.0f });
+}
+
 void TestSynthEngine::audioDeviceIOCallbackWithContext(const float* const*,
                                                        int,
                                                        float* const* outputs,

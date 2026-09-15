@@ -36,5 +36,6 @@ public:
     virtual void breathChanged(float value) noexcept = 0;
     virtual void pitchBendChanged(float bipolarValue) noexcept = 0;
     virtual void techniqueChanged(PerformanceTechnique, float) noexcept {}
+    virtual void resetPerformance() noexcept {}
 };
 }

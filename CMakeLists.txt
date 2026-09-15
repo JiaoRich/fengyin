@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 0.5.1 LANGUAGES C CXX)
+project(FengYin VERSION 0.6.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -69,6 +69,7 @@ target_sources(FengYin PRIVATE
     native/Source/MidiInputService.h
     native/Source/BreathMapper.h
     native/Source/DeviceProfile.h
+    native/Source/TechniqueAdvisor.h
     native/Source/ControllerDetector.h
     native/Source/MidiPerformanceSink.h
     native/Source/TestSynthEngine.cpp
@@ -210,5 +211,9 @@ if(BUILD_TESTING)
     add_executable(FengYinSwamClassifierTests tests/test_swam_classifier.cpp)
     target_include_directories(FengYinSwamClassifierTests PRIVATE native/Source)
     add_test(NAME swam_classifier COMMAND FengYinSwamClassifierTests)
+
+    add_executable(FengYinTechniqueAdvisorTests tests/test_technique_advisor.cpp)
+    target_include_directories(FengYinTechniqueAdvisorTests PRIVATE native/Source)
+    add_test(NAME technique_advisor COMMAND FengYinTechniqueAdvisorTests)
 
 endif()

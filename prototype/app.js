@@ -1,7 +1,7 @@
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
-const titles = {play:'开始演奏',sounds:'音色方案',chain:'音源与音效',wind:'电吹管设置',audio:'声音设置',settings:'软件设置'};
+const titles = {play:'开始演奏',sounds:'音色方案',chain:'音源与音效',wind:'智能适配',audio:'声音设置',settings:'软件设置'};
 const presets = [
   ['温暖萨克斯','SWAM 高音萨克斯','适合流行与抒情曲目'],
   ['明亮小号','SWAM 小号','清晰、有穿透力'],
@@ -29,6 +29,7 @@ let favoriteInstruments = [];
 let pendingPresetNavigation = null;
 let editingPresetName = '';
 let techniqueMappings = [];
+let latestBackendState = {};
 let appFocused = document.hasFocus();
 let unfocusedFrame = 0;
 
@@ -373,23 +374,33 @@ function sourceDescription(mapping) {
   return '已设置';
 }
 function renderTechniqueMappings() {
+  const hasCapabilityState = techniqueMappings.length > 0;
   $$('.technique-row').forEach(row => {
     const technique = Number(row.dataset.technique);
     const mapping = techniqueMappings.find(item => Number(item.technique) === technique);
     const mapped = !!mapping && Number(mapping.sourceType) !== 0;
-    row.querySelector('.mapping-status').textContent = mapped ? sourceDescription(mapping) : '未设置';
+    const relevant = mapping?.relevant !== false;
+    const pluginSupported = mapping?.pluginSupported !== false;
+    row.hidden = !hasCapabilityState || !relevant;
+    row.classList.toggle('unavailable', !pluginSupported);
+    row.querySelector('.mapping-status').textContent = !pluginSupported ? '当前音源不支持'
+      : mapped ? sourceDescription(mapping)
+      : mapping?.hardwareAvailable ? `推荐：${mapping.recommendedSource}` : '可手动识别';
     row.querySelector('select').value = mapping?.toggle ? 'toggle' : 'hold';
+    row.querySelector('select').disabled = !pluginSupported;
     row.querySelector('.remove-technique').hidden = !mapped;
-    row.classList.toggle('unsupported', mapping?.supported === false);
+    row.classList.toggle('unsupported', !pluginSupported);
+    row.querySelector('.learn-technique').disabled = !pluginSupported;
     row.querySelector('.learn-technique').textContent = Number(mapping?.technique) === Number(row.dataset.technique)
       && Number(window.fengyinTechniqueLearning) === technique ? '等待操作…' : (mapped ? '重新识别' : '开始识别');
   });
 }
-$('#technique-settings').addEventListener('click', () => {
+function openTechniqueDialog() {
   techniqueDialog.hidden = false;
-  techniqueHint.textContent = '映射会随“音色方案”保存，不同品牌电吹管无需手工查找 CC 编号。';
+  techniqueHint.textContent = '这里只显示当前乐器实际需要的技巧，并按已连接电吹管的硬件给出推荐。';
   renderTechniqueMappings();
-});
+}
+$('#technique-settings').addEventListener('click', openTechniqueDialog);
 $('#close-technique-dialog').addEventListener('click', () => {
   nativeEvent('cancelTechniqueLearn');
   techniqueDialog.hidden = true;
@@ -482,12 +493,53 @@ function updateBuiltinEffects() {
 }
 ['#eq-tone','#reverb-mix','#limiter-ceiling'].forEach(id => $(id).addEventListener('input', updateBuiltinEffects));
 updateBuiltinEffects();
-const windButtons = [...document.querySelectorAll('#page-wind button')];
-windButtons[0]?.addEventListener('click', () => nativeEvent('showMidiSetup'));
-windButtons[1]?.addEventListener('click', () => nativeEvent('showExpressionSettings'));
+$('#adapter-reconnect')?.addEventListener('click', () => nativeEvent('showMidiSetup'));
+$('#adapter-expression')?.addEventListener('click', () => nativeEvent('showExpressionSettings'));
+$('#adapter-techniques')?.addEventListener('click', openTechniqueDialog);
+$('#adapter-advanced-toggle')?.addEventListener('click', event => {
+  const body = $('#adapter-advanced-body');
+  body.classList.toggle('open');
+  event.currentTarget.textContent = body.classList.contains('open') ? '收起高级参数⌃' : '高级参数（普通用户无需设置）⌄';
+});
+$('#wind-status-pill')?.addEventListener('click', () => showPage('wind'));
 document.querySelectorAll('#page-audio button').forEach(button => button.addEventListener('click', () => nativeEvent('showAudioSettings')));
 
+const techniqueNames = ['嘶吼音','颤音','花舌'];
+function renderSmartAdapter(state) {
+  const connected = !!state.deviceConnected;
+  const loaded = !!state.pluginLoaded;
+  $('#adapter-kicker').textContent = connected ? (state.deviceRecognized ? '已自动识别' : '已连接 · 通用安全模式') : '等待连接设备';
+  $('#adapter-device-name').textContent = connected ? (state.deviceName || state.deviceProfileName || '电吹管已连接') : '尚未连接电吹管';
+  $('#adapter-summary').textContent = !connected ? '连接后将自动识别气息、弯音和可用硬件'
+    : loaded ? '气息、音符、弯音与当前 SWAM 乐器已完成匹配' : '电吹管已适配；加载 SWAM 后将继续匹配演奏技巧';
+  $('#adapter-breath-state').textContent = connected ? '✓ 已优化' : '等待设备';
+  $('#adapter-breath-value').textContent = connected ? '自然响应' : '自动识别';
+  $('#adapter-breath-detail').textContent = connected ? `已使用 CC${Number(state.breathController ?? 2)}，并启用首音柔化保护` : '兼容 CC2、CC11 等常见气息信号';
+  $('#adapter-hardware-state').textContent = connected ? '✓ 已识别' : '等待识别';
+  const hardware = [];
+  if (state.hasBiteSensor) hardware.push('吹嘴咬合');
+  if (state.hasThumbController) hardware.push('拇指控制器');
+  if (state.hasAssignableButtons) hardware.push('功能键');
+  if (state.hasMotionController) hardware.push('动作感应');
+  $('#adapter-hardware-detail').textContent = connected ? (hardware.length ? `可用于技巧：${hardware.join('、')}` : '未预设控制器，可通过操作一次完成识别') : '只推荐当前型号实际具备的硬件';
+  $('#adapter-profile-id').textContent = state.deviceProfileName || '通用模式';
+  $('#adapter-safety-state').textContent = state.safeOnsetProtection === false ? '未开启' : '✓ 已开启';
+  $$('.adapter-step').forEach((step,index) => step.classList.toggle('done', connected && (index < 3 || loaded)));
+  $('#adapter-technique-context').textContent = loaded
+    ? `${state.deviceProfileName || state.deviceName || '当前设备'} ＋ ${state.instrumentFamily || state.instrumentChineseName || '当前乐器'}`
+    : '加载 SWAM 后，根据电吹管硬件和乐器类别推荐';
+  $('#adapter-techniques').disabled = !loaded;
+  const recommendations = techniqueMappings.filter(item => item.relevant !== false && item.pluginSupported !== false);
+  $('#adapter-recommendations').innerHTML = recommendations.length ? recommendations.map(item => {
+    const mapped = Number(item.sourceType) !== 0;
+    const recommendation = mapped ? `已映射：${sourceDescription(item)}`
+      : item.hardwareAvailable ? `推荐：${escapeHtml(item.recommendedSource || '可用控制器')}` : '可点击“编辑映射”自动识别';
+    return `<div class="adapter-recommendation"><small>${escapeHtml(techniqueNames[Number(item.technique)] || '演奏技巧')}</small><strong>${recommendation}</strong><em>${escapeHtml(item.recommendationReason || '按当前设备与乐器智能匹配')}</em></div>`;
+  }).join('') : `<div class="adapter-empty">${loaded ? '当前音源没有开放可映射的技巧参数' : '尚未加载可识别的 SWAM 乐器'}</div>`;
+}
+
 window.__JUCE__?.backend?.addEventListener('backendState', state => {
+  latestBackendState = state || {};
   const connected = !!state.deviceConnected;
   hardwareBreath = connected ? Math.max(0,Math.min(100,Number(state.breath || 0)*100)) : null;
   const transpose = Number(state.transposeSemitones || 0);
@@ -515,6 +567,7 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   techniqueMappings = Array.isArray(state.techniqueMappings) ? state.techniqueMappings : [];
   window.fengyinTechniqueLearning = Number(state.techniqueLearning ?? -1);
   if (!techniqueDialog.hidden) renderTechniqueMappings();
+  renderSmartAdapter(state);
   const sideTitle = document.querySelector('.sidebar-status b');
   const sideText = document.querySelector('.sidebar-status small');
   const windStatusPill = $('#wind-status-pill');
@@ -620,6 +673,8 @@ window.__JUCE__?.backend?.addEventListener('techniqueLearnResult', result => {
   renderTechniqueMappings();
 });
 nativeEvent('webReady');
+renderSmartAdapter({});
+renderTechniqueMappings();
 showInstrumentArtwork('soprano-sax', '高音萨克斯');
 if(localStorage.getItem('fengyin-prototype-license') === 'active') {
   $('#license-title').textContent = '已永久激活';

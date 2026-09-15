@@ -126,6 +126,7 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                 return;
             }
             player.setProcessor(graph.get());
+            resetPerformance();
             if (completion)
                 completion(true, instrumentNode->getProcessor()->getName());
         });
@@ -354,6 +355,20 @@ void PluginHostEngine::techniqueChanged(PerformanceTechnique technique, float va
     if (index >= techniqueValues.size()) return;
     techniqueValues[index].store(juce::jlimit(0.0f, 1.0f, value), std::memory_order_relaxed);
     techniqueDirty[index].store(true, std::memory_order_release);
+}
+
+void PluginHostEngine::resetPerformance() noexcept
+{
+    queue(juce::MidiMessage::allNotesOff(1));
+    queue(juce::MidiMessage::allSoundOff(1));
+    queue(juce::MidiMessage::controllerEvent(1, 11, 0));
+    queue(juce::MidiMessage::controllerEvent(1, 2, 0));
+    queue(juce::MidiMessage::pitchWheel(1, 8192));
+    for (size_t index = 0; index < techniqueValues.size(); ++index)
+    {
+        techniqueValues[index].store(0.0f, std::memory_order_relaxed);
+        techniqueDirty[index].store(true, std::memory_order_release);
+    }
 }
 
 void PluginHostEngine::flushTechniqueValues()

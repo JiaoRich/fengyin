@@ -12,6 +12,7 @@
 #include "RecordingService.h"
 #include "AccompanimentAudioService.h"
 #include "MasterOutputService.h"
+#include "TechniqueAdvisor.h"
 
 class MainComponent final : public juce::Component, private juce::Timer
 {

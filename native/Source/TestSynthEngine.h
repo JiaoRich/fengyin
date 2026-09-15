@@ -22,6 +22,7 @@ public:
     void noteOff(int noteNumber) noexcept override;
     void breathChanged(float value) noexcept override;
     void pitchBendChanged(float bipolarValue) noexcept override;
+    void resetPerformance() noexcept override;
 
     void audioDeviceIOCallbackWithContext(const float* const* inputChannelData,
                                           int numInputChannels,

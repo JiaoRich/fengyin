@@ -79,6 +79,15 @@ class PrototypeStructureTests(unittest.TestCase):
         instrument_heading = HTML.split('<div class="instrument-heading">', 1)[1].split('</div></div>', 1)[0]
         self.assertNotIn('id="transpose-key"', instrument_heading)
 
+    def test_smart_adapter_ui_filters_hardware_and_instrument_techniques(self):
+        for control_id in ("adapter-device-name", "adapter-recommendations", "adapter-reconnect",
+                           "adapter-techniques", "adapter-advanced-toggle"):
+            self.assertIn(f'id="{control_id}"', HTML)
+        self.assertIn("state.hasBiteSensor", JS)
+        self.assertIn("item.relevant !== false", JS)
+        self.assertIn("item.pluginSupported !== false", JS)
+        self.assertIn("按“电吹管型号＋乐器类别”独立保存", HTML)
+
     def test_smart_audio_optimisation_is_user_controllable(self):
         self.assertIn('id="smart-audio"', HTML)
         self.assertIn("nativeEvent('setSmartOptimisation'", JS)

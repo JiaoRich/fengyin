@@ -46,7 +46,17 @@ bool MidiInputService::connect(const juce::String& identifier)
         activeProfile = DeviceProfileMatcher::match(device.name.toStdString());
         auto savedController = activeProfile.breathController;
         if (auto* settingsFile = properties.getUserSettings())
+        {
             savedController = settingsFile->getIntValue(controllerSettingKey(), savedController);
+            // 0.5.x 曾把 Yamaha YDS 的出厂气息控制误存为 CC2。
+            // 首次升级时迁移到官方默认 CC11；之后仍允许用户手动修改并记忆。
+            const auto profileRevisionKey = controllerSettingKey() + ".profileRevision";
+            if (activeProfile.id == "yamaha-yds" && settingsFile->getIntValue(profileRevisionKey, 0) < 1)
+            {
+                savedController = 11;
+                settingsFile->setValue(profileRevisionKey, 1);
+            }
+        }
         breathController.store(juce::jlimit(0, 127, savedController));
         activeProfile.breathController = breathController.load();
         BreathMapper::Settings settings;
@@ -61,7 +71,10 @@ bool MidiInputService::connect(const juce::String& identifier)
             pitchSensitivity.store(static_cast<float>(settingsFile->getDoubleValue(controllerSettingKey() + ".pitch", 1.0)));
         }
         { const juce::SpinLock::ScopedLockType lock(breathMapperLock); breathMapper.setSettings(settings); }
+        loadTechniqueMappings();
         input->start();
+        if (auto* sink = performanceSink.load(std::memory_order_acquire))
+            sink->resetPerformance();
         savePreferences();
         return true;
     }
@@ -81,10 +94,11 @@ void MidiInputService::disconnect()
         activeOutputNotes.fill(-1);
     }
     if (auto* sink = performanceSink.load(std::memory_order_acquire))
-        for (int technique = 0; technique < static_cast<int>(PerformanceTechnique::count); ++technique)
-            sink->techniqueChanged(static_cast<PerformanceTechnique>(technique), 0.0f);
+        sink->resetPerformance();
     connectedName.clear();
     connectedIdentifier.clear();
+    activeProfile = DeviceProfileMatcher::match("");
+    breathController.store(activeProfile.breathController, std::memory_order_relaxed);
     lastNote.store(-1, std::memory_order_relaxed);
     velocity.store(0.0f, std::memory_order_relaxed);
     breath.store(0.0f, std::memory_order_relaxed);
@@ -168,6 +182,11 @@ juce::String MidiInputService::controllerSettingKey() const
     return "breathCC." + juce::String::toHexString(connectedIdentifier.hashCode64());
 }
 
+juce::String MidiInputService::techniqueSettingKey() const
+{
+    return "technique." + juce::String::toHexString(connectedIdentifier.hashCode64()) + "." + techniqueContext;
+}
+
 void MidiInputService::savePreferences()
 {
     if (connectedIdentifier.isEmpty()) return;
@@ -204,6 +223,8 @@ void MidiInputService::setExpressionSettings(ExpressionSettings settings)
 void MidiInputService::setPerformanceSink(MidiPerformanceSink* sink) noexcept
 {
     performanceSink.store(sink, std::memory_order_release);
+    if (sink != nullptr)
+        sink->resetPerformance();
 }
 
 void MidiInputService::beginBreathDetection() noexcept
@@ -252,12 +273,71 @@ void MidiInputService::setTechniqueMappings(const juce::Array<TechniqueMapping>&
     if (auto* sink = performanceSink.load(std::memory_order_acquire))
         for (int technique = 0; technique < static_cast<int>(PerformanceTechnique::count); ++technique)
             sink->techniqueChanged(static_cast<PerformanceTechnique>(technique), 0.0f);
+    saveTechniqueMappings();
 }
 
 juce::Array<TechniqueMapping> MidiInputService::getTechniqueMappings() const
 {
     const juce::SpinLock::ScopedLockType lock(techniqueLock);
     return techniqueMappings;
+}
+
+void MidiInputService::setTechniqueContext(const juce::String& instrumentFamily)
+{
+    const auto next = instrumentFamily.isNotEmpty() ? instrumentFamily : juce::String("other");
+    if (techniqueContext == next)
+        return;
+    techniqueContext = next;
+    loadTechniqueMappings();
+}
+
+void MidiInputService::saveTechniqueMappings()
+{
+    if (connectedIdentifier.isEmpty() || properties.getUserSettings() == nullptr)
+        return;
+    juce::String serialised;
+    for (const auto& mapping : getTechniqueMappings())
+    {
+        if (serialised.isNotEmpty()) serialised += ";";
+        serialised += juce::String(static_cast<int>(mapping.technique)) + ","
+                   + juce::String(static_cast<int>(mapping.sourceType)) + ","
+                   + juce::String(mapping.sourceNumber) + ","
+                   + juce::String(mapping.toggle ? 1 : 0);
+    }
+    properties.getUserSettings()->setValue(techniqueSettingKey(), serialised);
+    properties.getUserSettings()->saveIfNeeded();
+}
+
+void MidiInputService::loadTechniqueMappings()
+{
+    juce::Array<TechniqueMapping> loaded;
+    if (connectedIdentifier.isNotEmpty() && properties.getUserSettings() != nullptr)
+    {
+        juce::StringArray entries;
+        entries.addTokens(properties.getUserSettings()->getValue(techniqueSettingKey()), ";", "");
+        for (const auto& entry : entries)
+        {
+            juce::StringArray fields;
+            fields.addTokens(entry, ",", "");
+            if (fields.size() != 4) continue;
+            TechniqueMapping mapping;
+            mapping.technique = static_cast<PerformanceTechnique>(juce::jlimit(0, static_cast<int>(PerformanceTechnique::count) - 1, fields[0].getIntValue()));
+            mapping.sourceType = static_cast<TechniqueSourceType>(juce::jlimit(0, static_cast<int>(TechniqueSourceType::note), fields[1].getIntValue()));
+            mapping.sourceNumber = fields[2].getIntValue();
+            mapping.toggle = fields[3].getIntValue() != 0;
+            if (mapping.sourceType != TechniqueSourceType::none)
+                loaded.add(mapping);
+        }
+    }
+    {
+        const juce::SpinLock::ScopedLockType lock(techniqueLock);
+        techniqueMappings = loaded;
+        techniquePreviousInput.fill(0.0f);
+        techniqueToggleState.fill(false);
+    }
+    if (auto* sink = performanceSink.load(std::memory_order_acquire))
+        for (int technique = 0; technique < static_cast<int>(PerformanceTechnique::count); ++technique)
+            sink->techniqueChanged(static_cast<PerformanceTechnique>(technique), 0.0f);
 }
 
 void MidiInputService::beginTechniqueLearn(PerformanceTechnique technique) noexcept
@@ -364,8 +444,14 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
         const auto outputNote = juce::jlimit(0, 127, sourceNote + transposeSemitones.load(std::memory_order_relaxed));
         { const juce::SpinLock::ScopedLockType lock(noteMapLock); activeOutputNotes[static_cast<size_t>(sourceNote)] = outputNote; }
         lastNote.store(outputNote, std::memory_order_relaxed);
-        velocity.store(message.getFloatVelocity(), std::memory_order_relaxed);
-        if (sink != nullptr) sink->noteOn(outputNote, message.getFloatVelocity());
+        const auto currentBreath = breath.load(std::memory_order_relaxed);
+        auto safeVelocity = message.getFloatVelocity();
+        if (activeProfile.safeOnsetProtection && currentBreath < 0.02f && sink != nullptr)
+            sink->breathChanged(0.035f);
+        if (activeProfile.breathDrivenVelocity && currentBreath < 0.02f)
+            safeVelocity = juce::jmin(safeVelocity, 0.28f + currentBreath * 0.52f);
+        velocity.store(safeVelocity, std::memory_order_relaxed);
+        if (sink != nullptr) sink->noteOn(outputNote, safeVelocity);
     }
     else if (message.isNoteOff())
     {

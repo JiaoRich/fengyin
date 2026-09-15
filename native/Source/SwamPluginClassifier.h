@@ -50,6 +50,20 @@ public:
         return "其他音源";
     }
 
+    [[nodiscard]] static const char* familyKey(SwamFamily family)
+    {
+        switch (family)
+        {
+            case SwamFamily::saxophone: return "saxophone";
+            case SwamFamily::brass: return "brass";
+            case SwamFamily::woodwind: return "woodwind";
+            case SwamFamily::strings: return "strings";
+            case SwamFamily::other: return "swam-other";
+            case SwamFamily::notSwam: return "other";
+        }
+        return "other";
+    }
+
     [[nodiscard]] static const char* instrumentChineseName(std::string_view name)
     {
         const auto text = lower(std::string(name));

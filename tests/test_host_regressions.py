@@ -26,6 +26,15 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("lastNote.store(-1", MIDI)
         self.assertIn("'已收到气息，尚未收到音符'", JS)
 
+    def test_safe_onset_resets_expression_and_caps_velocity(self):
+        self.assertIn("sink->resetPerformance()", MIDI)
+        self.assertIn("sink->breathChanged(0.035f)", MIDI)
+        self.assertIn("0.28f + currentBreath * 0.52f", MIDI)
+        self.assertIn('activeProfile.id == "yamaha-yds"', MIDI)
+        self.assertIn("savedController = 11", MIDI)
+        self.assertIn("juce::MidiMessage::allNotesOff", HOST)
+        self.assertIn("controllerEvent(1, 11, 0)", HOST)
+
     def test_transpose_releases_active_notes_and_uses_note_map(self):
         self.assertIn("void MidiInputService::setTransposeSemitones", MIDI)
         self.assertIn("activeOutputNotes", MIDI)
@@ -39,6 +48,10 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('name.contains("growl")', HOST)
         self.assertIn('name.contains("flutter")', HOST)
         self.assertIn("setValueNotifyingHost", HOST)
+        self.assertIn("setTechniqueContext", MIDI)
+        self.assertIn("techniqueSettingKey", MIDI)
+        self.assertNotIn("midi.setTechniqueMappings(preset.techniqueMappings)", MAIN)
+        self.assertNotIn("midi.setBreathController(preset.breathController)", MAIN)
 
     def test_smart_mix_separates_instrument_and_accompaniment(self):
         instrument = HOST.index("masterOutput->processInstrument")

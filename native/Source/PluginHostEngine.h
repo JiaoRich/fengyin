@@ -73,6 +73,7 @@ public:
     void breathChanged(float value) noexcept override;
     void pitchBendChanged(float bipolarValue) noexcept override;
     void techniqueChanged(PerformanceTechnique technique, float value) noexcept override;
+    void resetPerformance() noexcept override;
     void flushTechniqueValues();
     [[nodiscard]] bool supportsTechnique(PerformanceTechnique technique) const noexcept;
 

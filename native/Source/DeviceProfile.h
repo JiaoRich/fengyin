@@ -16,6 +16,12 @@ struct DeviceProfile
     int pitchBendSemitones = 2;
     float breathCurve = 0.9f;
     float smoothing = 0.28f;
+    bool hasBiteSensor = false;
+    bool hasThumbController = false;
+    bool hasAssignableButtons = false;
+    bool hasMotionController = false;
+    bool breathDrivenVelocity = true;
+    bool safeOnsetProtection = true;
 };
 
 class DeviceProfileMatcher
@@ -25,14 +31,22 @@ public:
     {
         const auto name = lower(deviceName);
         if (contains(name, "aerophone") || contains(name, "ae-"))
-            return { "roland-aerophone", "Roland Aerophone", 2, 11, 2, 0.9f, 0.26f };
+            return { "roland-aerophone", "Roland Aerophone", 2, 11, 2, 0.9f, 0.26f,
+                     true, true, true, true, true, true };
         if (contains(name, "yds-") || contains(name, "yamaha"))
-            return { "yamaha-yds", "Yamaha YDS", 2, 11, 2, 0.95f, 0.28f };
+            return { "yamaha-yds", "Yamaha YDS", 11, 11, 2, 0.95f, 0.28f,
+                     false, true, true, true, true, true };
         if (contains(name, "ewi") || contains(name, "akai"))
-            return { "akai-ewi", "Akai EWI", 2, 11, 2, 0.85f, 0.24f };
+            return { "akai-ewi", "Akai EWI", 2, 11, 2, 0.85f, 0.24f,
+                     true, true, true, false, true, true };
         if (contains(name, "sylphyo") || contains(name, "aodyo"))
-            return { "aodyo-sylphyo", "Aodyo Sylphyo", 2, 11, 2, 0.9f, 0.25f };
-        return { "generic-wind-controller", "通用电吹管", 2, 11, 2, 0.9f, 0.28f };
+            return { "aodyo-sylphyo", "Aodyo Sylphyo", 2, 11, 2, 0.9f, 0.25f,
+                     false, true, true, true, true, true };
+        if (contains(name, "wudi") || contains(name, "wu di") || contains(name, "无笛"))
+            return { "wudi", "无笛电吹管", 2, 11, 2, 0.9f, 0.24f,
+                     false, true, true, false, true, true };
+        return { "generic-wind-controller", "通用电吹管", 2, 11, 2, 0.9f, 0.28f,
+                 false, false, false, false, true, true };
     }
 
 private:
@@ -50,4 +64,3 @@ private:
     }
 };
 }
-
