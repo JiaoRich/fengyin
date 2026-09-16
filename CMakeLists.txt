@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 0.7.0 LANGUAGES C CXX)
+project(FengYin VERSION 0.7.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -126,14 +126,17 @@ juce_add_gui_app(FengYinActivator
     PRODUCT_NAME "风吟激活码工具"
     COMPANY_NAME "FengYin"
     BUNDLE_ID "cn.fengyin.activator"
+    ICON_BIG "${CMAKE_SOURCE_DIR}/assets/fengyin-app-icon.png"
 )
 set_target_properties(FengYinActivator PROPERTIES EXCLUDE_FROM_ALL TRUE)
 target_sources(FengYinActivator PRIVATE
     tools/activator/Main.cpp
+    tools/activator/ActivationRecordStore.cpp
+    tools/activator/ActivationRecordStore.h
     native/Source/LicenseService.cpp
     native/Source/LicenseService.h
 )
-target_include_directories(FengYinActivator PRIVATE native/Source)
+target_include_directories(FengYinActivator PRIVATE native/Source tools/activator)
 target_compile_definitions(FengYinActivator PRIVATE
     JUCE_APPLICATION_NAME_STRING="FengYinActivator"
     JUCE_APPLICATION_VERSION_STRING="${PROJECT_VERSION}"
@@ -203,6 +206,15 @@ if(BUILD_TESTING)
     target_include_directories(FengYinLicenseTests PRIVATE native/Source)
     target_link_libraries(FengYinLicenseTests PRIVATE juce::juce_cryptography juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
     add_test(NAME license_validation COMMAND FengYinLicenseTests)
+
+    add_executable(FengYinActivationRecordTests
+        tests/test_activation_record_store.cpp
+        tools/activator/ActivationRecordStore.cpp
+        tools/activator/ActivationRecordStore.h
+    )
+    target_include_directories(FengYinActivationRecordTests PRIVATE tools/activator)
+    target_link_libraries(FengYinActivationRecordTests PRIVATE juce::juce_core juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
+    add_test(NAME activation_record_roundtrip COMMAND FengYinActivationRecordTests)
 
     add_executable(FengYinRecordingTests tests/test_recording_service.cpp native/Source/RecordingService.cpp native/Source/AccompanimentAudioService.cpp native/Source/VideoAudioExtractor.cpp native/Source/MasterOutputService.cpp)
     target_include_directories(FengYinRecordingTests PRIVATE native/Source)

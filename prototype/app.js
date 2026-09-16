@@ -350,14 +350,47 @@ layoutResizer.addEventListener('keydown', event => {
 });
 $('#master-volume').addEventListener('input', event => nativeEvent('setMasterVolume', {value:Number(event.target.value)/100}));
 const transposeNames = new Map([...$('#transpose-key').options].map(option => [Number(option.value), option.textContent]));
+const keyCalibrationDialog = $('#key-calibration-dialog');
+const keyCalibrationInstruction = $('#key-calibration-instruction');
+const startKeyCalibration = $('#start-key-calibration');
+function openKeyCalibrationDialog() {
+  if (!latestBackendState.deviceConnected) {
+    toast('请先连接电吹管，再识别本调');
+    return;
+  }
+  const waiting = !!latestBackendState.keyCalibrationPending;
+  keyCalibrationInstruction.textContent = waiting
+    ? '正在识别：请按平时演奏 C（Do）的指法，吹一个音。'
+    : '请按平时演奏 C（Do）的指法，吹一个音。';
+  startKeyCalibration.textContent = waiting ? '等待吹奏…' : '开始识别';
+  startKeyCalibration.disabled = waiting;
+  keyCalibrationDialog.hidden = false;
+}
 $('#transpose-key').addEventListener('change', event => {
   const targetKey = Number(event.target.value);
   nativeEvent('setKeyTranspose', {targetKey});
-  toast(`目标演奏调已设为${transposeNames.get(targetKey) || '所选调性'}`);
+  if (!latestBackendState.deviceConnected) {
+    toast('已选择目标演奏调；连接电吹管后请先识别本调');
+  } else if (!latestBackendState.keyCalibrated) {
+    openKeyCalibrationDialog();
+  } else {
+    toast(`目标演奏调已设为${transposeNames.get(targetKey) || '所选调性'}`);
+  }
 });
-$('#key-calibration').addEventListener('click', () => {
+$('#key-calibration').addEventListener('click', openKeyCalibrationDialog);
+startKeyCalibration.addEventListener('click', () => {
   nativeEvent('beginKeyCalibration');
-  toast('请用 C 指法吹一个音，风吟会自动识别吹管本调');
+  keyCalibrationInstruction.textContent = '正在识别：请按平时演奏 C（Do）的指法，吹一个音。';
+  startKeyCalibration.textContent = '等待吹奏…';
+  startKeyCalibration.disabled = true;
+});
+function closeKeyCalibrationDialog() {
+  if (latestBackendState.keyCalibrationPending) nativeEvent('cancelKeyCalibration');
+  keyCalibrationDialog.hidden = true;
+}
+$('#cancel-key-calibration').addEventListener('click', closeKeyCalibrationDialog);
+keyCalibrationDialog.addEventListener('click', event => {
+  if (event.target === keyCalibrationDialog) closeKeyCalibrationDialog();
 });
 const performanceReverb = $('#performance-reverb');
 performanceReverb.addEventListener('input', event => {
@@ -516,7 +549,8 @@ function renderSmartAdapter(state) {
   $('#adapter-kicker').textContent = connected ? (state.deviceRecognized ? '已自动识别' : '已连接 · 通用安全模式') : '等待连接设备';
   $('#adapter-device-name').textContent = connected ? (state.deviceName || state.deviceProfileName || '电吹管已连接') : '尚未连接电吹管';
   $('#adapter-summary').textContent = !connected ? '连接后将自动识别气息、弯音和可用硬件'
-    : state.keyCalibrationPending ? '请先用 C 指法吹一个音，风吟会自动完成本调和气息适配'
+    : state.keyCalibrationPending ? '请按平时演奏 C（Do）的指法，吹一个音'
+    : !state.keyCalibrated ? '气息与控制器已适配；使用移调前需要识别吹管本调'
     : loaded ? '气息、音符、弯音与当前 SWAM 乐器已完成匹配' : '电吹管已适配；加载 SWAM 后将继续匹配演奏技巧';
   $('#adapter-breath-state').textContent = !connected ? '等待设备' : state.automaticBreathDetection ? '正在识别…' : '✓ 已优化';
   $('#adapter-breath-value').textContent = !connected ? '自动识别' : state.automaticBreathDetection ? '请自然吹奏' : '自然响应';
@@ -547,12 +581,20 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   const targetKey = Number(state.targetKey || 0);
   if ($('#transpose-key').value !== String(targetKey)) $('#transpose-key').value = String(targetKey);
   const calibrationPending = connected && !!state.keyCalibrationPending;
+  const keyCalibrated = connected && !!state.keyCalibrated;
   const calibrationButton = $('#key-calibration');
   calibrationButton.classList.toggle('pending', calibrationPending);
-  calibrationButton.classList.toggle('ready', connected && !calibrationPending);
-  calibrationButton.textContent = !connected ? '识别本调' : calibrationPending ? '请吹 C 指法' : `本调：${transposeNames.get(Number(state.sourceKey || 0)) || '已识别'}`;
-  if (calibrationPending && !keyCalibrationWasPending) toast('请先用 C 指法吹一个音，风吟将自动识别吹管本调');
-  if (!calibrationPending && keyCalibrationWasPending && connected) toast(`本调识别完成，已自动换算到${transposeNames.get(targetKey) || '目标调'}`);
+  calibrationButton.classList.toggle('ready', keyCalibrated && !calibrationPending);
+  calibrationButton.textContent = !connected || !keyCalibrated
+    ? (calibrationPending ? '请吹 C（Do）音' : '识别本调')
+    : `本调：${transposeNames.get(Number(state.sourceKey || 0)) || '已识别'}`;
+  if (calibrationPending && !keyCalibrationWasPending) toast('请按 C（Do）指法吹一个音');
+  if (!calibrationPending && keyCalibrationWasPending && keyCalibrated) {
+    keyCalibrationDialog.hidden = true;
+    startKeyCalibration.disabled = false;
+    startKeyCalibration.textContent = '开始识别';
+    toast(`本调识别完成，已自动换算到${transposeNames.get(targetKey) || '目标调'}`);
+  }
   keyCalibrationWasPending = calibrationPending;
   const backendReverb = Math.round(Math.max(0,Math.min(.6,Number(state.reverbMix ?? .28)))*100);
   if (document.activeElement !== performanceReverb && document.activeElement !== $('#reverb-mix')) {
@@ -643,6 +685,11 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   recording = !!state.recording;
   $('#record').textContent = recording ? '■ 停止录音' : '● 开始录音';
   $('#record').style.color = recording ? 'var(--danger)' : '';
+});
+$('#copy-machine-code').addEventListener('click', () => {
+  if (!latestBackendState.machineCode) return toast('尚未取得本机识别码');
+  nativeEvent('copyMachineCode');
+  toast('机器码已复制，请发送给安装人员');
 });
 window.__JUCE__?.backend?.addEventListener('pluginLoadResult', result => {
   if (!pendingPresetNavigation || pendingPresetNavigation.kind !== 'plugin') return;

@@ -61,13 +61,15 @@ public:
     void setPerformanceSink(MidiPerformanceSink* sink) noexcept;
     void beginBreathDetection() noexcept;
     [[nodiscard]] int finishBreathDetection() noexcept;
-    // 每次连接后以一次 C 指法吹奏自动识别吹管当前本调；本调不跨连接保存。
+    // 只有用户主动开始后，才把下一次 C 指法吹奏用于识别；本调不跨连接保存。
     void beginKeyCalibration() noexcept;
+    void cancelKeyCalibration() noexcept;
     void setTargetKey(int pitchClass);
     void setTransposeSemitones(int semitones); // 兼容旧设置：视为以 C 调为来源的目标偏移。
     [[nodiscard]] int getSourceKey() const noexcept { return sourceKey.load(std::memory_order_relaxed); }
     [[nodiscard]] int getTargetKey() const noexcept { return targetKey.load(std::memory_order_relaxed); }
     [[nodiscard]] bool isKeyCalibrationPending() const noexcept { return keyCalibrationPending.load(std::memory_order_acquire); }
+    [[nodiscard]] bool isKeyCalibrated() const noexcept { return keyCalibrated.load(std::memory_order_acquire); }
     [[nodiscard]] int getTransposeSemitones() const noexcept { return transposeSemitones.load(std::memory_order_relaxed); }
     void setTechniqueMappings(const juce::Array<TechniqueMapping>& mappings);
     [[nodiscard]] juce::Array<TechniqueMapping> getTechniqueMappings() const;
@@ -109,6 +111,7 @@ private:
     std::atomic<int> sourceKey { 0 };
     std::atomic<int> targetKey { 0 };
     std::atomic<bool> keyCalibrationPending { false };
+    std::atomic<bool> keyCalibrated { false };
     mutable juce::SpinLock noteMapLock;
     std::array<int, 128> activeOutputNotes {};
     mutable juce::SpinLock techniqueLock;

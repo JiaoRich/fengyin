@@ -43,10 +43,25 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("transposeFromTo", PITCH_KEY)
         self.assertIn("PitchKey::transposeFromTo", MIDI)
         self.assertIn("keyCalibrationPending.exchange", MIDI)
+        self.assertIn("keyCalibrated.store(true", MIDI)
+        self.assertIn("keyCalibrated.load", MIDI)
+        self.assertIn("transposeSemitones.store(0", MIDI)
+        connect_block = MIDI.split("bool MidiInputService::connect", 1)[1].split("void MidiInputService::disconnect", 1)[0]
+        self.assertIn("keyCalibrationPending.store(false", connect_block)
+        self.assertNotIn("keyCalibrationPending.store(true", connect_block)
         self.assertNotIn('setValue(sourceKeySettingKey()', MIDI)
         self.assertIn("activeOutputNotes", MIDI)
         self.assertIn("sourceNote + transposeSemitones.load", MIDI)
         self.assertIn("sink->noteOff(outputNote)", MIDI)
+
+    def test_machine_code_copy_and_calibration_gate_exist(self):
+        self.assertIn('id="copy-machine-code"', (ROOT / "prototype" / "index.html").read_text(encoding="utf-8"))
+        self.assertIn("nativeEvent('copyMachineCode')", JS)
+        self.assertIn('id="key-calibration-dialog"', (ROOT / "prototype" / "index.html").read_text(encoding="utf-8"))
+        self.assertIn("if (!latestBackendState.keyCalibrated)", JS)
+        self.assertIn("请按平时演奏 C（Do）的指法，吹一个音", JS)
+        self.assertIn("cancelKeyCalibration", MAIN)
+        self.assertIn("copyMachineCode", MAIN)
 
     def test_video_playback_prioritises_realtime_audio(self):
         accompaniment = (ROOT / "native" / "Source" / "AccompanimentAudioService.cpp").read_text(encoding="utf-8")

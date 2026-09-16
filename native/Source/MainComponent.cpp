@@ -304,6 +304,14 @@ void MainComponent::setupWebInterface()
         {
             midi.beginKeyCalibration();
         })
+        .withEventListener("cancelKeyCalibration", [this](juce::var)
+        {
+            midi.cancelKeyCalibration();
+        })
+        .withEventListener("copyMachineCode", [this](juce::var)
+        {
+            juce::SystemClipboard::copyTextToClipboard(machineCode);
+        })
         .withEventListener("setVideoPlaybackState", [this](juce::var payload)
         {
             videoPlaybackActive = static_cast<bool>(payload.getProperty("playing", false));
@@ -838,6 +846,7 @@ void MainComponent::timerCallback()
         state->setProperty("sourceKey", midi.getSourceKey());
         state->setProperty("targetKey", midi.getTargetKey());
         state->setProperty("keyCalibrationPending", midi.isKeyCalibrationPending());
+        state->setProperty("keyCalibrated", midi.isKeyCalibrated());
         state->setProperty("automaticBreathDetection", automaticBreathDetectionActive);
         state->setProperty("reverbMix", masterOutput.getReverbMix());
         state->setProperty("eqTone", masterOutput.getEqTone());

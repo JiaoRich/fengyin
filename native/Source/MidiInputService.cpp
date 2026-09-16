@@ -60,9 +60,9 @@ bool MidiInputService::connect(const juce::String& identifier)
             }
         }
         sourceKey.store(0, std::memory_order_relaxed);
-        transposeSemitones.store(PitchKey::transposeFromTo(0, targetKey.load(std::memory_order_relaxed)),
-                                 std::memory_order_relaxed);
-        keyCalibrationPending.store(true, std::memory_order_release);
+        transposeSemitones.store(0, std::memory_order_relaxed);
+        keyCalibrationPending.store(false, std::memory_order_release);
+        keyCalibrated.store(false, std::memory_order_release);
         breathController.store(juce::jlimit(0, 127, savedController));
         activeProfile.breathController = breathController.load();
         BreathMapper::Settings settings;
@@ -110,6 +110,7 @@ void MidiInputService::disconnect()
     breath.store(0.0f, std::memory_order_relaxed);
     pitchBend.store(0.0f, std::memory_order_relaxed);
     keyCalibrationPending.store(false, std::memory_order_release);
+    keyCalibrated.store(false, std::memory_order_release);
 }
 
 void MidiInputService::refreshAndConnectFirstAvailable()
@@ -255,7 +256,16 @@ int MidiInputService::finishBreathDetection() noexcept
 void MidiInputService::beginKeyCalibration() noexcept
 {
     if (input != nullptr)
+    {
+        keyCalibrated.store(false, std::memory_order_release);
         keyCalibrationPending.store(true, std::memory_order_release);
+        updateEffectiveTranspose();
+    }
+}
+
+void MidiInputService::cancelKeyCalibration() noexcept
+{
+    keyCalibrationPending.store(false, std::memory_order_release);
 }
 
 void MidiInputService::setTargetKey(int pitchClass)
@@ -272,13 +282,16 @@ void MidiInputService::setTargetKey(int pitchClass)
 void MidiInputService::setTransposeSemitones(int semitones)
 {
     sourceKey.store(0, std::memory_order_relaxed);
+    keyCalibrated.store(true, std::memory_order_release);
     setTargetKey(semitones);
 }
 
 void MidiInputService::updateEffectiveTranspose()
 {
-    const auto next = PitchKey::transposeFromTo(sourceKey.load(std::memory_order_relaxed),
-                                                targetKey.load(std::memory_order_relaxed));
+    const auto next = keyCalibrated.load(std::memory_order_acquire)
+        ? PitchKey::transposeFromTo(sourceKey.load(std::memory_order_relaxed),
+                                    targetKey.load(std::memory_order_relaxed))
+        : 0;
     if (transposeSemitones.exchange(next, std::memory_order_relaxed) == next)
         return;
 
@@ -478,6 +491,7 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
         {
             const auto detectedSourceKey = PitchKey::normalise(sourceNote);
             sourceKey.store(detectedSourceKey, std::memory_order_relaxed);
+            keyCalibrated.store(true, std::memory_order_release);
             transposeSemitones.store(PitchKey::transposeFromTo(detectedSourceKey,
                                                                targetKey.load(std::memory_order_relaxed)),
                                      std::memory_order_relaxed);
