@@ -30,7 +30,11 @@ bool AccompanimentAudioService::loadAudioFile(const juce::File& audioFile)
     if (reader == nullptr) return false;
     const juce::ScopedLock lock(stateLock);
     readerSource = std::make_unique<juce::AudioFormatReaderSource>(reader.release(), true);
-    transport.setSource(readerSource.get(), 32768, &readAheadThread, readerSource->getAudioFormatReader()->sampleRate);
+    // 约 5 秒的预读余量可隔离视频解码、磁盘瞬时繁忙和界面动画造成的抖动。
+    // 旧值只有 32768 个采样，播放高码率视频时很容易被耗尽并让实时音频线程等待。
+    constexpr int accompanimentReadAheadSamples = 262144;
+    transport.setSource(readerSource.get(), accompanimentReadAheadSamples, &readAheadThread,
+                        readerSource->getAudioFormatReader()->sampleRate);
     loadedFile = audioFile;
     ready.store(true, std::memory_order_release);
     return true;

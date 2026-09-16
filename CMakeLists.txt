@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 0.6.0 LANGUAGES C CXX)
+project(FengYin VERSION 0.7.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -72,6 +72,7 @@ target_sources(FengYin PRIVATE
     native/Source/TechniqueAdvisor.h
     native/Source/ControllerDetector.h
     native/Source/MidiPerformanceSink.h
+    native/Source/PitchKey.h
     native/Source/TestSynthEngine.cpp
     native/Source/TestSynthEngine.h
     native/Source/PluginCatalogService.cpp
@@ -215,5 +216,9 @@ if(BUILD_TESTING)
     add_executable(FengYinTechniqueAdvisorTests tests/test_technique_advisor.cpp)
     target_include_directories(FengYinTechniqueAdvisorTests PRIVATE native/Source)
     add_test(NAME technique_advisor COMMAND FengYinTechniqueAdvisorTests)
+
+    add_executable(FengYinPitchKeyTests tests/test_pitch_key.cpp)
+    target_include_directories(FengYinPitchKeyTests PRIVATE native/Source)
+    add_test(NAME pitch_key_transpose COMMAND FengYinPitchKeyTests)
 
 endif()

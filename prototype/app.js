@@ -32,6 +32,8 @@ let techniqueMappings = [];
 let latestBackendState = {};
 let appFocused = document.hasFocus();
 let unfocusedFrame = 0;
+let keyCalibrationWasPending = false;
+let lastDrawAt = 0;
 
 const instrumentArtwork = {
   'soprano-sax':'instrument_soprano_sax.png', 'alto-sax':'instrument_alto_sax.png',
@@ -281,9 +283,9 @@ function toggleVideo() {
 }
 $('#play-button').addEventListener('click', toggleVideo);
 $('#main-play').addEventListener('click', toggleVideo);
-video.addEventListener('play', () => { document.body.classList.add('video-playing'); $('#play-button').textContent='Ⅱ'; $('#main-play').textContent='Ⅱ 暂停视频'; });
-video.addEventListener('pause', () => { document.body.classList.remove('video-playing'); $('#play-button').textContent='▶'; $('#main-play').textContent='▶ 播放视频'; });
-video.addEventListener('ended', () => document.body.classList.remove('video-playing'));
+video.addEventListener('play', () => { document.body.classList.add('video-playing'); nativeEvent('setVideoPlaybackState',{playing:true}); $('#play-button').textContent='Ⅱ'; $('#main-play').textContent='Ⅱ 暂停视频'; });
+video.addEventListener('pause', () => { document.body.classList.remove('video-playing'); nativeEvent('setVideoPlaybackState',{playing:false}); $('#play-button').textContent='▶'; $('#main-play').textContent='▶ 播放视频'; });
+video.addEventListener('ended', () => { document.body.classList.remove('video-playing'); nativeEvent('setVideoPlaybackState',{playing:false}); });
 video.addEventListener('timeupdate', () => {
   $('#current-time').textContent = formatTime(video.currentTime);
   $('#seek').value = video.duration ? video.currentTime / video.duration * 100 : 0;
@@ -349,10 +351,13 @@ layoutResizer.addEventListener('keydown', event => {
 $('#master-volume').addEventListener('input', event => nativeEvent('setMasterVolume', {value:Number(event.target.value)/100}));
 const transposeNames = new Map([...$('#transpose-key').options].map(option => [Number(option.value), option.textContent]));
 $('#transpose-key').addEventListener('change', event => {
-  const semitones = Number(event.target.value);
-  nativeEvent('setTranspose', {semitones});
-  const direction = semitones === 0 ? '原调' : `${semitones > 0 ? '升高' : '降低'} ${Math.abs(semitones)} 个半音`;
-  toast(`已切换为${transposeNames.get(semitones) || '所选调性'} · ${direction}`);
+  const targetKey = Number(event.target.value);
+  nativeEvent('setKeyTranspose', {targetKey});
+  toast(`目标演奏调已设为${transposeNames.get(targetKey) || '所选调性'}`);
+});
+$('#key-calibration').addEventListener('click', () => {
+  nativeEvent('beginKeyCalibration');
+  toast('请用 C 指法吹一个音，风吟会自动识别吹管本调');
 });
 const performanceReverb = $('#performance-reverb');
 performanceReverb.addEventListener('input', event => {
@@ -511,9 +516,10 @@ function renderSmartAdapter(state) {
   $('#adapter-kicker').textContent = connected ? (state.deviceRecognized ? '已自动识别' : '已连接 · 通用安全模式') : '等待连接设备';
   $('#adapter-device-name').textContent = connected ? (state.deviceName || state.deviceProfileName || '电吹管已连接') : '尚未连接电吹管';
   $('#adapter-summary').textContent = !connected ? '连接后将自动识别气息、弯音和可用硬件'
+    : state.keyCalibrationPending ? '请先用 C 指法吹一个音，风吟会自动完成本调和气息适配'
     : loaded ? '气息、音符、弯音与当前 SWAM 乐器已完成匹配' : '电吹管已适配；加载 SWAM 后将继续匹配演奏技巧';
-  $('#adapter-breath-state').textContent = connected ? '✓ 已优化' : '等待设备';
-  $('#adapter-breath-value').textContent = connected ? '自然响应' : '自动识别';
+  $('#adapter-breath-state').textContent = !connected ? '等待设备' : state.automaticBreathDetection ? '正在识别…' : '✓ 已优化';
+  $('#adapter-breath-value').textContent = !connected ? '自动识别' : state.automaticBreathDetection ? '请自然吹奏' : '自然响应';
   $('#adapter-breath-detail').textContent = connected ? `已使用 CC${Number(state.breathController ?? 2)}，并启用首音柔化保护` : '兼容 CC2、CC11 等常见气息信号';
   $('#adapter-hardware-state').textContent = connected ? '✓ 已识别' : '等待识别';
   const hardware = [];
@@ -522,12 +528,6 @@ function renderSmartAdapter(state) {
   if (state.hasAssignableButtons) hardware.push('功能键');
   if (state.hasMotionController) hardware.push('动作感应');
   $('#adapter-hardware-detail').textContent = connected ? (hardware.length ? `可用于技巧：${hardware.join('、')}` : '未预设控制器，可通过操作一次完成识别') : '只推荐当前型号实际具备的硬件';
-  $('#adapter-profile-id').textContent = state.deviceProfileName || '通用模式';
-  $('#adapter-safety-state').textContent = state.safeOnsetProtection === false ? '未开启' : '✓ 已开启';
-  $$('.adapter-step').forEach((step,index) => step.classList.toggle('done', connected && (index < 3 || loaded)));
-  $('#adapter-technique-context').textContent = loaded
-    ? `${state.deviceProfileName || state.deviceName || '当前设备'} ＋ ${state.instrumentFamily || state.instrumentChineseName || '当前乐器'}`
-    : '加载 SWAM 后，根据电吹管硬件和乐器类别推荐';
   $('#adapter-techniques').disabled = !loaded;
   const recommendations = techniqueMappings.filter(item => item.relevant !== false && item.pluginSupported !== false);
   $('#adapter-recommendations').innerHTML = recommendations.length ? recommendations.map(item => {
@@ -541,9 +541,19 @@ function renderSmartAdapter(state) {
 window.__JUCE__?.backend?.addEventListener('backendState', state => {
   latestBackendState = state || {};
   const connected = !!state.deviceConnected;
+  if (Number.isFinite(Number(state.latency))) $('#latency').textContent = `${Number(state.latency).toFixed(1)} ms`;
+  if (Number.isFinite(Number(state.audioCpu))) $('#cpu').textContent = `${Math.round(Number(state.audioCpu)*100)}%`;
   hardwareBreath = connected ? Math.max(0,Math.min(100,Number(state.breath || 0)*100)) : null;
-  const transpose = Number(state.transposeSemitones || 0);
-  if ($('#transpose-key').value !== String(transpose)) $('#transpose-key').value = String(transpose);
+  const targetKey = Number(state.targetKey || 0);
+  if ($('#transpose-key').value !== String(targetKey)) $('#transpose-key').value = String(targetKey);
+  const calibrationPending = connected && !!state.keyCalibrationPending;
+  const calibrationButton = $('#key-calibration');
+  calibrationButton.classList.toggle('pending', calibrationPending);
+  calibrationButton.classList.toggle('ready', connected && !calibrationPending);
+  calibrationButton.textContent = !connected ? '识别本调' : calibrationPending ? '请吹 C 指法' : `本调：${transposeNames.get(Number(state.sourceKey || 0)) || '已识别'}`;
+  if (calibrationPending && !keyCalibrationWasPending) toast('请先用 C 指法吹一个音，风吟将自动识别吹管本调');
+  if (!calibrationPending && keyCalibrationWasPending && connected) toast(`本调识别完成，已自动换算到${transposeNames.get(targetKey) || '目标调'}`);
+  keyCalibrationWasPending = calibrationPending;
   const backendReverb = Math.round(Math.max(0,Math.min(.6,Number(state.reverbMix ?? .28)))*100);
   if (document.activeElement !== performanceReverb && document.activeElement !== $('#reverb-mix')) {
     performanceReverb.value = String(backendReverb);
@@ -909,7 +919,13 @@ function drawBreathWave(ratio, breath, accent, accent2) {
   breathWaveContext.shadowBlur = 0;
 }
 
-function draw() {
+function draw(timestamp = performance.now()) {
+  const targetInterval = document.body.classList.contains('video-playing') ? 1000/24 : 1000/60;
+  if (timestamp - lastDrawAt < targetInterval) {
+    animationFrame = requestAnimationFrame(draw);
+    return;
+  }
+  lastDrawAt = timestamp;
   if (!appFocused && ++unfocusedFrame % 4 !== 0) {
     animationFrame = requestAnimationFrame(draw);
     return;
@@ -945,7 +961,7 @@ function draw() {
   $('#breath-bar').style.width = `${safeBreath}%`;
   $('#meter-l').style.width = `${Math.min(97,safeBreath+12)}%`;
   $('#meter-r').style.width = `${Math.min(95,safeBreath+7+Math.sin(tick)*6)}%`;
-  $('#cpu').textContent = `${Math.round(14+Math.abs(Math.sin(tick*.3))*9)}%`;
+  if (!window.__JUCE__?.backend?.emitEvent) $('#cpu').textContent = `${Math.round(14+Math.abs(Math.sin(tick*.3))*9)}%`;
   animationFrame = requestAnimationFrame(draw);
 }
 draw();

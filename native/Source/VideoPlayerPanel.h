@@ -33,6 +33,8 @@ private:
     juce::Label timeLabel;
     std::unique_ptr<juce::FileChooser> chooser;
     bool userDraggingPosition = false;
+    int sustainedDriftChecks = 0;
+    double lastHardSyncAtMs = 0.0;
     AccompanimentAudioService* accompaniment = nullptr;
     VideoAudioExtractor extractor;
 

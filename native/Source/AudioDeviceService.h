@@ -13,6 +13,8 @@ struct AudioDeviceStatus
     double sampleRate = 0.0;
     int bufferSize = 0;
     double estimatedBufferLatencyMs = 0.0;
+    double cpuUsage = 0.0;
+    int xRunCount = 0;
     juce::String error;
 };
 

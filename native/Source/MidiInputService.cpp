@@ -11,6 +11,8 @@ MidiInputService::MidiInputService()
     options.folderName = "FengYin";
     options.osxLibrarySubFolder = "Application Support";
     properties.setStorageParameters(options);
+    if (auto* settingsFile = properties.getUserSettings())
+        targetKey.store(PitchKey::normalise(settingsFile->getIntValue("targetPerformanceKey", 0)));
     BreathMapper::Settings settings;
     settings.threshold = 0.02f;
     settings.curve = 0.9f;
@@ -57,6 +59,10 @@ bool MidiInputService::connect(const juce::String& identifier)
                 settingsFile->setValue(profileRevisionKey, 1);
             }
         }
+        sourceKey.store(0, std::memory_order_relaxed);
+        transposeSemitones.store(PitchKey::transposeFromTo(0, targetKey.load(std::memory_order_relaxed)),
+                                 std::memory_order_relaxed);
+        keyCalibrationPending.store(true, std::memory_order_release);
         breathController.store(juce::jlimit(0, 127, savedController));
         activeProfile.breathController = breathController.load();
         BreathMapper::Settings settings;
@@ -103,6 +109,7 @@ void MidiInputService::disconnect()
     velocity.store(0.0f, std::memory_order_relaxed);
     breath.store(0.0f, std::memory_order_relaxed);
     pitchBend.store(0.0f, std::memory_order_relaxed);
+    keyCalibrationPending.store(false, std::memory_order_release);
 }
 
 void MidiInputService::refreshAndConnectFirstAvailable()
@@ -141,8 +148,8 @@ void MidiInputService::pollConnection()
                 connect(preferred);
                 return;
             }
-        return;
     }
+    // 上次使用的设备不在时仍应接入当前唯一/首个电吹管，避免换品牌后界面一直显示未连接。
     if (! devices.isEmpty())
         connect(devices.getFirst().identifier);
 }
@@ -199,6 +206,7 @@ void MidiInputService::savePreferences()
         settingsFile->setValue(controllerSettingKey() + ".curve", expression.curve);
         settingsFile->setValue(controllerSettingKey() + ".smoothing", expression.smoothing);
         settingsFile->setValue(controllerSettingKey() + ".pitch", expression.pitchSensitivity);
+        settingsFile->setValue("targetPerformanceKey", targetKey.load(std::memory_order_relaxed));
         settingsFile->saveIfNeeded();
     }
 }
@@ -244,9 +252,33 @@ int MidiInputService::finishBreathDetection() noexcept
     return detected;
 }
 
+void MidiInputService::beginKeyCalibration() noexcept
+{
+    if (input != nullptr)
+        keyCalibrationPending.store(true, std::memory_order_release);
+}
+
+void MidiInputService::setTargetKey(int pitchClass)
+{
+    targetKey.store(PitchKey::normalise(pitchClass), std::memory_order_relaxed);
+    updateEffectiveTranspose();
+    if (auto* settingsFile = properties.getUserSettings())
+    {
+        settingsFile->setValue("targetPerformanceKey", targetKey.load(std::memory_order_relaxed));
+        settingsFile->saveIfNeeded();
+    }
+}
+
 void MidiInputService::setTransposeSemitones(int semitones)
 {
-    const auto next = juce::jlimit(-12, 12, semitones);
+    sourceKey.store(0, std::memory_order_relaxed);
+    setTargetKey(semitones);
+}
+
+void MidiInputService::updateEffectiveTranspose()
+{
+    const auto next = PitchKey::transposeFromTo(sourceKey.load(std::memory_order_relaxed),
+                                                targetKey.load(std::memory_order_relaxed));
     if (transposeSemitones.exchange(next, std::memory_order_relaxed) == next)
         return;
 
@@ -441,6 +473,15 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
     if (message.isNoteOn())
     {
         const auto sourceNote = message.getNoteNumber();
+        // 用户按 C 指法吹出的首音，其音级就是吹管当前本调。只保存在本次连接中。
+        if (keyCalibrationPending.exchange(false, std::memory_order_acq_rel))
+        {
+            const auto detectedSourceKey = PitchKey::normalise(sourceNote);
+            sourceKey.store(detectedSourceKey, std::memory_order_relaxed);
+            transposeSemitones.store(PitchKey::transposeFromTo(detectedSourceKey,
+                                                               targetKey.load(std::memory_order_relaxed)),
+                                     std::memory_order_relaxed);
+        }
         const auto outputNote = juce::jlimit(0, 127, sourceNote + transposeSemitones.load(std::memory_order_relaxed));
         { const juce::SpinLock::ScopedLockType lock(noteMapLock); activeOutputNotes[static_cast<size_t>(sourceNote)] = outputNote; }
         lastNote.store(outputNote, std::memory_order_relaxed);

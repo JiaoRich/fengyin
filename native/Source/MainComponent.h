@@ -133,6 +133,9 @@ private:
     std::vector<juce::MidiDeviceInfo> midiDialogDevices;
     bool breathDetectionActive = false;
     double breathDetectionEndsAtMs = 0.0;
+    bool automaticBreathDetectionActive = false;
+    bool wasMidiConnected = false;
+    double automaticBreathDetectionEndsAtMs = 0.0;
     double autoGuideAtMs = 0.0;
     bool autoGuideShown = false;
     float simulatedPhase = 0.0f;
@@ -150,6 +153,7 @@ private:
     std::unique_ptr<juce::WebBrowserComponent> webInterface;
     bool webInterfaceReady = false;
     int webUpdateCounter = 0;
+    bool videoPlaybackActive = false;
     int midiConnectionPollCounter = 0;
     int activeTechniqueLearn = -1;
     bool pendingTechniqueToggle = false;

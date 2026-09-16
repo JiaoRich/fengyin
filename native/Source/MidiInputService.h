@@ -12,6 +12,7 @@
 #include "DeviceProfile.h"
 #include "ControllerDetector.h"
 #include "MidiPerformanceSink.h"
+#include "PitchKey.h"
 
 namespace fengyin
 {
@@ -60,7 +61,13 @@ public:
     void setPerformanceSink(MidiPerformanceSink* sink) noexcept;
     void beginBreathDetection() noexcept;
     [[nodiscard]] int finishBreathDetection() noexcept;
-    void setTransposeSemitones(int semitones);
+    // 每次连接后以一次 C 指法吹奏自动识别吹管当前本调；本调不跨连接保存。
+    void beginKeyCalibration() noexcept;
+    void setTargetKey(int pitchClass);
+    void setTransposeSemitones(int semitones); // 兼容旧设置：视为以 C 调为来源的目标偏移。
+    [[nodiscard]] int getSourceKey() const noexcept { return sourceKey.load(std::memory_order_relaxed); }
+    [[nodiscard]] int getTargetKey() const noexcept { return targetKey.load(std::memory_order_relaxed); }
+    [[nodiscard]] bool isKeyCalibrationPending() const noexcept { return keyCalibrationPending.load(std::memory_order_acquire); }
     [[nodiscard]] int getTransposeSemitones() const noexcept { return transposeSemitones.load(std::memory_order_relaxed); }
     void setTechniqueMappings(const juce::Array<TechniqueMapping>& mappings);
     [[nodiscard]] juce::Array<TechniqueMapping> getTechniqueMappings() const;
@@ -78,6 +85,7 @@ private:
     void loadTechniqueMappings();
     bool handleTechniqueMessage(const juce::MidiMessage& message, MidiPerformanceSink* sink);
     static float techniqueMessageValue(const juce::MidiMessage& message) noexcept;
+    void updateEffectiveTranspose();
 
     std::unique_ptr<juce::MidiInput> input;
     juce::String connectedName;
@@ -98,6 +106,9 @@ private:
     std::atomic<float> pitchSensitivity { 1.0f };
     std::atomic<uint64_t> messageCount { 0 };
     std::atomic<int> transposeSemitones { 0 };
+    std::atomic<int> sourceKey { 0 };
+    std::atomic<int> targetKey { 0 };
+    std::atomic<bool> keyCalibrationPending { false };
     mutable juce::SpinLock noteMapLock;
     std::array<int, 128> activeOutputNotes {};
     mutable juce::SpinLock techniqueLock;

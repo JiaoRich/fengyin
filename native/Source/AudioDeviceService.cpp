@@ -34,6 +34,8 @@ AudioDeviceStatus AudioDeviceService::getStatus()
         status.bufferSize = device->getCurrentBufferSizeSamples();
         if (status.sampleRate > 0.0)
             status.estimatedBufferLatencyMs = status.bufferSize * 1000.0 / status.sampleRate;
+        status.cpuUsage = manager.getCpuUsage();
+        status.xRunCount = manager.getXRunCount();
     }
     return status;
 }

@@ -296,6 +296,18 @@ void MainComponent::setupWebInterface()
         {
             midi.setTransposeSemitones(static_cast<int>(payload.getProperty("semitones", 0)));
         })
+        .withEventListener("setKeyTranspose", [this](juce::var payload)
+        {
+            midi.setTargetKey(static_cast<int>(payload.getProperty("targetKey", 0)));
+        })
+        .withEventListener("beginKeyCalibration", [this](juce::var)
+        {
+            midi.beginKeyCalibration();
+        })
+        .withEventListener("setVideoPlaybackState", [this](juce::var payload)
+        {
+            videoPlaybackActive = static_cast<bool>(payload.getProperty("playing", false));
+        })
         .withEventListener("setPerformanceReverb", [this](juce::var payload)
         {
             masterOutput.setReverbMix(static_cast<float>(static_cast<double>(payload.getProperty("value", 0.28))));
@@ -726,6 +738,30 @@ void MainComponent::timerCallback()
         midi.pollConnection();
     }
     snapshot = midi.getSnapshot();
+    if (snapshot.deviceConnected && ! wasMidiConnected)
+    {
+        // 已知型号先使用档案中的推荐值，同时在用户完成本调识别的第一次吹奏中
+        // 静默观察真实连续控制器；可兼容用户在吹管 App 中改过 MIDI 输出的情况。
+        midi.beginBreathDetection();
+        automaticBreathDetectionActive = true;
+        automaticBreathDetectionEndsAtMs = 0.0;
+    }
+    else if (! snapshot.deviceConnected && wasMidiConnected)
+    {
+        automaticBreathDetectionActive = false;
+        automaticBreathDetectionEndsAtMs = 0.0;
+    }
+    wasMidiConnected = snapshot.deviceConnected;
+    if (automaticBreathDetectionActive && ! midi.isKeyCalibrationPending()
+        && automaticBreathDetectionEndsAtMs <= 0.0)
+        automaticBreathDetectionEndsAtMs = juce::Time::getMillisecondCounterHiRes() + 1800.0;
+    if (automaticBreathDetectionActive && automaticBreathDetectionEndsAtMs > 0.0
+        && juce::Time::getMillisecondCounterHiRes() >= automaticBreathDetectionEndsAtMs)
+    {
+        (void) midi.finishBreathDetection();
+        automaticBreathDetectionActive = false;
+        automaticBreathDetectionEndsAtMs = 0.0;
+    }
     pluginHost.flushTechniqueValues();
     if (activeTechniqueLearn >= 0)
     {
@@ -769,10 +805,12 @@ void MainComponent::timerCallback()
     simulatedPhase += 0.09f;
     displayedLeftPeak = juce::jmax(displayedLeftPeak * 0.88f, juce::jlimit(0.0f, 1.0f, masterOutput.getLeftPeak()));
     displayedRightPeak = juce::jmax(displayedRightPeak * 0.88f, juce::jlimit(0.0f, 1.0f, masterOutput.getRightPeak()));
-    masterOutput.getSpectrum(spectrumLevels);
-    if (webInterface != nullptr && webInterfaceReady && ++webUpdateCounter >= 3)
+    if (webInterface != nullptr && webInterfaceReady && ++webUpdateCounter >= (videoPlaybackActive ? 6 : 3))
     {
         webUpdateCounter = 0;
+        // FFT 只在真正要刷新网页时计算；视频播放期间由 30 次/秒降到 5 次/秒，
+        // 把 CPU 时间优先留给 SWAM 与视频解码。
+        masterOutput.getSpectrum(spectrumLevels);
         auto state = std::make_unique<juce::DynamicObject>();
         state->setProperty("deviceConnected", snapshot.deviceConnected);
         state->setProperty("deviceName", midi.getConnectedDeviceName());
@@ -791,10 +829,16 @@ void MainComponent::timerCallback()
         state->setProperty("noteReceived", snapshot.lastNote >= 0);
         state->setProperty("audioDevice", currentAudio.deviceName);
         state->setProperty("latency", currentAudio.estimatedBufferLatencyMs);
+        state->setProperty("audioCpu", currentAudio.cpuUsage);
+        state->setProperty("audioXruns", currentAudio.xRunCount);
         state->setProperty("activated", isActivated);
         state->setProperty("machineCode", machineCode);
         state->setProperty("recording", recorder.isRecording());
         state->setProperty("transposeSemitones", midi.getTransposeSemitones());
+        state->setProperty("sourceKey", midi.getSourceKey());
+        state->setProperty("targetKey", midi.getTargetKey());
+        state->setProperty("keyCalibrationPending", midi.isKeyCalibrationPending());
+        state->setProperty("automaticBreathDetection", automaticBreathDetectionActive);
         state->setProperty("reverbMix", masterOutput.getReverbMix());
         state->setProperty("eqTone", masterOutput.getEqTone());
         state->setProperty("limiterCeiling", masterOutput.getLimiterCeiling());
@@ -1641,6 +1685,8 @@ void MainComponent::showMidiSetup()
 
 void MainComponent::startBreathDetection(const juce::String&)
 {
+    automaticBreathDetectionActive = false;
+    automaticBreathDetectionEndsAtMs = 0.0;
     midi.beginBreathDetection();
     breathDetectionActive = true;
     breathDetectionEndsAtMs = juce::Time::getMillisecondCounterHiRes() + 6000.0;

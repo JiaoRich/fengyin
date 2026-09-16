@@ -117,9 +117,22 @@ void VideoPlayerPanel::timerCallback()
 {
     const auto duration = video.getVideoDuration();
     const auto current = video.getPlayPosition();
-    if (video.isPlaying() && accompaniment != nullptr && accompaniment->isReady()
-        && std::abs(accompaniment->getPosition() - current) > 0.25)
-        accompaniment->setPosition(current);
+    if (video.isPlaying() && accompaniment != nullptr && accompaniment->isReady())
+    {
+        const auto drift = std::abs(accompaniment->getPosition() - current);
+        sustainedDriftChecks = drift > 1.0 ? sustainedDriftChecks + 1 : 0;
+        const auto now = juce::Time::getMillisecondCounterHiRes();
+        // 短暂的时钟抖动不再触发 seek。只有持续明显失步才做一次硬同步，并设置冷却时间，
+        // 防止 AudioTransportSource 清空预读缓存时造成连续丢音。
+        if (sustainedDriftChecks >= 5 && now - lastHardSyncAtMs > 3000.0)
+        {
+            accompaniment->setPosition(current);
+            sustainedDriftChecks = 0;
+            lastHardSyncAtMs = now;
+        }
+    }
+    else
+        sustainedDriftChecks = 0;
     if (! userDraggingPosition && duration > 0.0)
         position.setValue(current / duration, juce::dontSendNotification);
     timeLabel.setText(formatTime(current) + " / " + formatTime(duration), juce::dontSendNotification);

@@ -9,6 +9,7 @@ MAIN = (ROOT / "native" / "Source" / "MainComponent.cpp").read_text(encoding="ut
 JS = (ROOT / "prototype" / "app.js").read_text(encoding="utf-8")
 MASTER = (ROOT / "native" / "Source" / "MasterOutputService.cpp").read_text(encoding="utf-8")
 PRESET = (ROOT / "native" / "Source" / "SoundPresetStore.cpp").read_text(encoding="utf-8")
+PITCH_KEY = (ROOT / "native" / "Source" / "PitchKey.h").read_text(encoding="utf-8")
 
 
 class HostRegressionTests(unittest.TestCase):
@@ -25,6 +26,8 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("midi.pollConnection();", MAIN)
         self.assertIn("lastNote.store(-1", MIDI)
         self.assertIn("'已收到气息，尚未收到音符'", JS)
+        preferred_block = MIDI.split("if (preferred.isNotEmpty())", 1)[1].split("if (! devices.isEmpty())", 1)[0]
+        self.assertNotIn("        return;\n    }", preferred_block)
 
     def test_safe_onset_resets_expression_and_caps_velocity(self):
         self.assertIn("sink->resetPerformance()", MIDI)
@@ -37,9 +40,29 @@ class HostRegressionTests(unittest.TestCase):
 
     def test_transpose_releases_active_notes_and_uses_note_map(self):
         self.assertIn("void MidiInputService::setTransposeSemitones", MIDI)
+        self.assertIn("transposeFromTo", PITCH_KEY)
+        self.assertIn("PitchKey::transposeFromTo", MIDI)
+        self.assertIn("keyCalibrationPending.exchange", MIDI)
+        self.assertNotIn('setValue(sourceKeySettingKey()', MIDI)
         self.assertIn("activeOutputNotes", MIDI)
         self.assertIn("sourceNote + transposeSemitones.load", MIDI)
         self.assertIn("sink->noteOff(outputNote)", MIDI)
+
+    def test_video_playback_prioritises_realtime_audio(self):
+        accompaniment = (ROOT / "native" / "Source" / "AccompanimentAudioService.cpp").read_text(encoding="utf-8")
+        video = (ROOT / "native" / "Source" / "VideoPlayerPanel.cpp").read_text(encoding="utf-8")
+        self.assertIn("accompanimentReadAheadSamples = 262144", accompaniment)
+        self.assertIn("sustainedDriftChecks >= 5", video)
+        self.assertIn("videoPlaybackActive ? 6 : 3", MAIN)
+        self.assertIn("setVideoPlaybackState", JS)
+        refresh = MAIN.index("videoPlaybackActive ? 6 : 3")
+        self.assertGreater(MAIN.index("masterOutput.getSpectrum", refresh), refresh)
+
+    def test_connection_runs_automatic_breath_adaptation(self):
+        self.assertIn("automaticBreathDetectionActive = true", MAIN)
+        self.assertIn("midi.beginBreathDetection()", MAIN)
+        self.assertIn("midi.finishBreathDetection()", MAIN)
+        self.assertIn("automaticBreathDetection", MAIN)
 
     def test_technique_learning_and_swam_parameter_control_are_connected(self):
         self.assertIn("beginTechniqueLearn", MIDI)
