@@ -66,10 +66,15 @@ class HostRegressionTests(unittest.TestCase):
     def test_video_playback_prioritises_realtime_audio(self):
         accompaniment = (ROOT / "native" / "Source" / "AccompanimentAudioService.cpp").read_text(encoding="utf-8")
         video = (ROOT / "native" / "Source" / "VideoPlayerPanel.cpp").read_text(encoding="utf-8")
+        audio_device = (ROOT / "native" / "Source" / "AudioDeviceService.cpp").read_text(encoding="utf-8")
         self.assertIn("accompanimentReadAheadSamples = 262144", accompaniment)
         self.assertIn("sustainedDriftChecks >= 5", video)
         self.assertIn("videoPlaybackActive ? 6 : 3", MAIN)
         self.assertIn("setVideoPlaybackState", JS)
+        self.assertIn("followSystemDefaultOutput", audio_device)
+        self.assertIn("getDefaultDeviceIndex(false)", audio_device)
+        self.assertIn("current->getTypeName().containsIgnoreCase(\"ASIO\")", audio_device)
+        self.assertIn("audio.followSystemDefaultOutput()", MAIN)
         refresh = MAIN.index("videoPlaybackActive ? 6 : 3")
         self.assertGreater(MAIN.index("masterOutput.getSpectrum", refresh), refresh)
 

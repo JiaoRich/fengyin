@@ -71,6 +71,7 @@ private:
     fengyin::SoundPresetStore presetStore;
     fengyin::LicenseService license;
     juce::String machineCode;
+    int audioOutputSyncTicks = 0;
     fengyin::MidiSnapshot snapshot;
     juce::TextButton detectButton;
     juce::TextButton settingsButton;

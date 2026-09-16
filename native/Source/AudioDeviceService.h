@@ -30,6 +30,9 @@ public:
     [[nodiscard]] juce::StringArray getAvailableOutputDevices(const juce::String& typeName);
     juce::String selectDeviceType(const juce::String& typeName);
     juce::String applyOutputSetup(const juce::String& outputName, double sampleRate, int bufferSize);
+    // Windows 普通音频模式下跟随系统默认输出，使 WebView 视频和软音源始终去往同一耳机/音响。
+    // ASIO 有独立的低延迟设备路由，不在这里强制覆盖用户选择。
+    bool followSystemDefaultOutput();
     [[nodiscard]] juce::AudioDeviceManager& getDeviceManager() noexcept { return manager; }
 
 private:

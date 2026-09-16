@@ -84,6 +84,41 @@ juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName
     return lastError;
 }
 
+bool AudioDeviceService::followSystemDefaultOutput()
+{
+   #if JUCE_WINDOWS
+    auto* current = manager.getCurrentAudioDevice();
+    if (current == nullptr || current->getTypeName().containsIgnoreCase("ASIO"))
+        return false;
+
+    auto* type = findType(manager.getCurrentAudioDeviceType());
+    if (type == nullptr)
+        return false;
+    type->scanForDevices();
+    const auto outputs = type->getDeviceNames(false);
+    const auto defaultIndex = type->getDefaultDeviceIndex(false);
+    if (! juce::isPositiveAndBelow(defaultIndex, outputs.size()))
+        return false;
+
+    const auto defaultOutput = outputs[defaultIndex];
+    if (defaultOutput.isEmpty() || current->getName() == defaultOutput)
+        return false;
+
+    auto setup = manager.getAudioDeviceSetup();
+    setup.outputDeviceName = defaultOutput;
+    setup.inputDeviceName.clear();
+    setup.useDefaultInputChannels = false;
+    setup.useDefaultOutputChannels = true;
+    lastError = manager.setAudioDeviceSetup(setup, true);
+    if (lastError.isNotEmpty())
+        return false;
+    saveSettings();
+    return true;
+   #else
+    return false;
+   #endif
+}
+
 void AudioDeviceService::saveSettings()
 {
     if (auto state = manager.createStateXml())

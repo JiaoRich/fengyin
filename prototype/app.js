@@ -242,7 +242,13 @@ function renderPresets() {
 renderPresets();
 
 const video = $('#video');
-$('#video-file').addEventListener('change', event => {
+const videoFileInput = $('#video-file');
+function chooseVideoFile() {
+  videoFileInput.click();
+}
+$('#choose-video').addEventListener('click', chooseVideoFile);
+$('#change-video').addEventListener('click', chooseVideoFile);
+videoFileInput.addEventListener('change', event => {
   const file = event.target.files[0];
   if (!file) return;
   selectedVideoFile = file;
@@ -255,6 +261,8 @@ $('#video-file').addEventListener('change', event => {
   video.src = videoUrl;
   video.load();
   $('#video-name').textContent = file.name;
+  $('#change-video').textContent = '更换视频';
+  event.target.value = '';
   toast('正在载入视频…');
 });
 video.addEventListener('loadedmetadata', () => {

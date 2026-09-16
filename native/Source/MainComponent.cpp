@@ -315,6 +315,9 @@ void MainComponent::setupWebInterface()
         .withEventListener("setVideoPlaybackState", [this](juce::var payload)
         {
             videoPlaybackActive = static_cast<bool>(payload.getProperty("playing", false));
+            audioOutputSyncTicks = 0;
+            if (videoPlaybackActive)
+                audio.followSystemDefaultOutput();
         })
         .withEventListener("setPerformanceReverb", [this](juce::var payload)
         {
@@ -746,6 +749,11 @@ void MainComponent::timerCallback()
         midi.pollConnection();
     }
     snapshot = midi.getSnapshot();
+    if (videoPlaybackActive && ++audioOutputSyncTicks >= 60)
+    {
+        audioOutputSyncTicks = 0;
+        audio.followSystemDefaultOutput();
+    }
     if (snapshot.deviceConnected && ! wasMidiConnected)
     {
         // 已知型号先使用档案中的推荐值，同时在用户完成本调识别的第一次吹奏中

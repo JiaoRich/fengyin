@@ -35,6 +35,14 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertIn("video.addEventListener('error'", JS)
         self.assertNotIn("alert(", JS)
 
+    def test_video_can_always_be_selected_and_replaced(self):
+        for control_id in ("video-file", "choose-video", "change-video"):
+            self.assertIn(f'id="{control_id}"', HTML)
+        self.assertIn("videoFileInput.click()", JS)
+        self.assertIn("event.target.value = ''", JS)
+        self.assertIn("$('#change-video').textContent = '更换视频'", JS)
+        self.assertIn(".video-topline,.video-controls{z-index:4}", HTML)
+
     def test_confirmed_visual_features_are_present(self):
         for element_id in ("theme-atmosphere", "breath-wave", "layout-resizer", "lower-stage", "instrument-picture"):
             self.assertIn(f'id="{element_id}"', HTML)
