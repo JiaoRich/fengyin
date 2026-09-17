@@ -46,6 +46,7 @@ public:
 
 private:
     juce::AudioIODeviceType* findType(const juce::String& typeName);
+    juce::String preferredLiveDeviceType();
     juce::String configureAutomaticType(const juce::String& typeName);
     juce::String currentDeviceSignature() const;
     void saveSettings();

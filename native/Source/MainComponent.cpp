@@ -1773,6 +1773,9 @@ void MainComponent::emitAudioSettingsState(bool success, const juce::String& mes
     result->setProperty("sampleRate", status.sampleRate);
     result->setProperty("bufferSize", status.bufferSize);
     result->setProperty("latency", status.estimatedBufferLatencyMs);
+    result->setProperty("lowLatencyMode", status.deviceType.containsIgnoreCase("Low Latency Mode")
+                                              || status.deviceType.containsIgnoreCase(utf8("低延迟"))
+                                              || status.deviceType.containsIgnoreCase("ASIO"));
 
     juce::Array<juce::var> types;
     for (const auto& item : audio.getAvailableDeviceTypes()) types.add(item);

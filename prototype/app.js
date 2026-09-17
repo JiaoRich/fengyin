@@ -840,6 +840,18 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   setAudioOptions($('#audio-output-select'), state?.outputs, state?.output, value => String(value));
   setAudioOptions($('#audio-rate-select'), state?.sampleRates, Number(state?.sampleRate), value => `${Math.round(Number(value))} Hz${Number(value) === 48000 ? '（推荐）' : ''}`);
   setAudioOptions($('#audio-buffer-select'), state?.bufferSizes, Number(state?.bufferSize), value => `${Number(value)}${Number(value) === 128 ? '（推荐）' : Number(value) === 256 ? '（更稳定）' : ''}`);
+  const rates = Array.isArray(state?.sampleRates) ? state.sampleRates : [];
+  const buffers = Array.isArray(state?.bufferSizes) ? state.bufferSizes : [];
+  const lowLatency = !!state?.lowLatencyMode;
+  $('#audio-driver-help').textContent = lowLatency
+    ? '已使用低延迟驱动'
+    : '当前为普通模式；点击“自动优化”切换低延迟驱动';
+  $('#audio-rate-help').textContent = rates.length <= 1
+    ? '当前设备仅上报这一个可用采样率'
+    : '伴奏视频和软音源推荐使用 48000 Hz';
+  $('#audio-buffer-help').textContent = buffers.length <= 1
+    ? (lowLatency ? '当前设备驱动仅上报这一个可用缓冲值' : '普通 Windows Audio 由系统固定缓冲；请点击“自动优化”')
+    : '128 延迟低；出现爆音时可改为 256';
   const latency = Number(state?.latency);
   const latencyText = Number.isFinite(latency) ? `${latency.toFixed(1)} ms · ${latency <= 10 ? '优秀' : latency <= 20 ? '良好' : '偏高'}` : '尚未取得';
   $('#audio-latency-value').textContent = latencyText;

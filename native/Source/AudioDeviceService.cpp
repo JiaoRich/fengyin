@@ -1,6 +1,27 @@
 #include "AudioDeviceService.h"
 #include <algorithm>
 
+namespace
+{
+constexpr int currentAudioSetupRevision = 2;
+
+int chooseLiveBufferSize(juce::Array<int> sizes, int preferred)
+{
+    if (sizes.isEmpty())
+        return preferred;
+
+    std::sort(sizes.begin(), sizes.end());
+    if (sizes.contains(preferred))
+        return preferred;
+
+    for (const auto size : sizes)
+        if (size > preferred)
+            return size;
+
+    return sizes.getLast();
+}
+}
+
 namespace fengyin
 {
 AudioDeviceService::AudioDeviceService()
@@ -107,19 +128,22 @@ juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName
 juce::String AudioDeviceService::applyBestInitialSetup()
 {
     auto* settings = properties.getUserSettings();
-    if (settings != nullptr && settings->getValue("audioSetupMode") == "manual")
+    const auto current = getStatus();
+    const auto revision = settings != nullptr ? settings->getIntValue("audioSetupRevision", 0) : 0;
+    // 0.7.4 会把普通 Windows Audio 的系统固定缓冲（常见为 512）
+    // 误当成已优化的手动设置。升级后只迁移这一种明显的旧配置，
+    // ASIO、独占模式和已经较低的手动缓冲仍保留。
+    const auto legacyFixedBuffer = revision < currentAudioSetupRevision
+        && current.deviceType.equalsIgnoreCase("Windows Audio")
+        && current.bufferSize >= 512;
+    if (settings != nullptr && settings->getValue("audioSetupMode") == "manual" && ! legacyFixedBuffer)
+    {
+        settings->setValue("audioSetupRevision", currentAudioSetupRevision);
+        settings->saveIfNeeded();
         return juce::String::fromUTF8("已保留用户的声音设置");
+    }
 
-    const auto types = getAvailableDeviceTypes();
-    juce::String preferredType;
-   #if JUCE_WINDOWS
-    for (const auto& type : types)
-        if (type.containsIgnoreCase("Low Latency Mode") || type.containsIgnoreCase(juce::String::fromUTF8("低延迟")))
-        {
-            preferredType = type;
-            break;
-        }
-   #endif
+    auto preferredType = preferredLiveDeviceType();
     if (preferredType.isEmpty())
         preferredType = manager.getCurrentAudioDeviceType();
 
@@ -134,7 +158,7 @@ juce::String AudioDeviceService::applyBestInitialSetup()
         if (juce::isPositiveAndBelow(defaultIndex, outputs.size()))
             desiredSignature = preferredType + "|" + outputs[defaultIndex];
     }
-    if (settings != nullptr && desiredSignature.isNotEmpty()
+    if (revision >= currentAudioSetupRevision && settings != nullptr && desiredSignature.isNotEmpty()
         && settings->getValue("automaticAudioDevice") == desiredSignature
         && currentDeviceSignature() == desiredSignature)
         return juce::String::fromUTF8("已恢复自动优化的声音设置");
@@ -150,12 +174,25 @@ juce::String AudioDeviceService::applyBestInitialSetup()
     {
         settings->setValue("audioSetupMode", "automatic");
         settings->setValue("automaticAudioDevice", currentDeviceSignature());
+        settings->setValue("audioSetupRevision", currentAudioSetupRevision);
     }
     saveSettings();
     const auto status = getStatus();
     return juce::String::fromUTF8("已自动选择：") + status.deviceType + "、"
          + juce::String(juce::roundToInt(status.sampleRate)) + " Hz、"
          + juce::String(status.bufferSize) + juce::String::fromUTF8(" 采样");
+}
+
+juce::String AudioDeviceService::preferredLiveDeviceType()
+{
+    const auto types = getAvailableDeviceTypes();
+   #if JUCE_WINDOWS
+    for (const auto& type : types)
+        if (type.containsIgnoreCase("Low Latency Mode")
+            || type.containsIgnoreCase(juce::String::fromUTF8("低延迟")))
+            return type;
+   #endif
+    return {};
 }
 
 juce::String AudioDeviceService::configureAutomaticType(const juce::String& typeName)
@@ -188,11 +225,7 @@ juce::String AudioDeviceService::configureAutomaticType(const juce::String& type
         const auto rates = device->getAvailableSampleRates();
         if (rates.contains(48000.0)) setup.sampleRate = 48000.0;
 
-        auto buffers = device->getAvailableBufferSizes();
-        std::sort(buffers.begin(), buffers.end());
-        setup.bufferSize = 128;
-        for (const auto candidate : buffers)
-            if (candidate >= 128) { setup.bufferSize = candidate; break; }
+        setup.bufferSize = chooseLiveBufferSize(device->getAvailableBufferSizes(), 128);
     }
     else
     {
@@ -257,6 +290,23 @@ juce::String AudioDeviceService::optimiseForLivePerformance()
     if (device == nullptr || ! device->isOpen())
         return juce::String::fromUTF8("声音设备尚未准备好");
 
+   #if JUCE_WINDOWS
+    // “自动优化”必须真正离开系统固定大缓冲的普通共享模式。
+    // 已在使用厂家 ASIO 时不强制替换。
+    if (! device->getTypeName().containsIgnoreCase("ASIO"))
+    {
+        const auto preferredType = preferredLiveDeviceType();
+        if (preferredType.isNotEmpty() && preferredType != manager.getCurrentAudioDeviceType())
+        {
+            if (const auto error = configureAutomaticType(preferredType); error.isNotEmpty())
+                return error;
+            device = manager.getCurrentAudioDevice();
+            if (device == nullptr || ! device->isOpen())
+                return juce::String::fromUTF8("低延迟声音驱动打开失败");
+        }
+    }
+   #endif
+
     auto setup = manager.getAudioDeviceSetup();
     setup.inputDeviceName.clear();
     setup.useDefaultInputChannels = false;
@@ -266,15 +316,8 @@ juce::String AudioDeviceService::optimiseForLivePerformance()
     if (rates.contains(48000.0))
         setup.sampleRate = 48000.0;
 
-    auto buffers = device->getAvailableBufferSizes();
-    std::sort(buffers.begin(), buffers.end());
     const auto preferred = device->getTypeName().containsIgnoreCase("ASIO") ? 64 : 128;
-    int chosen = setup.bufferSize > 0 ? setup.bufferSize : preferred;
-    for (const auto candidate : buffers)
-        if (candidate >= preferred) { chosen = candidate; break; }
-    // 用户已经选择了更低且设备支持的缓冲时不把它调大。
-    if (setup.bufferSize > 0 && setup.bufferSize < chosen && buffers.contains(setup.bufferSize))
-        chosen = setup.bufferSize;
+    const auto chosen = chooseLiveBufferSize(device->getAvailableBufferSizes(), preferred);
     setup.bufferSize = chosen;
 
     lastError = manager.setAudioDeviceSetup(setup, true);
@@ -282,9 +325,17 @@ juce::String AudioDeviceService::optimiseForLivePerformance()
     unstablePolls = 0;
     if (lastError.isNotEmpty())
         return lastError;
+    if (auto* settings = properties.getUserSettings())
+    {
+        settings->setValue("audioSetupMode", "automatic");
+        settings->setValue("automaticAudioDevice", currentDeviceSignature());
+        settings->setValue("audioSetupRevision", currentAudioSetupRevision);
+    }
     saveSettings();
-    return juce::String::fromUTF8("实时演奏模式已启用：48 kHz、关闭无用输入、缓冲区 ")
-         + juce::String(chosen) + juce::String::fromUTF8(" 采样");
+    const auto applied = getStatus();
+    return juce::String::fromUTF8("实时演奏模式已启用：") + applied.deviceType + "、"
+         + juce::String(juce::roundToInt(applied.sampleRate)) + " Hz、缓冲区 "
+         + juce::String(applied.bufferSize) + juce::String::fromUTF8(" 采样");
 }
 
 bool AudioDeviceService::stabiliseAfterXRuns()
