@@ -107,6 +107,7 @@ function showPage(page) {
   button.classList.add('active');
   $(`#page-${page}`).classList.add('active');
   $('#page-title').textContent = titles[page];
+  if (page === 'audio') nativeEvent('requestAudioSettings');
 }
 
 $$('.nav-item').forEach(button => button.addEventListener('click', () => showPage(button.dataset.page)));
@@ -352,15 +353,26 @@ const playPage = $('#page-play');
 const stageGrid = $('.stage-grid');
 const layoutResizer = $('#layout-resizer');
 const lowerStage = $('#lower-stage');
-function setStageHeight(clientY) {
+function getPerformanceLayoutLimits() {
   const bounds = playPage.getBoundingClientRect();
   const minimum = window.innerHeight <= 850 ? 280 : 300;
   const dividerHeight = layoutResizer.getBoundingClientRect().height;
   const lowerMinimum = parseFloat(getComputedStyle(lowerStage).minHeight) || 180;
+  return {bounds, minimum, dividerHeight, lowerMinimum};
+}
+function setStageHeight(clientY) {
+  const {bounds, minimum, dividerHeight, lowerMinimum} = getPerformanceLayoutLimits();
   const maximum = Math.max(minimum, bounds.height - dividerHeight - lowerMinimum);
   const next = Math.max(minimum, Math.min(maximum, clientY - bounds.top));
   stageGrid.style.flexBasis = `${next}px`;
 }
+function minimiseSoundPanelOnStartup() {
+  const {bounds, minimum, dividerHeight, lowerMinimum} = getPerformanceLayoutLimits();
+  if (bounds.height <= 0) return;
+  stageGrid.style.flexBasis = `${Math.max(minimum, bounds.height - dividerHeight - lowerMinimum)}px`;
+}
+// WebView 首帧的视口尺寸可能还在变化，连续两帧后再设置启动高度。
+requestAnimationFrame(() => requestAnimationFrame(minimiseSoundPanelOnStartup));
 layoutResizer.addEventListener('pointerdown', event => {
   layoutResizer.setPointerCapture(event.pointerId);
   setStageHeight(event.clientY);
@@ -371,10 +383,7 @@ layoutResizer.addEventListener('pointermove', event => {
 layoutResizer.addEventListener('keydown', event => {
   if (!['ArrowUp','ArrowDown'].includes(event.key)) return;
   event.preventDefault();
-  const bounds = playPage.getBoundingClientRect();
-  const minimum = window.innerHeight <= 850 ? 280 : 300;
-  const dividerHeight = layoutResizer.getBoundingClientRect().height;
-  const lowerMinimum = parseFloat(getComputedStyle(lowerStage).minHeight) || 180;
+  const {bounds, minimum, dividerHeight, lowerMinimum} = getPerformanceLayoutLimits();
   const next = stageGrid.getBoundingClientRect().height + (event.key === 'ArrowDown' ? 16 : -16);
   stageGrid.style.flexBasis = `${Math.max(minimum,Math.min(bounds.height - dividerHeight - lowerMinimum,next))}px`;
 });
@@ -573,7 +582,47 @@ $('#adapter-advanced-toggle')?.addEventListener('click', event => {
   event.currentTarget.textContent = body.classList.contains('open') ? '收起高级参数⌃' : '高级参数（普通用户无需设置）⌄';
 });
 $('#wind-status-pill')?.addEventListener('click', () => showPage('wind'));
-document.querySelectorAll('#page-audio button').forEach(button => button.addEventListener('click', () => nativeEvent('showAudioSettings')));
+const audioControls = ['#audio-driver-select','#audio-output-select','#audio-rate-select','#audio-buffer-select'].map(id => $(id));
+let audioSettingsApplying = false;
+
+function setAudioOptions(select, values, selected, label) {
+  const items = Array.isArray(values) ? values : [];
+  select.replaceChildren(...items.map(value => {
+    const option = document.createElement('option');
+    option.value = String(value);
+    option.textContent = label(value);
+    return option;
+  }));
+  if (items.length && items.map(String).includes(String(selected))) select.value = String(selected);
+}
+
+function setAudioControlsBusy(busy) {
+  audioSettingsApplying = busy;
+  audioControls.forEach(control => { control.disabled = busy; });
+  $('#audio-auto-optimize').disabled = busy;
+  $('#audio-apply-status').classList.toggle('audio-saving', busy);
+  if (busy) $('#audio-apply-status').textContent = '正在应用并保存声音设置…';
+}
+
+function applyInlineAudioSettings(driverChanged = false) {
+  if (audioSettingsApplying) return;
+  if (!window.__JUCE__?.backend?.emitEvent) return toast('原型模式：安装版会立即应用并保存');
+  setAudioControlsBusy(true);
+  nativeEvent('applyAudioSettings', {
+    type:$('#audio-driver-select').value,
+    output:driverChanged ? '' : $('#audio-output-select').value,
+    sampleRate:driverChanged ? 48000 : Number($('#audio-rate-select').value),
+    bufferSize:driverChanged ? 128 : Number($('#audio-buffer-select').value)
+  });
+}
+
+$('#audio-driver-select').addEventListener('change', () => applyInlineAudioSettings(true));
+['#audio-output-select','#audio-rate-select','#audio-buffer-select'].forEach(id => $(id).addEventListener('change', () => applyInlineAudioSettings(false)));
+$('#audio-auto-optimize').addEventListener('click', () => {
+  if (!window.__JUCE__?.backend?.emitEvent) return toast('原型模式：已模拟自动优化');
+  setAudioControlsBusy(true);
+  nativeEvent('optimiseAudioSettings');
+});
 
 const techniqueNames = ['嘶吼音','颤音','花舌'];
 function renderSmartAdapter(state) {
@@ -609,6 +658,11 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   latestBackendState = state || {};
   const connected = !!state.deviceConnected;
   if (Number.isFinite(Number(state.latency))) $('#latency').textContent = `${Number(state.latency).toFixed(1)} ms`;
+  if (!audioSettingsApplying && Number.isFinite(Number(state.latency))) {
+    const value = Number(state.latency);
+    $('#audio-latency-value').textContent = `${value.toFixed(1)} ms · ${value <= 10 ? '优秀' : value <= 20 ? '良好' : '偏高'}`;
+    $('#audio-latency-value').classList.toggle('green', value <= 20);
+  }
   if (Number.isFinite(Number(state.audioCpu))) $('#cpu').textContent = `${Math.round(Number(state.audioCpu)*100)}%`;
   hardwareBreath = connected ? Math.max(0,Math.min(100,Number(state.breath || 0)*100)) : null;
   const targetKey = Number(state.targetKey || 0);
@@ -780,6 +834,21 @@ window.__JUCE__?.backend?.addEventListener('videoAudioState', result => {
   if (result?.message) toast(result.message);
 });
 window.__JUCE__?.backend?.addEventListener('audioOptimisationResult', message => toast(String(message || '')));
+window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
+  setAudioControlsBusy(false);
+  setAudioOptions($('#audio-driver-select'), state?.types, state?.type, value => String(value));
+  setAudioOptions($('#audio-output-select'), state?.outputs, state?.output, value => String(value));
+  setAudioOptions($('#audio-rate-select'), state?.sampleRates, Number(state?.sampleRate), value => `${Math.round(Number(value))} Hz${Number(value) === 48000 ? '（推荐）' : ''}`);
+  setAudioOptions($('#audio-buffer-select'), state?.bufferSizes, Number(state?.bufferSize), value => `${Number(value)}${Number(value) === 128 ? '（推荐）' : Number(value) === 256 ? '（更稳定）' : ''}`);
+  const latency = Number(state?.latency);
+  const latencyText = Number.isFinite(latency) ? `${latency.toFixed(1)} ms · ${latency <= 10 ? '优秀' : latency <= 20 ? '良好' : '偏高'}` : '尚未取得';
+  $('#audio-latency-value').textContent = latencyText;
+  $('#audio-latency-value').classList.toggle('green', !Number.isFinite(latency) || latency <= 20);
+  const status = $('#audio-apply-status');
+  status.textContent = state?.message || '选择后会立即生效并自动保存。';
+  status.classList.toggle('audio-error', state?.success === false);
+  if (state?.message) toast(state.message);
+});
 window.__JUCE__?.backend?.addEventListener('techniqueLearnResult', result => {
   window.fengyinTechniqueLearning = -1;
   techniqueHint.textContent = result.message || (result.success ? '识别成功' : '没有识别到控制信号');

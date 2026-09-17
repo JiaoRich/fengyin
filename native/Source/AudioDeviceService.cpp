@@ -59,6 +59,20 @@ juce::StringArray AudioDeviceService::getAvailableOutputDevices(const juce::Stri
     return {};
 }
 
+juce::Array<double> AudioDeviceService::getAvailableSampleRates()
+{
+    if (auto* device = manager.getCurrentAudioDevice())
+        return device->getAvailableSampleRates();
+    return {};
+}
+
+juce::Array<int> AudioDeviceService::getAvailableBufferSizes()
+{
+    if (auto* device = manager.getCurrentAudioDevice())
+        return device->getAvailableBufferSizes();
+    return {};
+}
+
 juce::String AudioDeviceService::selectDeviceType(const juce::String& typeName)
 {
     manager.setCurrentAudioDeviceType(typeName, true);
@@ -81,8 +95,125 @@ juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName
     setup.useDefaultInputChannels = false;
     setup.useDefaultOutputChannels = true;
     lastError = manager.setAudioDeviceSetup(setup, true);
-    if (lastError.isEmpty()) saveSettings();
+    if (lastError.isEmpty())
+    {
+        if (auto* settings = properties.getUserSettings())
+            settings->setValue("audioSetupMode", "manual");
+        saveSettings();
+    }
     return lastError;
+}
+
+juce::String AudioDeviceService::applyBestInitialSetup()
+{
+    auto* settings = properties.getUserSettings();
+    if (settings != nullptr && settings->getValue("audioSetupMode") == "manual")
+        return juce::String::fromUTF8("已保留用户的声音设置");
+
+    const auto types = getAvailableDeviceTypes();
+    juce::String preferredType;
+   #if JUCE_WINDOWS
+    for (const auto& type : types)
+        if (type.containsIgnoreCase("Low Latency Mode") || type.containsIgnoreCase(juce::String::fromUTF8("低延迟")))
+        {
+            preferredType = type;
+            break;
+        }
+   #endif
+    if (preferredType.isEmpty())
+        preferredType = manager.getCurrentAudioDeviceType();
+
+    // 不只看上次打开的设备：耳机、音响或 USB 声卡改变为系统默认输出后，
+    // 自动模式在下次启动会为新设备重做一次安全配置。
+    juce::String desiredSignature;
+    if (auto* type = findType(preferredType))
+    {
+        type->scanForDevices();
+        const auto outputs = type->getDeviceNames(false);
+        const auto defaultIndex = type->getDefaultDeviceIndex(false);
+        if (juce::isPositiveAndBelow(defaultIndex, outputs.size()))
+            desiredSignature = preferredType + "|" + outputs[defaultIndex];
+    }
+    if (settings != nullptr && desiredSignature.isNotEmpty()
+        && settings->getValue("automaticAudioDevice") == desiredSignature
+        && currentDeviceSignature() == desiredSignature)
+        return juce::String::fromUTF8("已恢复自动优化的声音设置");
+
+    const auto fallbackType = manager.getCurrentAudioDeviceType();
+    auto result = configureAutomaticType(preferredType);
+    if (result.isNotEmpty() && fallbackType.isNotEmpty() && preferredType != fallbackType)
+        result = configureAutomaticType(fallbackType);
+    if (result.isNotEmpty())
+        return result;
+
+    if (settings != nullptr)
+    {
+        settings->setValue("audioSetupMode", "automatic");
+        settings->setValue("automaticAudioDevice", currentDeviceSignature());
+    }
+    saveSettings();
+    const auto status = getStatus();
+    return juce::String::fromUTF8("已自动选择：") + status.deviceType + "、"
+         + juce::String(juce::roundToInt(status.sampleRate)) + " Hz、"
+         + juce::String(status.bufferSize) + juce::String::fromUTF8(" 采样");
+}
+
+juce::String AudioDeviceService::configureAutomaticType(const juce::String& typeName)
+{
+    if (typeName.isEmpty())
+        return juce::String::fromUTF8("没有可用的声音驱动");
+
+    manager.setCurrentAudioDeviceType(typeName, true);
+    if (manager.getCurrentAudioDeviceType() != typeName)
+        return juce::String::fromUTF8("无法启用声音驱动：") + typeName;
+
+    auto* type = findType(typeName);
+    if (type == nullptr)
+        return juce::String::fromUTF8("无法读取声音驱动");
+    type->scanForDevices();
+    const auto outputs = type->getDeviceNames(false);
+    const auto defaultIndex = type->getDefaultDeviceIndex(false);
+    if (! juce::isPositiveAndBelow(defaultIndex, outputs.size()))
+        return juce::String::fromUTF8("没有可用的声音输出设备");
+
+    auto* device = manager.getCurrentAudioDevice();
+    auto setup = manager.getAudioDeviceSetup();
+    setup.outputDeviceName = outputs[defaultIndex];
+    setup.inputDeviceName.clear();
+    setup.useDefaultInputChannels = false;
+    setup.useDefaultOutputChannels = true;
+
+    if (device != nullptr)
+    {
+        const auto rates = device->getAvailableSampleRates();
+        if (rates.contains(48000.0)) setup.sampleRate = 48000.0;
+
+        auto buffers = device->getAvailableBufferSizes();
+        std::sort(buffers.begin(), buffers.end());
+        setup.bufferSize = 128;
+        for (const auto candidate : buffers)
+            if (candidate >= 128) { setup.bufferSize = candidate; break; }
+    }
+    else
+    {
+        setup.sampleRate = 48000.0;
+        setup.bufferSize = 128;
+    }
+
+    lastError = manager.setAudioDeviceSetup(setup, true);
+    if (lastError.isNotEmpty() && setup.bufferSize < 256)
+    {
+        setup.bufferSize = 256;
+        lastError = manager.setAudioDeviceSetup(setup, true);
+    }
+    return lastError;
+}
+
+juce::String AudioDeviceService::currentDeviceSignature() const
+{
+    if (auto* device = manager.getCurrentAudioDevice())
+        return device->getTypeName() + "|" + device->getName();
+    return {};
 }
 
 bool AudioDeviceService::followSystemDefaultOutput()

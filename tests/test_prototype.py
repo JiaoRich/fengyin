@@ -50,6 +50,20 @@ class PrototypeStructureTests(unittest.TestCase):
             self.assertIn(f'value="{theme}"', HTML)
         self.assertIn("drawThemeAtmosphere", JS)
 
+    def test_sound_panel_starts_at_its_minimum_height(self):
+        self.assertIn("minimiseSoundPanelOnStartup", JS)
+        self.assertIn("bounds.height - dividerHeight - lowerMinimum", JS)
+        self.assertIn("requestAnimationFrame(() => requestAnimationFrame(minimiseSoundPanelOnStartup))", JS)
+
+    def test_audio_settings_are_inline_and_apply_immediately(self):
+        for control_id in ("audio-driver-select", "audio-output-select", "audio-rate-select",
+                           "audio-buffer-select", "audio-latency-value", "audio-auto-optimize"):
+            self.assertIn(f'id="{control_id}"', HTML)
+        self.assertIn("nativeEvent('applyAudioSettings'", JS)
+        self.assertIn("nativeEvent('requestAudioSettings')", JS)
+        self.assertIn("addEventListener('audioSettingsState'", JS)
+        self.assertNotIn("document.querySelectorAll('#page-audio button')", JS)
+
     def test_instrument_artwork_covers_every_swam_family(self):
         for key in (
             "soprano-sax", "alto-sax", "tenor-sax", "baritone-sax",

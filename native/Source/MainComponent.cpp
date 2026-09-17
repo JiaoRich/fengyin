@@ -168,7 +168,7 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
 
     midi.refreshAndConnectFirstAvailable();
     audio.initialise();
-    audio.optimiseForLivePerformance();
+    audio.applyBestInitialSetup();
     testSynth.setRecordingService(&recorder);
     testSynth.setAccompanimentService(&accompaniment);
     pluginHost.setRecordingService(&recorder);
@@ -212,7 +212,11 @@ void MainComponent::setupWebInterface()
             .withStatusBarDisabled()
             .withBackgroundColour(juce::Colour(0xff07101d)))
         .withNativeIntegrationEnabled()
-        .withEventListener("webReady", [this](juce::var) { webInterfaceReady = true; })
+        .withEventListener("webReady", [this](juce::var)
+        {
+            webInterfaceReady = true;
+            emitAudioSettingsState();
+        })
         .withEventListener("scanPlugins", [this](juce::var) { if (isActivated) startPluginScan(); })
         .withEventListener("loadPlugin", [this](juce::var payload)
         {
@@ -360,6 +364,14 @@ void MainComponent::setupWebInterface()
             masterOutput.setSmartOptimisationEnabled(enabled);
             if (enabled && webInterface != nullptr)
                 webInterface->emitEventIfBrowserIsVisible("audioOptimisationResult", audio.optimiseForLivePerformance());
+        })
+        .withEventListener("requestAudioSettings", [this](juce::var) { emitAudioSettingsState(); })
+        .withEventListener("applyAudioSettings", [this](juce::var payload) { applyAudioSettingsFromWeb(payload); })
+        .withEventListener("optimiseAudioSettings", [this](juce::var)
+        {
+            if (recorder.isRecording()) toggleRecording();
+            const auto message = audio.optimiseForLivePerformance();
+            emitAudioSettingsState(message.containsIgnoreCase(utf8("已启用")), message);
         })
         .withEventListener("beginTechniqueLearn", [this](juce::var payload)
         {
@@ -957,7 +969,11 @@ void MainComponent::timerCallback()
         // 只在没有吹气且没有录音时安全升一级缓冲，避免正在演奏时突然重启设备。
         if (masterOutput.isSmartOptimisationEnabled() && snapshot.breath < 4 && ! recorder.isRecording()
             && audio.stabiliseAfterXRuns() && webInterface != nullptr)
-            webInterface->emitEventIfBrowserIsVisible("audioOptimisationResult", utf8("检测到连续丢音，已自动提高一级稳定性"));
+        {
+            const auto message = utf8("检测到连续丢音，已自动提高一级稳定性");
+            webInterface->emitEventIfBrowserIsVisible("audioOptimisationResult", message);
+            emitAudioSettingsState(true, message);
+        }
     }
     const auto currentAudio = audio.getStatus();
     const auto scanProgress = pluginCatalog.getProgress();
@@ -987,6 +1003,9 @@ void MainComponent::timerCallback()
         state->setProperty("note", snapshot.lastNote);
         state->setProperty("noteReceived", snapshot.lastNote >= 0);
         state->setProperty("audioDevice", currentAudio.deviceName);
+        state->setProperty("audioDeviceType", currentAudio.deviceType);
+        state->setProperty("audioSampleRate", currentAudio.sampleRate);
+        state->setProperty("audioBufferSize", currentAudio.bufferSize);
         const auto pluginLatencyMs = currentAudio.sampleRate > 0.0
             ? pluginHost.getProcessingLatencySamples() * 1000.0 / currentAudio.sampleRate : 0.0;
         state->setProperty("latency", currentAudio.estimatedBufferLatencyMs + pluginLatencyMs);
@@ -1741,12 +1760,93 @@ void MainComponent::toggleRecording()
     recordingStatus.setText(utf8("正在录音  00:00"), juce::dontSendNotification);
 }
 
+void MainComponent::emitAudioSettingsState(bool success, const juce::String& message)
+{
+    if (webInterface == nullptr || ! webInterfaceReady) return;
+
+    const auto status = audio.getStatus();
+    auto result = std::make_unique<juce::DynamicObject>();
+    result->setProperty("success", success);
+    result->setProperty("message", message);
+    result->setProperty("type", status.deviceType);
+    result->setProperty("output", status.deviceName);
+    result->setProperty("sampleRate", status.sampleRate);
+    result->setProperty("bufferSize", status.bufferSize);
+    result->setProperty("latency", status.estimatedBufferLatencyMs);
+
+    juce::Array<juce::var> types;
+    for (const auto& item : audio.getAvailableDeviceTypes()) types.add(item);
+    result->setProperty("types", juce::var(types));
+
+    juce::Array<juce::var> outputs;
+    for (const auto& item : audio.getAvailableOutputDevices(status.deviceType)) outputs.add(item);
+    result->setProperty("outputs", juce::var(outputs));
+
+    juce::Array<juce::var> rates;
+    for (const auto item : audio.getAvailableSampleRates()) rates.add(item);
+    result->setProperty("sampleRates", juce::var(rates));
+
+    juce::Array<juce::var> buffers;
+    for (const auto item : audio.getAvailableBufferSizes()) buffers.add(item);
+    result->setProperty("bufferSizes", juce::var(buffers));
+    webInterface->emitEventIfBrowserIsVisible("audioSettingsState", juce::var(result.release()));
+}
+
+void MainComponent::applyAudioSettingsFromWeb(const juce::var& payload)
+{
+    const auto previous = audio.getStatus();
+    if (recorder.isRecording()) toggleRecording();
+
+    const auto requestedType = payload.getProperty("type", previous.deviceType).toString();
+    const auto requestedOutput = payload.getProperty("output", previous.deviceName).toString();
+    const auto requestedRate = static_cast<double>(payload.getProperty("sampleRate", previous.sampleRate));
+    const auto requestedBuffer = static_cast<int>(payload.getProperty("bufferSize", previous.bufferSize));
+
+    auto error = requestedType == previous.deviceType ? juce::String() : audio.selectDeviceType(requestedType);
+    if (error.isEmpty())
+    {
+        const auto outputs = audio.getAvailableOutputDevices(requestedType);
+        auto output = outputs.contains(requestedOutput) ? requestedOutput : audio.getStatus().deviceName;
+        if (! outputs.contains(output) && ! outputs.isEmpty()) output = outputs[0];
+
+        auto sampleRate = requestedRate > 0.0 ? requestedRate : 48000.0;
+        const auto rates = audio.getAvailableSampleRates();
+        if (! rates.isEmpty() && ! rates.contains(sampleRate))
+        {
+            sampleRate = rates[0];
+            for (const auto candidate : rates)
+                if (std::abs(candidate - requestedRate) < std::abs(sampleRate - requestedRate)) sampleRate = candidate;
+        }
+
+        auto bufferSize = requestedBuffer > 0 ? requestedBuffer : 128;
+        const auto buffers = audio.getAvailableBufferSizes();
+        if (! buffers.isEmpty() && ! buffers.contains(bufferSize))
+        {
+            bufferSize = buffers[0];
+            for (const auto candidate : buffers)
+                if (std::abs(candidate - requestedBuffer) < std::abs(bufferSize - requestedBuffer)) bufferSize = candidate;
+        }
+        error = output.isEmpty() ? utf8("没有可用的声音输出设备")
+                                 : audio.applyOutputSetup(output, sampleRate, bufferSize);
+    }
+
+    if (error.isNotEmpty() && previous.ready && previous.deviceType.isNotEmpty())
+    {
+        (void) audio.selectDeviceType(previous.deviceType);
+        (void) audio.applyOutputSetup(previous.deviceName, previous.sampleRate, previous.bufferSize);
+    }
+
+    emitAudioSettingsState(error.isEmpty(), error.isEmpty()
+        ? utf8("设置已保存并立即生效")
+        : utf8("无法应用，已恢复上一个可用设置：") + error);
+}
+
 void MainComponent::showDeviceSettings()
 {
     const auto current = audio.getStatus();
     const auto types = audio.getAvailableDeviceTypes();
     deviceDialog = std::make_unique<juce::AlertWindow>(utf8("声音设备设置"),
-        utf8("推荐：优先选择 ASIO，采样率 48000 Hz，缓冲区 128。若出现爆音，可改为 256。"),
+        utf8("推荐：普通电脑优先使用低延迟模式、48000 Hz、128 缓冲区；专业声卡可选厂家 ASIO。"),
         juce::MessageBoxIconType::QuestionIcon);
     deviceDialog->addComboBox("type", types, utf8("声音驱动"));
     auto* typeBox = deviceDialog->getComboBoxComponent("type");

@@ -78,6 +78,21 @@ class HostRegressionTests(unittest.TestCase):
         refresh = MAIN.index("videoPlaybackActive ? 6 : 3")
         self.assertGreater(MAIN.index("masterOutput.getSpectrum", refresh), refresh)
 
+    def test_initial_audio_setup_prefers_low_latency_without_overriding_manual_choice(self):
+        audio_device = (ROOT / "native" / "Source" / "AudioDeviceService.cpp").read_text(encoding="utf-8")
+        self.assertIn("applyBestInitialSetup", audio_device)
+        self.assertIn('getValue("audioSetupMode") == "manual"', audio_device)
+        self.assertIn('containsIgnoreCase("Low Latency Mode")', audio_device)
+        self.assertIn('getDefaultDeviceIndex(false)', audio_device)
+        self.assertIn('automaticAudioDevice', audio_device)
+        self.assertIn("setup.sampleRate = 48000.0", audio_device)
+        self.assertIn("setup.bufferSize = 128", audio_device)
+        self.assertIn("setup.bufferSize = 256", audio_device)
+        self.assertIn("audio.applyBestInitialSetup();", MAIN)
+        self.assertIn('withEventListener("applyAudioSettings"', MAIN)
+        self.assertIn('withEventListener("requestAudioSettings"', MAIN)
+        self.assertIn('emitEventIfBrowserIsVisible("audioSettingsState"', MAIN)
+
     def test_connection_runs_automatic_breath_adaptation(self):
         self.assertIn("automaticBreathDetectionActive = true", MAIN)
         self.assertIn("midi.beginBreathDetection()", MAIN)
