@@ -63,7 +63,8 @@ juce::File VideoAudioExtractor::getExecutable() const
     const auto app = juce::File::getSpecialLocation(juce::File::currentApplicationFile);
    #if JUCE_WINDOWS
     const juce::File candidates[] { app.getParentDirectory().getChildFile("ffmpeg.exe"),
-                                    app.getParentDirectory().getChildFile("tools").getChildFile("ffmpeg.exe") };
+                                    app.getParentDirectory().getChildFile("tools").getChildFile("ffmpeg.exe"),
+                                    app.getParentDirectory().getChildFile("tools").getChildFile("ffmpeg").getChildFile("ffmpeg.exe") };
    #else
     const juce::File candidates[] { app.getParentDirectory().getChildFile("ffmpeg"),
                                     juce::File("/opt/homebrew/bin/ffmpeg"), juce::File("/usr/local/bin/ffmpeg") };

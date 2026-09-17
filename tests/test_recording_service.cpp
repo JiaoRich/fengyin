@@ -95,6 +95,30 @@ int main()
         accompaniment.mixInto(mixed.getArrayOfWritePointers(), 2, mixed.getNumSamples());
     }
     assert(mixed.getMagnitude(0, mixed.getNumSamples()) > 0.0f);
+
+    // 正式音频回调采用相同顺序：软音源 -> 伴奏混入 -> 录音器。
+    // 验证录音文件里的电平不只是软音源基线，防止视频伴奏再次被漏录。
+    const auto mixedRecordingFile = folder.getChildFile("instrument-with-accompaniment.wav");
+    fengyin::RecordingService mixedRecorder;
+    assert(mixedRecorder.startToFile(mixedRecordingFile, 48000.0, 2));
+    accompaniment.setPosition(0.0);
+    accompaniment.play();
+    for (int block = 0; block < 8; ++block)
+    {
+        mixed.clear();
+        for (int channel = 0; channel < mixed.getNumChannels(); ++channel)
+            for (int sample = 0; sample < mixed.getNumSamples(); ++sample)
+                mixed.setSample(channel, sample, 0.01f);
+        juce::Thread::sleep(5);
+        accompaniment.mixInto(mixed.getArrayOfWritePointers(), 2, mixed.getNumSamples());
+        mixedRecorder.push(mixed.getArrayOfWritePointers(), 2, mixed.getNumSamples());
+    }
+    mixedRecorder.stop();
+    auto mixedReader = std::unique_ptr<juce::AudioFormatReader>(formats.createReaderFor(mixedRecordingFile));
+    assert(mixedReader != nullptr);
+    juce::AudioBuffer<float> recordedMix(2, static_cast<int>(mixedReader->lengthInSamples));
+    assert(mixedReader->read(&recordedMix, 0, recordedMix.getNumSamples(), 0, true, true));
+    assert(recordedMix.getMagnitude(0, recordedMix.getNumSamples()) > 0.02f);
     accompaniment.release();
     accompaniment.unload();
     folder.deleteRecursively();

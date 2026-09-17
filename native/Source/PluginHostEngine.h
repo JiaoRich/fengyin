@@ -76,6 +76,7 @@ public:
     void resetPerformance() noexcept override;
     void flushTechniqueValues();
     [[nodiscard]] bool supportsTechnique(PerformanceTechnique technique) const noexcept;
+    [[nodiscard]] int getProcessingLatencySamples() const noexcept;
 
 private:
     void queue(juce::MidiMessage message) noexcept;

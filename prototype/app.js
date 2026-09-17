@@ -16,6 +16,8 @@ let animationFrame;
 let videoUrl;
 let selectedVideoFile;
 let triedVideoDataFallback = false;
+let nativeAccompanimentReady = false;
+let lastVideoSyncAt = 0;
 let availableInstruments = [];
 let availableEffects = [];
 let pluginListSignature = '';
@@ -244,7 +246,12 @@ renderPresets();
 const video = $('#video');
 const videoFileInput = $('#video-file');
 function chooseVideoFile() {
-  videoFileInput.click();
+  if (window.__JUCE__?.backend?.emitEvent) {
+    nativeEvent('chooseVideo');
+    toast('请选择一个伴奏视频');
+  } else {
+    videoFileInput.click();
+  }
 }
 $('#choose-video').addEventListener('click', chooseVideoFile);
 $('#change-video').addEventListener('click', chooseVideoFile);
@@ -252,6 +259,8 @@ videoFileInput.addEventListener('change', event => {
   const file = event.target.files[0];
   if (!file) return;
   selectedVideoFile = file;
+  nativeAccompanimentReady = false;
+  video.muted = false;
   triedVideoDataFallback = false;
   video.pause();
   video.style.display = 'none';
@@ -291,15 +300,28 @@ function toggleVideo() {
 }
 $('#play-button').addEventListener('click', toggleVideo);
 $('#main-play').addEventListener('click', toggleVideo);
-video.addEventListener('play', () => { document.body.classList.add('video-playing'); nativeEvent('setVideoPlaybackState',{playing:true}); $('#play-button').textContent='Ⅱ'; $('#main-play').textContent='Ⅱ 暂停视频'; });
-video.addEventListener('pause', () => { document.body.classList.remove('video-playing'); nativeEvent('setVideoPlaybackState',{playing:false}); $('#play-button').textContent='▶'; $('#main-play').textContent='▶ 播放视频'; });
-video.addEventListener('ended', () => { document.body.classList.remove('video-playing'); nativeEvent('setVideoPlaybackState',{playing:false}); });
+video.addEventListener('play', () => { document.body.classList.add('video-playing'); nativeEvent('setVideoPlaybackState',{playing:true,position:video.currentTime}); $('#play-button').textContent='Ⅱ'; $('#main-play').textContent='Ⅱ 暂停视频'; });
+video.addEventListener('pause', () => { document.body.classList.remove('video-playing'); nativeEvent('setVideoPlaybackState',{playing:false,position:video.currentTime}); $('#play-button').textContent='▶'; $('#main-play').textContent='▶ 播放视频'; });
+video.addEventListener('ended', () => { document.body.classList.remove('video-playing'); nativeEvent('setVideoPlaybackState',{playing:false,position:video.currentTime}); });
 video.addEventListener('timeupdate', () => {
   $('#current-time').textContent = formatTime(video.currentTime);
   $('#seek').value = video.duration ? video.currentTime / video.duration * 100 : 0;
+  const now = performance.now();
+  if (nativeAccompanimentReady && now-lastVideoSyncAt > 750) {
+    lastVideoSyncAt = now;
+    nativeEvent('syncVideoPlayback',{position:video.currentTime});
+  }
 });
-$('#seek').addEventListener('input', event => { if(video.duration) video.currentTime = event.target.value / 100 * video.duration; });
-$('#video-volume').addEventListener('input', event => video.volume = event.target.value / 100);
+$('#seek').addEventListener('input', event => {
+  if(!video.duration) return;
+  video.currentTime = event.target.value / 100 * video.duration;
+  nativeEvent('seekVideo',{position:video.currentTime});
+});
+$('#video-volume').addEventListener('input', event => {
+  const value = event.target.value / 100;
+  video.volume = value;
+  nativeEvent('setVideoVolume',{value});
+});
 const videoCard = $('.video-card');
 const fullscreenButton = $('#fullscreen');
 async function toggleFullscreen() {
@@ -477,6 +499,9 @@ $('#simulate').addEventListener('click', event => {
   event.target.textContent = simulating ? '暂停模拟吹奏' : '继续模拟吹奏';
 });
 $('#record').addEventListener('click', event => {
+  if (!recording && video.src && window.__JUCE__?.backend?.emitEvent && !nativeAccompanimentReady) {
+    return toast('伴奏音轨尚未准备好，请稍候再开始录音');
+  }
   nativeEvent('toggleRecording');
   recording = !recording;
   event.target.textContent = recording ? '■ 停止录音' : '● 开始录音';
@@ -731,6 +756,30 @@ window.__JUCE__?.backend?.addEventListener('activationResult', result => {
   toast(result.message || (result.activated ? '激活成功' : '无法激活'));
 });
 window.__JUCE__?.backend?.addEventListener('editorResult', message => toast(String(message || '')));
+window.__JUCE__?.backend?.addEventListener('videoSelected', result => {
+  if (!result?.url) return;
+  selectedVideoFile = null;
+  triedVideoDataFallback = true;
+  nativeAccompanimentReady = false;
+  video.pause();
+  video.muted = false;
+  video.style.display = 'none';
+  $('#video-empty').style.display = 'grid';
+  if (videoUrl) URL.revokeObjectURL(videoUrl);
+  videoUrl = '';
+  video.src = result.url;
+  video.load();
+  $('#video-name').textContent = result.name || '伴奏视频';
+  $('#change-video').textContent = '更换视频';
+  toast('正在载入视频并准备伴奏音轨…');
+});
+window.__JUCE__?.backend?.addEventListener('videoAudioState', result => {
+  nativeAccompanimentReady = !!result?.ready;
+  // 后台音轨准备成功后，网页只负责画面，声音统一由风吟输出并进入录音。
+  video.muted = nativeAccompanimentReady;
+  if (result?.message) toast(result.message);
+});
+window.__JUCE__?.backend?.addEventListener('audioOptimisationResult', message => toast(String(message || '')));
 window.__JUCE__?.backend?.addEventListener('techniqueLearnResult', result => {
   window.fengyinTechniqueLearning = -1;
   techniqueHint.textContent = result.message || (result.success ? '识别成功' : '没有识别到控制信号');

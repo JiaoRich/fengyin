@@ -385,6 +385,14 @@ bool PluginHostEngine::supportsTechnique(PerformanceTechnique technique) const n
     return index < techniqueParameters.size() && techniqueParameters[index] != nullptr;
 }
 
+int PluginHostEngine::getProcessingLatencySamples() const noexcept
+{
+    int samples = instrumentNode != nullptr ? instrumentNode->getProcessor()->getLatencySamples() : 0;
+    if (effectNode != nullptr && ! effectNode->isBypassed())
+        samples += effectNode->getProcessor()->getLatencySamples();
+    return juce::jmax(0, samples);
+}
+
 void PluginHostEngine::resolveTechniqueParameters()
 {
     techniqueParameters.fill(nullptr);

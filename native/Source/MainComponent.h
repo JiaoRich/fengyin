@@ -13,6 +13,7 @@
 #include "AccompanimentAudioService.h"
 #include "MasterOutputService.h"
 #include "TechniqueAdvisor.h"
+#include "VideoAudioExtractor.h"
 
 class MainComponent final : public juce::Component, private juce::Timer
 {
@@ -31,6 +32,10 @@ private:
     void applyTheme(Theme theme);
     void setupWebInterface();
     static std::optional<juce::WebBrowserComponent::Resource> getWebResource(const juce::String& path);
+    static juce::File prepareLocalWebInterface();
+    void chooseVideoForWebInterface();
+    void loadVideoForWebInterface(const juce::File& file);
+    void emitVideoAudioState(bool ready, const juce::String& message);
     juce::Rectangle<int> getContentBounds() const;
     void timerCallback() override;
     void startPluginScan();
@@ -72,6 +77,7 @@ private:
     fengyin::LicenseService license;
     juce::String machineCode;
     int audioOutputSyncTicks = 0;
+    int lowLatencyMonitorTicks = 0;
     fengyin::MidiSnapshot snapshot;
     juce::TextButton detectButton;
     juce::TextButton settingsButton;
@@ -118,6 +124,12 @@ private:
     juce::Array<juce::PluginDescription> cachedInstrumentPlugins;
     juce::Array<juce::PluginDescription> cachedEffectPlugins;
     fengyin::VideoPlayerPanel videoPlayer;
+    fengyin::VideoAudioExtractor webVideoAudioExtractor;
+    std::unique_ptr<juce::FileChooser> webVideoChooser;
+    juce::File webVideoFile;
+    bool webVideoAudioReady = false;
+    double webVideoPosition = 0.0;
+    float webVideoVolume = 1.0f;
     bool pluginChoicesLoaded = false;
     bool pluginLoading = false;
     bool effectLoading = false;

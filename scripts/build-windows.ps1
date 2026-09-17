@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "0.7.2",
+    [string]$Version = "0.7.3",
     [switch]$SkipInstaller
 )
 
@@ -9,6 +9,7 @@ $BuildDir = Join-Path $ProjectRoot "build-windows"
 $PackageDir = Join-Path $ProjectRoot "dist\FengYin"
 $InstallerDir = Join-Path $ProjectRoot "dist\installer"
 $FfmpegPath = Join-Path $ProjectRoot "third_party\ffmpeg\windows\ffmpeg.exe"
+$FfmpegPackageDir = Join-Path $PackageDir "tools\ffmpeg"
 $NugetPackageDir = Join-Path $ProjectRoot "third_party\nuget-packages"
 $WebViewBootstrapperPath = Join-Path $PackageDir "MicrosoftEdgeWebview2Setup.exe"
 
@@ -61,6 +62,30 @@ Copy-Item (Join-Path $ProjectRoot "README.md") $PackageDir -Force
 Copy-Item (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES.md") $PackageDir -Force
 if (Test-Path $FfmpegPath) {
     Copy-Item $FfmpegPath (Join-Path $PackageDir "ffmpeg.exe") -Force
+} else {
+    Write-Host "正在准备视频伴奏混录组件（FFmpeg LGPL）..." -ForegroundColor Cyan
+    $FfmpegRelease = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-15-13-18"
+    $FfmpegArchiveName = "ffmpeg-n8.1.2-53-g1005b294ff-win64-lgpl-shared-8.1.zip"
+    $FfmpegArchive = Join-Path $env:TEMP $FfmpegArchiveName
+    $FfmpegChecksums = Join-Path $env:TEMP "fengyin-ffmpeg-checksums.sha256"
+    $FfmpegExtract = Join-Path $env:TEMP "fengyin-ffmpeg-lgpl-8.1"
+    Invoke-WebRequest -UseBasicParsing -Uri "$FfmpegRelease/$FfmpegArchiveName" -OutFile $FfmpegArchive
+    Invoke-WebRequest -UseBasicParsing -Uri "$FfmpegRelease/checksums.sha256" -OutFile $FfmpegChecksums
+    $ExpectedLine = Select-String -Path $FfmpegChecksums -Pattern ([regex]::Escape($FfmpegArchiveName)) | Select-Object -First 1
+    if (-not $ExpectedLine) { throw "无法核对 FFmpeg 下载文件。" }
+    $ExpectedHash = ($ExpectedLine.Line -split '\s+')[0].ToUpperInvariant()
+    $ActualHash = (Get-FileHash -Algorithm SHA256 $FfmpegArchive).Hash.ToUpperInvariant()
+    if ($ActualHash -ne $ExpectedHash) { throw "FFmpeg 下载校验失败。" }
+    if (Test-Path $FfmpegExtract) { Remove-Item -Path $FfmpegExtract -Recurse -Force }
+    Expand-Archive -Path $FfmpegArchive -DestinationPath $FfmpegExtract -Force
+    $FfmpegBin = Get-ChildItem $FfmpegExtract -Directory | Select-Object -First 1 | ForEach-Object { Join-Path $_.FullName "bin" }
+    if (-not $FfmpegBin -or -not (Test-Path (Join-Path $FfmpegBin "ffmpeg.exe"))) {
+        throw "FFmpeg 压缩包结构不正确。"
+    }
+    New-Item -ItemType Directory -Force -Path $FfmpegPackageDir | Out-Null
+    Copy-Item (Join-Path $FfmpegBin "*") $FfmpegPackageDir -Force
+    $FfmpegRoot = Split-Path $FfmpegBin -Parent
+    Get-ChildItem $FfmpegRoot -File | Where-Object { $_.Name -match 'LICENSE|COPYING|README' } | Copy-Item -Destination $FfmpegPackageDir -Force
 }
 
 Write-Host "正在准备 Microsoft Edge WebView2 运行环境安装程序..." -ForegroundColor Cyan
@@ -74,10 +99,6 @@ if ((Get-Item $WebViewBootstrapperPath).Length -lt 1MB) {
 $ExePath = Join-Path $PackageDir "FengYin.exe"
 if (-not (Test-Path $ExePath)) {
     throw "未找到编译结果：$ExePath"
-}
-
-if (-not (Test-Path $FfmpegPath)) {
-    Write-Warning "未放入 ffmpeg.exe：视频仍可播放，但部分视频的伴奏混录功能不可用。"
 }
 
 # 单独整理店主工具，绝不放进客户安装目录。

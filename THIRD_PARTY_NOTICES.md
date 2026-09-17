@@ -8,11 +8,13 @@
 - 当前工程版本：9.0.2。
 - 正式商业发布前必须取得与发行方式相符的 JUCE 授权，并随安装包保留所需声明。
 
-## FFmpeg（正式包待定）
+## FFmpeg
 
 - 用途：在系统无法直接解码视频音轨时，离线提取伴奏缓存。
-- 仓库当前不包含 FFmpeg 二进制。
-- 打包人员必须记录实际版本、下载来源、编译选项和适用许可证；确认是否包含会改变许可义务的编码器后，才能对外分发。
+- Windows 安装包使用 BtbN FFmpeg Builds 提供的 FFmpeg 8.1 x64 LGPL shared 构建，作为独立命令行程序运行。
+- 下载来源：https://github.com/BtbN/FFmpeg-Builds/releases/tag/autobuild-2026-09-15-13-18
+- FFmpeg 主要采用 GNU Lesser General Public License 2.1 或更高版本；安装目录 `tools/ffmpeg` 保留构建包附带的许可证与说明文件。
+- FFmpeg 项目与源码：https://ffmpeg.org/ ；构建脚本与对应补丁：https://github.com/BtbN/FFmpeg-Builds
 
 ## 用户自行安装的插件
 

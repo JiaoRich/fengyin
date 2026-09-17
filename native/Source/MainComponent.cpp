@@ -168,6 +168,7 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
 
     midi.refreshAndConnectFirstAvailable();
     audio.initialise();
+    audio.optimiseForLivePerformance();
     testSynth.setRecordingService(&recorder);
     testSynth.setAccompanimentService(&accompaniment);
     pluginHost.setRecordingService(&recorder);
@@ -192,6 +193,8 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
 MainComponent::~MainComponent()
 {
     stopTimer();
+    webVideoAudioExtractor.cancel();
+    accompaniment.pause();
     webInterface.reset();
     recorder.stop();
     midi.setPerformanceSink(nullptr);
@@ -312,12 +315,40 @@ void MainComponent::setupWebInterface()
         {
             juce::SystemClipboard::copyTextToClipboard(machineCode);
         })
+        .withEventListener("chooseVideo", [this](juce::var) { chooseVideoForWebInterface(); })
         .withEventListener("setVideoPlaybackState", [this](juce::var payload)
         {
             videoPlaybackActive = static_cast<bool>(payload.getProperty("playing", false));
+            webVideoPosition = static_cast<double>(payload.getProperty("position", webVideoPosition));
             audioOutputSyncTicks = 0;
             if (videoPlaybackActive)
+            {
                 audio.followSystemDefaultOutput();
+                if (webVideoAudioReady)
+                {
+                    accompaniment.setPosition(webVideoPosition);
+                    accompaniment.play();
+                }
+            }
+            else
+                accompaniment.pause();
+        })
+        .withEventListener("syncVideoPlayback", [this](juce::var payload)
+        {
+            webVideoPosition = static_cast<double>(payload.getProperty("position", webVideoPosition));
+            if (webVideoAudioReady && std::abs(accompaniment.getPosition() - webVideoPosition) > 0.35)
+                accompaniment.setPosition(webVideoPosition);
+        })
+        .withEventListener("seekVideo", [this](juce::var payload)
+        {
+            webVideoPosition = static_cast<double>(payload.getProperty("position", 0.0));
+            if (webVideoAudioReady) accompaniment.setPosition(webVideoPosition);
+        })
+        .withEventListener("setVideoVolume", [this](juce::var payload)
+        {
+            webVideoVolume = juce::jlimit(0.0f, 1.0f,
+                static_cast<float>(static_cast<double>(payload.getProperty("value", 1.0))));
+            accompaniment.setVolume(webVideoVolume);
         })
         .withEventListener("setPerformanceReverb", [this](juce::var payload)
         {
@@ -325,7 +356,10 @@ void MainComponent::setupWebInterface()
         })
         .withEventListener("setSmartOptimisation", [this](juce::var payload)
         {
-            masterOutput.setSmartOptimisationEnabled(static_cast<bool>(payload.getProperty("enabled", true)));
+            const auto enabled = static_cast<bool>(payload.getProperty("enabled", true));
+            masterOutput.setSmartOptimisationEnabled(enabled);
+            if (enabled && webInterface != nullptr)
+                webInterface->emitEventIfBrowserIsVisible("audioOptimisationResult", audio.optimiseForLivePerformance());
         })
         .withEventListener("beginTechniqueLearn", [this](juce::var payload)
         {
@@ -415,8 +449,109 @@ void MainComponent::setupWebInterface()
     // The component may have received its first resized() callback before the browser existed.
     // Give WebView2 a real viewport immediately so the legacy native UI never appears at startup.
     webInterface->setBounds(getLocalBounds());
-    webInterface->goToURL(juce::WebBrowserComponent::getResourceProviderRoot());
+    const auto localInterface = prepareLocalWebInterface();
+    webInterface->goToURL(localInterface.existsAsFile()
+        ? juce::URL(localInterface).toString(false)
+        : juce::WebBrowserComponent::getResourceProviderRoot());
     webInterface->toFront(false);
+}
+
+juce::File MainComponent::prepareLocalWebInterface()
+{
+    const auto root = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+                          .getChildFile("FengYin").getChildFile("web-runtime");
+    const juce::StringArray files {
+        "prototype/index.html", "prototype/styles.css", "prototype/app.js", "assets/fengyin-app-icon.png",
+        "assets/instruments/instrument_soprano_sax.png", "assets/instruments/instrument_alto_sax.png",
+        "assets/instruments/instrument_tenor_sax.png", "assets/instruments/instrument_baritone_sax.png",
+        "assets/instruments/instrument_flugelhorn.png", "assets/instruments/instrument_trumpet.png",
+        "assets/instruments/instrument_piccolo_trumpet.png", "assets/instruments/instrument_tenor_trombone.png",
+        "assets/instruments/instrument_bass_trombone.png", "assets/instruments/instrument_tuba.png",
+        "assets/instruments/instrument_euphonium.png", "assets/instruments/instrument_horn.png",
+        "assets/instruments/instrument_piccolo.png", "assets/instruments/instrument_flute.png",
+        "assets/instruments/instrument_alto_flute.png", "assets/instruments/instrument_bass_flute.png",
+        "assets/instruments/instrument_clarinet.png", "assets/instruments/instrument_bass_clarinet.png",
+        "assets/instruments/instrument_oboe.png", "assets/instruments/instrument_english_horn.png",
+        "assets/instruments/instrument_bassoon.png", "assets/instruments/instrument_contrabassoon.png",
+        "assets/instruments/instrument_violin.png", "assets/instruments/instrument_viola.png",
+        "assets/instruments/instrument_cello.png", "assets/instruments/instrument_double_bass.png"
+    };
+    for (const auto& relative : files)
+    {
+        const auto resourcePath = relative.startsWith("prototype/") ? relative.fromFirstOccurrenceOf("prototype/", false, false) : relative;
+        const auto resource = getWebResource("/" + resourcePath);
+        if (! resource.has_value()) return {};
+        const auto destination = root.getChildFile(relative);
+        destination.getParentDirectory().createDirectory();
+        if (! destination.replaceWithData(resource->data.data(), resource->data.size())) return {};
+    }
+    return root.getChildFile("prototype").getChildFile("index.html");
+}
+
+void MainComponent::chooseVideoForWebInterface()
+{
+    webVideoChooser = std::make_unique<juce::FileChooser>(utf8("选择伴奏视频"), juce::File(), "*.mp4;*.mov;*.m4v;*.avi;*.mkv;*.webm");
+    const auto safeThis = juce::Component::SafePointer<MainComponent>(this);
+    webVideoChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+        [safeThis](const juce::FileChooser& chooser)
+        {
+            if (safeThis == nullptr) return;
+            const auto file = chooser.getResult();
+            safeThis->webVideoChooser.reset();
+            if (file.existsAsFile()) safeThis->loadVideoForWebInterface(file);
+        });
+}
+
+void MainComponent::loadVideoForWebInterface(const juce::File& file)
+{
+    webVideoAudioExtractor.cancel();
+    accompaniment.unload();
+    webVideoFile = file;
+    webVideoPosition = 0.0;
+    webVideoAudioReady = false;
+
+    if (webInterface != nullptr)
+    {
+        auto result = std::make_unique<juce::DynamicObject>();
+        result->setProperty("url", juce::URL(file).toString(false));
+        result->setProperty("name", file.getFileName());
+        webInterface->emitEventIfBrowserIsVisible("videoSelected", juce::var(result.release()));
+    }
+
+    if (accompaniment.loadForVideo(file))
+    {
+        accompaniment.setVolume(webVideoVolume);
+        webVideoAudioReady = true;
+        emitVideoAudioState(true, utf8("伴奏声音已进入风吟混音与录音"));
+        return;
+    }
+
+    emitVideoAudioState(false, utf8("正在准备伴奏音轨，请稍候…"));
+    webVideoAudioExtractor.extractAsync(file,
+        [safeThis = juce::Component::SafePointer<MainComponent>(this), file](bool success, const juce::File& audioFile, const juce::String& error)
+        {
+            if (safeThis == nullptr || safeThis->webVideoFile != file) return;
+            const auto loaded = success && safeThis->accompaniment.loadAudioFile(audioFile);
+            safeThis->webVideoAudioReady = loaded;
+            if (loaded)
+            {
+                safeThis->accompaniment.setVolume(safeThis->webVideoVolume);
+                safeThis->accompaniment.setPosition(safeThis->webVideoPosition);
+                if (safeThis->videoPlaybackActive) safeThis->accompaniment.play();
+                safeThis->emitVideoAudioState(true, utf8("伴奏声音已进入风吟混音与录音"));
+            }
+            else
+                safeThis->emitVideoAudioState(false, error.isNotEmpty() ? error : utf8("无法读取视频中的伴奏音轨"));
+        });
+}
+
+void MainComponent::emitVideoAudioState(bool ready, const juce::String& message)
+{
+    if (webInterface == nullptr) return;
+    auto result = std::make_unique<juce::DynamicObject>();
+    result->setProperty("ready", ready);
+    result->setProperty("message", message);
+    webInterface->emitEventIfBrowserIsVisible("videoAudioState", juce::var(result.release()));
 }
 
 std::optional<juce::WebBrowserComponent::Resource> MainComponent::getWebResource(const juce::String& path)
@@ -816,6 +951,14 @@ void MainComponent::timerCallback()
             }
         }
     }
+    if (++lowLatencyMonitorTicks >= 60)
+    {
+        lowLatencyMonitorTicks = 0;
+        // 只在没有吹气且没有录音时安全升一级缓冲，避免正在演奏时突然重启设备。
+        if (masterOutput.isSmartOptimisationEnabled() && snapshot.breath < 4 && ! recorder.isRecording()
+            && audio.stabiliseAfterXRuns() && webInterface != nullptr)
+            webInterface->emitEventIfBrowserIsVisible("audioOptimisationResult", utf8("检测到连续丢音，已自动提高一级稳定性"));
+    }
     const auto currentAudio = audio.getStatus();
     const auto scanProgress = pluginCatalog.getProgress();
     simulatedPhase += 0.09f;
@@ -844,7 +987,10 @@ void MainComponent::timerCallback()
         state->setProperty("note", snapshot.lastNote);
         state->setProperty("noteReceived", snapshot.lastNote >= 0);
         state->setProperty("audioDevice", currentAudio.deviceName);
-        state->setProperty("latency", currentAudio.estimatedBufferLatencyMs);
+        const auto pluginLatencyMs = currentAudio.sampleRate > 0.0
+            ? pluginHost.getProcessingLatencySamples() * 1000.0 / currentAudio.sampleRate : 0.0;
+        state->setProperty("latency", currentAudio.estimatedBufferLatencyMs + pluginLatencyMs);
+        state->setProperty("pluginLatency", pluginLatencyMs);
         state->setProperty("audioCpu", currentAudio.cpuUsage);
         state->setProperty("audioXruns", currentAudio.xRunCount);
         state->setProperty("activated", isActivated);
