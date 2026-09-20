@@ -178,6 +178,9 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
     videoPlayer.setAccompanimentService(&accompaniment);
     midi.setPerformanceSink(&testSynth);
     audio.getDeviceManager().addAudioCallback(&testSynth);
+    // 首次安装、升级调优策略或声卡改变时静默试跑。
+    // 采用非阻塞状态机，不弹出驱动设置窗口。
+    audio.beginAutomaticLatencyTuning();
     refreshPresetChoices();
     refreshLicenseUi();
     if (! pluginCatalog.getPlugins().isEmpty()) refreshPluginChoices();
@@ -215,7 +218,8 @@ void MainComponent::setupWebInterface()
         .withEventListener("webReady", [this](juce::var)
         {
             webInterfaceReady = true;
-            emitAudioSettingsState();
+            emitAudioSettingsState(true, audio.isAutomaticLatencyTuning()
+                ? utf8("正在自动优化声音，无需操作…") : juce::String());
         })
         .withEventListener("scanPlugins", [this](juce::var) { if (isActivated) startPluginScan(); })
         .withEventListener("loadPlugin", [this](juce::var payload)
@@ -378,8 +382,10 @@ void MainComponent::setupWebInterface()
         .withEventListener("optimiseAudioSettings", [this](juce::var)
         {
             if (recorder.isRecording()) toggleRecording();
-            const auto message = audio.optimiseForLivePerformance();
-            emitAudioSettingsState(message.containsIgnoreCase(utf8("已启用")), message);
+            if (audio.beginAutomaticLatencyTuning(true))
+                emitAudioSettingsState(true, utf8("正在自动优化声音，无需操作…"));
+            else
+                emitAudioSettingsState(false, utf8("当前无法开始自动优化，请检查声音输出设备"));
         })
         .withEventListener("beginTechniqueLearn", [this](juce::var payload)
         {
@@ -909,10 +915,19 @@ void MainComponent::timerCallback()
         midi.pollConnection();
     }
     snapshot = midi.getSnapshot();
-    if (videoPlaybackActive && ++audioOutputSyncTicks >= 60)
+    if (++audioOutputSyncTicks >= 60)
     {
         audioOutputSyncTicks = 0;
-        audio.followSystemDefaultOutput();
+        const auto outputChanged = audio.followSystemDefaultOutput();
+        const auto safeToRetune = ! videoPlaybackActive && ! recorder.isRecording() && snapshot.breath < 4;
+        if (safeToRetune && (outputChanged || audio.needsAutomaticLatencyTuning()))
+            audio.beginAutomaticLatencyTuning();
+    }
+    if (const auto tuningResult = audio.pollAutomaticLatencyTuning(); tuningResult.has_value())
+    {
+        if (webInterface != nullptr)
+            webInterface->emitEventIfBrowserIsVisible("audioOptimisationResult", *tuningResult);
+        emitAudioSettingsState(! tuningResult->containsIgnoreCase(utf8("未找到")), *tuningResult);
     }
     if (snapshot.deviceConnected && ! wasMidiConnected)
     {
@@ -1858,6 +1873,8 @@ void MainComponent::emitAudioSettingsState(bool success, const juce::String& mes
     result->setProperty("sampleRate", status.sampleRate);
     result->setProperty("bufferSize", status.bufferSize);
     result->setProperty("latency", status.estimatedBufferLatencyMs);
+    result->setProperty("automatic", audio.isAutomaticMode());
+    result->setProperty("autoTuning", audio.isAutomaticLatencyTuning());
     result->setProperty("lowLatencyMode", status.deviceType.containsIgnoreCase("Low Latency Mode")
                                               || status.deviceType.containsIgnoreCase(utf8("低延迟"))
                                               || status.deviceType.containsIgnoreCase("ASIO"));

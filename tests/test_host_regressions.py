@@ -101,6 +101,19 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("manager.getCpuUsage() >= 0.82", audio_device)
         self.assertIn("audio.stabiliseAfterXRuns()", MAIN)
 
+    def test_first_run_audio_tuning_is_automatic_but_manual_controls_remain(self):
+        audio_header = (ROOT / "native" / "Source" / "AudioDeviceService.h").read_text(encoding="utf-8")
+        audio_device = (ROOT / "native" / "Source" / "AudioDeviceService.cpp").read_text(encoding="utf-8")
+        self.assertIn("beginAutomaticLatencyTuning", audio_header)
+        self.assertIn("pollAutomaticLatencyTuning", audio_header)
+        self.assertIn("latencyCandidateTestMs", audio_device)
+        self.assertIn('containsIgnoreCase("Exclusive")', audio_device)
+        self.assertIn("addedXRuns == 0", audio_device)
+        self.assertIn("tuningCandidateMaximumCpu", audio_device)
+        self.assertIn('automaticLatencyTunedDevice', audio_device)
+        self.assertIn("audio.beginAutomaticLatencyTuning();", MAIN)
+        self.assertIn('withEventListener("applyAudioSettings"', MAIN)
+
     def test_three_day_trial_unlocks_features_and_expires_safely(self):
         license_header = (ROOT / "native" / "Source" / "LicenseService.h").read_text(encoding="utf-8")
         license_source = (ROOT / "native" / "Source" / "LicenseService.cpp").read_text(encoding="utf-8")

@@ -886,7 +886,7 @@ window.__JUCE__?.backend?.addEventListener('videoAudioState', result => {
 });
 window.__JUCE__?.backend?.addEventListener('audioOptimisationResult', message => toast(String(message || '')));
 window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
-  setAudioControlsBusy(false);
+  setAudioControlsBusy(!!state?.autoTuning);
   setAudioOptions($('#audio-driver-select'), state?.types, state?.type, value => String(value));
   setAudioOptions($('#audio-output-select'), state?.outputs, state?.output, value => String(value));
   setAudioOptions($('#audio-rate-select'), state?.sampleRates, Number(state?.sampleRate), value => `${Math.round(Number(value))} Hz${Number(value) === 48000 ? '（推荐）' : ''}`);
@@ -908,7 +908,7 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   $('#audio-latency-value').textContent = latencyText;
   $('#audio-latency-value').classList.toggle('green', !Number.isFinite(latency) || latency <= 20);
   const status = $('#audio-apply-status');
-  status.textContent = state?.message || '选择后会立即生效并自动保存。';
+  status.textContent = state?.message || (state?.automatic ? '已由风吟自动优化；也可使用上方高级选项手动调整。' : '已使用高级手动设置，软件不会自动覆盖。');
   status.classList.toggle('audio-error', state?.success === false);
   if (state?.message) toast(state.message);
 });

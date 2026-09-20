@@ -2,6 +2,8 @@
 
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_data_structures/juce_data_structures.h>
+#include <optional>
+#include <vector>
 
 namespace fengyin
 {
@@ -42,6 +44,14 @@ public:
     juce::String optimiseForLivePerformance();
     // 出现连续丢音时只上调一级缓冲，避免反复爆音；返回 true 表示已自动降级。
     bool stabiliseAfterXRuns();
+    // 首次启动或检测到新输出设备时，在后台依次试跑可用的低延迟方案。
+    // 默认只在自动模式下执行；force 仅用于用户主动点击“恢复自动优化”。
+    bool beginAutomaticLatencyTuning(bool force = false);
+    [[nodiscard]] bool needsAutomaticLatencyTuning();
+    [[nodiscard]] bool isAutomaticMode();
+    [[nodiscard]] bool isAutomaticLatencyTuning() const noexcept { return tuningActive; }
+    // 由界面定时器非阻塞轮询；仅在调优结束时返回用户可读的结果。
+    std::optional<juce::String> pollAutomaticLatencyTuning();
     [[nodiscard]] juce::AudioDeviceManager& getDeviceManager() noexcept { return manager; }
 
 private:
@@ -49,6 +59,26 @@ private:
     juce::String preferredLiveDeviceType();
     juce::String configureAutomaticType(const juce::String& typeName);
     juce::String currentDeviceSignature() const;
+    struct LatencyCandidate
+    {
+        juce::String typeName;
+        juce::String outputName;
+        int preferredBuffer = 128;
+        int priority = 0;
+    };
+    struct LatencyResult
+    {
+        LatencyCandidate candidate;
+        AudioDeviceStatus status;
+        double maximumCpu = 0.0;
+        int addedXRuns = 0;
+        bool stable = false;
+        double score = 1.0e9;
+    };
+    void buildLatencyCandidates();
+    bool applyLatencyCandidate(const LatencyCandidate& candidate);
+    bool startNextLatencyCandidate();
+    juce::String finishAutomaticLatencyTuning();
     void saveSettings();
 
     juce::AudioDeviceManager manager;
@@ -56,5 +86,16 @@ private:
     juce::String lastError;
     int observedXRunCount = 0;
     int unstablePolls = 0;
+    bool tuningActive = false;
+    int tuningCandidateIndex = -1;
+    double tuningCandidateStartedAtMs = 0.0;
+    int tuningCandidateStartXRuns = 0;
+    double tuningCandidateMaximumCpu = 0.0;
+    juce::String tuningFallbackType;
+    juce::String tuningFallbackOutput;
+    double tuningFallbackRate = 0.0;
+    int tuningFallbackBuffer = 0;
+    std::vector<LatencyCandidate> tuningCandidates;
+    std::vector<LatencyResult> tuningResults;
 };
 }
