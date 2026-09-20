@@ -56,6 +56,7 @@ private:
     void showSetupGuide(bool automatic = false);
     static juce::File getOnboardingMarkerFile();
     void activatePluginOutput(const juce::String& pluginName);
+    void configureTechniqueDefaults();
     void showActivationDialog();
     void refreshLicenseUi();
     void emitLicenseState(const fengyin::LicenseStatus& status);

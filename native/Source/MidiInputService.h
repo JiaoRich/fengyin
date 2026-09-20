@@ -11,6 +11,7 @@
 #include "BreathMapper.h"
 #include "DeviceProfile.h"
 #include "ControllerDetector.h"
+#include "IntelligentTechniqueProcessor.h"
 #include "MidiPerformanceSink.h"
 #include "PitchKey.h"
 
@@ -86,6 +87,7 @@ private:
     void saveTechniqueMappings();
     void loadTechniqueMappings();
     bool handleTechniqueMessage(const juce::MidiMessage& message, MidiPerformanceSink* sink);
+    void updateBreathDrivenTechniques(float mappedBreath, MidiPerformanceSink* sink, double nowMs);
     static float techniqueMessageValue(const juce::MidiMessage& message) noexcept;
     void updateEffectiveTranspose();
 
@@ -119,6 +121,10 @@ private:
     juce::String techniqueContext { "other" };
     std::array<float, static_cast<size_t>(PerformanceTechnique::count)> techniquePreviousInput {};
     std::array<bool, static_cast<size_t>(PerformanceTechnique::count)> techniqueToggleState {};
+    std::array<float, static_cast<size_t>(PerformanceTechnique::count)> techniqueHardwareInput {};
+    std::array<float, static_cast<size_t>(PerformanceTechnique::count)> techniqueBreathInput {};
+    IntelligentTechniqueProcessor intelligentTechniques;
+    int activeNoteCount = 0;
     std::atomic<bool> learningTechnique { false };
     std::atomic<int> learningTechniqueId { 0 };
     std::atomic<int> learnedSourceType { 0 };

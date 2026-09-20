@@ -102,7 +102,8 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertIn("nativeEvent('beginKeyCalibration'", JS)
         self.assertIn("nativeEvent('setPerformanceReverb'", JS)
         self.assertIn("nativeEvent('beginTechniqueLearn'", JS)
-        self.assertIn("nativeEvent('removeTechniqueMapping'", JS)
+        self.assertIn("nativeEvent('setTechniqueConfiguration'", JS)
+        self.assertIn("techniqueId", JS)
         action_bar = HTML.split('<div class="action-bar glass">', 1)[1].split('</div>\n        </div>', 1)[0]
         self.assertIn('id="transpose-key"', action_bar)
         self.assertIn('id="performance-reverb"', action_bar)
@@ -114,9 +115,10 @@ class PrototypeStructureTests(unittest.TestCase):
                            "adapter-techniques", "adapter-advanced-toggle"):
             self.assertIn(f'id="{control_id}"', HTML)
         self.assertIn("state.hasBiteSensor", JS)
-        self.assertIn("item.relevant !== false", JS)
-        self.assertIn("item.pluginSupported !== false", JS)
-        self.assertIn("按“电吹管型号＋乐器类别”独立保存", HTML)
+        self.assertIn("mergeBackendTechniquePlan", JS)
+        self.assertIn("backend.relevant === false", JS)
+        self.assertIn("backend.pluginSupported === false", JS)
+        self.assertIn("按“电吹管型号＋具体乐器”保存", HTML)
 
     def test_smart_audio_optimisation_is_user_controllable(self):
         self.assertIn('id="smart-audio"', HTML)
@@ -125,7 +127,9 @@ class PrototypeStructureTests(unittest.TestCase):
 
     def test_instrument_art_uses_independent_images_without_distortion(self):
         self.assertIn('object-fit:contain', HTML)
-        self.assertIn('assets/instruments/instrument_soprano_sax.png', HTML)
+        self.assertIn("'soprano-sax':'instrument_soprano_sax.png'", JS)
+        self.assertIn("picture.src = `../assets/instruments/${artwork}`", JS)
+        self.assertIn('id="instrument-picture" alt="当前加载的乐器" hidden', HTML)
         self.assertNotIn('instrument-saxophones.png', JS)
         for filename in ("instrument_soprano_sax.png", "instrument_trumpet.png",
                          "instrument_flute.png", "instrument_violin.png"):

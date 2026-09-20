@@ -35,7 +35,7 @@ public:
                      true, true, true, true, true, true };
         if (contains(name, "yds-") || contains(name, "yamaha"))
             return { "yamaha-yds", "Yamaha YDS", 11, 11, 2, 0.95f, 0.28f,
-                     false, true, true, true, true, true };
+                     false, true, false, false, true, true };
         if (contains(name, "ewi") || contains(name, "akai"))
             return { "akai-ewi", "Akai EWI", 2, 11, 2, 0.85f, 0.24f,
                      true, true, true, false, true, true };

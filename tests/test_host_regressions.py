@@ -144,6 +144,19 @@ class HostRegressionTests(unittest.TestCase):
         self.assertNotIn("midi.setTechniqueMappings(preset.techniqueMappings)", MAIN)
         self.assertNotIn("midi.setBreathController(preset.breathController)", MAIN)
 
+    def test_intelligent_techniques_are_instrument_specific_and_drive_real_parameters(self):
+        processor = (ROOT / "native" / "Source" / "IntelligentTechniqueProcessor.h").read_text(encoding="utf-8")
+        advisor = (ROOT / "native" / "Source" / "TechniqueAdvisor.h").read_text(encoding="utf-8")
+        self.assertIn("setTechniqueConfiguration", MAIN)
+        self.assertIn("updateBreathDrivenTechniques", MIDI)
+        self.assertIn("onsetGuardMs", processor)
+        self.assertIn("PerformanceTechnique::vibrato", processor)
+        self.assertIn('device.id == "yamaha-yds"', advisor)
+        self.assertIn("TechniqueControlMode::breath", advisor)
+        self.assertIn("pluginHost.getPluginIdentifier().hashCode64()", MAIN)
+        self.assertIn('name.contains("portamento")', HOST)
+        self.assertIn('name.contains("bowpressure")', HOST)
+
     def test_smart_mix_separates_instrument_and_accompaniment(self):
         instrument = HOST.index("masterOutput->processInstrument")
         accompaniment = HOST.index("accompaniment->mixInto", instrument)

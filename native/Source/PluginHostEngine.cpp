@@ -409,6 +409,39 @@ void PluginHostEngine::resolveTechniqueParameters()
         else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::flutter)] == nullptr
                  && name.contains("flutter"))
             techniqueParameters[static_cast<size_t>(PerformanceTechnique::flutter)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::portamento)] == nullptr
+                 && name.contains("portamento") && ! name.contains("split"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::portamento)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::fall)] == nullptr
+                 && (name.contains("falldown") || name == "fall" || name.contains("doit")))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::fall)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::overblow)] == nullptr
+                 && name.contains("overblow"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::overblow)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::breathNoise)] == nullptr
+                 && name.contains("breathnoise"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::breathNoise)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::alternateFingering)] == nullptr
+                 && (name.contains("altfingering") || name.contains("alternatefingering")))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::alternateFingering)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::mute)] == nullptr
+                 && (name == "mute" || name.contains("mutestate") || name.contains("handmute")))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::mute)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::halfValve)] == nullptr
+                 && name.contains("halfvalve"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::halfValve)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::legato)] == nullptr
+                 && (name == "legato" || name.contains("legatomode")))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::legato)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::bowPressure)] == nullptr
+                 && name.contains("bowpressure"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::bowPressure)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::pizzicato)] == nullptr
+                 && (name.contains("pizzicato") || name == "pizz"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::pizzicato)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::tremolo)] == nullptr
+                 && name.contains("tremolo"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::tremolo)] = parameter;
     }
 }
 
