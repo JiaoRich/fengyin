@@ -58,6 +58,7 @@ private:
     void activatePluginOutput(const juce::String& pluginName);
     void showActivationDialog();
     void refreshLicenseUi();
+    void emitLicenseState(const fengyin::LicenseStatus& status);
     void toggleRecording();
     void showDeviceSettings();
     void emitAudioSettingsState(bool success = true, const juce::String& message = {});
@@ -137,6 +138,10 @@ private:
     bool effectLoading = false;
     bool attemptedDefaultPreset = false;
     bool isActivated = false;
+    bool isPermanent = false;
+    bool featureAudioEnabled = true;
+    int licensePollTicks = 0;
+    fengyin::LicenseStatus currentLicenseStatus;
     std::unique_ptr<juce::AlertWindow> activationDialog;
     std::unique_ptr<juce::AlertWindow> deviceDialog;
     std::unique_ptr<juce::AlertWindow> midiDialog;

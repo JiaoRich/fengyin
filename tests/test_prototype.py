@@ -27,6 +27,13 @@ class PrototypeStructureTests(unittest.TestCase):
         ):
             self.assertIn(f'id="{control_id}"', HTML)
 
+    def test_trial_entry_and_expiry_lock_exist(self):
+        for control_id in ("start-trial", "license-lock", "license-lock-primary", "license-lock-activate"):
+            self.assertIn(f'id="{control_id}"', HTML)
+        self.assertIn("nativeEvent('startTrial')", JS)
+        self.assertIn("renderLicenseState", JS)
+        self.assertIn("trialRemainingSeconds", JS)
+
     def test_only_one_page_starts_active(self):
         active_pages = re.findall(r'<section class="page active"', HTML)
         self.assertEqual(1, len(active_pages))

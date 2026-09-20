@@ -528,6 +528,64 @@ $('#smart-audio').addEventListener('change', event => {
   toast(event.target.checked ? '智能音频优化已开启' : '智能音频优化已关闭');
 });
 
+function trialTimeText(seconds) {
+  const safe = Math.max(0, Number(seconds) || 0);
+  const days = Math.floor(safe / 86400);
+  const hours = Math.ceil((safe % 86400) / 3600);
+  return days > 0 ? `${days}天${hours ? `${hours}小时` : ''}` : `${Math.max(1, hours)}小时`;
+}
+
+function renderLicenseState(state = {}) {
+  const permanent = !!state.activated;
+  const trialActive = !!state.trialActive;
+  const trialExpired = !!state.trialExpired;
+  const lock = $('#license-lock');
+  $('#license-title').classList.toggle('green', permanent || trialActive);
+  $('#start-trial').hidden = permanent || trialActive || trialExpired;
+  if (permanent) {
+    $('#license-title').textContent = '已永久激活';
+    lock.hidden = true;
+    return;
+  }
+  if (trialActive) {
+    $('#license-title').textContent = `完整试用中 · 剩余${trialTimeText(state.trialRemainingSeconds)}`;
+    lock.hidden = true;
+    return;
+  }
+  lock.hidden = false;
+  $('#license-lock-primary').dataset.action = trialExpired ? 'activate' : 'trial';
+  $('#license-lock-primary').textContent = trialExpired ? '输入永久激活码' : '开始3天完整试用';
+  $('#license-lock-kicker').textContent = trialExpired ? '完整试用已结束' : '欢迎使用风吟';
+  $('#license-lock-title').textContent = trialExpired ? '激活后继续演奏' : '开始3天完整试用';
+  $('#license-lock-message').textContent = trialExpired
+    ? '试用期间保存的设置会继续保留。完成永久激活后，全部功能会立即恢复。'
+    : '请准备好电吹管和软音源后再开始。点击后将连续计算72小时，全部功能均可使用。';
+  $('#license-title').textContent = trialExpired ? '3天试用已结束' : '可开始3天完整试用';
+}
+
+function startFullTrial() {
+  if (window.__JUCE__?.backend?.emitEvent) {
+    nativeEvent('startTrial');
+    toast('正在开始3天完整试用…');
+    return;
+  }
+  const startedAt = Date.now();
+  localStorage.setItem('fengyin-prototype-trial-start', String(startedAt));
+  renderLicenseState({trialActive:true, trialRemainingSeconds:3*24*60*60});
+  toast('3天完整试用已开始');
+}
+
+$('#start-trial').addEventListener('click', startFullTrial);
+$('#license-lock-primary').addEventListener('click', event => {
+  if (event.currentTarget.dataset.action === 'activate') return nativeEvent('showActivation');
+  startFullTrial();
+});
+$('#license-lock-activate').addEventListener('click', () => nativeEvent('showActivation'));
+$('#license-lock-copy').addEventListener('click', () => {
+  nativeEvent('copyMachineCode');
+  toast('机器码已复制');
+});
+
 $('#activate').addEventListener('click', () => {
   if (window.__JUCE__?.backend?.emitEvent) {
     const code = $('#license-code').value.trim();
@@ -539,8 +597,7 @@ $('#activate').addEventListener('click', () => {
   const code = $('#license-code').value.trim();
   if (code.length < 8) return toast('请输入至少 8 位激活码');
   localStorage.setItem('fengyin-prototype-license','active');
-  $('#license-title').textContent = '已永久激活';
-  $('#license-title').classList.add('green');
+  renderLicenseState({activated:true});
   toast('原型激活成功');
 });
 
@@ -764,10 +821,7 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
     presetListSignature = nextPresetSignature;
     renderPresets();
   }
-  if (state.activated) {
-    $('#license-title').textContent = '已永久激活';
-    $('#license-title').classList.add('green');
-  }
+  renderLicenseState(state);
   if (state.machineCode) $('#machine-code').textContent = `本机识别码：${state.machineCode}`;
   recording = !!state.recording;
   $('#record').textContent = recording ? '■ 停止录音' : '● 开始录音';
@@ -801,13 +855,10 @@ window.__JUCE__?.backend?.addEventListener('presetLoadResult', result => {
     toast(`已载入：${pending.name}`);
   }
 });
-window.__JUCE__?.backend?.addEventListener('activationResult', result => {
-  if (result.activated) {
-    $('#license-title').textContent = '已永久激活';
-    $('#license-title').classList.add('green');
-    $('#license-code').value = '';
-  }
-  toast(result.message || (result.activated ? '激活成功' : '无法激活'));
+window.__JUCE__?.backend?.addEventListener('licenseStateResult', result => {
+  renderLicenseState(result);
+  if (result.activated) $('#license-code').value = '';
+  toast(result.message || (result.featuresUnlocked ? '可以开始使用' : '无法继续'));
 });
 window.__JUCE__?.backend?.addEventListener('editorResult', message => toast(String(message || '')));
 window.__JUCE__?.backend?.addEventListener('videoSelected', result => {
@@ -871,9 +922,17 @@ nativeEvent('webReady');
 renderSmartAdapter({});
 renderTechniqueMappings();
 showInstrumentArtwork('soprano-sax', '高音萨克斯');
-if(localStorage.getItem('fengyin-prototype-license') === 'active') {
-  $('#license-title').textContent = '已永久激活';
-  $('#license-title').classList.add('green');
+// 浏览器原型使用 localStorage 模拟试用；正式软件等待本地授权服务回传状态。
+// 这样已永久激活的用户启动时不会短暂看到“开始试用”遮罩。
+if (!window.__JUCE__?.backend?.emitEvent) {
+  if(localStorage.getItem('fengyin-prototype-license') === 'active') renderLicenseState({activated:true});
+  else {
+    const trialStartedAt = Number(localStorage.getItem('fengyin-prototype-trial-start') || 0);
+    const trialRemaining = Math.max(0, 3*24*60*60 - Math.floor((Date.now() - trialStartedAt) / 1000));
+    renderLicenseState(trialStartedAt > 0 && trialRemaining > 0
+      ? {trialActive:true, trialRemainingSeconds:trialRemaining}
+      : {trialExpired:trialStartedAt > 0});
+  }
 }
 
 const canvas = $('#spectrum');

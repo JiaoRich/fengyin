@@ -93,6 +93,26 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('withEventListener("requestAudioSettings"', MAIN)
         self.assertIn('emitEventIfBrowserIsVisible("audioSettingsState"', MAIN)
 
+    def test_audio_setup_uses_real_driver_capabilities_and_runtime_stability(self):
+        audio_device = (ROOT / "native" / "Source" / "AudioDeviceService.cpp").read_text(encoding="utf-8")
+        self.assertIn("recommendedInitialBuffer", audio_device)
+        self.assertIn('containsIgnoreCase("ASIO4ALL")', audio_device)
+        self.assertIn("getAvailableBufferSizes()", audio_device)
+        self.assertIn("manager.getCpuUsage() >= 0.82", audio_device)
+        self.assertIn("audio.stabiliseAfterXRuns()", MAIN)
+
+    def test_three_day_trial_unlocks_features_and_expires_safely(self):
+        license_header = (ROOT / "native" / "Source" / "LicenseService.h").read_text(encoding="utf-8")
+        license_source = (ROOT / "native" / "Source" / "LicenseService.cpp").read_text(encoding="utf-8")
+        self.assertIn("trialActive", license_header)
+        self.assertIn("trialExpired", license_header)
+        self.assertIn("startTrial", license_source)
+        self.assertIn("3 * 24 * 60 * 60", license_source)
+        self.assertIn("clockRolledBack", license_source)
+        self.assertIn('withEventListener("startTrial"', MAIN)
+        self.assertIn("currentLicenseStatus.canUseFeatures()", MAIN)
+        self.assertIn("midi.setPerformanceSink(nullptr)", MAIN)
+
     def test_connection_runs_automatic_breath_adaptation(self):
         self.assertIn("automaticBreathDetectionActive = true", MAIN)
         self.assertIn("midi.beginBreathDetection()", MAIN)

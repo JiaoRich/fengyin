@@ -301,15 +301,17 @@ void MainComponent::setupWebInterface()
         })
         .withEventListener("setTranspose", [this](juce::var payload)
         {
-            midi.setTransposeSemitones(static_cast<int>(payload.getProperty("semitones", 0)));
+            if (isActivated)
+                midi.setTransposeSemitones(static_cast<int>(payload.getProperty("semitones", 0)));
         })
         .withEventListener("setKeyTranspose", [this](juce::var payload)
         {
-            midi.setTargetKey(static_cast<int>(payload.getProperty("targetKey", 0)));
+            if (isActivated)
+                midi.setTargetKey(static_cast<int>(payload.getProperty("targetKey", 0)));
         })
         .withEventListener("beginKeyCalibration", [this](juce::var)
         {
-            midi.beginKeyCalibration();
+            if (isActivated) midi.beginKeyCalibration();
         })
         .withEventListener("cancelKeyCalibration", [this](juce::var)
         {
@@ -319,9 +321,14 @@ void MainComponent::setupWebInterface()
         {
             juce::SystemClipboard::copyTextToClipboard(machineCode);
         })
-        .withEventListener("chooseVideo", [this](juce::var) { chooseVideoForWebInterface(); })
+        .withEventListener("chooseVideo", [this](juce::var) { if (isActivated) chooseVideoForWebInterface(); })
         .withEventListener("setVideoPlaybackState", [this](juce::var payload)
         {
+            if (! isActivated)
+            {
+                accompaniment.pause();
+                return;
+            }
             videoPlaybackActive = static_cast<bool>(payload.getProperty("playing", false));
             webVideoPosition = static_cast<double>(payload.getProperty("position", webVideoPosition));
             audioOutputSyncTicks = 0;
@@ -356,7 +363,8 @@ void MainComponent::setupWebInterface()
         })
         .withEventListener("setPerformanceReverb", [this](juce::var payload)
         {
-            masterOutput.setReverbMix(static_cast<float>(static_cast<double>(payload.getProperty("value", 0.28))));
+            if (isActivated)
+                masterOutput.setReverbMix(static_cast<float>(static_cast<double>(payload.getProperty("value", 0.28))));
         })
         .withEventListener("setSmartOptimisation", [this](juce::var payload)
         {
@@ -434,7 +442,7 @@ void MainComponent::setupWebInterface()
         .withEventListener("showMidiSetup", [this](juce::var) { showMidiSetup(); })
         .withEventListener("showExpressionSettings", [this](juce::var) { showExpressionSettings(); })
         .withEventListener("showAudioSettings", [this](juce::var) { showDeviceSettings(); })
-        .withEventListener("toggleRecording", [this](juce::var) { toggleRecording(); })
+        .withEventListener("toggleRecording", [this](juce::var) { if (isActivated || recorder.isRecording()) toggleRecording(); })
         .withEventListener("showRecordings", [](juce::var)
         {
             const auto folder = fengyin::RecordingService::getRecordingsFolder();
@@ -445,13 +453,13 @@ void MainComponent::setupWebInterface()
         {
             const auto status = license.activate(payload.getProperty("code", juce::String()).toString());
             refreshLicenseUi();
-            if (webInterface != nullptr)
-            {
-                auto result = std::make_unique<juce::DynamicObject>();
-                result->setProperty("activated", status.activated);
-                result->setProperty("message", status.message);
-                webInterface->emitEventIfBrowserIsVisible("activationResult", juce::var(result.release()));
-            }
+            emitLicenseState(status);
+        })
+        .withEventListener("startTrial", [this](juce::var)
+        {
+            const auto status = license.startTrial();
+            refreshLicenseUi();
+            emitLicenseState(status);
         })
         .withEventListener("showActivation", [this](juce::var) { showActivationDialog(); })
         .withResourceProvider([](const juce::String& path) { return getWebResource(path); });
@@ -890,6 +898,11 @@ void MainComponent::resized()
 
 void MainComponent::timerCallback()
 {
+    if (++licensePollTicks >= 300)
+    {
+        licensePollTicks = 0;
+        refreshLicenseUi();
+    }
     if (++midiConnectionPollCounter >= 30)
     {
         midiConnectionPollCounter = 0;
@@ -1012,7 +1025,12 @@ void MainComponent::timerCallback()
         state->setProperty("pluginLatency", pluginLatencyMs);
         state->setProperty("audioCpu", currentAudio.cpuUsage);
         state->setProperty("audioXruns", currentAudio.xRunCount);
-        state->setProperty("activated", isActivated);
+        state->setProperty("activated", currentLicenseStatus.activated);
+        state->setProperty("featuresUnlocked", currentLicenseStatus.canUseFeatures());
+        state->setProperty("trialActive", currentLicenseStatus.trialActive);
+        state->setProperty("trialExpired", currentLicenseStatus.trialExpired);
+        state->setProperty("trialRemainingSeconds", currentLicenseStatus.trialRemainingSeconds);
+        state->setProperty("licenseMessage", currentLicenseStatus.message);
         state->setProperty("machineCode", machineCode);
         state->setProperty("recording", recorder.isRecording());
         state->setProperty("transposeSemitones", midi.getTransposeSemitones());
@@ -1536,7 +1554,7 @@ juce::File MainComponent::getOnboardingMarkerFile()
 void MainComponent::showSetupGuide(bool automatic)
 {
     if (setupGuideDialog != nullptr) return;
-    const auto licenseReady = license.getStatus().activated;
+    const auto licenseReady = license.getStatus().canUseFeatures();
     const auto midiReady = midi.getSnapshot().deviceConnected;
     const auto audioReady = audio.getStatus().ready;
     const auto pluginsReady = ! pluginCatalog.getPlugins().isEmpty();
@@ -1547,7 +1565,7 @@ void MainComponent::showSetupGuide(bool automatic)
                  + utf8("3. 声音设备：") + mark(audioReady) + "\n"
                  + utf8("4. SWAM 音源：") + mark(pluginsReady) + "\n\n";
     const juce::String instructions[] {
-        {}, utf8("先完成永久激活。软件会显示本机码，收到激活码后粘贴一次即可。"),
+        {}, utf8("您可以先开始3天完整试用，满意后再永久激活。"),
         utf8("请连接并打开电吹管，然后运行连接向导。"),
         utf8("请检查声音设备。推荐 ASIO、48000 Hz、缓冲区 128。"),
         utf8("最后扫描电脑中的 SWAM/VST3 音源。首次扫描可能需要一些时间。"),
@@ -1557,7 +1575,7 @@ void MainComponent::showSetupGuide(bool automatic)
     setupGuideDialog = std::make_unique<juce::AlertWindow>(automatic ? utf8("欢迎使用风吟") : utf8("风吟使用向导"), message,
                                                             nextStep == 5 ? juce::MessageBoxIconType::InfoIcon
                                                                           : juce::MessageBoxIconType::QuestionIcon);
-    const juce::String buttonLabels[] { {}, utf8("去激活"), utf8("连接电吹管"), utf8("声音设置"), utf8("扫描音源"), utf8("完成") };
+    const juce::String buttonLabels[] { {}, utf8("试用或激活"), utf8("连接电吹管"), utf8("声音设置"), utf8("扫描音源"), utf8("完成") };
     setupGuideDialog->addButton(buttonLabels[nextStep], 1, juce::KeyPress(juce::KeyPress::returnKey));
     setupGuideDialog->addButton(automatic ? utf8("稍后再说") : utf8("关闭"), 0, juce::KeyPress(juce::KeyPress::escapeKey));
     setupGuideDialog->enterModalState(true, juce::ModalCallbackFunction::create([this, nextStep](int result)
@@ -1695,11 +1713,59 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName)
 
 void MainComponent::refreshLicenseUi()
 {
-    const auto status = license.getStatus();
-    isActivated = status.activated;
-    licenseButton.setButtonText(status.activated ? utf8("✓ 永久版") : utf8("激活软件"));
+    currentLicenseStatus = license.getStatus();
+    isPermanent = currentLicenseStatus.activated;
+    isActivated = currentLicenseStatus.canUseFeatures();
+
+    if (isPermanent)
+        licenseButton.setButtonText(utf8("✓ 永久版"));
+    else if (currentLicenseStatus.trialActive)
+    {
+        const auto hours = juce::jmax<juce::int64>(1, (currentLicenseStatus.trialRemainingSeconds + 3599) / 3600);
+        licenseButton.setButtonText(utf8("试用剩余 ") + juce::String(hours) + utf8(" 小时"));
+    }
+    else if (currentLicenseStatus.trialExpired)
+        licenseButton.setButtonText(utf8("试用已到期 · 去激活"));
+    else
+        licenseButton.setButtonText(utf8("开始3天试用"));
     licenseButton.setColour(juce::TextButton::buttonColourId,
-                            status.activated ? juce::Colour(0xff176b57) : juce::Colour(0xff7a4d16));
+                            isPermanent ? juce::Colour(0xff176b57)
+                                        : currentLicenseStatus.trialActive ? juce::Colour(0xff17617a)
+                                                                           : juce::Colour(0xff7a4d16));
+
+    if (featureAudioEnabled != isActivated)
+    {
+        if (! isActivated)
+        {
+            if (recorder.isRecording()) recorder.stop();
+            accompaniment.pause();
+            videoPlaybackActive = false;
+            midi.setPerformanceSink(nullptr);
+            pluginHost.detach();
+            audio.getDeviceManager().removeAudioCallback(&testSynth);
+        }
+        else if (pluginHost.hasPlugin())
+            activatePluginOutput(pluginHost.getPluginName());
+        else
+        {
+            audio.getDeviceManager().addAudioCallback(&testSynth);
+            midi.setPerformanceSink(&testSynth);
+        }
+        featureAudioEnabled = isActivated;
+    }
+}
+
+void MainComponent::emitLicenseState(const fengyin::LicenseStatus& status)
+{
+    if (webInterface == nullptr) return;
+    auto result = std::make_unique<juce::DynamicObject>();
+    result->setProperty("activated", status.activated);
+    result->setProperty("featuresUnlocked", status.canUseFeatures());
+    result->setProperty("trialActive", status.trialActive);
+    result->setProperty("trialExpired", status.trialExpired);
+    result->setProperty("trialRemainingSeconds", status.trialRemainingSeconds);
+    result->setProperty("message", status.message);
+    webInterface->emitEventIfBrowserIsVisible("licenseStateResult", juce::var(result.release()));
 }
 
 void MainComponent::showActivationDialog()
@@ -1713,11 +1779,18 @@ void MainComponent::showActivationDialog()
         return;
     }
 
-    activationDialog = std::make_unique<juce::AlertWindow>(utf8("激活风吟"),
-        utf8("请把下面的本机码发给安装人员，收到激活码后粘贴到输入框。\n\n本机码：") + license.getMachineCode(),
+    auto explanation = current.trialExpired
+        ? utf8("3天完整试用已经结束。请输入永久激活码后继续使用。")
+        : current.trialActive
+            ? utf8("当前正在完整试用。您也可以随时输入永久激活码。")
+            : utf8("您可以立即开始3天完整试用，或输入永久激活码。试用开始后会连续计算72小时。 ");
+    activationDialog = std::make_unique<juce::AlertWindow>(utf8("试用与激活风吟"),
+        explanation + utf8("\n\n本机码：") + license.getMachineCode(),
         juce::MessageBoxIconType::QuestionIcon);
     activationDialog->addTextEditor("code", {}, utf8("唯一激活码"));
     activationDialog->addButton(utf8("确认激活"), 1, juce::KeyPress(juce::KeyPress::returnKey));
+    if (! current.trialActive && ! current.trialExpired)
+        activationDialog->addButton(utf8("开始3天完整试用"), 2);
     activationDialog->addButton(utf8("取消"), 0, juce::KeyPress(juce::KeyPress::escapeKey));
     activationDialog->enterModalState(true, juce::ModalCallbackFunction::create([this](int result)
     {
@@ -1725,9 +1798,21 @@ void MainComponent::showActivationDialog()
         {
             const auto status = license.activate(activationDialog->getTextEditorContents("code"));
             refreshLicenseUi();
+            emitLicenseState(status);
             juce::AlertWindow::showMessageBoxAsync(status.activated ? juce::MessageBoxIconType::InfoIcon
                                                                     : juce::MessageBoxIconType::WarningIcon,
                                                    status.activated ? utf8("激活成功") : utf8("无法激活"), status.message);
+        }
+        else if (result == 2)
+        {
+            const auto status = license.startTrial();
+            refreshLicenseUi();
+            emitLicenseState(status);
+            juce::AlertWindow::showMessageBoxAsync(status.trialActive ? juce::MessageBoxIconType::InfoIcon
+                                                                       : juce::MessageBoxIconType::WarningIcon,
+                                                   status.trialActive ? utf8("完整试用已开始") : utf8("无法开始试用"),
+                                                   status.trialActive ? utf8("从现在起72小时内，风吟全部功能均可使用。")
+                                                                      : status.message);
         }
         activationDialog.reset();
     }), false);

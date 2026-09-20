@@ -3,7 +3,7 @@
 
 namespace
 {
-constexpr int currentAudioSetupRevision = 2;
+constexpr int currentAudioSetupRevision = 3;
 
 int chooseLiveBufferSize(juce::Array<int> sizes, int preferred)
 {
@@ -19,6 +19,16 @@ int chooseLiveBufferSize(juce::Array<int> sizes, int preferred)
             return size;
 
     return sizes.getLast();
+}
+
+int recommendedInitialBuffer(const juce::String& deviceType)
+{
+    const auto cpuCount = juce::SystemStats::getNumCpus();
+    const auto memoryMb = juce::SystemStats::getMemorySizeInMegabytes();
+    const auto modestComputer = cpuCount <= 4 || (memoryMb > 0 && memoryMb < 8192);
+    if (deviceType.containsIgnoreCase("ASIO"))
+        return modestComputer ? 128 : 64;
+    return modestComputer ? 256 : 128;
 }
 }
 
@@ -187,6 +197,26 @@ juce::String AudioDeviceService::preferredLiveDeviceType()
 {
     const auto types = getAvailableDeviceTypes();
    #if JUCE_WINDOWS
+    // 已经成功打开厂家 ASIO 时优先保留；不要为了“自动”而切回系统驱动。
+    if (auto* current = manager.getCurrentAudioDevice())
+        if (current->isOpen() && current->getTypeName().containsIgnoreCase("ASIO"))
+            return manager.getCurrentAudioDeviceType();
+
+    // 只有唯一且明确属于硬件厂家的 ASIO 输出时才自动选择。
+    // ASIO4ALL/Generic 等包装驱动往往需要用户手工路由，不适合作为“插上就吹”的默认值。
+    for (const auto& typeName : types)
+    {
+        if (! typeName.containsIgnoreCase("ASIO")) continue;
+        if (auto* type = findType(typeName))
+        {
+            type->scanForDevices();
+            const auto outputs = type->getDeviceNames(false);
+            if (outputs.size() == 1
+                && ! outputs[0].containsIgnoreCase("ASIO4ALL")
+                && ! outputs[0].containsIgnoreCase("Generic"))
+                return typeName;
+        }
+    }
     for (const auto& type : types)
         if (type.containsIgnoreCase("Low Latency Mode")
             || type.containsIgnoreCase(juce::String::fromUTF8("低延迟")))
@@ -225,7 +255,8 @@ juce::String AudioDeviceService::configureAutomaticType(const juce::String& type
         const auto rates = device->getAvailableSampleRates();
         if (rates.contains(48000.0)) setup.sampleRate = 48000.0;
 
-        setup.bufferSize = chooseLiveBufferSize(device->getAvailableBufferSizes(), 128);
+        setup.bufferSize = chooseLiveBufferSize(device->getAvailableBufferSizes(),
+                                                recommendedInitialBuffer(typeName));
     }
     else
     {
@@ -316,7 +347,7 @@ juce::String AudioDeviceService::optimiseForLivePerformance()
     if (rates.contains(48000.0))
         setup.sampleRate = 48000.0;
 
-    const auto preferred = device->getTypeName().containsIgnoreCase("ASIO") ? 64 : 128;
+    const auto preferred = recommendedInitialBuffer(device->getTypeName());
     const auto chosen = chooseLiveBufferSize(device->getAvailableBufferSizes(), preferred);
     setup.bufferSize = chosen;
 
@@ -344,7 +375,8 @@ bool AudioDeviceService::stabiliseAfterXRuns()
     if (device == nullptr || ! device->isOpen()) return false;
     const auto xruns = manager.getXRunCount();
     if (xruns < 0) return false;
-    if (xruns > observedXRunCount)
+    const auto cpuOverloaded = manager.getCpuUsage() >= 0.82;
+    if (xruns > observedXRunCount || cpuOverloaded)
         ++unstablePolls;
     else
         unstablePolls = 0;
@@ -357,6 +389,8 @@ bool AudioDeviceService::stabiliseAfterXRuns()
     int next = 0;
     for (const auto candidate : buffers)
         if (candidate > setup.bufferSize && candidate <= 256) { next = candidate; break; }
+    if (next == 0 && buffers.isEmpty() && setup.bufferSize < 256)
+        next = setup.bufferSize < 128 ? 128 : 256;
     if (next == 0) return false;
     setup.bufferSize = next;
     setup.inputDeviceName.clear();
