@@ -378,6 +378,8 @@ void MainComponent::setupWebInterface()
             const auto style = fengyin::ToneStyleCatalog::find(instrumentKey,
                 payload.getProperty("id", "natural").toString());
             currentToneStyleId = style.id;
+            currentPresetDisplayName.clear();
+            currentPresetIsCustom = false;
             currentBaseToneSettings = style.settings;
             masterOutput.setToneStyle(style.settings);
         })
@@ -436,9 +438,7 @@ void MainComponent::setupWebInterface()
                 }
                 return;
             }
-            const auto family = pluginHost.hasPlugin()
-                ? fengyin::SwamPluginClassifier::classify(pluginHost.getPluginName().toStdString(), {})
-                : fengyin::SwamFamily::notSwam;
+            const auto family = currentTechniqueFamily();
             const auto target = static_cast<fengyin::PerformanceTechnique>(technique);
             const auto advice = fengyin::TechniqueAdvisor::advise(midi.getActiveProfile(), family, target);
             if (! pluginHost.hasPlugin() || ! advice.relevantToInstrument || ! pluginHost.supportsTechnique(target))
@@ -449,17 +449,6 @@ void MainComponent::setupWebInterface()
                     result->setProperty("success", false);
                     result->setProperty("message", ! advice.relevantToInstrument ? utf8("当前乐器不需要这项技巧")
                                                                                 : utf8("当前音源没有开放这项技巧参数"));
-                    webInterface->emitEventIfBrowserIsVisible("techniqueLearnResult", juce::var(result.release()));
-                }
-                return;
-            }
-            if (! advice.hardwareAvailable && midi.getActiveProfile().id != "generic-wind-controller")
-            {
-                if (webInterface != nullptr)
-                {
-                    auto result = std::make_unique<juce::DynamicObject>();
-                    result->setProperty("success", false);
-                    result->setProperty("message", utf8("当前电吹管没有适合这项技巧的硬件控制器，已使用气息智能"));
                     webInterface->emitEventIfBrowserIsVisible("techniqueLearnResult", juce::var(result.release()));
                 }
                 return;
@@ -479,14 +468,6 @@ void MainComponent::setupWebInterface()
             else if (modeText == "hardware") mode = fengyin::TechniqueControlMode::hardware;
             else if (modeText == "hybrid") mode = fengyin::TechniqueControlMode::hybrid;
             else if (modeText == "off") mode = fengyin::TechniqueControlMode::off;
-            const auto family = pluginHost.hasPlugin()
-                ? fengyin::SwamPluginClassifier::classify(pluginHost.getPluginName().toStdString(), {})
-                : fengyin::SwamFamily::notSwam;
-            const auto advice = fengyin::TechniqueAdvisor::advise(midi.getActiveProfile(), family, target);
-            if ((mode == fengyin::TechniqueControlMode::hardware || mode == fengyin::TechniqueControlMode::hybrid)
-                && ! advice.hardwareAvailable && midi.getActiveProfile().id != "generic-wind-controller")
-                mode = fengyin::IntelligentTechniqueProcessor::canUseBreath(target)
-                    ? fengyin::TechniqueControlMode::breath : fengyin::TechniqueControlMode::automatic;
             auto mappings = midi.getTechniqueMappings();
             auto found = false;
             for (auto& mapping : mappings)
@@ -1177,10 +1158,10 @@ void MainComponent::timerCallback()
         state->setProperty("effectLoaded", pluginHost.hasEffect());
         state->setProperty("effectLoading", effectLoading);
         state->setProperty("presetEditing", editingPresetId.isNotEmpty());
+        state->setProperty("activePresetName", currentPresetDisplayName);
+        state->setProperty("activePresetCustom", currentPresetIsCustom);
         state->setProperty("techniqueLearning", activeTechniqueLearn);
-        const auto currentFamily = pluginHost.hasPlugin()
-            ? fengyin::SwamPluginClassifier::classify(currentPluginName.toStdString(), {})
-            : fengyin::SwamFamily::notSwam;
+        const auto currentFamily = currentTechniqueFamily();
         state->setProperty("instrumentFamily", utf8(fengyin::SwamPluginClassifier::familyChineseName(currentFamily)));
         juce::Array<juce::var> techniqueMappings;
         for (int technique = 0; technique < static_cast<int>(fengyin::PerformanceTechnique::count); ++technique)
@@ -1242,6 +1223,26 @@ void MainComponent::timerCallback()
         juce::Array<juce::var> effects;
         for (const auto& effect : cachedEffectPlugins) effects.add(effect.name);
         state->setProperty("instruments", juce::var(instruments));
+        juce::Array<juce::var> kongInstruments;
+        if (pluginHost.hasPlugin() && currentPluginBrand == "kong")
+        {
+            auto programs = pluginHost.getProgramNames();
+            const auto currentProgram = pluginHost.getCurrentProgramName();
+            if (currentProgram.isNotEmpty()) programs.addIfNotAlreadyThere(currentProgram);
+            juce::StringArray addedKeys;
+            for (const auto& program : programs)
+                if (const auto* definition = fengyin::KongInstrumentCatalog::matchProgram(program))
+                    if (! addedKeys.contains(definition->key))
+                    {
+                        auto item = std::make_unique<juce::DynamicObject>();
+                        item->setProperty("key", definition->key);
+                        item->setProperty("name", utf8(definition->chineseName));
+                        item->setProperty("program", program);
+                        kongInstruments.add(juce::var(item.release()));
+                        addedKeys.add(definition->key);
+                    }
+        }
+        state->setProperty("kongInstruments", juce::var(kongInstruments));
         state->setProperty("effects", juce::var(effects));
         juce::Array<juce::var> presets;
         for (const auto& preset : cachedPresets)
@@ -1439,6 +1440,8 @@ void MainComponent::loadSelectedPlugin()
     }
 
     const auto brand = fengyin::SupportedInstrumentClassifier::classify(chosen.name, chosen.manufacturerName);
+    currentPresetDisplayName.clear();
+    currentPresetIsCustom = false;
     currentPluginBrand = brand == fengyin::SupportedInstrumentClassifier::Brand::kong ? "kong" : "swam";
     if (currentPluginBrand == "swam")
     {
@@ -1491,6 +1494,28 @@ void MainComponent::loadKongInstrument(const juce::String& instrumentKey, const 
 {
     const auto* definition = fengyin::KongInstrumentCatalog::find(instrumentKey);
     if (definition == nullptr) return;
+    const auto aliases = juce::StringArray::fromTokens(definition->programAliases, "|", "");
+    if (pluginHost.hasPlugin() && currentPluginBrand == "kong")
+    {
+        currentInstrumentKey = instrumentKey;
+        currentInstrumentChineseName = instrumentName.isNotEmpty() ? instrumentName : utf8(definition->chineseName);
+        currentPresetDisplayName.clear();
+        currentPresetIsCustom = false;
+        const auto selected = pluginHost.selectProgramByAliases(aliases);
+        activatePluginOutput(pluginHost.getPluginName());
+        pluginStatus.setText(selected ? utf8("已载入：") + currentInstrumentChineseName
+                                      : utf8("请在空音界面选择“") + currentInstrumentChineseName + utf8("”"),
+                             juce::dontSendNotification);
+        if (! selected) pluginHost.showPluginEditor(false);
+        if (webInterface != nullptr)
+        {
+            auto result = std::make_unique<juce::DynamicObject>();
+            result->setProperty("success", true);
+            result->setProperty("message", pluginStatus.getText());
+            webInterface->emitEventIfBrowserIsVisible("pluginLoadResult", juce::var(result.release()));
+        }
+        return;
+    }
     juce::PluginDescription chosen;
     bool found = false;
     for (const auto& candidate : cachedInstrumentPlugins)
@@ -1515,6 +1540,8 @@ void MainComponent::loadKongInstrument(const juce::String& instrumentKey, const 
         return;
     }
     currentPluginBrand = "kong";
+    currentPresetDisplayName.clear();
+    currentPresetIsCustom = false;
     currentInstrumentKey = instrumentKey;
     currentInstrumentChineseName = instrumentName.isNotEmpty() ? instrumentName : utf8(definition->chineseName);
     const auto status = audio.getStatus();
@@ -1522,7 +1549,7 @@ void MainComponent::loadKongInstrument(const juce::String& instrumentKey, const 
     pluginStatus.setText(utf8("正在载入空音·") + currentInstrumentChineseName, juce::dontSendNotification);
     pluginHost.loadAsync(chosen, status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
         status.bufferSize > 0 ? status.bufferSize : 128,
-        [this, aliases = juce::StringArray::fromTokens(definition->programAliases, "|", "")](bool success, const juce::String& message)
+        [this, aliases](bool success, const juce::String& message)
         {
             pluginLoading = false;
             if (! success)
@@ -1716,7 +1743,8 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
     if (name.isEmpty() || ! pluginHost.hasPlugin()) return;
     fengyin::SoundPreset preset;
     for (const auto& existing : cachedPresets)
-        if (existing.name.equalsIgnoreCase(name) && existing.pluginBrand == currentPluginBrand)
+        if ((editingPresetId.isNotEmpty() && existing.id == editingPresetId)
+            || (editingPresetId.isEmpty() && existing.name.equalsIgnoreCase(name) && existing.pluginBrand == currentPluginBrand))
         {
             preset = existing;
             break;
@@ -1746,6 +1774,9 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
     preset.outputGain = settings.outputGain;
     if (presetStore.save(preset))
     {
+        currentPresetDisplayName = name;
+        currentPresetIsCustom = true;
+        editingPresetId.clear();
         refreshPresetChoices();
         pluginStatus.setText(utf8("已保存我的方案：") + name, juce::dontSendNotification);
     }
@@ -1971,6 +2002,8 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                              currentToneStyleId = preset.baseToneStyleId;
                              currentBaseToneSettings = style.settings;
                              masterOutput.setToneStyle(style.settings);
+                             currentPresetDisplayName = preset.name;
+                             currentPresetIsCustom = preset.customTone;
                              pluginStatus.setText(utf8("已恢复音色：") + preset.name, juce::dontSendNotification);
                              pluginHost.unloadEffect();
                              effectStatus.setText(utf8("内置音色引擎已启用"), juce::dontSendNotification);
@@ -2030,7 +2063,7 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName)
 void MainComponent::configureTechniqueDefaults()
 {
     if (! pluginHost.hasPlugin() || ! midi.getTechniqueMappings().isEmpty()) return;
-    const auto family = fengyin::SwamPluginClassifier::classify(pluginHost.getPluginName().toStdString(), {});
+    const auto family = currentTechniqueFamily();
     const auto device = midi.getActiveProfile();
     juce::Array<fengyin::TechniqueMapping> defaults;
     for (int value = 0; value < static_cast<int>(fengyin::PerformanceTechnique::count); ++value)
@@ -2045,6 +2078,24 @@ void MainComponent::configureTechniqueDefaults()
         defaults.add(mapping);
     }
     midi.setTechniqueMappings(defaults);
+}
+
+fengyin::SwamFamily MainComponent::currentTechniqueFamily() const
+{
+    if (! pluginHost.hasPlugin()) return fengyin::SwamFamily::notSwam;
+    if (currentPluginBrand != "kong")
+        return fengyin::SwamPluginClassifier::classify(pluginHost.getPluginName().toStdString(), {});
+
+    if (const auto* definition = fengyin::KongInstrumentCatalog::find(currentInstrumentKey))
+        switch (definition->profile)
+        {
+            case fengyin::InstrumentMixProfile::saxophone: return fengyin::SwamFamily::saxophone;
+            case fengyin::InstrumentMixProfile::strings:  return fengyin::SwamFamily::strings;
+            case fengyin::InstrumentMixProfile::brass:    return fengyin::SwamFamily::brass;
+            case fengyin::InstrumentMixProfile::woodwind: return fengyin::SwamFamily::woodwind;
+            case fengyin::InstrumentMixProfile::generic:  break;
+        }
+    return fengyin::SwamFamily::other;
 }
 
 void MainComponent::refreshLicenseUi()
