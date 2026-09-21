@@ -67,10 +67,14 @@ public:
     bool showPluginEditor(bool effect);
     [[nodiscard]] juce::MemoryBlock savePluginState() const;
     bool restorePluginState(const void* data, std::size_t size);
+    [[nodiscard]] juce::StringArray getProgramNames() const;
+    [[nodiscard]] juce::String getCurrentProgramName() const;
+    bool selectProgramByAliases(const juce::StringArray& aliases);
 
     void noteOn(int noteNumber, float velocity) noexcept override;
     void noteOff(int noteNumber) noexcept override;
     void breathChanged(float value) noexcept override;
+    void setKongExpressionMode(bool enabled) noexcept { kongExpressionMode.store(enabled); }
     void pitchBendChanged(float bipolarValue) noexcept override;
     void techniqueChanged(PerformanceTechnique technique, float value) noexcept override;
     void resetPerformance() noexcept override;
@@ -100,6 +104,7 @@ private:
     std::array<juce::AudioProcessorParameter*, static_cast<size_t>(PerformanceTechnique::count)> techniqueParameters {};
     std::array<std::atomic<float>, static_cast<size_t>(PerformanceTechnique::count)> techniqueValues {};
     std::array<std::atomic<bool>, static_cast<size_t>(PerformanceTechnique::count)> techniqueDirty {};
+    std::atomic<bool> kongExpressionMode { false };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginHostEngine)
 };

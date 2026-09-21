@@ -86,23 +86,32 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertIn('id="recording-manager"', HTML)
         self.assertIn("nativeEvent('showRecordings')", JS)
         self.assertIn('id="wind-status-text">未连接电吹管', HTML)
-        self.assertIn('id="favorite-current"', HTML)
-        self.assertIn('id="favorite-instruments"', HTML)
-        self.assertIn("fengyin-favorite-instruments-v1", JS)
-        self.assertIn("slice(0, 3)", JS)
+        self.assertIn('id="tone-style-switcher"', HTML)
+        self.assertIn('id="tone-style-prev"', HTML)
+        self.assertIn('id="tone-style-next"', HTML)
+        self.assertIn('id="tone-style-select"', HTML)
+        self.assertIn("toneStyleLibrary", JS)
+        self.assertIn('data-library="swam"', HTML)
+        self.assertIn('data-library="kong"', HTML)
+        self.assertIn("中国民乐 · 空音", HTML)
+        self.assertIn("kongPresets", JS)
+        self.assertNotIn('id="favorite-current"', HTML)
+        self.assertNotIn("fengyin-favorite-instruments-v1", JS)
         self.assertIn("document.body.classList.add('video-playing')", JS)
         self.assertIn("document.body.classList.remove('video-playing')", JS)
 
     def test_performance_transpose_reverb_and_technique_controls_are_live(self):
-        for control_id in ("transpose-key", "key-calibration", "performance-reverb", "technique-settings", "technique-dialog"):
+        for control_id in ("transpose-key", "transpose-dialog", "performance-reverb", "technique-settings", "technique-dialog"):
             self.assertIn(f'id="{control_id}"', HTML)
         for key_name in ("C调", "降E调", "升F调", "降B调"):
             self.assertIn(key_name, HTML)
         self.assertIn("nativeEvent('setKeyTranspose'", JS)
-        self.assertIn("nativeEvent('beginKeyCalibration'", JS)
+        self.assertIn("请先将电吹管上的调值设置为 C 调", HTML)
+        self.assertNotIn("beginKeyCalibration", JS)
         self.assertIn("nativeEvent('setPerformanceReverb'", JS)
         self.assertIn("nativeEvent('beginTechniqueLearn'", JS)
-        self.assertIn("nativeEvent('removeTechniqueMapping'", JS)
+        self.assertIn("nativeEvent('setTechniqueConfiguration'", JS)
+        self.assertIn("techniqueId", JS)
         action_bar = HTML.split('<div class="action-bar glass">', 1)[1].split('</div>\n        </div>', 1)[0]
         self.assertIn('id="transpose-key"', action_bar)
         self.assertIn('id="performance-reverb"', action_bar)
@@ -114,9 +123,10 @@ class PrototypeStructureTests(unittest.TestCase):
                            "adapter-techniques", "adapter-advanced-toggle"):
             self.assertIn(f'id="{control_id}"', HTML)
         self.assertIn("state.hasBiteSensor", JS)
-        self.assertIn("item.relevant !== false", JS)
-        self.assertIn("item.pluginSupported !== false", JS)
-        self.assertIn("按“电吹管型号＋乐器类别”独立保存", HTML)
+        self.assertIn("mergeBackendTechniquePlan", JS)
+        self.assertIn("backend.relevant === false", JS)
+        self.assertIn("backend.pluginSupported === false", JS)
+        self.assertIn("按“电吹管型号＋具体乐器”保存", HTML)
 
     def test_smart_audio_optimisation_is_user_controllable(self):
         self.assertIn('id="smart-audio"', HTML)
@@ -125,7 +135,9 @@ class PrototypeStructureTests(unittest.TestCase):
 
     def test_instrument_art_uses_independent_images_without_distortion(self):
         self.assertIn('object-fit:contain', HTML)
-        self.assertIn('assets/instruments/instrument_soprano_sax.png', HTML)
+        self.assertIn("'soprano-sax':'instrument_soprano_sax.png'", JS)
+        self.assertIn("picture.src = `../assets/instruments/${artwork}`", JS)
+        self.assertIn('id="instrument-picture" alt="当前加载的乐器" hidden', HTML)
         self.assertNotIn('instrument-saxophones.png', JS)
         for filename in ("instrument_soprano_sax.png", "instrument_trumpet.png",
                          "instrument_flute.png", "instrument_violin.png"):
@@ -146,10 +158,19 @@ class PrototypeStructureTests(unittest.TestCase):
 
     def test_scanned_plugins_become_editable_preset_catalog(self):
         self.assertIn("availableInstruments.map((instrument,index)", JS)
-        self.assertIn('data-kind="scanned"', JS)
+        self.assertIn("supported ? 'scanned' : 'unsupported'", JS)
         self.assertIn('class="preset-edit"', JS)
         self.assertIn("nativeEvent('editPreset', {index})", JS)
-        self.assertIn("保存对“${pending.name}”的修改", JS)
+        self.assertIn("nativeEvent('saveCustomPreset'", JS)
+
+    def test_professional_settings_save_a_separate_named_plan(self):
+        for control_id in ("tone-expert", "expert-confirm-dialog", "expert-dialog", "preset-name-dialog",
+                           "save-expert", "preset-name-input"):
+            self.assertIn(f'id="{control_id}"', HTML)
+        self.assertIn("保存为我的方案", HTML)
+        self.assertIn("nativeEvent('previewCustomTone'", JS)
+        self.assertIn("nativeEvent('cancelCustomTone')", JS)
+        self.assertNotIn('选择音源系列后，下方直接展示全部乐器', HTML)
 
     def test_only_one_lower_stage_container_exists(self):
         self.assertEqual(1, HTML.count('id="lower-stage"'))

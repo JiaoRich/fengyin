@@ -340,6 +340,10 @@ void PluginHostEngine::breathChanged(float value) noexcept
     const auto midiValue = juce::jlimit(0, 127, juce::roundToInt(value * 127.0f));
     queue(juce::MidiMessage::controllerEvent(1, 11, midiValue));
     queue(juce::MidiMessage::controllerEvent(1, 2, midiValue));
+    // Qin Engine soundbanks commonly use the modulation wheel for expression.
+    // Keep CC11 as well so user-edited programs remain playable.
+    if (kongExpressionMode.load(std::memory_order_relaxed))
+        queue(juce::MidiMessage::controllerEvent(1, 1, midiValue));
 }
 
 void PluginHostEngine::pitchBendChanged(float bipolarValue) noexcept
@@ -363,12 +367,47 @@ void PluginHostEngine::resetPerformance() noexcept
     queue(juce::MidiMessage::allSoundOff(1));
     queue(juce::MidiMessage::controllerEvent(1, 11, 0));
     queue(juce::MidiMessage::controllerEvent(1, 2, 0));
+    if (kongExpressionMode.load(std::memory_order_relaxed))
+        queue(juce::MidiMessage::controllerEvent(1, 1, 0));
     queue(juce::MidiMessage::pitchWheel(1, 8192));
     for (size_t index = 0; index < techniqueValues.size(); ++index)
     {
         techniqueValues[index].store(0.0f, std::memory_order_relaxed);
         techniqueDirty[index].store(true, std::memory_order_release);
     }
+}
+
+juce::StringArray PluginHostEngine::getProgramNames() const
+{
+    juce::StringArray names;
+    if (auto* processor = getPlugin())
+        for (int index = 0; index < processor->getNumPrograms(); ++index)
+            names.add(processor->getProgramName(index));
+    return names;
+}
+
+juce::String PluginHostEngine::getCurrentProgramName() const
+{
+    if (auto* processor = getPlugin())
+        return processor->getProgramName(processor->getCurrentProgram());
+    return {};
+}
+
+bool PluginHostEngine::selectProgramByAliases(const juce::StringArray& aliases)
+{
+    auto* processor = getPlugin();
+    if (processor == nullptr) return false;
+    for (int index = 0; index < processor->getNumPrograms(); ++index)
+    {
+        const auto candidate = processor->getProgramName(index).toLowerCase().removeCharacters(" ._-");
+        for (const auto& alias : aliases)
+            if (candidate.contains(alias.toLowerCase().removeCharacters(" ._-")))
+            {
+                processor->setCurrentProgram(index);
+                return true;
+            }
+    }
+    return false;
 }
 
 void PluginHostEngine::flushTechniqueValues()
@@ -409,6 +448,39 @@ void PluginHostEngine::resolveTechniqueParameters()
         else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::flutter)] == nullptr
                  && name.contains("flutter"))
             techniqueParameters[static_cast<size_t>(PerformanceTechnique::flutter)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::portamento)] == nullptr
+                 && name.contains("portamento") && ! name.contains("split"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::portamento)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::fall)] == nullptr
+                 && (name.contains("falldown") || name == "fall" || name.contains("doit")))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::fall)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::overblow)] == nullptr
+                 && name.contains("overblow"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::overblow)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::breathNoise)] == nullptr
+                 && name.contains("breathnoise"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::breathNoise)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::alternateFingering)] == nullptr
+                 && (name.contains("altfingering") || name.contains("alternatefingering")))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::alternateFingering)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::mute)] == nullptr
+                 && (name == "mute" || name.contains("mutestate") || name.contains("handmute")))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::mute)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::halfValve)] == nullptr
+                 && name.contains("halfvalve"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::halfValve)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::legato)] == nullptr
+                 && (name == "legato" || name.contains("legatomode")))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::legato)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::bowPressure)] == nullptr
+                 && name.contains("bowpressure"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::bowPressure)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::pizzicato)] == nullptr
+                 && (name.contains("pizzicato") || name == "pizz"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::pizzicato)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::tremolo)] == nullptr
+                 && name.contains("tremolo"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::tremolo)] = parameter;
     }
 }
 

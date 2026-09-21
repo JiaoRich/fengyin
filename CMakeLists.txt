@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 0.7.7 LANGUAGES C CXX)
+project(FengYin VERSION 0.10.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -70,6 +70,7 @@ target_sources(FengYin PRIVATE
     native/Source/BreathMapper.h
     native/Source/DeviceProfile.h
     native/Source/TechniqueAdvisor.h
+    native/Source/IntelligentTechniqueProcessor.h
     native/Source/ControllerDetector.h
     native/Source/MidiPerformanceSink.h
     native/Source/PitchKey.h
@@ -80,6 +81,7 @@ target_sources(FengYin PRIVATE
     native/Source/PluginHostEngine.cpp
     native/Source/PluginHostEngine.h
     native/Source/SwamPluginClassifier.h
+    native/Source/KongInstrumentCatalog.h
     native/Source/SoundPresetStore.cpp
     native/Source/SoundPresetStore.h
     native/Source/VideoPlayerPanel.cpp
@@ -94,6 +96,7 @@ target_sources(FengYin PRIVATE
     native/Source/VideoAudioExtractor.h
     native/Source/MasterOutputService.h
     native/Source/MasterOutputService.cpp
+    native/Source/ToneStyleCatalog.h
     native/Source/AudioDeviceService.cpp
     native/Source/AudioDeviceService.h
 )
@@ -229,8 +232,17 @@ if(BUILD_TESTING)
     target_include_directories(FengYinTechniqueAdvisorTests PRIVATE native/Source)
     add_test(NAME technique_advisor COMMAND FengYinTechniqueAdvisorTests)
 
+    add_executable(FengYinIntelligentTechniqueTests tests/test_intelligent_technique.cpp)
+    target_include_directories(FengYinIntelligentTechniqueTests PRIVATE native/Source)
+    add_test(NAME intelligent_technique COMMAND FengYinIntelligentTechniqueTests)
+
     add_executable(FengYinPitchKeyTests tests/test_pitch_key.cpp)
     target_include_directories(FengYinPitchKeyTests PRIVATE native/Source)
     add_test(NAME pitch_key_transpose COMMAND FengYinPitchKeyTests)
+
+    add_executable(FengYinToneStyleTests tests/test_tone_style_catalog.cpp native/Source/MasterOutputService.cpp)
+    target_include_directories(FengYinToneStyleTests PRIVATE native/Source)
+    target_link_libraries(FengYinToneStyleTests PRIVATE juce::juce_dsp juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
+    add_test(NAME tone_style_catalog COMMAND FengYinToneStyleTests)
 
 endif()

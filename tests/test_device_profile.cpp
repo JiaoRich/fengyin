@@ -10,7 +10,8 @@ int main()
     assert(yds.breathController == 11);
     assert(! yds.hasBiteSensor);
     assert(yds.hasThumbController);
-    assert(yds.hasAssignableButtons);
+    assert(! yds.hasAssignableButtons);
+    assert(! yds.hasMotionController);
     assert(DeviceProfileMatcher::match("Akai EWI USB").id == "akai-ewi");
     assert(DeviceProfileMatcher::match("Aodyo Sylphyo Link").id == "aodyo-sylphyo");
     const auto generic = DeviceProfileMatcher::match("USB MIDI Device");
