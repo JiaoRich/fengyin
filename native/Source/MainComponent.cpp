@@ -313,13 +313,10 @@ void MainComponent::setupWebInterface()
             if (isActivated)
                 midi.setTargetKey(static_cast<int>(payload.getProperty("targetKey", 0)));
         })
-        .withEventListener("beginKeyCalibration", [this](juce::var)
+        .withEventListener("setGrowlSensitivity", [this](juce::var payload)
         {
-            if (isActivated) midi.beginKeyCalibration();
-        })
-        .withEventListener("cancelKeyCalibration", [this](juce::var)
-        {
-            midi.cancelKeyCalibration();
+            const auto value = payload.getProperty("sensitivity", "standard").toString();
+            midi.setGrowlSensitivity(value == "easy" ? 0 : value == "hard" ? 2 : 1);
         })
         .withEventListener("copyMachineCode", [this](juce::var)
         {
@@ -389,8 +386,13 @@ void MainComponent::setupWebInterface()
         })
         .withEventListener("beginTechniqueLearn", [this](juce::var payload)
         {
-            const auto technique = juce::jlimit(0, static_cast<int>(fengyin::PerformanceTechnique::count) - 1,
-                                                static_cast<int>(payload.getProperty("technique", 0)));
+            const auto requestedId = payload.getProperty("techniqueId", {}).toString().toStdString();
+            const auto requestedTechnique = requestedId.empty()
+                ? static_cast<fengyin::PerformanceTechnique>(juce::jlimit(0, static_cast<int>(fengyin::PerformanceTechnique::count) - 1,
+                                                                         static_cast<int>(payload.getProperty("technique", 0))))
+                : fengyin::techniqueFromId(requestedId);
+            if (requestedTechnique == fengyin::PerformanceTechnique::count) return;
+            const auto technique = static_cast<int>(requestedTechnique);
             if (! midi.getSnapshot().deviceConnected)
             {
                 if (webInterface != nullptr)
@@ -419,10 +421,61 @@ void MainComponent::setupWebInterface()
                 }
                 return;
             }
+            if (! advice.hardwareAvailable && midi.getActiveProfile().id != "generic-wind-controller")
+            {
+                if (webInterface != nullptr)
+                {
+                    auto result = std::make_unique<juce::DynamicObject>();
+                    result->setProperty("success", false);
+                    result->setProperty("message", utf8("当前电吹管没有适合这项技巧的硬件控制器，已使用气息智能"));
+                    webInterface->emitEventIfBrowserIsVisible("techniqueLearnResult", juce::var(result.release()));
+                }
+                return;
+            }
             activeTechniqueLearn = technique;
             pendingTechniqueToggle = static_cast<bool>(payload.getProperty("toggle", false));
             techniqueLearnEndsAtMs = juce::Time::getMillisecondCounterHiRes() + 10000.0;
             midi.beginTechniqueLearn(static_cast<fengyin::PerformanceTechnique>(technique));
+        })
+        .withEventListener("setTechniqueConfiguration", [this](juce::var payload)
+        {
+            const auto target = fengyin::techniqueFromId(payload.getProperty("techniqueId", {}).toString().toStdString());
+            if (target == fengyin::PerformanceTechnique::count) return;
+            const auto modeText = payload.getProperty("mode", "auto").toString();
+            auto mode = fengyin::TechniqueControlMode::automatic;
+            if (modeText == "breath") mode = fengyin::TechniqueControlMode::breath;
+            else if (modeText == "hardware") mode = fengyin::TechniqueControlMode::hardware;
+            else if (modeText == "hybrid") mode = fengyin::TechniqueControlMode::hybrid;
+            else if (modeText == "off") mode = fengyin::TechniqueControlMode::off;
+            const auto family = pluginHost.hasPlugin()
+                ? fengyin::SwamPluginClassifier::classify(pluginHost.getPluginName().toStdString(), {})
+                : fengyin::SwamFamily::notSwam;
+            const auto advice = fengyin::TechniqueAdvisor::advise(midi.getActiveProfile(), family, target);
+            if ((mode == fengyin::TechniqueControlMode::hardware || mode == fengyin::TechniqueControlMode::hybrid)
+                && ! advice.hardwareAvailable && midi.getActiveProfile().id != "generic-wind-controller")
+                mode = fengyin::IntelligentTechniqueProcessor::canUseBreath(target)
+                    ? fengyin::TechniqueControlMode::breath : fengyin::TechniqueControlMode::automatic;
+            auto mappings = midi.getTechniqueMappings();
+            auto found = false;
+            for (auto& mapping : mappings)
+                if (mapping.technique == target)
+                {
+                    mapping.mode = mode;
+                    mapping.strength = juce::jlimit(0.0f, 1.0f,
+                        static_cast<float>(static_cast<double>(payload.getProperty("strength", mapping.strength))));
+                    found = true;
+                    break;
+                }
+            if (! found)
+            {
+                fengyin::TechniqueMapping mapping;
+                mapping.technique = target;
+                mapping.mode = mode;
+                mapping.strength = juce::jlimit(0.0f, 1.0f,
+                    static_cast<float>(static_cast<double>(payload.getProperty("strength", 0.5))));
+                mappings.add(mapping);
+            }
+            midi.setTechniqueMappings(mappings);
         })
         .withEventListener("cancelTechniqueLearn", [this](juce::var)
         {
@@ -931,11 +984,12 @@ void MainComponent::timerCallback()
     }
     if (snapshot.deviceConnected && ! wasMidiConnected)
     {
-        // 已知型号先使用档案中的推荐值，同时在用户完成本调识别的第一次吹奏中
-        // 静默观察真实连续控制器；可兼容用户在吹管 App 中改过 MIDI 输出的情况。
+        // 已知型号先使用档案中的推荐值，同时静默观察真实连续控制器；
+        // 可兼容用户在吹管 App 中改过 MIDI 输出的情况。
         midi.beginBreathDetection();
         automaticBreathDetectionActive = true;
         automaticBreathDetectionEndsAtMs = 0.0;
+        configureTechniqueDefaults();
     }
     else if (! snapshot.deviceConnected && wasMidiConnected)
     {
@@ -943,8 +997,7 @@ void MainComponent::timerCallback()
         automaticBreathDetectionEndsAtMs = 0.0;
     }
     wasMidiConnected = snapshot.deviceConnected;
-    if (automaticBreathDetectionActive && ! midi.isKeyCalibrationPending()
-        && automaticBreathDetectionEndsAtMs <= 0.0)
+    if (automaticBreathDetectionActive && automaticBreathDetectionEndsAtMs <= 0.0)
         automaticBreathDetectionEndsAtMs = juce::Time::getMillisecondCounterHiRes() + 1800.0;
     if (automaticBreathDetectionActive && automaticBreathDetectionEndsAtMs > 0.0
         && juce::Time::getMillisecondCounterHiRes() >= automaticBreathDetectionEndsAtMs)
@@ -960,11 +1013,20 @@ void MainComponent::timerCallback()
         if (learned.ready)
         {
             auto mappings = midi.getTechniqueMappings();
+            auto previousMode = fengyin::TechniqueControlMode::hardware;
+            auto previousStrength = 0.5f;
             for (int index = mappings.size(); --index >= 0;)
                 if (mappings.getReference(index).technique == learned.mapping.technique)
+                {
+                    previousMode = mappings.getReference(index).mode;
+                    previousStrength = mappings.getReference(index).strength;
                     mappings.remove(index);
+                }
             auto mapping = learned.mapping;
             mapping.toggle = pendingTechniqueToggle;
+            mapping.mode = previousMode == fengyin::TechniqueControlMode::hybrid
+                ? previousMode : fengyin::TechniqueControlMode::hardware;
+            mapping.strength = previousStrength;
             mappings.add(mapping);
             midi.setTechniqueMappings(mappings);
             activeTechniqueLearn = -1;
@@ -1049,10 +1111,8 @@ void MainComponent::timerCallback()
         state->setProperty("machineCode", machineCode);
         state->setProperty("recording", recorder.isRecording());
         state->setProperty("transposeSemitones", midi.getTransposeSemitones());
-        state->setProperty("sourceKey", midi.getSourceKey());
         state->setProperty("targetKey", midi.getTargetKey());
-        state->setProperty("keyCalibrationPending", midi.isKeyCalibrationPending());
-        state->setProperty("keyCalibrated", midi.isKeyCalibrated());
+        state->setProperty("growlSensitivity", midi.getGrowlSensitivity());
         state->setProperty("automaticBreathDetection", automaticBreathDetectionActive);
         state->setProperty("reverbMix", masterOutput.getReverbMix());
         state->setProperty("eqTone", masterOutput.getEqTone());
@@ -1083,21 +1143,29 @@ void MainComponent::timerCallback()
             const auto advice = fengyin::TechniqueAdvisor::advise(deviceProfile, currentFamily, target);
             auto item = std::make_unique<juce::DynamicObject>();
             item->setProperty("technique", technique);
+            item->setProperty("id", fengyin::techniqueId(target));
+            item->setProperty("name", utf8(fengyin::TechniqueAdvisor::chineseName(target)));
             item->setProperty("relevant", advice.relevantToInstrument);
             item->setProperty("pluginSupported", pluginHost.supportsTechnique(target));
             item->setProperty("hardwareAvailable", advice.hardwareAvailable);
             item->setProperty("supported", advice.relevantToInstrument && pluginHost.supportsTechnique(target));
             item->setProperty("recommendedSource", utf8(advice.recommendedSource));
             item->setProperty("recommendationReason", utf8(advice.reason));
+            item->setProperty("defaultMode", static_cast<int>(advice.defaultMode));
+            item->setProperty("featured", advice.featured);
             item->setProperty("sourceType", 0);
             item->setProperty("sourceNumber", -1);
             item->setProperty("toggle", false);
+            item->setProperty("mode", static_cast<int>(advice.defaultMode));
+            item->setProperty("strength", advice.defaultStrength);
             for (const auto& mapping : midi.getTechniqueMappings())
                 if (static_cast<int>(mapping.technique) == technique)
                 {
                     item->setProperty("sourceType", static_cast<int>(mapping.sourceType));
                     item->setProperty("sourceNumber", mapping.sourceNumber);
                     item->setProperty("toggle", mapping.toggle);
+                    item->setProperty("mode", static_cast<int>(mapping.mode));
+                    item->setProperty("strength", mapping.strength);
                     break;
                 }
             techniqueMappings.add(juce::var(item.release()));
@@ -1106,12 +1174,20 @@ void MainComponent::timerCallback()
         juce::Array<juce::var> instruments;
         for (const auto& plugin : cachedInstrumentPlugins)
         {
+            const auto isSwam = fengyin::SwamPluginClassifier::classify(plugin.name.toStdString(),
+                                                                        plugin.manufacturerName.toStdString())
+                                != fengyin::SwamFamily::notSwam;
             auto item = std::make_unique<juce::DynamicObject>();
             item->setProperty("name", plugin.name);
-            item->setProperty("chineseName", utf8(fengyin::SwamPluginClassifier::instrumentChineseName(plugin.name.toStdString())));
-            item->setProperty("instrumentKey", utf8(fengyin::SwamPluginClassifier::instrumentKey(plugin.name.toStdString())));
-            item->setProperty("label", utf8(fengyin::SwamPluginClassifier::instrumentChineseName(plugin.name.toStdString()))
-                                       + utf8(" · ") + plugin.name);
+            item->setProperty("isSwam", isSwam);
+            item->setProperty("supported", isSwam);
+            item->setProperty("chineseName", isSwam
+                ? utf8(fengyin::SwamPluginClassifier::instrumentChineseName(plugin.name.toStdString())) : plugin.name);
+            item->setProperty("instrumentKey", isSwam
+                ? utf8(fengyin::SwamPluginClassifier::instrumentKey(plugin.name.toStdString())) : juce::String());
+            item->setProperty("label", isSwam
+                ? utf8(fengyin::SwamPluginClassifier::instrumentChineseName(plugin.name.toStdString())) + utf8(" · ") + plugin.name
+                : plugin.name + utf8("（暂未支持）"));
             instruments.add(juce::var(item.release()));
         }
         juce::Array<juce::var> effects;
@@ -1265,7 +1341,8 @@ void MainComponent::refreshPluginChoices()
                 otherHeadingAdded = true;
             }
             cachedInstrumentPlugins.add(plugin);
-            pluginSelector.addItem(plugin.name, itemId++);
+            const auto disabledItemId = itemId++;
+            pluginSelector.addItem(plugin.name + utf8("（当前版本暂未支持）"), disabledItemId);
         }
         if (! plugin.isInstrument)
         {
@@ -1289,6 +1366,20 @@ void MainComponent::loadSelectedPlugin()
     }
 
     const auto chosen = cachedInstrumentPlugins.getReference(selectedIndex);
+    if (fengyin::SwamPluginClassifier::classify(chosen.name.toStdString(), chosen.manufacturerName.toStdString())
+        == fengyin::SwamFamily::notSwam)
+    {
+        const auto message = utf8("当前版本尚未支持 Kontakt、三体等其他音源，请关注后续版本升级。");
+        pluginStatus.setText(message, juce::dontSendNotification);
+        if (webInterface != nullptr)
+        {
+            auto result = std::make_unique<juce::DynamicObject>();
+            result->setProperty("success", false);
+            result->setProperty("message", message);
+            webInterface->emitEventIfBrowserIsVisible("pluginLoadResult", juce::var(result.release()));
+        }
+        return;
+    }
 
     const auto status = audio.getStatus();
     pluginStatus.setText(utf8("正在加载：") + chosen.name, juce::dontSendNotification);
@@ -1638,6 +1729,14 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
         if (completion) completion(false, message);
         return;
     }
+    if (fengyin::SwamPluginClassifier::classify(chosen.name.toStdString(), chosen.manufacturerName.toStdString())
+        == fengyin::SwamFamily::notSwam)
+    {
+        const auto message = utf8("当前版本尚未支持 Kontakt、三体等其他音源，请关注后续版本升级。");
+        pluginStatus.setText(message, juce::dontSendNotification);
+        if (completion) completion(false, message);
+        return;
+    }
 
     const auto status = audio.getStatus();
     pluginStatus.setText(utf8("正在恢复音色方案……"), juce::dontSendNotification);
@@ -1710,8 +1809,11 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName)
     audio.getDeviceManager().removeAudioCallback(&testSynth);
     pluginHost.attachTo(audio.getDeviceManager());
     const auto family = fengyin::SwamPluginClassifier::classify(pluginName.toStdString(), {});
-    midi.setTechniqueContext(fengyin::SwamPluginClassifier::familyKey(family));
+    const auto exactContext = juce::String(fengyin::SwamPluginClassifier::familyKey(family)) + "."
+                            + juce::String::toHexString(pluginHost.getPluginIdentifier().hashCode64());
+    midi.setTechniqueContext(exactContext);
     midi.setPerformanceSink(&pluginHost);
+    configureTechniqueDefaults();
     switch (family)
     {
         case fengyin::SwamFamily::saxophone: masterOutput.setInstrumentProfile(fengyin::InstrumentMixProfile::saxophone); break;
@@ -1724,6 +1826,26 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName)
     pluginStatus.setText(utf8("当前音源：") + pluginName, juce::dontSendNotification);
     if (! pluginHost.hasEffect())
         effectStatus.setText(utf8("效果器：未使用"), juce::dontSendNotification);
+}
+
+void MainComponent::configureTechniqueDefaults()
+{
+    if (! pluginHost.hasPlugin() || ! midi.getTechniqueMappings().isEmpty()) return;
+    const auto family = fengyin::SwamPluginClassifier::classify(pluginHost.getPluginName().toStdString(), {});
+    const auto device = midi.getActiveProfile();
+    juce::Array<fengyin::TechniqueMapping> defaults;
+    for (int value = 0; value < static_cast<int>(fengyin::PerformanceTechnique::count); ++value)
+    {
+        const auto technique = static_cast<fengyin::PerformanceTechnique>(value);
+        const auto advice = fengyin::TechniqueAdvisor::advise(device, family, technique);
+        if (! advice.relevantToInstrument || ! pluginHost.supportsTechnique(technique)) continue;
+        fengyin::TechniqueMapping mapping;
+        mapping.technique = technique;
+        mapping.mode = advice.defaultMode;
+        mapping.strength = advice.defaultStrength;
+        defaults.add(mapping);
+    }
+    midi.setTechniqueMappings(defaults);
 }
 
 void MainComponent::refreshLicenseUi()

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string_view>
+
 namespace fengyin
 {
 enum class PerformanceTechnique
@@ -7,7 +9,27 @@ enum class PerformanceTechnique
     growl = 0,
     vibrato,
     flutter,
+    portamento,
+    fall,
+    overblow,
+    breathNoise,
+    alternateFingering,
+    mute,
+    halfValve,
+    legato,
+    bowPressure,
+    pizzicato,
+    tremolo,
     count
+};
+
+enum class TechniqueControlMode
+{
+    automatic = 0,
+    breath,
+    hardware,
+    hybrid,
+    off
 };
 
 enum class TechniqueSourceType
@@ -25,7 +47,42 @@ struct TechniqueMapping
     TechniqueSourceType sourceType = TechniqueSourceType::none;
     int sourceNumber = -1;
     bool toggle = false;
+    TechniqueControlMode mode = TechniqueControlMode::automatic;
+    float strength = 0.5f;
 };
+
+[[nodiscard]] inline const char* techniqueId(PerformanceTechnique technique) noexcept
+{
+    switch (technique)
+    {
+        case PerformanceTechnique::growl: return "growl";
+        case PerformanceTechnique::vibrato: return "vibrato";
+        case PerformanceTechnique::flutter: return "flutter";
+        case PerformanceTechnique::portamento: return "portamento";
+        case PerformanceTechnique::fall: return "fall";
+        case PerformanceTechnique::overblow: return "overblow";
+        case PerformanceTechnique::breathNoise: return "breathNoise";
+        case PerformanceTechnique::alternateFingering: return "altFingering";
+        case PerformanceTechnique::mute: return "mute";
+        case PerformanceTechnique::halfValve: return "halfValve";
+        case PerformanceTechnique::legato: return "legato";
+        case PerformanceTechnique::bowPressure: return "bowPressure";
+        case PerformanceTechnique::pizzicato: return "pizzicato";
+        case PerformanceTechnique::tremolo: return "tremolo";
+        case PerformanceTechnique::count: break;
+    }
+    return "unknown";
+}
+
+[[nodiscard]] inline PerformanceTechnique techniqueFromId(const std::string_view id) noexcept
+{
+    for (int value = 0; value < static_cast<int>(PerformanceTechnique::count); ++value)
+    {
+        const auto technique = static_cast<PerformanceTechnique>(value);
+        if (id == techniqueId(technique)) return technique;
+    }
+    return PerformanceTechnique::count;
+}
 
 class MidiPerformanceSink
 {

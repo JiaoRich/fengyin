@@ -13,6 +13,10 @@ int main()
     assert(ydsVibrato.hardwareAvailable);
     assert(std::string(ydsVibrato.recommendedSource) != "吹嘴咬合");
 
+    const auto ydsGrowl = TechniqueAdvisor::advise(yds, SwamFamily::saxophone, PerformanceTechnique::growl);
+    assert(ydsGrowl.defaultMode == TechniqueControlMode::breath);
+    assert(std::string(ydsGrowl.recommendedSource).find("气息") != std::string::npos);
+
     const auto rolandVibrato = TechniqueAdvisor::advise(aerophone, SwamFamily::saxophone, PerformanceTechnique::vibrato);
     assert(std::string(rolandVibrato.recommendedSource) == "吹嘴咬合");
 
@@ -22,4 +26,7 @@ int main()
     assert(! stringFlutter.relevantToInstrument);
     const auto stringVibrato = TechniqueAdvisor::advise(yds, SwamFamily::strings, PerformanceTechnique::vibrato);
     assert(stringVibrato.relevantToInstrument);
+    const auto bowPressure = TechniqueAdvisor::advise(yds, SwamFamily::strings, PerformanceTechnique::bowPressure);
+    assert(bowPressure.relevantToInstrument);
+    assert(bowPressure.defaultMode == TechniqueControlMode::breath);
 }

@@ -3,8 +3,8 @@
 
 namespace
 {
-constexpr int currentAudioSetupRevision = 4;
-constexpr double latencyCandidateTestMs = 900.0;
+constexpr int currentAudioSetupRevision = 5;
+constexpr double latencyCandidateTestMs = 1800.0;
 
 int chooseLiveBufferSize(juce::Array<int> sizes, int preferred)
 {
@@ -77,7 +77,8 @@ juce::StringArray AudioDeviceService::getAvailableDeviceTypes()
 {
     juce::StringArray names;
     for (const auto* type : manager.getAvailableDeviceTypes())
-        names.add(type->getTypeName());
+        if (! type->getTypeName().containsIgnoreCase("Exclusive"))
+            names.add(type->getTypeName());
     return names;
 }
 
@@ -107,6 +108,8 @@ juce::Array<int> AudioDeviceService::getAvailableBufferSizes()
 
 juce::String AudioDeviceService::selectDeviceType(const juce::String& typeName)
 {
+    if (typeName.containsIgnoreCase("Exclusive"))
+        return juce::String::fromUTF8("风吟已停用 Windows 独占模式，请选择低延迟共享模式或 ASIO");
     manager.setCurrentAudioDeviceType(typeName, true);
     lastError = manager.getCurrentAudioDeviceType() == typeName
         ? juce::String()
@@ -150,7 +153,10 @@ juce::String AudioDeviceService::applyBestInitialSetup()
     const auto legacyFixedBuffer = revision < currentAudioSetupRevision
         && current.deviceType.equalsIgnoreCase("Windows Audio")
         && current.bufferSize >= 512;
-    if (settings != nullptr && settings->getValue("audioSetupMode") == "manual" && ! legacyFixedBuffer)
+    const auto legacyExclusiveMode = revision < currentAudioSetupRevision
+        && current.deviceType.containsIgnoreCase("Exclusive");
+    if (settings != nullptr && settings->getValue("audioSetupMode") == "manual"
+        && ! legacyFixedBuffer && ! legacyExclusiveMode)
     {
         settings->setValue("audioSetupRevision", currentAudioSetupRevision);
         settings->saveIfNeeded();
@@ -458,18 +464,8 @@ void AudioDeviceService::buildLatencyCandidates()
             type->scanForDevices();
             const auto outputs = type->getDeviceNames(false);
             const auto index = type->getDefaultDeviceIndex(false);
-            if (juce::isPositiveAndBelow(index, outputs.size())) add(typeName, outputs[index], 128, 1);
-        }
-    }
-    for (const auto& typeName : types)
-    {
-        if (! typeName.containsIgnoreCase("Exclusive")) continue;
-        if (auto* type = findType(typeName))
-        {
-            type->scanForDevices();
-            const auto outputs = type->getDeviceNames(false);
-            const auto index = type->getDefaultDeviceIndex(false);
-            if (juce::isPositiveAndBelow(index, outputs.size())) add(typeName, outputs[index], 128, 2);
+            if (juce::isPositiveAndBelow(index, outputs.size()))
+                add(typeName, outputs[index], recommendedInitialBuffer(typeName), 1);
         }
     }
     // 如果用户已自行安装 ASIO4ALL，可以试跑；风吟不捆绑或静默安装第三方驱动。
@@ -478,7 +474,7 @@ void AudioDeviceService::buildLatencyCandidates()
         if (! typeName.containsIgnoreCase("ASIO")) continue;
         const auto outputs = getAvailableOutputDevices(typeName);
         if (outputs.size() == 1 && outputs[0].containsIgnoreCase("ASIO4ALL"))
-            add(typeName, outputs[0], 128, 3);
+            add(typeName, outputs[0], 128, 2);
     }
    #endif
     // 系统共享模式永远作为最后的兼容性候选。
@@ -492,7 +488,7 @@ void AudioDeviceService::buildLatencyCandidates()
             type->scanForDevices();
             const auto outputs = type->getDeviceNames(false);
             const auto index = type->getDefaultDeviceIndex(false);
-            if (juce::isPositiveAndBelow(index, outputs.size())) add(typeName, outputs[index], 256, 4);
+            if (juce::isPositiveAndBelow(index, outputs.size())) add(typeName, outputs[index], 256, 3);
         }
     }
     const auto current = getStatus();
@@ -583,7 +579,8 @@ std::optional<juce::String> AudioDeviceService::pollAutomaticLatencyTuning()
     const auto status = getStatus();
     const auto xrunsNow = manager.getXRunCount();
     const auto addedXRuns = xrunsNow < 0 ? 0 : juce::jmax(0, xrunsNow - tuningCandidateStartXRuns);
-    const auto stable = status.ready && addedXRuns == 0 && tuningCandidateMaximumCpu < 0.78;
+    // 留出至少约 35% 实时音频余量，避免用户开始播放伴奏后才暴露丢音。
+    const auto stable = status.ready && addedXRuns == 0 && tuningCandidateMaximumCpu < 0.65;
     const auto score = status.estimatedBufferLatencyMs
         + tuningCandidateMaximumCpu * 10.0
         + static_cast<double>(tuningCandidates[static_cast<size_t>(tuningCandidateIndex)].priority) * 0.15
