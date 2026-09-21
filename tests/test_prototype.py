@@ -50,6 +50,31 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertIn("$('#change-video').textContent = '更换视频'", JS)
         self.assertIn(".video-topline,.video-controls{z-index:4}", HTML)
 
+    def test_sound_libraries_follow_scanned_plugins(self):
+        self.assertIn('id="library-tabs"', HTML)
+        self.assertIn("const hasSwam = availableInstruments.some", JS)
+        self.assertIn("const hasKong = availableInstruments.some", JS)
+        self.assertIn("tab.hidden = !available", JS)
+        self.assertIn("key.startsWith('kong-suona')", JS)
+        self.assertIn('"kong-yangqin"', (ROOT / "native" / "Source" / "KongInstrumentCatalog.h").read_text(encoding="utf-8"))
+
+    def test_technique_modes_are_simple_and_editable(self):
+        self.assertIn('data-tech-global="hardware">\u786c\u4ef6\u63a7\u5236', HTML)
+        self.assertIn('data-tech-global="breath">\u6c14\u606f\u63a7\u5236', HTML)
+        self.assertNotIn('data-tech-global="auto"', HTML)
+        self.assertNotIn("hardwareAvailableFor", JS)
+        self.assertIn("event.target.matches('.growl-sensitivity')", JS)
+
+    def test_reverb_and_custom_preset_state_are_not_reset_by_polling(self):
+        self.assertIn("let reverbDragging = false", JS)
+        self.assertIn("if (reset || instrumentChanged) applyToneStyle", JS)
+        self.assertIn("state.activePresetCustom && state.activePresetName", JS)
+        self.assertIn("key.startsWith('horn-')", JS)
+        self.assertNotIn("key.includes('horn') || key === 'euphonium'", JS)
+
+    def test_audio_page_omits_internal_implementation_copy(self):
+        self.assertNotIn("\u5df2\u53d6\u6d88 Windows \u72ec\u5360\u6a21\u5f0f", HTML)
+
     def test_confirmed_visual_features_are_present(self):
         for element_id in ("theme-atmosphere", "breath-wave", "layout-resizer", "lower-stage", "instrument-picture"):
             self.assertIn(f'id="{element_id}"', HTML)
