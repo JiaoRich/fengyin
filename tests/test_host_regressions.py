@@ -10,6 +10,7 @@ JS = (ROOT / "prototype" / "app.js").read_text(encoding="utf-8")
 MASTER = (ROOT / "native" / "Source" / "MasterOutputService.cpp").read_text(encoding="utf-8")
 PRESET = (ROOT / "native" / "Source" / "SoundPresetStore.cpp").read_text(encoding="utf-8")
 PITCH_KEY = (ROOT / "native" / "Source" / "PitchKey.h").read_text(encoding="utf-8")
+TONE_STYLES = (ROOT / "native" / "Source" / "ToneStyleCatalog.h").read_text(encoding="utf-8")
 
 
 class HostRegressionTests(unittest.TestCase):
@@ -42,25 +43,20 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("void MidiInputService::setTransposeSemitones", MIDI)
         self.assertIn("transposeFromTo", PITCH_KEY)
         self.assertIn("PitchKey::transposeFromTo", MIDI)
-        self.assertIn("keyCalibrationPending.exchange", MIDI)
-        self.assertIn("keyCalibrated.store(true", MIDI)
-        self.assertIn("keyCalibrated.load", MIDI)
-        self.assertIn("transposeSemitones.store(0", MIDI)
-        connect_block = MIDI.split("bool MidiInputService::connect", 1)[1].split("void MidiInputService::disconnect", 1)[0]
-        self.assertIn("keyCalibrationPending.store(false", connect_block)
-        self.assertNotIn("keyCalibrationPending.store(true", connect_block)
-        self.assertNotIn('setValue(sourceKeySettingKey()', MIDI)
+        self.assertIn("PitchKey::transposeFromTo(0", MIDI)
+        self.assertNotIn("keyCalibrationPending", MIDI)
+        self.assertNotIn("sourceKey", MIDI)
         self.assertIn("activeOutputNotes", MIDI)
         self.assertIn("sourceNote + transposeSemitones.load", MIDI)
         self.assertIn("sink->noteOff(outputNote)", MIDI)
 
-    def test_machine_code_copy_and_calibration_gate_exist(self):
+    def test_machine_code_copy_and_c_key_transpose_warning_exist(self):
         self.assertIn('id="copy-machine-code"', (ROOT / "prototype" / "index.html").read_text(encoding="utf-8"))
         self.assertIn("nativeEvent('copyMachineCode')", JS)
-        self.assertIn('id="key-calibration-dialog"', (ROOT / "prototype" / "index.html").read_text(encoding="utf-8"))
-        self.assertIn("if (!latestBackendState.keyCalibrated)", JS)
-        self.assertIn("请按平时演奏 C（Do）的指法，吹一个音", JS)
-        self.assertIn("cancelKeyCalibration", MAIN)
+        html = (ROOT / "prototype" / "index.html").read_text(encoding="utf-8")
+        self.assertIn('id="transpose-dialog"', html)
+        self.assertIn("请先将电吹管上的调值设置为 C 调", html)
+        self.assertNotIn("beginKeyCalibration", MAIN)
         self.assertIn("copyMachineCode", MAIN)
 
     def test_video_playback_prioritises_realtime_audio(self):
@@ -107,8 +103,10 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("beginAutomaticLatencyTuning", audio_header)
         self.assertIn("pollAutomaticLatencyTuning", audio_header)
         self.assertIn("latencyCandidateTestMs", audio_device)
-        self.assertIn('containsIgnoreCase("Exclusive")', audio_device)
+        self.assertIn('if (! type->getTypeName().containsIgnoreCase("Exclusive"))', audio_device)
+        self.assertNotIn('if (! typeName.containsIgnoreCase("Exclusive")) continue;', audio_device)
         self.assertIn("addedXRuns == 0", audio_device)
+        self.assertIn("tuningCandidateMaximumCpu < 0.65", audio_device)
         self.assertIn("tuningCandidateMaximumCpu", audio_device)
         self.assertIn('automaticLatencyTunedDevice', audio_device)
         self.assertIn("audio.beginAutomaticLatencyTuning();", MAIN)
@@ -144,6 +142,26 @@ class HostRegressionTests(unittest.TestCase):
         self.assertNotIn("midi.setTechniqueMappings(preset.techniqueMappings)", MAIN)
         self.assertNotIn("midi.setBreathController(preset.breathController)", MAIN)
 
+    def test_intelligent_techniques_are_instrument_specific_and_drive_real_parameters(self):
+        processor = (ROOT / "native" / "Source" / "IntelligentTechniqueProcessor.h").read_text(encoding="utf-8")
+        advisor = (ROOT / "native" / "Source" / "TechniqueAdvisor.h").read_text(encoding="utf-8")
+        self.assertIn("setTechniqueConfiguration", MAIN)
+        self.assertIn("updateBreathDrivenTechniques", MIDI)
+        self.assertIn("onsetGuardMs", processor)
+        self.assertIn("PerformanceTechnique::vibrato", processor)
+        self.assertIn('device.id == "yamaha-yds"', advisor)
+        self.assertIn("TechniqueControlMode::breath", advisor)
+        self.assertIn("growlOnThreshold", processor)
+        self.assertIn("60.0, 0.0", processor)
+
+    def test_non_swam_instruments_are_listed_but_blocked(self):
+        self.assertIn('item->setProperty("supported", isSwam)', MAIN)
+        self.assertIn("当前版本尚未支持 Kontakt、三体等其他音源", MAIN)
+        self.assertIn("SwamFamily::notSwam", MAIN)
+        self.assertIn("pluginHost.getPluginIdentifier().hashCode64()", MAIN)
+        self.assertIn('name.contains("portamento")', HOST)
+        self.assertIn('name.contains("bowpressure")', HOST)
+
     def test_smart_mix_separates_instrument_and_accompaniment(self):
         instrument = HOST.index("masterOutput->processInstrument")
         accompaniment = HOST.index("accompaniment->mixInto", instrument)
@@ -160,6 +178,19 @@ class HostRegressionTests(unittest.TestCase):
         commit = MAIN.split("void MainComponent::commitCurrentPreset", 1)[1].split("void MainComponent::", 1)[0]
         self.assertNotIn("transposeSemitones", commit)
         self.assertNotIn("masterVolume", commit)
+
+    def test_tone_styles_drive_builtin_zero_latency_chain_and_roundtrip(self):
+        self.assertIn('withEventListener("setToneStyle"', MAIN)
+        self.assertIn("masterOutput.setToneStyle", MAIN)
+        self.assertIn('child->setAttribute("toneStyleId"', PRESET)
+        self.assertIn('child->setAttribute("warmth"', PRESET)
+        self.assertIn("styleCompressionThreshold", MASTER)
+        self.assertIn("styleHarshControl", MASTER)
+        self.assertIn("std::tanh", MASTER)
+        self.assertIn('"silky"', TONE_STYLES)
+        self.assertIn('"warm-jazz"', TONE_STYLES)
+        self.assertIn('"cinematic"', TONE_STYLES)
+        self.assertNotIn("favoritePresetButton", MAIN)
 
 
 if __name__ == "__main__":

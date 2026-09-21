@@ -19,10 +19,12 @@ struct SoundPreset
     float breathCurve = 0.9f;
     float breathSmoothing = 0.28f;
     float eqTone = 0.2f;
+    float warmth = 0.2f;
     float reverbMix = 0.28f;
+    juce::String toneStyleId = "natural";
     juce::Array<TechniqueMapping> techniqueMappings;
     juce::String visualTheme = "neon";
-    bool favorite = false;
+    bool favorite = false; // Retained only for reading older preset files.
 };
 
 class SoundPresetStore final

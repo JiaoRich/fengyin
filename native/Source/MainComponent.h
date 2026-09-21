@@ -12,6 +12,7 @@
 #include "RecordingService.h"
 #include "AccompanimentAudioService.h"
 #include "MasterOutputService.h"
+#include "ToneStyleCatalog.h"
 #include "TechniqueAdvisor.h"
 #include "VideoAudioExtractor.h"
 
@@ -48,7 +49,6 @@ private:
     void saveCurrentPreset();
     void commitCurrentPreset(const juce::String& name);
     void loadSelectedPreset(std::function<void(bool, const juce::String&)> completion = {});
-    void togglePresetFavorite();
     void makePresetDefault();
     void deleteSelectedPreset();
     void tryAutoLoadDefaultPreset();
@@ -56,6 +56,7 @@ private:
     void showSetupGuide(bool automatic = false);
     static juce::File getOnboardingMarkerFile();
     void activatePluginOutput(const juce::String& pluginName);
+    void configureTechniqueDefaults();
     void showActivationDialog();
     void refreshLicenseUi();
     void emitLicenseState(const fengyin::LicenseStatus& status);
@@ -114,7 +115,6 @@ private:
     juce::ComboBox presetSelector;
     juce::TextButton savePresetButton;
     juce::TextButton loadPresetButton;
-    juce::TextButton favoritePresetButton;
     juce::TextButton defaultPresetButton;
     juce::TextButton deletePresetButton;
     juce::TextButton recordButton;
@@ -124,6 +124,7 @@ private:
     juce::TextButton recordingManagerButton;
     juce::Array<fengyin::SoundPreset> cachedPresets;
     juce::String editingPresetId;
+    juce::String currentToneStyleId { "natural" };
     juce::Array<juce::PluginDescription> cachedInstrumentPlugins;
     juce::Array<juce::PluginDescription> cachedEffectPlugins;
     fengyin::VideoPlayerPanel videoPlayer;

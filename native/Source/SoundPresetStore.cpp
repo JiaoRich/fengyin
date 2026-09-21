@@ -93,7 +93,7 @@ juce::File SoundPresetStore::getFile() const
 std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<SoundPreset>& presets)
 {
     auto root = std::make_unique<juce::XmlElement>("FENGYIN_SOUND_PRESETS");
-    root->setAttribute("version", 4);
+    root->setAttribute("version", 5);
     for (const auto& preset : presets)
     {
         auto* child = root->createNewChildElement("PRESET");
@@ -106,7 +106,9 @@ std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<Soun
         child->setAttribute("breathCurve", static_cast<double>(preset.breathCurve));
         child->setAttribute("breathSmoothing", static_cast<double>(preset.breathSmoothing));
         child->setAttribute("eqTone", static_cast<double>(preset.eqTone));
+        child->setAttribute("warmth", static_cast<double>(preset.warmth));
         child->setAttribute("reverbMix", static_cast<double>(preset.reverbMix));
+        child->setAttribute("toneStyleId", preset.toneStyleId);
         child->setAttribute("visualTheme", preset.visualTheme);
         child->setAttribute("favorite", preset.favorite);
         child->createNewChildElement("PLUGIN_STATE")->addTextElement(preset.pluginState.toBase64Encoding());
@@ -143,7 +145,9 @@ juce::Array<SoundPreset> SoundPresetStore::fromXml(const juce::XmlElement& root)
         preset.breathCurve = static_cast<float>(child->getDoubleAttribute("breathCurve", 0.9));
         preset.breathSmoothing = static_cast<float>(child->getDoubleAttribute("breathSmoothing", 0.28));
         preset.eqTone = static_cast<float>(child->getDoubleAttribute("eqTone", 0.2));
+        preset.warmth = static_cast<float>(child->getDoubleAttribute("warmth", 0.2));
         preset.reverbMix = static_cast<float>(child->getDoubleAttribute("reverbMix", 0.28));
+        preset.toneStyleId = child->getStringAttribute("toneStyleId", "natural");
         preset.visualTheme = child->getStringAttribute("visualTheme", "neon");
         preset.favorite = child->getBoolAttribute("favorite", false);
         if (auto* pluginState = child->getChildByName("PLUGIN_STATE"))

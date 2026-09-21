@@ -4,6 +4,21 @@
 
 namespace fengyin
 {
+void MasterOutputService::setToneStyle(const ToneStyleSettings& settings) noexcept
+{
+    eqTone.store(juce::jlimit(-1.0f, 1.0f, settings.tone));
+    warmth.store(juce::jlimit(0.0f, 1.0f, settings.warmth));
+    reverbMix.store(juce::jlimit(0.0f, 0.6f, settings.reverbMix));
+    styleCompressionThreshold.store(juce::jlimit(0.20f, 0.95f, settings.compressionThreshold));
+    styleCompressionRatio.store(juce::jlimit(1.0f, 4.0f, settings.compressionRatio));
+    styleSaturation.store(juce::jlimit(0.0f, 0.35f, settings.saturation));
+    styleHarshControl.store(juce::jlimit(0.0f, 0.35f, settings.harshControl));
+    styleRoomSize.store(juce::jlimit(0.0f, 1.0f, settings.reverbRoomSize));
+    styleDamping.store(juce::jlimit(0.0f, 1.0f, settings.reverbDamping));
+    styleWidth.store(juce::jlimit(0.0f, 1.0f, settings.reverbWidth));
+    lastInstrumentReverbMix = -1.0f;
+}
+
 void MasterOutputService::setSampleRate(double value) noexcept
 {
     const auto validRate = value > 0.0 ? value : 48000.0;
@@ -41,11 +56,11 @@ void MasterOutputService::updateInstrumentReverb(float mix, const ProfileSetting
     if (std::abs(mix - lastInstrumentReverbMix) < 0.001f && profile == lastInstrumentProfile)
         return;
     juce::Reverb::Parameters parameters;
-    parameters.roomSize = settings.reverbRoomSize;
-    parameters.damping = settings.reverbDamping;
+    parameters.roomSize = styleRoomSize.load(std::memory_order_relaxed);
+    parameters.damping = styleDamping.load(std::memory_order_relaxed);
     parameters.wetLevel = juce::jlimit(0.0f, 0.48f, mix * settings.reverbScale);
     parameters.dryLevel = 1.0f - parameters.wetLevel * 0.32f;
-    parameters.width = 0.88f;
+    parameters.width = styleWidth.load(std::memory_order_relaxed);
     instrumentReverb.setParameters(parameters);
     lastInstrumentReverbMix = mix;
     lastInstrumentProfile = profile;
@@ -76,10 +91,11 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
                             * (linkedPeak > instrumentEnvelope ? envelopeAttack : envelopeRelease);
 
         auto desiredCompressorGain = 1.0f;
-        if (smart && instrumentEnvelope > settings.compressionThreshold)
+        const auto threshold = styleCompressionThreshold.load(std::memory_order_relaxed);
+        const auto ratio = styleCompressionRatio.load(std::memory_order_relaxed);
+        if (smart && instrumentEnvelope > threshold)
         {
-            const auto compressed = settings.compressionThreshold
-                + (instrumentEnvelope - settings.compressionThreshold) / settings.compressionRatio;
+            const auto compressed = threshold + (instrumentEnvelope - threshold) / ratio;
             desiredCompressorGain = compressed / juce::jmax(0.0001f, instrumentEnvelope);
         }
         compressorGain += (desiredCompressorGain - compressorGain)
@@ -110,9 +126,18 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
             const auto highBand = value - toneLowPass[lane];
             value += tone >= 0.0f ? tone * 0.24f * highBand
                                   : tone * 0.20f * highBand;
-            const auto harshControl = smart && settings.toneBias < -0.05f
-                ? juce::jlimit(0.0f, 0.10f, activity * (-settings.toneBias) * 0.7f) : 0.0f;
+            const auto warm = warmth.load(std::memory_order_relaxed);
+            value += toneLowPass[lane] * warm * 0.075f;
+            const auto harshControl = smart
+                ? activity * styleHarshControl.load(std::memory_order_relaxed) : 0.0f;
             value -= highBand * harshControl;
+            const auto saturation = styleSaturation.load(std::memory_order_relaxed);
+            if (saturation > 0.001f)
+            {
+                const auto drive = 1.0f + saturation * 4.0f;
+                const auto saturated = std::tanh(value * drive) / std::tanh(drive);
+                value += (saturated - value) * saturation;
+            }
             data[sample] = value * compressorGain * automaticTrim;
         }
     }
