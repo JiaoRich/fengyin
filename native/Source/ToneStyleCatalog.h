@@ -59,11 +59,11 @@ public:
             { "cinematic", juce::String::fromUTF8("电影叙事"), juce::String::fromUTF8("宽广、明亮、具有画面感"), { .18f,.38f,.40f,.48f,2.0f,.08f,.13f,.68f,.55f,1.0f } } };
         if (key.startsWith("kong-"))
         {
-            if (key == "kong-dizi" || key == "kong-xiao" || key == "kong-xun") return {
+            if (key.startsWith("kong-dizi") || key == "kong-xiao" || key == "kong-nanxiao" || key == "kong-xun") return {
                 natural(),
                 { "silk-bamboo", juce::String::fromUTF8("清雅丝竹"), juce::String::fromUTF8("清透自然，保留气息细节"), { .12f,.28f,.29f,.57f,1.55f,.035f,.11f,.52f,.60f,.96f } },
                 { "landscape", juce::String::fromUTF8("空灵山水"), juce::String::fromUTF8("宽广悠远，适合古风抒情"), { -.10f,.42f,.44f,.60f,1.50f,.05f,.12f,.70f,.62f,1.0f } } };
-            if (key == "kong-suona" || key == "kong-guanzi") return {
+            if (key.startsWith("kong-suona") || key == "kong-guanzi") return {
                 natural(),
                 { "festive", juce::String::fromUTF8("喜庆明亮"), juce::String::fromUTF8("鲜明通透，保留民乐冲击力"), { .24f,.20f,.19f,.46f,2.25f,.08f,.23f,.40f,.58f,.88f } },
                 { "epic-folk", juce::String::fromUTF8("厚重叙事"), juce::String::fromUTF8("稳重有力，适合大场面"), { -.08f,.46f,.35f,.47f,2.2f,.12f,.20f,.62f,.58f,.98f } } };
