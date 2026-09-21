@@ -60,6 +60,7 @@ private:
     void showSetupGuide(bool automatic = false);
     static juce::File getOnboardingMarkerFile();
     void activatePluginOutput(const juce::String& pluginName);
+    [[nodiscard]] fengyin::SwamFamily currentTechniqueFamily() const;
     void configureTechniqueDefaults();
     void showActivationDialog();
     void refreshLicenseUi();
@@ -132,6 +133,8 @@ private:
     juce::String currentPluginBrand { "swam" };
     juce::String currentInstrumentKey;
     juce::String currentInstrumentChineseName;
+    juce::String currentPresetDisplayName;
+    bool currentPresetIsCustom = false;
     fengyin::ToneStyleSettings currentBaseToneSettings;
     juce::Array<juce::PluginDescription> cachedInstrumentPlugins;
     juce::Array<juce::PluginDescription> cachedEffectPlugins;
