@@ -101,7 +101,7 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
         auto desiredCompressorGain = 1.0f;
         const auto threshold = styleCompressionThreshold.load(std::memory_order_relaxed);
         const auto ratio = styleCompressionRatio.load(std::memory_order_relaxed);
-        if (smart && instrumentEnvelope > threshold)
+        if (instrumentEnvelope > threshold)
         {
             const auto compressed = threshold + (instrumentEnvelope - threshold) / ratio;
             desiredCompressorGain = compressed / juce::jmax(0.0001f, instrumentEnvelope);
@@ -132,19 +132,18 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
             value -= rumbleLowPass[lane];
             toneLowPass[lane] += 0.075f * (value - toneLowPass[lane]);
             const auto highBand = value - toneLowPass[lane];
-            value += tone >= 0.0f ? tone * 0.24f * highBand
-                                  : tone * 0.20f * highBand;
+            value += tone >= 0.0f ? tone * 0.52f * highBand
+                                  : tone * 0.38f * highBand;
             const auto warm = warmth.load(std::memory_order_relaxed);
-            value += toneLowPass[lane] * warm * 0.075f;
-            const auto harshControl = smart
-                ? activity * styleHarshControl.load(std::memory_order_relaxed) : 0.0f;
+            value += toneLowPass[lane] * warm * 0.14f;
+            const auto harshControl = activity * styleHarshControl.load(std::memory_order_relaxed);
             value -= highBand * harshControl;
             const auto saturation = styleSaturation.load(std::memory_order_relaxed);
             if (saturation > 0.001f)
             {
                 const auto drive = 1.0f + saturation * 4.0f;
                 const auto saturated = std::tanh(value * drive) / std::tanh(drive);
-                value += (saturated - value) * saturation;
+                value += (saturated - value) * juce::jlimit(0.0f, 0.85f, 0.18f + saturation * 1.9f);
             }
             data[sample] = value * compressorGain * automaticTrim * styleOutputGain.load(std::memory_order_relaxed);
         }
