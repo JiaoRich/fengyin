@@ -44,7 +44,6 @@ public:
     [[nodiscard]] bool isSmartOptimisationEnabled() const noexcept { return smartOptimisation.load(); }
     [[nodiscard]] float getWarmth() const noexcept { return warmth.load(); }
     [[nodiscard]] ToneStyleSettings getToneStyle() const noexcept;
-    [[nodiscard]] float getAccompanimentDuckGain() const noexcept { return accompanimentDuckGain.load(); }
     [[nodiscard]] float getLeftPeak() const noexcept { return leftPeak.load(); }
     [[nodiscard]] float getRightPeak() const noexcept { return rightPeak.load(); }
 
@@ -82,18 +81,14 @@ private:
     std::atomic<float> styleOutputGain { 1.0f };
     std::atomic<bool> smartOptimisation { true };
     std::atomic<int> instrumentProfile { static_cast<int>(InstrumentMixProfile::generic) };
-    std::atomic<float> accompanimentDuckGain { 1.0f };
     std::atomic<double> sampleRate { 48000.0 };
 
     juce::Reverb instrumentReverb;
-    juce::Reverb glueReverb;
     float lastInstrumentReverbMix = -1.0f;
     int lastInstrumentProfile = -1;
     float instrumentEnvelope = 0.0f;
     float compressorGain = 1.0f;
     float automaticTrim = 1.0f;
-    float duckGainState = 1.0f;
-    float limiterGain = 1.0f;
     std::array<float, 2> toneLowPass {};
     std::array<float, 2> rumbleLowPass {};
 

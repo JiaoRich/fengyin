@@ -37,8 +37,10 @@ public:
     // 首次运行或自动跟随到新设备时，优先使用 Windows 低延迟共享模式、48 kHz 和 128 采样。
     // 用户在设置面板手动应用过配置后，不再自动覆盖。
     juce::String applyBestInitialSetup();
-    // Windows 普通音频模式下跟随系统默认输出，使 WebView 视频和软音源始终去往同一耳机/音响。
-    // ASIO 有独立的低延迟设备路由，不在这里强制覆盖用户选择。
+    // 检测耳机、音响或 USB 声卡是否已成为 Windows 默认输出。
+    // 手动模式尊重专业用户选择；自动模式才跟随系统。
+    [[nodiscard]] bool systemDefaultOutputChanged();
+    // Windows 共享模式下跟随系统默认输出，使伴奏和软音源去往同一耳机/音响。
     bool followSystemDefaultOutput();
     // 对当前输出设备应用适合实时演奏的设置：关闭输入、优先 48 kHz，并选用设备可稳定支持的低延迟缓冲。
     juce::String optimiseForLivePerformance();

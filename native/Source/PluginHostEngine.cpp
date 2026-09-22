@@ -35,8 +35,7 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
     if (masterOutput != nullptr)
         masterOutput->processInstrument(outputs, numOutputs, numSamples);
     if (accompaniment != nullptr)
-        accompaniment->mixInto(outputs, numOutputs, numSamples,
-            masterOutput != nullptr ? masterOutput->getAccompanimentDuckGain() : 1.0f);
+        accompaniment->mixInto(outputs, numOutputs, numSamples);
     if (masterOutput != nullptr)
         masterOutput->processMaster(outputs, numOutputs, numSamples);
     if (recorder != nullptr)

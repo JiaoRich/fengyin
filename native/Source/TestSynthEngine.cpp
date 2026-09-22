@@ -64,8 +64,7 @@ void TestSynthEngine::audioDeviceIOCallbackWithContext(const float* const*,
     if (masterOutput != nullptr)
         masterOutput->processInstrument(outputs, numOutputs, numSamples);
     if (accompaniment != nullptr)
-        accompaniment->mixInto(outputs, numOutputs, numSamples,
-            masterOutput != nullptr ? masterOutput->getAccompanimentDuckGain() : 1.0f);
+        accompaniment->mixInto(outputs, numOutputs, numSamples);
     if (masterOutput != nullptr)
         masterOutput->processMaster(outputs, numOutputs, numSamples);
     leftPeak.store(peak, std::memory_order_relaxed);

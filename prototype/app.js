@@ -1443,10 +1443,8 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   setAudioControlsBusy(!!state?.autoTuning);
   setAudioOptions($('#audio-driver-select'), state?.types, state?.type, value => {
     const name = String(value);
-    if (/ASIO4ALL/i.test(name)) return `${name}（最低延迟，可能占用声卡）`;
-    if (/ASIO/i.test(name)) return `${name}（专业低延迟）`;
-    if (/Low Latency|低延迟/i.test(name)) return `${name}（兼容播放）`;
-    return name;
+    if (/Low Latency|低延迟/i.test(name)) return `${name}（推荐·共享）`;
+    return `${name}（共享）`;
   });
   setAudioOptions($('#audio-output-select'), state?.outputs, state?.output, value => String(value));
   setAudioOptions($('#audio-rate-select'), state?.sampleRates, Number(state?.sampleRate), value => `${Math.round(Number(value))} Hz${Number(value) === 48000 ? '（推荐）' : ''}`);
@@ -1455,8 +1453,8 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   const buffers = Array.isArray(state?.bufferSizes) ? state.bufferSizes : [];
   const lowLatency = !!state?.lowLatencyMode;
   $('#audio-driver-help').textContent = lowLatency
-    ? '已使用低延迟驱动'
-    : '当前为普通模式；点击“自动优化”切换低延迟驱动';
+    ? '已使用 Windows 共享低延迟，不影响其他软件发声'
+    : '当前为 Windows 共享兼容模式；可点击“自动优化”降低延迟';
   $('#audio-rate-help').textContent = rates.length <= 1
     ? '当前设备仅上报这一个可用采样率'
     : '伴奏视频和软音源推荐使用 48000 Hz';

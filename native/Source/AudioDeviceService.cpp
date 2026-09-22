@@ -3,8 +3,19 @@
 
 namespace
 {
-constexpr int currentAudioSetupRevision = 5;
-constexpr double latencyCandidateTestMs = 1800.0;
+constexpr int currentAudioSetupRevision = 6;
+constexpr double latencyCandidateTestMs = 2600.0;
+
+bool isWindowsSharedType(const juce::String& typeName)
+{
+   #if JUCE_WINDOWS
+    return typeName == "Windows Audio"
+        || typeName.containsIgnoreCase("Low Latency Mode")
+        || typeName.containsIgnoreCase(juce::String::fromUTF8("低延迟"));
+   #else
+    return ! typeName.containsIgnoreCase("Exclusive") && ! typeName.containsIgnoreCase("ASIO");
+   #endif
+}
 
 int chooseLiveBufferSize(juce::Array<int> sizes, int preferred)
 {
@@ -22,13 +33,11 @@ int chooseLiveBufferSize(juce::Array<int> sizes, int preferred)
     return sizes.getLast();
 }
 
-int recommendedInitialBuffer(const juce::String& deviceType)
+int recommendedInitialBuffer(const juce::String&)
 {
     const auto cpuCount = juce::SystemStats::getNumCpus();
     const auto memoryMb = juce::SystemStats::getMemorySizeInMegabytes();
     const auto modestComputer = cpuCount <= 4 || (memoryMb > 0 && memoryMb < 8192);
-    if (deviceType.containsIgnoreCase("ASIO"))
-        return modestComputer ? 128 : 64;
     return modestComputer ? 256 : 128;
 }
 }
@@ -50,6 +59,12 @@ juce::String AudioDeviceService::initialise()
     std::unique_ptr<juce::XmlElement> saved;
     if (auto* settings = properties.getUserSettings())
         saved = juce::parseXML(settings->getValue("audioDevice"));
+   #if JUCE_WINDOWS
+    // 旧版可能保存了 ASIO/Exclusive。启动时不允许短暂打开这些独占路径，
+    // 而是直接从 Windows 共享设备起步。
+    if (saved != nullptr && ! isWindowsSharedType(saved->getStringAttribute("deviceType")))
+        saved.reset();
+   #endif
     lastError = manager.initialise(0, 2, saved.get(), true);
     return lastError;
 }
@@ -77,7 +92,7 @@ juce::StringArray AudioDeviceService::getAvailableDeviceTypes()
 {
     juce::StringArray names;
     for (const auto* type : manager.getAvailableDeviceTypes())
-        if (! type->getTypeName().containsIgnoreCase("Exclusive"))
+        if (isWindowsSharedType(type->getTypeName()))
             names.add(type->getTypeName());
     return names;
 }
@@ -108,8 +123,8 @@ juce::Array<int> AudioDeviceService::getAvailableBufferSizes()
 
 juce::String AudioDeviceService::selectDeviceType(const juce::String& typeName)
 {
-    if (typeName.containsIgnoreCase("Exclusive"))
-        return juce::String::fromUTF8("风吟已停用 Windows 独占模式，请选择低延迟共享模式或 ASIO");
+    if (! isWindowsSharedType(typeName))
+        return juce::String::fromUTF8("风吟仅使用 Windows 共享输出，不会独占耳机或音响");
     manager.setCurrentAudioDeviceType(typeName, true);
     lastError = manager.getCurrentAudioDeviceType() == typeName
         ? juce::String()
@@ -147,14 +162,13 @@ juce::String AudioDeviceService::applyBestInitialSetup()
     auto* settings = properties.getUserSettings();
     const auto current = getStatus();
     const auto revision = settings != nullptr ? settings->getIntValue("audioSetupRevision", 0) : 0;
-    // 0.7.4 会把普通 Windows Audio 的系统固定缓冲（常见为 512）
-    // 误当成已优化的手动设置。升级后只迁移这一种明显的旧配置，
-    // ASIO、独占模式和已经较低的手动缓冲仍保留。
+    // 升级后迁移旧版误判的固定大缓冲，并强制废弃任何已保存的
+    // ASIO/独占路径；只保留用户亲自选择的 Windows 共享参数。
     const auto legacyFixedBuffer = revision < currentAudioSetupRevision
         && current.deviceType.equalsIgnoreCase("Windows Audio")
         && current.bufferSize >= 512;
     const auto legacyExclusiveMode = revision < currentAudioSetupRevision
-        && current.deviceType.containsIgnoreCase("Exclusive");
+        && ! isWindowsSharedType(current.deviceType);
     if (settings != nullptr && settings->getValue("audioSetupMode") == "manual"
         && ! legacyFixedBuffer && ! legacyExclusiveMode)
     {
@@ -207,26 +221,6 @@ juce::String AudioDeviceService::preferredLiveDeviceType()
 {
     const auto types = getAvailableDeviceTypes();
    #if JUCE_WINDOWS
-    // 已经成功打开厂家 ASIO 时优先保留；不要为了“自动”而切回系统驱动。
-    if (auto* current = manager.getCurrentAudioDevice())
-        if (current->isOpen() && current->getTypeName().containsIgnoreCase("ASIO"))
-            return manager.getCurrentAudioDeviceType();
-
-    // 只有唯一且明确属于硬件厂家的 ASIO 输出时才自动选择。
-    // ASIO4ALL/Generic 等包装驱动往往需要用户手工路由，不适合作为“插上就吹”的默认值。
-    for (const auto& typeName : types)
-    {
-        if (! typeName.containsIgnoreCase("ASIO")) continue;
-        if (auto* type = findType(typeName))
-        {
-            type->scanForDevices();
-            const auto outputs = type->getDeviceNames(false);
-            if (outputs.size() == 1
-                && ! outputs[0].containsIgnoreCase("ASIO4ALL")
-                && ! outputs[0].containsIgnoreCase("Generic"))
-                return typeName;
-        }
-    }
     for (const auto& type : types)
         if (type.containsIgnoreCase("Low Latency Mode")
             || type.containsIgnoreCase(juce::String::fromUTF8("低延迟")))
@@ -293,10 +287,10 @@ juce::String AudioDeviceService::currentDeviceSignature() const
 bool AudioDeviceService::followSystemDefaultOutput()
 {
    #if JUCE_WINDOWS
-    if (tuningActive)
+    if (tuningActive || ! isAutomaticMode())
         return false;
     auto* current = manager.getCurrentAudioDevice();
-    if (current == nullptr || current->getTypeName().containsIgnoreCase("ASIO"))
+    if (current == nullptr || ! isWindowsSharedType(current->getTypeName()))
         return false;
 
     auto* type = findType(manager.getCurrentAudioDeviceType());
@@ -319,9 +313,40 @@ bool AudioDeviceService::followSystemDefaultOutput()
     setup.useDefaultOutputChannels = true;
     lastError = manager.setAudioDeviceSetup(setup, true);
     if (lastError.isNotEmpty())
+    {
+        // 新端点可能不接受旧设备的采样率/周期。先用它自己的共享默认值打开，
+        // 随后的静默预检再选出最低稳定周期。
+        setup.sampleRate = 0.0;
+        setup.bufferSize = 0;
+        lastError = manager.setAudioDeviceSetup(setup, true);
+    }
+    if (lastError.isNotEmpty())
         return false;
+    if (auto* settings = properties.getUserSettings())
+    {
+        settings->setValue("automaticAudioDevice", currentDeviceSignature());
+        settings->removeValue("automaticLatencyTunedDevice");
+    }
     saveSettings();
     return true;
+   #else
+    return false;
+   #endif
+}
+
+bool AudioDeviceService::systemDefaultOutputChanged()
+{
+   #if JUCE_WINDOWS
+    if (tuningActive || ! isAutomaticMode()) return false;
+    auto* current = manager.getCurrentAudioDevice();
+    if (current == nullptr || ! isWindowsSharedType(current->getTypeName())) return false;
+    auto* type = findType(manager.getCurrentAudioDeviceType());
+    if (type == nullptr) return false;
+    type->scanForDevices();
+    const auto outputs = type->getDeviceNames(false);
+    const auto index = type->getDefaultDeviceIndex(false);
+    return juce::isPositiveAndBelow(index, outputs.size())
+        && outputs[index].isNotEmpty() && outputs[index] != current->getName();
    #else
     return false;
    #endif
@@ -334,9 +359,7 @@ juce::String AudioDeviceService::optimiseForLivePerformance()
         return juce::String::fromUTF8("声音设备尚未准备好");
 
    #if JUCE_WINDOWS
-    // “自动优化”必须真正离开系统固定大缓冲的普通共享模式。
-    // 已在使用厂家 ASIO 时不强制替换。
-    if (! device->getTypeName().containsIgnoreCase("ASIO"))
+    // 优先进入 IAudioClient3 支持的 Windows 共享低延迟类型。
     {
         const auto preferredType = preferredLiveDeviceType();
         if (preferredType.isNotEmpty() && preferredType != manager.getCurrentAudioDeviceType())
@@ -401,9 +424,9 @@ bool AudioDeviceService::stabiliseAfterXRuns()
     std::sort(buffers.begin(), buffers.end());
     int next = 0;
     for (const auto candidate : buffers)
-        if (candidate > setup.bufferSize && candidate <= 256) { next = candidate; break; }
-    if (next == 0 && buffers.isEmpty() && setup.bufferSize < 256)
-        next = setup.bufferSize < 128 ? 128 : 256;
+        if (candidate > setup.bufferSize && candidate <= 1024) { next = candidate; break; }
+    if (next == 0 && buffers.isEmpty() && setup.bufferSize < 512)
+        next = setup.bufferSize < 128 ? 128 : setup.bufferSize < 256 ? 256 : 512;
     if (next == 0) return false;
     setup.bufferSize = next;
     setup.inputDeviceName.clear();
@@ -440,21 +463,13 @@ void AudioDeviceService::buildLatencyCandidates()
     {
         if (typeName.isEmpty() || outputName.isEmpty()) return;
         for (const auto& existing : tuningCandidates)
-            if (existing.typeName == typeName && existing.outputName == outputName) return;
+            if (existing.typeName == typeName && existing.outputName == outputName
+                && existing.preferredBuffer == preferredBuffer) return;
         tuningCandidates.push_back({ typeName, outputName, preferredBuffer, priority });
     };
 
     const auto types = getAvailableDeviceTypes();
    #if JUCE_WINDOWS
-    // 硬件厂家 ASIO 只在唯一且无需人工路由时自动尝试。
-    for (const auto& typeName : types)
-    {
-        if (! typeName.containsIgnoreCase("ASIO")) continue;
-        const auto outputs = getAvailableOutputDevices(typeName);
-        if (outputs.size() == 1 && ! outputs[0].containsIgnoreCase("ASIO4ALL")
-            && ! outputs[0].containsIgnoreCase("Generic"))
-            add(typeName, outputs[0], recommendedInitialBuffer(typeName), 0);
-    }
     for (const auto& typeName : types)
     {
         if (! (typeName.containsIgnoreCase("Low Latency Mode")
@@ -465,16 +480,13 @@ void AudioDeviceService::buildLatencyCandidates()
             const auto outputs = type->getDeviceNames(false);
             const auto index = type->getDefaultDeviceIndex(false);
             if (juce::isPositiveAndBelow(index, outputs.size()))
-                add(typeName, outputs[index], recommendedInitialBuffer(typeName), 1);
+            {
+                // 先真正试跑 128；如果当前声卡/电脑承受不住，再比较 256。
+                // JUCE 会把不被驱动支持的值对齐到合法的 IAudioClient3 周期。
+                add(typeName, outputs[index], 128, 0);
+                add(typeName, outputs[index], 256, 0);
+            }
         }
-    }
-    // 如果用户已自行安装 ASIO4ALL，可以试跑；风吟不捆绑或静默安装第三方驱动。
-    for (const auto& typeName : types)
-    {
-        if (! typeName.containsIgnoreCase("ASIO")) continue;
-        const auto outputs = getAvailableOutputDevices(typeName);
-        if (outputs.size() == 1 && outputs[0].containsIgnoreCase("ASIO4ALL"))
-            add(typeName, outputs[0], 128, 2);
     }
    #endif
     // 系统共享模式永远作为最后的兼容性候选。
@@ -488,7 +500,7 @@ void AudioDeviceService::buildLatencyCandidates()
             type->scanForDevices();
             const auto outputs = type->getDeviceNames(false);
             const auto index = type->getDefaultDeviceIndex(false);
-            if (juce::isPositiveAndBelow(index, outputs.size())) add(typeName, outputs[index], 256, 3);
+            if (juce::isPositiveAndBelow(index, outputs.size())) add(typeName, outputs[index], 256, 1);
         }
     }
     const auto current = getStatus();
@@ -595,7 +607,7 @@ juce::String AudioDeviceService::finishAutomaticLatencyTuning()
 {
     const LatencyResult* best = nullptr;
     for (const auto& result : tuningResults)
-        if (result.status.ready && (best == nullptr || result.score < best->score)) best = &result;
+        if (result.status.ready && result.stable && (best == nullptr || result.score < best->score)) best = &result;
 
     bool restoredFallback = false;
     if (best != nullptr)

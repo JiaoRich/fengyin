@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 0.10.0 LANGUAGES C CXX)
+project(FengYin VERSION 0.11.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -164,8 +164,9 @@ target_link_libraries(FengYinLicenseGenerator PRIVATE juce::juce_cryptography)
 
 if(WIN32)
     target_compile_definitions(FengYin PRIVATE
-        JUCE_ASIO=1
-        JUCE_ASIO_USE_EXTERNAL_SDK=0
+        # 风吟的默认用户使用板载声卡。ASIO4ALL 等 ASIO 包装驱动会绕过
+        # Windows 混音并导致其他应用无声，与产品的“永不独占”原则冲突。
+        JUCE_ASIO=0
         JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
         NOMINMAX
         WIN32_LEAN_AND_MEAN

@@ -338,7 +338,7 @@ void MainComponent::setupWebInterface()
             audioOutputSyncTicks = 0;
             if (videoPlaybackActive)
             {
-                audio.followSystemDefaultOutput();
+                followSystemAudioOutputIfNeeded();
                 if (webVideoAudioReady)
                 {
                     accompaniment.setPosition(webVideoPosition);
@@ -816,7 +816,7 @@ void MainComponent::paint(juce::Graphics& g)
         const juce::String descriptions[] { {}, utf8("命名、保存并快速恢复完整的演奏音色。"),
             utf8("按从左到右的顺序管理音源、效果器和最终输出。"),
             utf8("连接电吹管并调整气息、起音与弯音手感。"),
-            utf8("选择驱动与输出设备，推荐 ASIO、48000 Hz、128 缓冲区。"),
+            utf8("自动跟随 Windows 默认耳机或音响，并选择共享低延迟方案。"),
             utf8("选择视觉主题、性能模式、使用向导和永久授权。") };
         g.drawText(descriptions[static_cast<int>(currentPage)], pagePanel.toNearestInt().reduced(28).removeFromTop(36),
                    juce::Justification::centredLeft);
@@ -984,7 +984,9 @@ void MainComponent::timerCallback()
     if (++audioOutputSyncTicks >= 60)
     {
         audioOutputSyncTicks = 0;
-        const auto outputChanged = audio.followSystemDefaultOutput();
+        const auto outputChanged = audio.systemDefaultOutputChanged();
+        if (outputChanged)
+            followSystemAudioOutputIfNeeded();
         const auto safeToRetune = ! videoPlaybackActive && ! recorder.isRecording() && snapshot.breath < 4;
         if (safeToRetune && (outputChanged || audio.needsAutomaticLatencyTuning()))
             audio.beginAutomaticLatencyTuning();
@@ -1340,6 +1342,33 @@ void MainComponent::timerCallback()
                             juce::dontSendNotification);
     }
     repaint();
+}
+
+void MainComponent::followSystemAudioOutputIfNeeded()
+{
+    if (! audio.systemDefaultOutputChanged()) return;
+
+    // 切换 Windows 默认输出前先收音，避免正在发声的音符被遗留在旧设备。
+    pluginHost.resetPerformance();
+    testSynth.resetPerformance();
+    if (recorder.isRecording()) toggleRecording();
+
+    const auto shouldResumeAccompaniment = videoPlaybackActive && webVideoAudioReady;
+    const auto resumePosition = webVideoAudioReady ? accompaniment.getPosition() : webVideoPosition;
+    accompaniment.pause();
+    if (! audio.followSystemDefaultOutput()) return;
+
+    if (shouldResumeAccompaniment)
+    {
+        accompaniment.setPosition(resumePosition);
+        accompaniment.play();
+    }
+
+    const auto status = audio.getStatus();
+    const auto message = utf8("已自动切换声音输出：") + status.deviceName;
+    if (webInterface != nullptr)
+        webInterface->emitEventIfBrowserIsVisible("audioOptimisationResult", message);
+    emitAudioSettingsState(true, message);
 }
 
 void MainComponent::startPluginScan()
@@ -1897,7 +1926,7 @@ void MainComponent::showSetupGuide(bool automatic)
     const juce::String instructions[] {
         {}, utf8("您可以先开始3天完整试用，满意后再永久激活。"),
         utf8("请连接并打开电吹管，然后运行连接向导。"),
-        utf8("请检查声音设备。推荐 ASIO、48000 Hz、缓冲区 128。"),
+        utf8("请检查耳机或音响。风吟会自动选择 Windows 共享低延迟方案。"),
         utf8("最后扫描电脑中的 SWAM/VST3 音源。首次扫描可能需要一些时间。"),
         utf8("基础设置已经完成，可以开始演奏。")
     };
@@ -2248,8 +2277,7 @@ void MainComponent::emitAudioSettingsState(bool success, const juce::String& mes
     result->setProperty("automatic", audio.isAutomaticMode());
     result->setProperty("autoTuning", audio.isAutomaticLatencyTuning());
     result->setProperty("lowLatencyMode", status.deviceType.containsIgnoreCase("Low Latency Mode")
-                                              || status.deviceType.containsIgnoreCase(utf8("低延迟"))
-                                              || status.deviceType.containsIgnoreCase("ASIO"));
+                                              || status.deviceType.containsIgnoreCase(utf8("低延迟")));
 
     juce::Array<juce::var> types;
     for (const auto& item : audio.getAvailableDeviceTypes()) types.add(item);
@@ -2323,7 +2351,7 @@ void MainComponent::showDeviceSettings()
     const auto current = audio.getStatus();
     const auto types = audio.getAvailableDeviceTypes();
     deviceDialog = std::make_unique<juce::AlertWindow>(utf8("声音设备设置"),
-        utf8("推荐：普通电脑优先使用低延迟模式、48000 Hz、128 缓冲区；专业声卡可选厂家 ASIO。"),
+        utf8("推荐使用自动优化。所有可选模式均为 Windows 共享输出，不影响其他软件发声。"),
         juce::MessageBoxIconType::QuestionIcon);
     deviceDialog->addComboBox("type", types, utf8("声音驱动"));
     auto* typeBox = deviceDialog->getComboBoxComponent("type");
@@ -2331,13 +2359,33 @@ void MainComponent::showDeviceSettings()
     deviceDialog->addComboBox("output", audio.getAvailableOutputDevices(current.deviceType), utf8("输出设备"));
     auto* outputBox = deviceDialog->getComboBoxComponent("output");
     outputBox->setText(current.deviceName, juce::dontSendNotification);
-    deviceDialog->addComboBox("rate", { utf8("44100 Hz"), utf8("48000 Hz（推荐）"), utf8("96000 Hz") }, utf8("采样率"));
+    juce::StringArray rateLabels;
+    int selectedRate = 1;
+    const auto availableRates = audio.getAvailableSampleRates();
+    for (int index = 0; index < availableRates.size(); ++index)
+    {
+        const auto rate = juce::roundToInt(availableRates[index]);
+        rateLabels.add(juce::String(rate) + (rate == 48000 ? utf8(" Hz（推荐）") : " Hz"));
+        if (std::abs(availableRates[index] - current.sampleRate) < 1.0) selectedRate = index + 1;
+    }
+    if (rateLabels.isEmpty()) rateLabels.add(juce::String(juce::roundToInt(current.sampleRate)) + " Hz");
+    deviceDialog->addComboBox("rate", rateLabels, utf8("采样率"));
     auto* rateBox = deviceDialog->getComboBoxComponent("rate");
-    rateBox->setSelectedId(current.sampleRate >= 88000.0 ? 3 : (current.sampleRate >= 46000.0 ? 2 : 1), juce::dontSendNotification);
-    deviceDialog->addComboBox("buffer", { utf8("64（低延迟）"), utf8("128（推荐）"), utf8("256（更稳定）"), utf8("512（最稳定）") }, utf8("缓冲区"));
+    rateBox->setSelectedId(selectedRate, juce::dontSendNotification);
+    juce::StringArray bufferLabels;
+    int selectedBuffer = 1;
+    const auto availableBuffers = audio.getAvailableBufferSizes();
+    for (int index = 0; index < availableBuffers.size(); ++index)
+    {
+        const auto size = availableBuffers[index];
+        bufferLabels.add(juce::String(size) + (size == 128 ? utf8("（低延迟）")
+                                               : size == 256 ? utf8("（更稳定）") : juce::String()));
+        if (size == current.bufferSize) selectedBuffer = index + 1;
+    }
+    if (bufferLabels.isEmpty()) bufferLabels.add(juce::String(current.bufferSize));
+    deviceDialog->addComboBox("buffer", bufferLabels, utf8("共享缓冲周期"));
     auto* bufferBox = deviceDialog->getComboBoxComponent("buffer");
-    const auto bufferId = current.bufferSize <= 64 ? 1 : current.bufferSize <= 128 ? 2 : current.bufferSize <= 256 ? 3 : 4;
-    bufferBox->setSelectedId(bufferId, juce::dontSendNotification);
+    bufferBox->setSelectedId(selectedBuffer, juce::dontSendNotification);
     typeBox->onChange = [this, typeBox, outputBox]
     {
         outputBox->clear(juce::dontSendNotification);
@@ -2353,14 +2401,12 @@ void MainComponent::showDeviceSettings()
             if (recorder.isRecording()) toggleRecording();
             const auto type = deviceDialog->getComboBoxComponent("type")->getText();
             const auto output = deviceDialog->getComboBoxComponent("output")->getText();
-            const int rates[] { 44100, 48000, 96000 };
-            const int buffers[] { 64, 128, 256, 512 };
             auto error = audio.selectDeviceType(type);
             if (error.isEmpty())
             {
-                const auto rateId = juce::jlimit(1, 3, deviceDialog->getComboBoxComponent("rate")->getSelectedId());
-                const auto selectedBufferId = juce::jlimit(1, 4, deviceDialog->getComboBoxComponent("buffer")->getSelectedId());
-                error = audio.applyOutputSetup(output, rates[rateId - 1], buffers[selectedBufferId - 1]);
+                const auto rate = deviceDialog->getComboBoxComponent("rate")->getText().getDoubleValue();
+                const auto buffer = deviceDialog->getComboBoxComponent("buffer")->getText().getIntValue();
+                error = audio.applyOutputSetup(output, rate, buffer);
             }
             juce::AlertWindow::showMessageBoxAsync(error.isEmpty() ? juce::MessageBoxIconType::InfoIcon
                                                                     : juce::MessageBoxIconType::WarningIcon,

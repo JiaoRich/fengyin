@@ -28,7 +28,7 @@ int main()
     limited.setSample(0, 0, 2.0f);
     limited.setSample(1, 0, -2.0f);
     master.process(limited.getArrayOfWritePointers(), 2, limited.getNumSamples());
-    assert(limited.getSample(0, 0) <= 0.7f && limited.getSample(1, 0) >= -0.7f);
+    assert(limited.getSample(0, 0) <= 1.0f && limited.getSample(1, 0) >= -1.0f);
 
     master.setGain(1.0f);
     master.setLimiterCeiling(1.0f);
@@ -43,12 +43,18 @@ int main()
         performance.setSample(1, i, 0.38f);
     }
     master.processInstrument(performance.getArrayOfWritePointers(), 2, performance.getNumSamples());
-    assert(master.getAccompanimentDuckGain() < 0.98f);
-    master.setSmartOptimisationEnabled(false);
-    performance.clear();
-    for (int block = 0; block < 30; ++block)
-        master.processInstrument(performance.getArrayOfWritePointers(), 2, performance.getNumSamples());
-    assert(master.getAccompanimentDuckGain() > 0.99f);
+    assert(performance.getMagnitude(0, performance.getNumSamples()) > 0.0f);
+
+    // 伴奏在正常电平下经过总输出时必须保持透明：不随乐器活动降低，
+    // 也不再经过总线混响或带释放时间的压限。
+    juce::AudioBuffer<float> transparentMaster(2, 256);
+    transparentMaster.clear();
+    for (int channel = 0; channel < transparentMaster.getNumChannels(); ++channel)
+        for (int sample = 0; sample < transparentMaster.getNumSamples(); ++sample)
+            transparentMaster.setSample(channel, sample, 0.25f);
+    master.processMaster(transparentMaster.getArrayOfWritePointers(), 2, transparentMaster.getNumSamples());
+    assert(std::abs(transparentMaster.getSample(0, 0) - 0.25f) < 0.000001f);
+    assert(std::abs(transparentMaster.getSample(1, 200) - 0.25f) < 0.000001f);
 
     const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory)
                             .getChildFile("fengyin-recording-test-" + juce::Uuid().toString());

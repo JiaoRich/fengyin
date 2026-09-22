@@ -69,6 +69,7 @@ private:
     void showDeviceSettings();
     void emitAudioSettingsState(bool success = true, const juce::String& message = {});
     void applyAudioSettingsFromWeb(const juce::var& payload);
+    void followSystemAudioOutputIfNeeded();
     void showMidiSetup();
     void startBreathDetection(const juce::String& deviceIdentifier);
     void showExpressionSettings();
