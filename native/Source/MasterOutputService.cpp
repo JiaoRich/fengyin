@@ -4,21 +4,35 @@
 
 namespace fengyin
 {
+void MasterOutputService::setToneStyle(const ToneStyleSettings& settings) noexcept
+{
+    eqTone.store(juce::jlimit(-1.0f, 1.0f, settings.tone));
+    warmth.store(juce::jlimit(0.0f, 1.0f, settings.warmth));
+    reverbMix.store(juce::jlimit(0.0f, 0.6f, settings.reverbMix));
+    styleCompressionThreshold.store(juce::jlimit(0.20f, 0.95f, settings.compressionThreshold));
+    styleCompressionRatio.store(juce::jlimit(1.0f, 4.0f, settings.compressionRatio));
+    styleSaturation.store(juce::jlimit(0.0f, 0.35f, settings.saturation));
+    styleHarshControl.store(juce::jlimit(0.0f, 0.35f, settings.harshControl));
+    styleRoomSize.store(juce::jlimit(0.0f, 1.0f, settings.reverbRoomSize));
+    styleDamping.store(juce::jlimit(0.0f, 1.0f, settings.reverbDamping));
+    styleWidth.store(juce::jlimit(0.0f, 1.0f, settings.reverbWidth));
+    styleOutputGain.store(juce::jlimit(0.5f, 1.25f, settings.outputGain));
+    reverbParametersDirty.store(true, std::memory_order_release);
+}
+
+ToneStyleSettings MasterOutputService::getToneStyle() const noexcept
+{
+    return { eqTone.load(), warmth.load(), reverbMix.load(), styleCompressionThreshold.load(),
+             styleCompressionRatio.load(), styleSaturation.load(), styleHarshControl.load(),
+             styleRoomSize.load(), styleDamping.load(), styleWidth.load(), styleOutputGain.load() };
+}
+
 void MasterOutputService::setSampleRate(double value) noexcept
 {
     const auto validRate = value > 0.0 ? value : 48000.0;
     sampleRate.store(validRate, std::memory_order_relaxed);
     instrumentReverb.setSampleRate(validRate);
-    glueReverb.setSampleRate(validRate);
-    juce::Reverb::Parameters glue;
-    glue.roomSize = 0.18f;
-    glue.damping = 0.72f;
-    glue.wetLevel = 0.035f;
-    glue.dryLevel = 0.965f;
-    glue.width = 0.72f;
-    glueReverb.setParameters(glue);
     instrumentReverb.reset();
-    glueReverb.reset();
     lastInstrumentReverbMix = -1.0f;
 }
 
@@ -38,14 +52,15 @@ MasterOutputService::ProfileSettings MasterOutputService::currentProfileSettings
 void MasterOutputService::updateInstrumentReverb(float mix, const ProfileSettings& settings) noexcept
 {
     const auto profile = instrumentProfile.load(std::memory_order_relaxed);
-    if (std::abs(mix - lastInstrumentReverbMix) < 0.001f && profile == lastInstrumentProfile)
+    if (! reverbParametersDirty.exchange(false, std::memory_order_acq_rel)
+        && std::abs(mix - lastInstrumentReverbMix) < 0.001f && profile == lastInstrumentProfile)
         return;
     juce::Reverb::Parameters parameters;
-    parameters.roomSize = settings.reverbRoomSize;
-    parameters.damping = settings.reverbDamping;
+    parameters.roomSize = styleRoomSize.load(std::memory_order_relaxed);
+    parameters.damping = styleDamping.load(std::memory_order_relaxed);
     parameters.wetLevel = juce::jlimit(0.0f, 0.48f, mix * settings.reverbScale);
     parameters.dryLevel = 1.0f - parameters.wetLevel * 0.32f;
-    parameters.width = 0.88f;
+    parameters.width = styleWidth.load(std::memory_order_relaxed);
     instrumentReverb.setParameters(parameters);
     lastInstrumentReverbMix = mix;
     lastInstrumentProfile = profile;
@@ -63,8 +78,17 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
     const auto envelopeRelease = 1.0f - std::exp(-1.0f / (0.24f * rate));
     const auto gainRelease = 1.0f - std::exp(-1.0f / (0.18f * rate));
     const auto trimSpeed = 1.0f - std::exp(-1.0f / (2.8f * rate));
-    const auto duckAttack = 1.0f - std::exp(-1.0f / (0.055f * rate));
-    const auto duckRelease = 1.0f - std::exp(-1.0f / (0.42f * rate));
+    // Snapshot UI-controlled atomics once per block. Loading them for every
+    // sample unnecessarily lengthens the real-time callback on older laptops.
+    const auto threshold = styleCompressionThreshold.load(std::memory_order_relaxed);
+    const auto ratio = styleCompressionRatio.load(std::memory_order_relaxed);
+    const auto warm = warmth.load(std::memory_order_relaxed);
+    const auto harshStyle = styleHarshControl.load(std::memory_order_relaxed);
+    const auto saturation = styleSaturation.load(std::memory_order_relaxed);
+    const auto styleGain = styleOutputGain.load(std::memory_order_relaxed);
+    const auto saturationDrive = 1.0f + saturation * 4.0f;
+    const auto saturationNormaliser = saturation > 0.001f ? 1.0f / std::tanh(saturationDrive) : 1.0f;
+    const auto saturationMix = juce::jlimit(0.0f, 0.85f, 0.18f + saturation * 1.9f);
 
     for (int sample = 0; sample < samples; ++sample)
     {
@@ -76,10 +100,9 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
                             * (linkedPeak > instrumentEnvelope ? envelopeAttack : envelopeRelease);
 
         auto desiredCompressorGain = 1.0f;
-        if (smart && instrumentEnvelope > settings.compressionThreshold)
+        if (instrumentEnvelope > threshold)
         {
-            const auto compressed = settings.compressionThreshold
-                + (instrumentEnvelope - settings.compressionThreshold) / settings.compressionRatio;
+            const auto compressed = threshold + (instrumentEnvelope - threshold) / ratio;
             desiredCompressorGain = compressed / juce::jmax(0.0001f, instrumentEnvelope);
         }
         compressorGain += (desiredCompressorGain - compressorGain)
@@ -94,10 +117,6 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
             automaticTrim += (1.0f - automaticTrim) * trimSpeed;
 
         const auto activity = juce::jlimit(0.0f, 1.0f, (instrumentEnvelope - 0.025f) / 0.22f);
-        const auto desiredDuck = smart ? (1.0f - activity * 0.16f) : 1.0f;
-        duckGainState += (desiredDuck - duckGainState)
-                       * (desiredDuck < duckGainState ? duckAttack : duckRelease);
-
         for (int channel = 0; channel < channels; ++channel)
         {
             auto* data = outputs[channel];
@@ -108,49 +127,58 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
             value -= rumbleLowPass[lane];
             toneLowPass[lane] += 0.075f * (value - toneLowPass[lane]);
             const auto highBand = value - toneLowPass[lane];
-            value += tone >= 0.0f ? tone * 0.24f * highBand
-                                  : tone * 0.20f * highBand;
-            const auto harshControl = smart && settings.toneBias < -0.05f
-                ? juce::jlimit(0.0f, 0.10f, activity * (-settings.toneBias) * 0.7f) : 0.0f;
+            value += tone >= 0.0f ? tone * 0.52f * highBand
+                                  : tone * 0.38f * highBand;
+            value += toneLowPass[lane] * warm * 0.14f;
+            const auto harshControl = activity * harshStyle;
             value -= highBand * harshControl;
-            data[sample] = value * compressorGain * automaticTrim;
+            if (saturation > 0.001f)
+            {
+                const auto saturated = std::tanh(value * saturationDrive) * saturationNormaliser;
+                value += (saturated - value) * saturationMix;
+            }
+            data[sample] = value * compressorGain * automaticTrim * styleGain;
         }
     }
-    accompanimentDuckGain.store(duckGainState, std::memory_order_relaxed);
-
     const auto wetMix = reverbMix.load(std::memory_order_relaxed);
     updateInstrumentReverb(wetMix, settings);
     if (channels > 1 && outputs[0] != nullptr && outputs[1] != nullptr)
         instrumentReverb.processStereo(outputs[0], outputs[1], samples);
     else if (outputs[0] != nullptr)
         instrumentReverb.processMono(outputs[0], samples);
+
+    // 用户设置的“安全上限”只约束乐器总线，不得修改伴奏原声。
+    const auto instrumentCeiling = limiterCeiling.load(std::memory_order_relaxed);
+    for (int sample = 0; sample < samples; ++sample)
+    {
+        float linkedPeak = 0.0f;
+        for (int channel = 0; channel < channels; ++channel)
+            if (outputs[channel] != nullptr)
+                linkedPeak = juce::jmax(linkedPeak, std::abs(outputs[channel][sample]));
+        const auto safety = linkedPeak > instrumentCeiling ? instrumentCeiling / linkedPeak : 1.0f;
+        for (int channel = 0; channel < channels; ++channel)
+            if (outputs[channel] != nullptr)
+                outputs[channel][sample] *= safety;
+    }
 }
 
 void MasterOutputService::processMaster(float* const* outputs, int channels, int samples) noexcept
 {
     if (outputs == nullptr || channels <= 0 || samples <= 0) return;
-    if (smartOptimisation.load(std::memory_order_relaxed))
-    {
-        if (channels > 1 && outputs[0] != nullptr && outputs[1] != nullptr)
-            glueReverb.processStereo(outputs[0], outputs[1], samples);
-        else if (outputs[0] != nullptr)
-            glueReverb.processMono(outputs[0], samples);
-    }
-
     const auto currentGain = gain.load(std::memory_order_relaxed);
-    const auto ceiling = limiterCeiling.load(std::memory_order_relaxed);
-    const auto release = 1.0f - std::exp(-1.0f / (0.12f * static_cast<float>(sampleRate.load())));
+    constexpr auto digitalCeiling = 1.0f;
     for (int sample = 0; sample < samples; ++sample)
     {
         float linkedPeak = 0.0f;
         for (int channel = 0; channel < channels; ++channel)
             if (outputs[channel] != nullptr)
                 linkedPeak = juce::jmax(linkedPeak, std::abs(outputs[channel][sample] * currentGain));
-        const auto desired = linkedPeak > ceiling ? ceiling / linkedPeak : 1.0f;
-        limiterGain = desired < limiterGain ? desired : limiterGain + (1.0f - limiterGain) * release;
+        // 仅在两路相加真正越界时做逐样本安全衰减，不使用带释放时间的
+        // 总线压缩，避免乐器峰值让伴奏产生“呼吸/抽动”。
+        const auto safetyGain = linkedPeak > digitalCeiling ? digitalCeiling / linkedPeak : 1.0f;
         for (int channel = 0; channel < channels; ++channel)
             if (outputs[channel] != nullptr)
-                outputs[channel][sample] *= currentGain * limiterGain;
+                outputs[channel][sample] *= currentGain * safetyGain;
     }
     updateSpectrumAndPeaks(outputs, channels, samples);
 }

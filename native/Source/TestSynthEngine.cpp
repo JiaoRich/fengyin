@@ -8,22 +8,22 @@
 
 namespace fengyin
 {
-void TestSynthEngine::noteOn(int noteNumber, float velocity) noexcept
+void TestSynthEngine::noteOn(int noteNumber, float velocity, double) noexcept
 {
     push({ CommandType::noteOn, noteNumber, std::clamp(velocity, 0.0f, 1.0f) });
 }
 
-void TestSynthEngine::noteOff(int noteNumber) noexcept
+void TestSynthEngine::noteOff(int noteNumber, double) noexcept
 {
     push({ CommandType::noteOff, noteNumber, 0.0f });
 }
 
-void TestSynthEngine::breathChanged(float value) noexcept
+void TestSynthEngine::breathChanged(float value, double) noexcept
 {
     push({ CommandType::breath, 0, std::clamp(value, 0.0f, 1.0f) });
 }
 
-void TestSynthEngine::pitchBendChanged(float bipolarValue) noexcept
+void TestSynthEngine::pitchBendChanged(float bipolarValue, double) noexcept
 {
     push({ CommandType::pitchBend, 0, std::clamp(bipolarValue, -1.0f, 1.0f) });
 }
@@ -64,8 +64,7 @@ void TestSynthEngine::audioDeviceIOCallbackWithContext(const float* const*,
     if (masterOutput != nullptr)
         masterOutput->processInstrument(outputs, numOutputs, numSamples);
     if (accompaniment != nullptr)
-        accompaniment->mixInto(outputs, numOutputs, numSamples,
-            masterOutput != nullptr ? masterOutput->getAccompanimentDuckGain() : 1.0f);
+        accompaniment->mixInto(outputs, numOutputs, numSamples);
     if (masterOutput != nullptr)
         masterOutput->processMaster(outputs, numOutputs, numSamples);
     leftPeak.store(peak, std::memory_order_relaxed);

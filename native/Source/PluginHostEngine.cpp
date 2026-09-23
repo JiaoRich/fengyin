@@ -5,6 +5,77 @@
 
 namespace fengyin
 {
+bool RecordingAudioProcessorPlayer::enqueueMidi(const juce::MidiMessage& message,
+                                                double timestampSeconds) noexcept
+{
+    const auto size = message.getRawDataSize();
+    if (size <= 0 || size > 3)
+        return false;
+
+    const auto timestamp = timestampSeconds > 0.0
+        ? timestampSeconds : juce::Time::getMillisecondCounterHiRes() * 0.001;
+    if (! midiQueue.push(message.getRawData(), size, timestamp))
+    {
+        resetRequested.store(true, std::memory_order_release);
+        return false;
+    }
+    return true;
+}
+
+void RecordingAudioProcessorPlayer::addResetMessages(double timestampSeconds)
+{
+    auto& collector = getMidiMessageCollector();
+    auto send = [&collector, timestampSeconds](juce::MidiMessage message)
+    {
+        message.setTimeStamp(timestampSeconds);
+        collector.addMessageToQueue(message);
+    };
+    send(juce::MidiMessage::allNotesOff(1));
+    send(juce::MidiMessage::allSoundOff(1));
+    send(juce::MidiMessage::controllerEvent(1, 11, 0));
+    send(juce::MidiMessage::controllerEvent(1, 2, 0));
+    send(juce::MidiMessage::controllerEvent(1, 1, 0));
+    send(juce::MidiMessage::pitchWheel(1, 8192));
+}
+
+void RecordingAudioProcessorPlayer::setLatencyProbeActive(bool active) noexcept
+{
+    latencyProbeActive.store(active, std::memory_order_release);
+    if (! active)
+        requestPerformanceReset();
+}
+
+void RecordingAudioProcessorPlayer::addLatencyProbeMessages(int numSamples, double timestampSeconds)
+{
+    probeSamplesUntilChange -= numSamples;
+    auto& collector = getMidiMessageCollector();
+    auto send = [&collector, timestampSeconds](juce::MidiMessage message)
+    {
+        message.setTimeStamp(timestampSeconds);
+        collector.addMessageToQueue(message);
+    };
+
+    const auto phase = 1.0 - juce::jlimit(0.0, 1.0,
+        static_cast<double>(juce::jmax(0, probeSamplesUntilChange)) / (currentSampleRate * 0.8));
+    const auto breath = juce::jlimit(18, 105, 18 + juce::roundToInt(87.0 * phase));
+    send(juce::MidiMessage::controllerEvent(1, 11, breath));
+    send(juce::MidiMessage::controllerEvent(1, 2, breath));
+
+    if (probeSamplesUntilChange > 0)
+        return;
+    probeNoteIsOn = ! probeNoteIsOn;
+    if (probeNoteIsOn)
+    {
+        send(juce::MidiMessage::noteOn(1, 67, static_cast<juce::uint8>(82)));
+        probeSamplesUntilChange = juce::roundToInt(currentSampleRate * 0.8);
+    }
+    else
+    {
+        send(juce::MidiMessage::noteOff(1, 67));
+        probeSamplesUntilChange = juce::roundToInt(currentSampleRate * 0.15);
+    }
+}
+
 class PluginHostEngine::PluginEditorWindow final : public juce::DocumentWindow
 {
 public:
@@ -31,14 +102,30 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
                                                                      int numSamples,
                                                                      const juce::AudioIODeviceCallbackContext& context)
 {
+    const auto nowSeconds = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    if (resetRequested.exchange(false, std::memory_order_acq_rel))
+        addResetMessages(nowSeconds);
+    RealtimeMidiEvent event;
+    while (midiQueue.pop(event))
+    {
+        juce::MidiMessage message(event.bytes.data(), static_cast<int>(event.size), event.timestampSeconds);
+        getMidiMessageCollector().addMessageToQueue(message);
+    }
+    const auto probing = latencyProbeActive.load(std::memory_order_acquire);
+    if (probing)
+        addLatencyProbeMessages(numSamples, nowSeconds);
+
     juce::AudioProcessorPlayer::audioDeviceIOCallbackWithContext(inputs, numInputs, outputs, numOutputs, numSamples, context);
     if (masterOutput != nullptr)
         masterOutput->processInstrument(outputs, numOutputs, numSamples);
     if (accompaniment != nullptr)
-        accompaniment->mixInto(outputs, numOutputs, numSamples,
-            masterOutput != nullptr ? masterOutput->getAccompanimentDuckGain() : 1.0f);
+        accompaniment->mixInto(outputs, numOutputs, numSamples);
     if (masterOutput != nullptr)
         masterOutput->processMaster(outputs, numOutputs, numSamples);
+    if (probing)
+        for (int channel = 0; channel < numOutputs; ++channel)
+            if (outputs[channel] != nullptr)
+                juce::FloatVectorOperations::clear(outputs[channel], numSamples);
     if (recorder != nullptr)
         recorder->push(outputs, numOutputs, numSamples);
 }
@@ -46,6 +133,11 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
 void RecordingAudioProcessorPlayer::audioDeviceAboutToStart(juce::AudioIODevice* device)
 {
     juce::AudioProcessorPlayer::audioDeviceAboutToStart(device);
+    getMidiMessageCollector().ensureStorageAllocated(64 * 1024);
+    currentSampleRate = device != nullptr && device->getCurrentSampleRate() > 0.0
+        ? device->getCurrentSampleRate() : 48000.0;
+    probeSamplesUntilChange = 0;
+    probeNoteIsOn = false;
     if (accompaniment != nullptr && device != nullptr)
         accompaniment->prepare(device->getCurrentSampleRate(), device->getCurrentBufferSizeSamples());
     if (masterOutput != nullptr && device != nullptr)
@@ -324,29 +416,35 @@ bool PluginHostEngine::rebuildConnections()
     return midiConnected && audioConnections > 0;
 }
 
-void PluginHostEngine::noteOn(int noteNumber, float velocity) noexcept
+void PluginHostEngine::noteOn(int noteNumber, float velocity, double timestampSeconds) noexcept
 {
     queue(juce::MidiMessage::noteOn(1, juce::jlimit(0, 127, noteNumber),
-                                    juce::jlimit(0.0f, 1.0f, velocity)));
+                                    juce::jlimit(0.0f, 1.0f, velocity)), timestampSeconds);
 }
 
-void PluginHostEngine::noteOff(int noteNumber) noexcept
+void PluginHostEngine::noteOff(int noteNumber, double timestampSeconds) noexcept
 {
-    queue(juce::MidiMessage::noteOff(1, juce::jlimit(0, 127, noteNumber)));
+    queue(juce::MidiMessage::noteOff(1, juce::jlimit(0, 127, noteNumber)), timestampSeconds);
 }
 
-void PluginHostEngine::breathChanged(float value) noexcept
+void PluginHostEngine::breathChanged(float value, double timestampSeconds) noexcept
 {
     const auto midiValue = juce::jlimit(0, 127, juce::roundToInt(value * 127.0f));
-    queue(juce::MidiMessage::controllerEvent(1, 11, midiValue));
-    queue(juce::MidiMessage::controllerEvent(1, 2, midiValue));
+    if (lastBreathMidiValue.exchange(midiValue, std::memory_order_relaxed) == midiValue)
+        return;
+    queue(juce::MidiMessage::controllerEvent(1, 11, midiValue), timestampSeconds);
+    queue(juce::MidiMessage::controllerEvent(1, 2, midiValue), timestampSeconds);
+    // Qin Engine soundbanks commonly use the modulation wheel for expression.
+    // Keep CC11 as well so user-edited programs remain playable.
+    if (kongExpressionMode.load(std::memory_order_relaxed))
+        queue(juce::MidiMessage::controllerEvent(1, 1, midiValue), timestampSeconds);
 }
 
-void PluginHostEngine::pitchBendChanged(float bipolarValue) noexcept
+void PluginHostEngine::pitchBendChanged(float bipolarValue, double timestampSeconds) noexcept
 {
     const auto pitch = juce::jlimit(0, 16383,
         juce::roundToInt(8192.0f + juce::jlimit(-1.0f, 1.0f, bipolarValue) * 8191.0f));
-    queue(juce::MidiMessage::pitchWheel(1, pitch));
+    queue(juce::MidiMessage::pitchWheel(1, pitch), timestampSeconds);
 }
 
 void PluginHostEngine::techniqueChanged(PerformanceTechnique technique, float value) noexcept
@@ -359,16 +457,46 @@ void PluginHostEngine::techniqueChanged(PerformanceTechnique technique, float va
 
 void PluginHostEngine::resetPerformance() noexcept
 {
-    queue(juce::MidiMessage::allNotesOff(1));
-    queue(juce::MidiMessage::allSoundOff(1));
-    queue(juce::MidiMessage::controllerEvent(1, 11, 0));
-    queue(juce::MidiMessage::controllerEvent(1, 2, 0));
-    queue(juce::MidiMessage::pitchWheel(1, 8192));
+    lastBreathMidiValue.store(-1, std::memory_order_relaxed);
+    player.requestPerformanceReset();
     for (size_t index = 0; index < techniqueValues.size(); ++index)
     {
         techniqueValues[index].store(0.0f, std::memory_order_relaxed);
         techniqueDirty[index].store(true, std::memory_order_release);
     }
+}
+
+juce::StringArray PluginHostEngine::getProgramNames() const
+{
+    juce::StringArray names;
+    if (auto* processor = getPlugin())
+        for (int index = 0; index < processor->getNumPrograms(); ++index)
+            names.add(processor->getProgramName(index));
+    return names;
+}
+
+juce::String PluginHostEngine::getCurrentProgramName() const
+{
+    if (auto* processor = getPlugin())
+        return processor->getProgramName(processor->getCurrentProgram());
+    return {};
+}
+
+bool PluginHostEngine::selectProgramByAliases(const juce::StringArray& aliases)
+{
+    auto* processor = getPlugin();
+    if (processor == nullptr) return false;
+    for (int index = 0; index < processor->getNumPrograms(); ++index)
+    {
+        const auto candidate = processor->getProgramName(index).toLowerCase().removeCharacters(" ._-");
+        for (const auto& alias : aliases)
+            if (candidate.contains(alias.toLowerCase().removeCharacters(" ._-")))
+            {
+                processor->setCurrentProgram(index);
+                return true;
+            }
+    }
+    return false;
 }
 
 void PluginHostEngine::flushTechniqueValues()
@@ -409,11 +537,44 @@ void PluginHostEngine::resolveTechniqueParameters()
         else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::flutter)] == nullptr
                  && name.contains("flutter"))
             techniqueParameters[static_cast<size_t>(PerformanceTechnique::flutter)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::portamento)] == nullptr
+                 && name.contains("portamento") && ! name.contains("split"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::portamento)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::fall)] == nullptr
+                 && (name.contains("falldown") || name == "fall" || name.contains("doit")))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::fall)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::overblow)] == nullptr
+                 && name.contains("overblow"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::overblow)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::breathNoise)] == nullptr
+                 && name.contains("breathnoise"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::breathNoise)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::alternateFingering)] == nullptr
+                 && (name.contains("altfingering") || name.contains("alternatefingering")))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::alternateFingering)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::mute)] == nullptr
+                 && (name == "mute" || name.contains("mutestate") || name.contains("handmute")))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::mute)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::halfValve)] == nullptr
+                 && name.contains("halfvalve"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::halfValve)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::legato)] == nullptr
+                 && (name == "legato" || name.contains("legatomode")))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::legato)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::bowPressure)] == nullptr
+                 && name.contains("bowpressure"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::bowPressure)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::pizzicato)] == nullptr
+                 && (name.contains("pizzicato") || name == "pizz"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::pizzicato)] = parameter;
+        else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::tremolo)] == nullptr
+                 && name.contains("tremolo"))
+            techniqueParameters[static_cast<size_t>(PerformanceTechnique::tremolo)] = parameter;
     }
 }
 
-void PluginHostEngine::queue(juce::MidiMessage message) noexcept
+void PluginHostEngine::queue(juce::MidiMessage message, double timestampSeconds) noexcept
 {
-    player.getMidiMessageCollector().addMessageToQueue(message);
+    (void) player.enqueueMidi(message, timestampSeconds);
 }
 }

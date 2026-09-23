@@ -12,6 +12,8 @@
 #include "RecordingService.h"
 #include "AccompanimentAudioService.h"
 #include "MasterOutputService.h"
+#include "ToneStyleCatalog.h"
+#include "KongInstrumentCatalog.h"
 #include "TechniqueAdvisor.h"
 #include "VideoAudioExtractor.h"
 
@@ -41,14 +43,16 @@ private:
     void startPluginScan();
     void refreshPluginChoices();
     void loadSelectedPlugin();
+    void loadKongInstrument(const juce::String& instrumentKey, const juce::String& instrumentName);
     void loadSelectedEffect();
     void removeEffect();
     void useTestSynth();
     void refreshPresetChoices();
     void saveCurrentPreset();
     void commitCurrentPreset(const juce::String& name);
+    void commitCustomPreset(const juce::String& name, const juce::String& baseStyleId);
+    fengyin::ToneStyleSettings customToneSettingsFromPayload(const juce::var& payload) const;
     void loadSelectedPreset(std::function<void(bool, const juce::String&)> completion = {});
-    void togglePresetFavorite();
     void makePresetDefault();
     void deleteSelectedPreset();
     void tryAutoLoadDefaultPreset();
@@ -56,6 +60,8 @@ private:
     void showSetupGuide(bool automatic = false);
     static juce::File getOnboardingMarkerFile();
     void activatePluginOutput(const juce::String& pluginName);
+    [[nodiscard]] fengyin::SwamFamily currentTechniqueFamily() const;
+    void configureTechniqueDefaults();
     void showActivationDialog();
     void refreshLicenseUi();
     void emitLicenseState(const fengyin::LicenseStatus& status);
@@ -63,6 +69,7 @@ private:
     void showDeviceSettings();
     void emitAudioSettingsState(bool success = true, const juce::String& message = {});
     void applyAudioSettingsFromWeb(const juce::var& payload);
+    void followSystemAudioOutputIfNeeded();
     void showMidiSetup();
     void startBreathDetection(const juce::String& deviceIdentifier);
     void showExpressionSettings();
@@ -114,7 +121,6 @@ private:
     juce::ComboBox presetSelector;
     juce::TextButton savePresetButton;
     juce::TextButton loadPresetButton;
-    juce::TextButton favoritePresetButton;
     juce::TextButton defaultPresetButton;
     juce::TextButton deletePresetButton;
     juce::TextButton recordButton;
@@ -124,6 +130,13 @@ private:
     juce::TextButton recordingManagerButton;
     juce::Array<fengyin::SoundPreset> cachedPresets;
     juce::String editingPresetId;
+    juce::String currentToneStyleId { "natural" };
+    juce::String currentPluginBrand { "swam" };
+    juce::String currentInstrumentKey;
+    juce::String currentInstrumentChineseName;
+    juce::String currentPresetDisplayName;
+    bool currentPresetIsCustom = false;
+    fengyin::ToneStyleSettings currentBaseToneSettings;
     juce::Array<juce::PluginDescription> cachedInstrumentPlugins;
     juce::Array<juce::PluginDescription> cachedEffectPlugins;
     fengyin::VideoPlayerPanel videoPlayer;

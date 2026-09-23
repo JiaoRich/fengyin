@@ -59,18 +59,16 @@ void AccompanimentAudioService::pause() { transport.stop(); }
 void AccompanimentAudioService::stopAndRewind() { transport.stop(); transport.setPosition(0.0); }
 void AccompanimentAudioService::setPosition(double seconds) { if (isReady()) transport.setPosition(juce::jmax(0.0, seconds)); }
 void AccompanimentAudioService::setVolume(float volume) { transport.setGain(juce::jlimit(0.0f, 1.0f, volume)); }
-void AccompanimentAudioService::mixInto(float* const* outputs, int outputChannels, int sampleCount,
-                                        float gainMultiplier) noexcept
+void AccompanimentAudioService::mixInto(float* const* outputs, int outputChannels, int sampleCount) noexcept
 {
     if (! isReady() || outputs == nullptr || outputChannels <= 0 || sampleCount <= 0 || mixBuffer.getNumSamples() < sampleCount) return;
     mixBuffer.clear();
     juce::AudioSourceChannelInfo info(&mixBuffer, 0, sampleCount);
     transport.getNextAudioBlock(info);
-    const auto mixGain = juce::jlimit(0.0f, 1.0f, gainMultiplier);
     for (int channel = 0; channel < outputChannels; ++channel)
         if (outputs[channel] != nullptr)
-            juce::FloatVectorOperations::addWithMultiply(outputs[channel],
-                mixBuffer.getReadPointer(juce::jmin(channel, 1)), mixGain, sampleCount);
+            juce::FloatVectorOperations::add(outputs[channel],
+                mixBuffer.getReadPointer(juce::jmin(channel, 1)), sampleCount);
 }
 double AccompanimentAudioService::getPosition() const { return transport.getCurrentPosition(); }
 juce::File AccompanimentAudioService::getAudioFile() const { const juce::ScopedLock lock(stateLock); return loadedFile; }

@@ -18,10 +18,10 @@ public:
     void setRecordingService(RecordingService* service) noexcept { recorder = service; }
     void setAccompanimentService(AccompanimentAudioService* service) noexcept { accompaniment = service; }
     void setMasterOutputService(MasterOutputService* service) noexcept { masterOutput = service; }
-    void noteOn(int noteNumber, float velocity) noexcept override;
-    void noteOff(int noteNumber) noexcept override;
-    void breathChanged(float value) noexcept override;
-    void pitchBendChanged(float bipolarValue) noexcept override;
+    void noteOn(int noteNumber, float velocity, double timestampSeconds = 0.0) noexcept override;
+    void noteOff(int noteNumber, double timestampSeconds = 0.0) noexcept override;
+    void breathChanged(float value, double timestampSeconds = 0.0) noexcept override;
+    void pitchBendChanged(float bipolarValue, double timestampSeconds = 0.0) noexcept override;
     void resetPerformance() noexcept override;
 
     void audioDeviceIOCallbackWithContext(const float* const* inputChannelData,

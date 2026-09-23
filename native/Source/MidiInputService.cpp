@@ -5,6 +5,8 @@ namespace fengyin
 MidiInputService::MidiInputService()
 {
     activeOutputNotes.fill(-1);
+    techniqueHardwareInput.fill(0.0f);
+    techniqueBreathInput.fill(0.0f);
     juce::PropertiesFile::Options options;
     options.applicationName = "FengYinMidi";
     options.filenameSuffix = ".settings";
@@ -59,10 +61,7 @@ bool MidiInputService::connect(const juce::String& identifier)
                 settingsFile->setValue(profileRevisionKey, 1);
             }
         }
-        sourceKey.store(0, std::memory_order_relaxed);
-        transposeSemitones.store(0, std::memory_order_relaxed);
-        keyCalibrationPending.store(false, std::memory_order_release);
-        keyCalibrated.store(false, std::memory_order_release);
+        updateEffectiveTranspose();
         breathController.store(juce::jlimit(0, 127, savedController));
         activeProfile.breathController = breathController.load();
         BreathMapper::Settings settings;
@@ -75,9 +74,17 @@ bool MidiInputService::connect(const juce::String& identifier)
             settings.curve = static_cast<float>(settingsFile->getDoubleValue(controllerSettingKey() + ".curve", settings.curve));
             settings.smoothing = static_cast<float>(settingsFile->getDoubleValue(controllerSettingKey() + ".smoothing", settings.smoothing));
             pitchSensitivity.store(static_cast<float>(settingsFile->getDoubleValue(controllerSettingKey() + ".pitch", 1.0)));
+            const auto savedSensitivity = juce::jlimit(0, 2,
+                settingsFile->getIntValue(controllerSettingKey() + ".growlSensitivity", 1));
+            growlSensitivity.store(savedSensitivity, std::memory_order_relaxed);
+            if (savedSensitivity == 0) intelligentTechniques.setGrowlThresholds(0.82f, 0.74f);
+            else if (savedSensitivity == 2) intelligentTechniques.setGrowlThresholds(0.94f, 0.86f);
+            else intelligentTechniques.setGrowlThresholds(0.89f, 0.80f);
         }
         { const juce::SpinLock::ScopedLockType lock(breathMapperLock); breathMapper.setSettings(settings); }
         loadTechniqueMappings();
+        intelligentTechniques.reset();
+        activeNoteCount = 0;
         input->start();
         if (auto* sink = performanceSink.load(std::memory_order_acquire))
             sink->resetPerformance();
@@ -109,8 +116,8 @@ void MidiInputService::disconnect()
     velocity.store(0.0f, std::memory_order_relaxed);
     breath.store(0.0f, std::memory_order_relaxed);
     pitchBend.store(0.0f, std::memory_order_relaxed);
-    keyCalibrationPending.store(false, std::memory_order_release);
-    keyCalibrated.store(false, std::memory_order_release);
+    intelligentTechniques.reset();
+    activeNoteCount = 0;
 }
 
 void MidiInputService::refreshAndConnectFirstAvailable()
@@ -207,6 +214,7 @@ void MidiInputService::savePreferences()
         settingsFile->setValue(controllerSettingKey() + ".curve", expression.curve);
         settingsFile->setValue(controllerSettingKey() + ".smoothing", expression.smoothing);
         settingsFile->setValue(controllerSettingKey() + ".pitch", expression.pitchSensitivity);
+        settingsFile->setValue(controllerSettingKey() + ".growlSensitivity", growlSensitivity.load(std::memory_order_relaxed));
         settingsFile->setValue("targetPerformanceKey", targetKey.load(std::memory_order_relaxed));
         settingsFile->saveIfNeeded();
     }
@@ -253,21 +261,6 @@ int MidiInputService::finishBreathDetection() noexcept
     return detected;
 }
 
-void MidiInputService::beginKeyCalibration() noexcept
-{
-    if (input != nullptr)
-    {
-        keyCalibrated.store(false, std::memory_order_release);
-        keyCalibrationPending.store(true, std::memory_order_release);
-        updateEffectiveTranspose();
-    }
-}
-
-void MidiInputService::cancelKeyCalibration() noexcept
-{
-    keyCalibrationPending.store(false, std::memory_order_release);
-}
-
 void MidiInputService::setTargetKey(int pitchClass)
 {
     targetKey.store(PitchKey::normalise(pitchClass), std::memory_order_relaxed);
@@ -281,17 +274,13 @@ void MidiInputService::setTargetKey(int pitchClass)
 
 void MidiInputService::setTransposeSemitones(int semitones)
 {
-    sourceKey.store(0, std::memory_order_relaxed);
-    keyCalibrated.store(true, std::memory_order_release);
     setTargetKey(semitones);
 }
 
 void MidiInputService::updateEffectiveTranspose()
 {
-    const auto next = keyCalibrated.load(std::memory_order_acquire)
-        ? PitchKey::transposeFromTo(sourceKey.load(std::memory_order_relaxed),
-                                    targetKey.load(std::memory_order_relaxed))
-        : 0;
+    // 风吟统一要求电吹管本机设为 C 调，软件只负责从 C 调换算到目标演奏调。
+    const auto next = PitchKey::transposeFromTo(0, targetKey.load(std::memory_order_relaxed));
     if (transposeSemitones.exchange(next, std::memory_order_relaxed) == next)
         return;
 
@@ -307,6 +296,16 @@ void MidiInputService::updateEffectiveTranspose()
     velocity.store(0.0f, std::memory_order_relaxed);
 }
 
+void MidiInputService::setGrowlSensitivity(int level)
+{
+    const auto safeLevel = juce::jlimit(0, 2, level);
+    growlSensitivity.store(safeLevel, std::memory_order_relaxed);
+    if (safeLevel == 0) intelligentTechniques.setGrowlThresholds(0.82f, 0.74f);
+    else if (safeLevel == 2) intelligentTechniques.setGrowlThresholds(0.94f, 0.86f);
+    else intelligentTechniques.setGrowlThresholds(0.89f, 0.80f);
+    savePreferences();
+}
+
 void MidiInputService::setTechniqueMappings(const juce::Array<TechniqueMapping>& mappings)
 {
     {
@@ -314,6 +313,8 @@ void MidiInputService::setTechniqueMappings(const juce::Array<TechniqueMapping>&
         techniqueMappings = mappings;
         techniquePreviousInput.fill(0.0f);
         techniqueToggleState.fill(false);
+        techniqueHardwareInput.fill(0.0f);
+        techniqueBreathInput.fill(0.0f);
     }
     if (auto* sink = performanceSink.load(std::memory_order_acquire))
         for (int technique = 0; technique < static_cast<int>(PerformanceTechnique::count); ++technique)
@@ -347,7 +348,9 @@ void MidiInputService::saveTechniqueMappings()
         serialised += juce::String(static_cast<int>(mapping.technique)) + ","
                    + juce::String(static_cast<int>(mapping.sourceType)) + ","
                    + juce::String(mapping.sourceNumber) + ","
-                   + juce::String(mapping.toggle ? 1 : 0);
+                   + juce::String(mapping.toggle ? 1 : 0) + ","
+                   + juce::String(static_cast<int>(mapping.mode)) + ","
+                   + juce::String(mapping.strength, 4);
     }
     properties.getUserSettings()->setValue(techniqueSettingKey(), serialised);
     properties.getUserSettings()->saveIfNeeded();
@@ -364,14 +367,20 @@ void MidiInputService::loadTechniqueMappings()
         {
             juce::StringArray fields;
             fields.addTokens(entry, ",", "");
-            if (fields.size() != 4) continue;
+            if (fields.size() != 4 && fields.size() != 6) continue;
             TechniqueMapping mapping;
             mapping.technique = static_cast<PerformanceTechnique>(juce::jlimit(0, static_cast<int>(PerformanceTechnique::count) - 1, fields[0].getIntValue()));
             mapping.sourceType = static_cast<TechniqueSourceType>(juce::jlimit(0, static_cast<int>(TechniqueSourceType::note), fields[1].getIntValue()));
             mapping.sourceNumber = fields[2].getIntValue();
             mapping.toggle = fields[3].getIntValue() != 0;
-            if (mapping.sourceType != TechniqueSourceType::none)
-                loaded.add(mapping);
+            if (fields.size() >= 6)
+            {
+                mapping.mode = static_cast<TechniqueControlMode>(juce::jlimit(0, static_cast<int>(TechniqueControlMode::off), fields[4].getIntValue()));
+                mapping.strength = juce::jlimit(0.0f, 1.0f, fields[5].getFloatValue());
+            }
+            else
+                mapping.mode = TechniqueControlMode::hardware;
+            loaded.add(mapping);
         }
     }
     {
@@ -379,6 +388,8 @@ void MidiInputService::loadTechniqueMappings()
         techniqueMappings = loaded;
         techniquePreviousInput.fill(0.0f);
         techniqueToggleState.fill(false);
+        techniqueHardwareInput.fill(0.0f);
+        techniqueBreathInput.fill(0.0f);
     }
     if (auto* sink = performanceSink.load(std::memory_order_acquire))
         for (int technique = 0; technique < static_cast<int>(PerformanceTechnique::count); ++technique)
@@ -442,7 +453,14 @@ bool MidiInputService::handleTechniqueMessage(const juce::MidiMessage& message, 
         return false;
 
     bool capturedByLearn = false;
-    if (learningTechnique.load(std::memory_order_acquire)
+    const auto inputValue = techniqueMessageValue(message);
+    const auto ordinaryPlayedNote = sourceType == TechniqueSourceType::note
+        && breath.load(std::memory_order_relaxed) > 0.03f;
+    const auto meaningfulContinuousSignal = sourceType == TechniqueSourceType::pitchWheel
+        ? std::abs(inputValue - 0.5f) > 0.18f : inputValue > 0.55f;
+    const auto validLearningSignal = sourceType == TechniqueSourceType::note
+        ? message.isNoteOn() && ! ordinaryPlayedNote : meaningfulContinuousSignal;
+    if (learningTechnique.load(std::memory_order_acquire) && validLearningSignal
         && ! (sourceType == TechniqueSourceType::controller && sourceNumber == breathController.load()))
     {
         learnedSourceType.store(static_cast<int>(sourceType), std::memory_order_relaxed);
@@ -452,7 +470,6 @@ bool MidiInputService::handleTechniqueMessage(const juce::MidiMessage& message, 
         capturedByLearn = true;
     }
 
-    const auto inputValue = techniqueMessageValue(message);
     bool consumedMessage = false;
     const juce::SpinLock::ScopedTryLockType lock(techniqueLock);
     if (! lock.isLocked()) return false;
@@ -470,43 +487,65 @@ bool MidiInputService::handleTechniqueMessage(const juce::MidiMessage& message, 
             outputValue = techniqueToggleState[index] ? 1.0f : 0.0f;
         }
         techniquePreviousInput[index] = inputValue;
-        if (sink != nullptr) sink->techniqueChanged(mapping.technique, outputValue);
+        techniqueHardwareInput[index] = outputValue;
+        if (sink != nullptr && mapping.mode != TechniqueControlMode::off && mapping.mode != TechniqueControlMode::breath)
+        {
+            const auto scaled = outputValue * juce::jlimit(0.0f, 1.0f, mapping.strength * 1.35f);
+            sink->techniqueChanged(mapping.technique,
+                mapping.mode == TechniqueControlMode::hybrid ? scaled * techniqueBreathInput[index] : scaled);
+        }
         consumedMessage = true;
     }
     return consumedMessage || capturedByLearn;
+}
+
+void MidiInputService::updateBreathDrivenTechniques(float mappedBreath, MidiPerformanceSink* sink, double nowMs)
+{
+    if (sink == nullptr) return;
+    const juce::SpinLock::ScopedTryLockType lock(techniqueLock);
+    if (! lock.isLocked()) return;
+    for (const auto& mapping : techniqueMappings)
+    {
+        if (mapping.mode == TechniqueControlMode::off || mapping.mode == TechniqueControlMode::hardware)
+            continue;
+        if (! IntelligentTechniqueProcessor::canUseBreath(mapping.technique))
+            continue;
+        const auto index = static_cast<size_t>(mapping.technique);
+        const auto value = intelligentTechniques.process(mapping.technique, mappedBreath, mapping.strength, nowMs);
+        techniqueBreathInput[index] = value;
+        sink->techniqueChanged(mapping.technique,
+            mapping.mode == TechniqueControlMode::hybrid ? value * techniqueHardwareInput[index] : value);
+    }
 }
 
 void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::MidiMessage& message)
 {
     messageCount.fetch_add(1, std::memory_order_relaxed);
     auto* sink = performanceSink.load(std::memory_order_acquire);
+    // JUCE MIDI backends provide a monotonic arrival timestamp. Preserve it all the
+    // way to the audio callback so the collector can place the event at the correct
+    // sample offset instead of quantising every event to the next block boundary.
+    const auto timestampSeconds = message.getTimeStamp() > 0.0
+        ? message.getTimeStamp() : juce::Time::getMillisecondCounterHiRes() * 0.001;
     if (handleTechniqueMessage(message, sink))
         return;
 
     if (message.isNoteOn())
     {
         const auto sourceNote = message.getNoteNumber();
-        // 用户按 C 指法吹出的首音，其音级就是吹管当前本调。只保存在本次连接中。
-        if (keyCalibrationPending.exchange(false, std::memory_order_acq_rel))
-        {
-            const auto detectedSourceKey = PitchKey::normalise(sourceNote);
-            sourceKey.store(detectedSourceKey, std::memory_order_relaxed);
-            keyCalibrated.store(true, std::memory_order_release);
-            transposeSemitones.store(PitchKey::transposeFromTo(detectedSourceKey,
-                                                               targetKey.load(std::memory_order_relaxed)),
-                                     std::memory_order_relaxed);
-        }
         const auto outputNote = juce::jlimit(0, 127, sourceNote + transposeSemitones.load(std::memory_order_relaxed));
         { const juce::SpinLock::ScopedLockType lock(noteMapLock); activeOutputNotes[static_cast<size_t>(sourceNote)] = outputNote; }
         lastNote.store(outputNote, std::memory_order_relaxed);
         const auto currentBreath = breath.load(std::memory_order_relaxed);
         auto safeVelocity = message.getFloatVelocity();
         if (activeProfile.safeOnsetProtection && currentBreath < 0.02f && sink != nullptr)
-            sink->breathChanged(0.035f);
+            sink->breathChanged(0.035f, timestampSeconds);
         if (activeProfile.breathDrivenVelocity && currentBreath < 0.02f)
             safeVelocity = juce::jmin(safeVelocity, 0.28f + currentBreath * 0.52f);
         velocity.store(safeVelocity, std::memory_order_relaxed);
-        if (sink != nullptr) sink->noteOn(outputNote, safeVelocity);
+        if (activeNoteCount++ == 0)
+            intelligentTechniques.noteStarted(juce::Time::getMillisecondCounterHiRes());
+        if (sink != nullptr) sink->noteOn(outputNote, safeVelocity, timestampSeconds);
     }
     else if (message.isNoteOff())
     {
@@ -516,21 +555,27 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
           if (activeOutputNotes[sourceNote] >= 0) outputNote = activeOutputNotes[sourceNote];
           activeOutputNotes[sourceNote] = -1; }
         velocity.store(0.0f, std::memory_order_relaxed);
-        if (sink != nullptr) sink->noteOff(outputNote);
+        if (activeNoteCount > 0 && --activeNoteCount == 0)
+            intelligentTechniques.noteEnded();
+        if (sink != nullptr) sink->noteOff(outputNote, timestampSeconds);
     }
     else if (message.isController() && message.getControllerNumber() == breathController.load())
     {
         float mappedBreath = 0.0f;
         { const juce::SpinLock::ScopedLockType lock(breathMapperLock); mappedBreath = breathMapper.processMidiValue(message.getControllerValue()); }
         breath.store(mappedBreath, std::memory_order_relaxed);
-        if (sink != nullptr) sink->breathChanged(mappedBreath);
+        if (sink != nullptr)
+        {
+            sink->breathChanged(mappedBreath, timestampSeconds);
+            updateBreathDrivenTechniques(mappedBreath, sink, juce::Time::getMillisecondCounterHiRes());
+        }
     }
     else if (message.isPitchWheel())
     {
         const auto centred = static_cast<float>(message.getPitchWheelValue() - 8192) / 8192.0f
                            * pitchSensitivity.load(std::memory_order_relaxed);
         pitchBend.store(juce::jlimit(-1.0f, 1.0f, centred), std::memory_order_relaxed);
-        if (sink != nullptr) sink->pitchBendChanged(juce::jlimit(-1.0f, 1.0f, centred));
+        if (sink != nullptr) sink->pitchBendChanged(juce::jlimit(-1.0f, 1.0f, centred), timestampSeconds);
     }
     if (message.isController() && detectingBreath.load(std::memory_order_acquire))
     {

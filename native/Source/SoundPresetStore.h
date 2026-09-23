@@ -19,10 +19,26 @@ struct SoundPreset
     float breathCurve = 0.9f;
     float breathSmoothing = 0.28f;
     float eqTone = 0.2f;
+    float warmth = 0.2f;
     float reverbMix = 0.28f;
+    juce::String toneStyleId = "natural";
+    juce::String baseToneStyleId = "natural";
+    juce::String pluginBrand = "swam";
+    juce::String instrumentKey;
+    juce::String instrumentChineseName;
+    juce::String pluginProgramName;
+    bool customTone = false;
+    float compressionThreshold = 0.58f;
+    float compressionRatio = 1.7f;
+    float saturation = 0.04f;
+    float harshControl = 0.10f;
+    float reverbRoomSize = 0.42f;
+    float reverbDamping = 0.54f;
+    float reverbWidth = 0.88f;
+    float outputGain = 1.0f;
     juce::Array<TechniqueMapping> techniqueMappings;
     juce::String visualTheme = "neon";
-    bool favorite = false;
+    bool favorite = false; // Retained only for reading older preset files.
 };
 
 class SoundPresetStore final
