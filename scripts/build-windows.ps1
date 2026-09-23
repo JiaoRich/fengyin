@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Version = "0.11.1",
     [switch]$SkipInstaller
 )
