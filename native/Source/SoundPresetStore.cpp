@@ -123,6 +123,7 @@ std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<Soun
         child->setAttribute("reverbDamping", static_cast<double>(preset.reverbDamping));
         child->setAttribute("reverbWidth", static_cast<double>(preset.reverbWidth));
         child->setAttribute("outputGain", static_cast<double>(preset.outputGain));
+        child->setAttribute("bass", static_cast<double>(preset.bass));
         child->setAttribute("visualTheme", preset.visualTheme);
         child->setAttribute("favorite", preset.favorite);
         child->createNewChildElement("PLUGIN_STATE")->addTextElement(preset.pluginState.toBase64Encoding());
@@ -176,6 +177,7 @@ juce::Array<SoundPreset> SoundPresetStore::fromXml(const juce::XmlElement& root)
         preset.reverbDamping = static_cast<float>(child->getDoubleAttribute("reverbDamping", 0.54));
         preset.reverbWidth = static_cast<float>(child->getDoubleAttribute("reverbWidth", 0.88));
         preset.outputGain = static_cast<float>(child->getDoubleAttribute("outputGain", 1.0));
+        preset.bass = static_cast<float>(child->getDoubleAttribute("bass", 0.0));
         preset.visualTheme = child->getStringAttribute("visualTheme", "neon");
         preset.favorite = child->getBoolAttribute("favorite", false);
         if (auto* pluginState = child->getChildByName("PLUGIN_STATE"))

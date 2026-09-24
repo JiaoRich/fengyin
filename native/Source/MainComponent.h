@@ -60,6 +60,7 @@ private:
     void showSetupGuide(bool automatic = false);
     static juce::File getOnboardingMarkerFile();
     void activatePluginOutput(const juce::String& pluginName);
+    void applyCurrentSwamToneStyle();
     [[nodiscard]] fengyin::SwamFamily currentTechniqueFamily() const;
     void configureTechniqueDefaults();
     void showActivationDialog();
@@ -69,6 +70,7 @@ private:
     void showDeviceSettings();
     void emitAudioSettingsState(bool success = true, const juce::String& message = {});
     void applyAudioSettingsFromWeb(const juce::var& payload);
+    void followSystemAudioOutputIfNeeded();
     void showMidiSetup();
     void startBreathDetection(const juce::String& deviceIdentifier);
     void showExpressionSettings();
@@ -86,6 +88,7 @@ private:
     fengyin::LicenseService license;
     juce::String machineCode;
     int audioOutputSyncTicks = 0;
+    double lastPerformanceActivityMs = 0.0;
     int lowLatencyMonitorTicks = 0;
     fengyin::MidiSnapshot snapshot;
     juce::TextButton detectButton;
@@ -136,12 +139,14 @@ private:
     juce::String currentPresetDisplayName;
     bool currentPresetIsCustom = false;
     fengyin::ToneStyleSettings currentBaseToneSettings;
+    int currentSwamToneParameterCount = 0;
     juce::Array<juce::PluginDescription> cachedInstrumentPlugins;
     juce::Array<juce::PluginDescription> cachedEffectPlugins;
     fengyin::VideoPlayerPanel videoPlayer;
     fengyin::VideoAudioExtractor webVideoAudioExtractor;
     std::unique_ptr<juce::FileChooser> webVideoChooser;
     juce::File webVideoFile;
+    int webVideoGeneration = 0;
     bool webVideoAudioReady = false;
     double webVideoPosition = 0.0;
     float webVideoVolume = 1.0f;

@@ -24,6 +24,15 @@ void checkStyles(const juce::String& key)
     assert(materiallyDifferent(styles[0].settings, styles[1].settings));
     assert(materiallyDifferent(styles[1].settings, styles[2].settings));
 }
+
+void checkSaxophoneSwamProfiles(const juce::String& key)
+{
+    const auto styles = fengyin::ToneStyleCatalog::forInstrument(key);
+    assert(styles.size() == 3);
+    for (const auto& style : styles) assert(style.swam.enabled);
+    assert(std::abs(styles[0].swam.brightness - styles[1].swam.brightness) > 0.04f);
+    assert(std::abs(styles[1].swam.timbre - styles[2].swam.timbre) > 0.04f);
+}
 }
 
 int main()
@@ -36,6 +45,10 @@ int main()
         "english-horn", "oboe", "contrabassoon", "bassoon", "double-bass", "violin", "viola", "cello" };
     for (const auto* key : swamKeys)
         checkStyles(key);
+    checkSaxophoneSwamProfiles("soprano-sax");
+    checkSaxophoneSwamProfiles("alto-sax");
+    checkSaxophoneSwamProfiles("tenor-sax");
+    checkSaxophoneSwamProfiles("baritone-sax");
     for (const auto& instrument : fengyin::KongInstrumentCatalog::all())
         checkStyles(instrument.key);
     assert(fengyin::KongInstrumentCatalog::matchProgram("Qin Dizi Solo") != nullptr);

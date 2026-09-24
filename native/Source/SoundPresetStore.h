@@ -36,6 +36,7 @@ struct SoundPreset
     float reverbDamping = 0.54f;
     float reverbWidth = 0.88f;
     float outputGain = 1.0f;
+    float bass = 0.0f;
     juce::Array<TechniqueMapping> techniqueMappings;
     juce::String visualTheme = "neon";
     bool favorite = false; // Retained only for reading older preset files.

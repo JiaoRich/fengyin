@@ -522,6 +522,11 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
 {
     messageCount.fetch_add(1, std::memory_order_relaxed);
     auto* sink = performanceSink.load(std::memory_order_acquire);
+    // JUCE MIDI backends provide a monotonic arrival timestamp. Preserve it all the
+    // way to the audio callback so the collector can place the event at the correct
+    // sample offset instead of quantising every event to the next block boundary.
+    const auto timestampSeconds = message.getTimeStamp() > 0.0
+        ? message.getTimeStamp() : juce::Time::getMillisecondCounterHiRes() * 0.001;
     if (handleTechniqueMessage(message, sink))
         return;
 
@@ -534,13 +539,13 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
         const auto currentBreath = breath.load(std::memory_order_relaxed);
         auto safeVelocity = message.getFloatVelocity();
         if (activeProfile.safeOnsetProtection && currentBreath < 0.02f && sink != nullptr)
-            sink->breathChanged(0.035f);
+            sink->breathChanged(0.035f, timestampSeconds);
         if (activeProfile.breathDrivenVelocity && currentBreath < 0.02f)
             safeVelocity = juce::jmin(safeVelocity, 0.28f + currentBreath * 0.52f);
         velocity.store(safeVelocity, std::memory_order_relaxed);
         if (activeNoteCount++ == 0)
             intelligentTechniques.noteStarted(juce::Time::getMillisecondCounterHiRes());
-        if (sink != nullptr) sink->noteOn(outputNote, safeVelocity);
+        if (sink != nullptr) sink->noteOn(outputNote, safeVelocity, timestampSeconds);
     }
     else if (message.isNoteOff())
     {
@@ -552,7 +557,7 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
         velocity.store(0.0f, std::memory_order_relaxed);
         if (activeNoteCount > 0 && --activeNoteCount == 0)
             intelligentTechniques.noteEnded();
-        if (sink != nullptr) sink->noteOff(outputNote);
+        if (sink != nullptr) sink->noteOff(outputNote, timestampSeconds);
     }
     else if (message.isController() && message.getControllerNumber() == breathController.load())
     {
@@ -561,16 +566,16 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
         breath.store(mappedBreath, std::memory_order_relaxed);
         if (sink != nullptr)
         {
-            sink->breathChanged(mappedBreath);
+            sink->breathChanged(mappedBreath, timestampSeconds);
             updateBreathDrivenTechniques(mappedBreath, sink, juce::Time::getMillisecondCounterHiRes());
         }
     }
     else if (message.isPitchWheel())
     {
-        const auto centred = static_cast<float>(message.getPitchWheelValue() - 8192) / 8192.0f
-                           * pitchSensitivity.load(std::memory_order_relaxed);
+        const auto raw = message.getPitchWheelValue();
+        const auto centred = static_cast<float>(raw - 8192) / (raw < 8192 ? 8192.0f : 8191.0f);
         pitchBend.store(juce::jlimit(-1.0f, 1.0f, centred), std::memory_order_relaxed);
-        if (sink != nullptr) sink->pitchBendChanged(juce::jlimit(-1.0f, 1.0f, centred));
+        if (sink != nullptr) sink->pitchBendChanged(juce::jlimit(-1.0f, 1.0f, centred), timestampSeconds);
     }
     if (message.isController() && detectingBreath.load(std::memory_order_acquire))
     {

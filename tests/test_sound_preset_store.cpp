@@ -34,6 +34,7 @@ int main()
     preset.compressionRatio = 2.4f;
     preset.harshControl = 0.22f;
     preset.outputGain = 0.92f;
+    preset.bass = -0.35f;
     fengyin::TechniqueMapping technique;
     technique.technique = fengyin::PerformanceTechnique::growl;
     technique.sourceType = fengyin::TechniqueSourceType::controller;
@@ -65,6 +66,7 @@ int main()
     assert(std::abs(loaded->compressionRatio - 2.4f) < 0.001f);
     assert(std::abs(loaded->harshControl - 0.22f) < 0.001f);
     assert(std::abs(loaded->outputGain - 0.92f) < 0.001f);
+    assert(std::abs(loaded->bass + 0.35f) < 0.001f);
     assert(loaded->techniqueMappings.size() == 1);
     assert(loaded->techniqueMappings[0].sourceNumber == 21);
     assert(loaded->techniqueMappings[0].toggle);

@@ -76,16 +76,17 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertNotIn("\u5df2\u53d6\u6d88 Windows \u72ec\u5360\u6a21\u5f0f", HTML)
 
     def test_confirmed_visual_features_are_present(self):
-        for element_id in ("theme-atmosphere", "breath-wave", "layout-resizer", "lower-stage", "instrument-picture"):
+        for element_id in ("theme-atmosphere", "breath-wave", "lower-stage", "instrument-picture",
+                           "instrument-model-switcher", "tone-style-switcher"):
             self.assertIn(f'id="{element_id}"', HTML)
         for theme in ("spring", "summer", "autumn", "winter", "china-red", "gold", "neon", "minimal"):
             self.assertIn(f'value="{theme}"', HTML)
         self.assertIn("drawThemeAtmosphere", JS)
 
     def test_sound_panel_starts_at_its_minimum_height(self):
-        self.assertIn("minimiseSoundPanelOnStartup", JS)
-        self.assertIn("bounds.height - dividerHeight - lowerMinimum", JS)
-        self.assertIn("requestAnimationFrame(() => requestAnimationFrame(minimiseSoundPanelOnStartup))", JS)
+        self.assertNotIn('id="layout-resizer"', HTML)
+        self.assertIn(".lower-stage{flex:0 0 clamp(148px,17vh,178px)", HTML)
+        self.assertIn(".stage-grid{flex:1 1 auto", HTML)
 
     def test_audio_settings_are_inline_and_apply_immediately(self):
         for control_id in ("audio-driver-select", "audio-output-select", "audio-rate-select",
@@ -105,7 +106,7 @@ class PrototypeStructureTests(unittest.TestCase):
         ):
             self.assertIn(f"'{key}'", JS)
         self.assertIn("showInstrumentArtwork", JS)
-        self.assertIn("lowerMinimum", JS)
+        self.assertIn("object-fit:contain", HTML)
 
     def test_live_controls_have_real_behaviour(self):
         self.assertIn('id="recording-manager"', HTML)

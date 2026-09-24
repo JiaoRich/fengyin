@@ -2,9 +2,135 @@
 
 #include <algorithm>
 #include <limits>
+#include <optional>
 
 namespace fengyin
 {
+namespace
+{
+juce::String normalisedParameterName(juce::AudioProcessorParameter& parameter)
+{
+    return parameter.getName(160).toLowerCase().removeCharacters(" ._-/()[]");
+}
+
+bool isProtectedPerformanceParameter(const juce::String& name)
+{
+    // Tone styles must never rewrite the control layer used by smart wind-
+    // controller adaptation or technique mapping.
+    static const juce::StringArray protectedWords {
+        "midi", "midicc", "controller", "mapping", "keyswitch", "channel",
+        "breath", "expression", "aftertouch", "velocity", "dynamiccurve",
+        "pitchbend", "bendrange", "growl", "vibrato", "flutter", "portamento",
+        "falldown", "overblow", "halfvalve", "legato", "tremolo", "pizzicato",
+        "bowpressure", "mutestate"
+    };
+    for (const auto& word : protectedWords)
+        if (name.contains(word)) return true;
+    return name.startsWith("cc") || name.endsWith("cc");
+}
+
+std::optional<float> acousticToneValue(const juce::String& name, const SwamToneProfile& profile)
+{
+    // SWAM's Breath Noise is an acoustic sound parameter, not the Breath /
+    // Expression controller or its MIDI curve. Match only the exact exposed
+    // sound-parameter names so controller mappings remain protected below.
+    if (name == "breathnoise" || name == "breathnoiseamount") return profile.breathNoise;
+    if (isProtectedPerformanceParameter(name)) return std::nullopt;
+    if (name == "timbre" || name.contains("timbrecontrol")) return profile.timbre;
+    if (name == "brightness" || name.contains("soundbrightness")) return profile.brightness;
+    if (name.contains("formant")) return profile.formant;
+    if (name.contains("reedstiffness") || name.contains("reedhardness")) return profile.reedStiffness;
+    if (name == "attack" || name.contains("attacktime") || name.contains("attackshape")) return profile.attack;
+    if (name.contains("harmonicstructure") || name == "harmonics" || name.contains("harmoniccontent")) return profile.harmonics;
+    if (name.contains("keynoise") || name.contains("mechanicalnoise")) return profile.keyNoise;
+    if (name == "resonance" || name.contains("boreresonance") || name.contains("bodyresonance")) return profile.resonance;
+    return std::nullopt;
+}
+}
+
+class TechniqueProcessingGraph final : public juce::AudioProcessorGraph
+{
+public:
+    std::function<void()> applyTechniqueValues;
+    void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& messages) override
+    {
+        if (applyTechniqueValues) applyTechniqueValues();
+        juce::AudioProcessorGraph::processBlock(buffer, messages);
+    }
+};
+bool RecordingAudioProcessorPlayer::enqueueMidi(const juce::MidiMessage& message,
+                                                double timestampSeconds) noexcept
+{
+    const auto size = message.getRawDataSize();
+    if (size <= 0 || size > 3)
+        return false;
+
+    const auto timestamp = timestampSeconds > 0.0
+        ? timestampSeconds : juce::Time::getMillisecondCounterHiRes() * 0.001;
+    auto& queue = timestampSeconds > 0.0 ? midiQueue : controlQueue;
+    if (! queue.push(message.getRawData(), size, timestamp))
+    {
+        resetRequested.store(true, std::memory_order_release);
+        return false;
+    }
+    return true;
+}
+
+void RecordingAudioProcessorPlayer::addResetMessages(double timestampSeconds)
+{
+    auto& collector = getMidiMessageCollector();
+    auto send = [&collector, timestampSeconds](juce::MidiMessage message)
+    {
+        message.setTimeStamp(timestampSeconds);
+        collector.addMessageToQueue(message);
+    };
+    send(juce::MidiMessage::allNotesOff(1));
+    send(juce::MidiMessage::allSoundOff(1));
+    send(juce::MidiMessage::controllerEvent(1, 11, 0));
+    send(juce::MidiMessage::controllerEvent(1, 2, 0));
+    send(juce::MidiMessage::controllerEvent(1, 1, 0));
+    send(juce::MidiMessage::pitchWheel(1, 8192));
+}
+
+void RecordingAudioProcessorPlayer::setLatencyProbeActive(bool active) noexcept
+{
+    latencyProbeActive.store(active, std::memory_order_release);
+    if (! active)
+        requestPerformanceReset();
+}
+
+void RecordingAudioProcessorPlayer::addLatencyProbeMessages(int numSamples, double timestampSeconds)
+{
+    probeSamplesUntilChange -= numSamples;
+    auto& collector = getMidiMessageCollector();
+    auto send = [&collector, timestampSeconds](juce::MidiMessage message)
+    {
+        message.setTimeStamp(timestampSeconds);
+        collector.addMessageToQueue(message);
+    };
+
+    const auto phase = 1.0 - juce::jlimit(0.0, 1.0,
+        static_cast<double>(juce::jmax(0, probeSamplesUntilChange)) / (currentSampleRate * 0.8));
+    const auto breath = juce::jlimit(18, 105, 18 + juce::roundToInt(87.0 * phase));
+    send(juce::MidiMessage::controllerEvent(1, 11, breath));
+    send(juce::MidiMessage::controllerEvent(1, 2, breath));
+    send(juce::MidiMessage::controllerEvent(1, 1, breath));
+
+    if (probeSamplesUntilChange > 0)
+        return;
+    probeNoteIsOn = ! probeNoteIsOn;
+    if (probeNoteIsOn)
+    {
+        send(juce::MidiMessage::noteOn(1, 67, static_cast<juce::uint8>(82)));
+        probeSamplesUntilChange = juce::roundToInt(currentSampleRate * 0.8);
+    }
+    else
+    {
+        send(juce::MidiMessage::noteOff(1, 67));
+        probeSamplesUntilChange = juce::roundToInt(currentSampleRate * 0.15);
+    }
+}
+
 class PluginHostEngine::PluginEditorWindow final : public juce::DocumentWindow
 {
 public:
@@ -31,21 +157,55 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
                                                                      int numSamples,
                                                                      const juce::AudioIODeviceCallbackContext& context)
 {
+    const auto nowSeconds = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    if (resetRequested.exchange(false, std::memory_order_acq_rel))
+        addResetMessages(nowSeconds);
+    RealtimeMidiEvent event;
+    for (std::size_t count = 0; count < midiQueueSize && midiQueue.pop(event); ++count)
+    {
+        juce::MidiMessage message(event.bytes.data(), static_cast<int>(event.size), event.timestampSeconds);
+        getMidiMessageCollector().addMessageToQueue(message);
+    }
+    for (std::size_t count = 0; count < midiQueueSize && controlQueue.pop(event); ++count)
+        getMidiMessageCollector().addMessageToQueue(
+            juce::MidiMessage(event.bytes.data(), static_cast<int>(event.size), event.timestampSeconds));
+    const auto probing = latencyProbeActive.load(std::memory_order_acquire);
+    if (probing)
+        addLatencyProbeMessages(numSamples, nowSeconds);
+
     juce::AudioProcessorPlayer::audioDeviceIOCallbackWithContext(inputs, numInputs, outputs, numOutputs, numSamples, context);
+    bool signal = false;
+    for (int channel = 0; channel < numOutputs; ++channel)
+        if (outputs[channel] != nullptr)
+            for (int i = 0; i < numSamples && ! signal; ++i)
+                signal = std::abs(outputs[channel][i]) > 0.00001f;
+    if (signal) signalBlocks.fetch_add(1, std::memory_order_relaxed);
     if (masterOutput != nullptr)
         masterOutput->processInstrument(outputs, numOutputs, numSamples);
     if (accompaniment != nullptr)
-        accompaniment->mixInto(outputs, numOutputs, numSamples,
-            masterOutput != nullptr ? masterOutput->getAccompanimentDuckGain() : 1.0f);
+        accompaniment->mixInto(outputs, numOutputs, numSamples);
     if (masterOutput != nullptr)
         masterOutput->processMaster(outputs, numOutputs, numSamples);
+    if (probing)
+        for (int channel = 0; channel < numOutputs; ++channel)
+            if (outputs[channel] != nullptr)
+                juce::FloatVectorOperations::clear(outputs[channel], numSamples);
     if (recorder != nullptr)
         recorder->push(outputs, numOutputs, numSamples);
+    callbackCount.fetch_add(1, std::memory_order_relaxed);
+    if (juce::Time::getMillisecondCounterHiRes() * 0.001 - nowSeconds
+        > static_cast<double>(numSamples) / currentSampleRate)
+        callbackOverruns.fetch_add(1, std::memory_order_relaxed);
 }
 
 void RecordingAudioProcessorPlayer::audioDeviceAboutToStart(juce::AudioIODevice* device)
 {
     juce::AudioProcessorPlayer::audioDeviceAboutToStart(device);
+    getMidiMessageCollector().ensureStorageAllocated(256 * 1024);
+    currentSampleRate = device != nullptr && device->getCurrentSampleRate() > 0.0
+        ? device->getCurrentSampleRate() : 48000.0;
+    probeSamplesUntilChange = 0;
+    probeNoteIsOn = false;
     if (accompaniment != nullptr && device != nullptr)
         accompaniment->prepare(device->getCurrentSampleRate(), device->getCurrentBufferSizeSamples());
     if (masterOutput != nullptr && device != nullptr)
@@ -106,7 +266,9 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                     completion(false, error.isNotEmpty() ? error : juce::String("VST3 load failed"));
                 return;
             }
-            graph = std::make_unique<juce::AudioProcessorGraph>();
+            auto processingGraph = std::make_unique<TechniqueProcessingGraph>();
+            processingGraph->applyTechniqueValues = [this] { flushTechniqueValues(); };
+            graph = std::move(processingGraph);
             // Configure the graph's output buses before adding the IO node. Without this,
             // the output node initially has zero input channels and silently rejects every
             // instrument-to-output connection while accompaniment audio still remains audible.
@@ -118,6 +280,7 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
             instrumentNode = graph->addNode(std::move(instance));
             currentDescription = description;
             resolveTechniqueParameters();
+            resolveInstrumentModelParameter();
             if (! rebuildConnections())
             {
                 unload();
@@ -144,8 +307,10 @@ void PluginHostEngine::unload()
     graph.reset();
     currentDescription = {};
     currentEffectDescription = {};
-    techniqueParameters.fill(nullptr);
+    for (auto& parameter : techniqueParameters) parameter.store(nullptr);
     for (auto& dirty : techniqueDirty) dirty.store(false, std::memory_order_relaxed);
+    instrumentModelParameter = nullptr;
+    instrumentModelNames.clear();
 }
 
 bool PluginHostEngine::hasPlugin() const noexcept
@@ -324,33 +489,36 @@ bool PluginHostEngine::rebuildConnections()
     return midiConnected && audioConnections > 0;
 }
 
-void PluginHostEngine::noteOn(int noteNumber, float velocity) noexcept
+void PluginHostEngine::noteOn(int noteNumber, float velocity, double timestampSeconds) noexcept
 {
     queue(juce::MidiMessage::noteOn(1, juce::jlimit(0, 127, noteNumber),
-                                    juce::jlimit(0.0f, 1.0f, velocity)));
+                                    juce::jlimit(0.0f, 1.0f, velocity)), timestampSeconds);
 }
 
-void PluginHostEngine::noteOff(int noteNumber) noexcept
+void PluginHostEngine::noteOff(int noteNumber, double timestampSeconds) noexcept
 {
-    queue(juce::MidiMessage::noteOff(1, juce::jlimit(0, 127, noteNumber)));
+    queue(juce::MidiMessage::noteOff(1, juce::jlimit(0, 127, noteNumber)), timestampSeconds);
 }
 
-void PluginHostEngine::breathChanged(float value) noexcept
+void PluginHostEngine::breathChanged(float value, double timestampSeconds) noexcept
 {
     const auto midiValue = juce::jlimit(0, 127, juce::roundToInt(value * 127.0f));
-    queue(juce::MidiMessage::controllerEvent(1, 11, midiValue));
-    queue(juce::MidiMessage::controllerEvent(1, 2, midiValue));
+    if (lastBreathMidiValue.exchange(midiValue, std::memory_order_relaxed) == midiValue)
+        return;
+    queue(juce::MidiMessage::controllerEvent(1, 11, midiValue), timestampSeconds);
+    queue(juce::MidiMessage::controllerEvent(1, 2, midiValue), timestampSeconds);
     // Qin Engine soundbanks commonly use the modulation wheel for expression.
     // Keep CC11 as well so user-edited programs remain playable.
     if (kongExpressionMode.load(std::memory_order_relaxed))
-        queue(juce::MidiMessage::controllerEvent(1, 1, midiValue));
+        queue(juce::MidiMessage::controllerEvent(1, 1, midiValue), timestampSeconds);
 }
 
-void PluginHostEngine::pitchBendChanged(float bipolarValue) noexcept
+void PluginHostEngine::pitchBendChanged(float bipolarValue, double timestampSeconds) noexcept
 {
     const auto pitch = juce::jlimit(0, 16383,
-        juce::roundToInt(8192.0f + juce::jlimit(-1.0f, 1.0f, bipolarValue) * 8191.0f));
-    queue(juce::MidiMessage::pitchWheel(1, pitch));
+        juce::roundToInt(8192.0f + juce::jlimit(-1.0f, 1.0f, bipolarValue)
+                         * (bipolarValue < 0.0f ? 8192.0f : 8191.0f)));
+    queue(juce::MidiMessage::pitchWheel(1, pitch), timestampSeconds);
 }
 
 void PluginHostEngine::techniqueChanged(PerformanceTechnique technique, float value) noexcept
@@ -363,13 +531,8 @@ void PluginHostEngine::techniqueChanged(PerformanceTechnique technique, float va
 
 void PluginHostEngine::resetPerformance() noexcept
 {
-    queue(juce::MidiMessage::allNotesOff(1));
-    queue(juce::MidiMessage::allSoundOff(1));
-    queue(juce::MidiMessage::controllerEvent(1, 11, 0));
-    queue(juce::MidiMessage::controllerEvent(1, 2, 0));
-    if (kongExpressionMode.load(std::memory_order_relaxed))
-        queue(juce::MidiMessage::controllerEvent(1, 1, 0));
-    queue(juce::MidiMessage::pitchWheel(1, 8192));
+    lastBreathMidiValue.store(-1, std::memory_order_relaxed);
+    player.requestPerformanceReset();
     for (size_t index = 0; index < techniqueValues.size(); ++index)
     {
         techniqueValues[index].store(0.0f, std::memory_order_relaxed);
@@ -410,11 +573,58 @@ bool PluginHostEngine::selectProgramByAliases(const juce::StringArray& aliases)
     return false;
 }
 
+juce::StringArray PluginHostEngine::getInstrumentModelNames() const
+{
+    return instrumentModelNames;
+}
+
+int PluginHostEngine::getCurrentInstrumentModelIndex() const noexcept
+{
+    if (instrumentModelParameter == nullptr || instrumentModelNames.size() < 2) return -1;
+    return juce::jlimit(0, instrumentModelNames.size() - 1,
+        juce::roundToInt(instrumentModelParameter->getValue() * static_cast<float>(instrumentModelNames.size() - 1)));
+}
+
+juce::String PluginHostEngine::getCurrentInstrumentModelName() const
+{
+    const auto index = getCurrentInstrumentModelIndex();
+    return juce::isPositiveAndBelow(index, instrumentModelNames.size()) ? instrumentModelNames[index] : juce::String();
+}
+
+bool PluginHostEngine::selectInstrumentModel(int index)
+{
+    if (instrumentModelParameter == nullptr || ! juce::isPositiveAndBelow(index, instrumentModelNames.size()))
+        return false;
+    const auto value = static_cast<float>(index) / static_cast<float>(instrumentModelNames.size() - 1);
+    instrumentModelParameter->beginChangeGesture();
+    instrumentModelParameter->setValueNotifyingHost(value);
+    instrumentModelParameter->endChangeGesture();
+    return true;
+}
+
+int PluginHostEngine::applySwamToneProfile(const SwamToneProfile& profile)
+{
+    auto* plugin = getPlugin();
+    if (plugin == nullptr || ! profile.enabled) return 0;
+    int changed = 0;
+    for (auto* parameter : plugin->getParameters())
+    {
+        if (parameter == nullptr || parameter == instrumentModelParameter) continue;
+        const auto target = acousticToneValue(normalisedParameterName(*parameter), profile);
+        if (! target.has_value()) continue;
+        parameter->beginChangeGesture();
+        parameter->setValueNotifyingHost(juce::jlimit(0.0f, 1.0f, *target));
+        parameter->endChangeGesture();
+        ++changed;
+    }
+    return changed;
+}
+
 void PluginHostEngine::flushTechniqueValues()
 {
     for (size_t index = 0; index < techniqueParameters.size(); ++index)
         if (techniqueDirty[index].exchange(false, std::memory_order_acq_rel))
-            if (auto* parameter = techniqueParameters[index])
+            if (auto* parameter = techniqueParameters[index].load(std::memory_order_acquire))
                 parameter->setValueNotifyingHost(techniqueValues[index].load(std::memory_order_relaxed));
 }
 
@@ -434,7 +644,7 @@ int PluginHostEngine::getProcessingLatencySamples() const noexcept
 
 void PluginHostEngine::resolveTechniqueParameters()
 {
-    techniqueParameters.fill(nullptr);
+    for (auto& parameter : techniqueParameters) parameter.store(nullptr);
     if (instrumentNode == nullptr) return;
     for (auto* parameter : instrumentNode->getProcessor()->getParameters())
     {
@@ -484,8 +694,46 @@ void PluginHostEngine::resolveTechniqueParameters()
     }
 }
 
-void PluginHostEngine::queue(juce::MidiMessage message) noexcept
+void PluginHostEngine::resolveInstrumentModelParameter()
 {
-    player.getMidiMessageCollector().addMessageToQueue(message);
+    instrumentModelParameter = nullptr;
+    instrumentModelNames.clear();
+    if (instrumentNode == nullptr) return;
+    int bestScore = 0;
+    for (auto* parameter : instrumentNode->getProcessor()->getParameters())
+    {
+        if (parameter == nullptr) continue;
+        const auto name = normalisedParameterName(*parameter);
+        if (isProtectedPerformanceParameter(name)) continue;
+        int score = 0;
+        if (name == "instrumentmodel" || name == "saxmodel") score = 120;
+        else if (name == "instrument" || name == "model") score = 100;
+        else if (name.contains("instrumentmodel") || name.contains("saxmodel")) score = 90;
+        else if (name == "bodymodel") score = 80;
+        if (score <= bestScore) continue;
+        const auto steps = parameter->getNumSteps();
+        if (steps < 2 || steps > 64) continue;
+        juce::StringArray names;
+        for (int index = 0; index < steps; ++index)
+        {
+            const auto value = static_cast<float>(index) / static_cast<float>(steps - 1);
+            auto label = parameter->getText(value, 96).trim();
+            if (label.isEmpty()) label = juce::String::fromUTF8("型号 ") + juce::String(index + 1);
+            names.add(label);
+        }
+        // Keep the array step-aligned. Removing duplicate labels would change the
+        // normalised value used for later entries and could select the wrong model.
+        auto distinctNames = names;
+        distinctNames.removeDuplicates(false);
+        if (distinctNames.size() < 2) continue;
+        bestScore = score;
+        instrumentModelParameter = parameter;
+        instrumentModelNames = names;
+    }
+}
+
+void PluginHostEngine::queue(juce::MidiMessage message, double timestampSeconds) noexcept
+{
+    (void) player.enqueueMidi(message, timestampSeconds);
 }
 }

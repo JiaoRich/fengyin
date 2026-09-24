@@ -11,6 +11,8 @@
 #include "RecordingService.h"
 #include "AccompanimentAudioService.h"
 #include "MasterOutputService.h"
+#include "RealtimeMidiQueue.h"
+#include "SwamToneProfile.h"
 
 namespace fengyin
 {
@@ -20,12 +22,30 @@ public:
     void setRecordingService(RecordingService* service) noexcept { recorder = service; }
     void setAccompanimentService(AccompanimentAudioService* service) noexcept { accompaniment = service; }
     void setMasterOutputService(MasterOutputService* service) noexcept { masterOutput = service; }
+    void setLatencyProbeActive(bool active) noexcept;
+    bool enqueueMidi(const juce::MidiMessage& message, double timestampSeconds) noexcept;
+    void requestPerformanceReset() noexcept { resetRequested.store(true, std::memory_order_release); }
+    [[nodiscard]] uint64_t getDroppedMidiEventCount() const noexcept { return midiQueue.droppedCount() + controlQueue.droppedCount(); }
+    std::atomic<uint64_t> callbackCount { 0 }, callbackOverruns { 0 }, signalBlocks { 0 };
     void audioDeviceIOCallbackWithContext(const float* const* inputs, int numInputs, float* const* outputs,
                                           int numOutputs, int numSamples,
                                           const juce::AudioIODeviceCallbackContext& context) override;
     void audioDeviceAboutToStart(juce::AudioIODevice* device) override;
     void audioDeviceStopped() override;
 private:
+    static constexpr std::size_t midiQueueSize = 8192;
+    void addResetMessages(double timestampSeconds);
+    void addLatencyProbeMessages(int numSamples, double timestampSeconds);
+
+    RealtimeMidiQueue<midiQueueSize> midiQueue;
+    // Timestamped MIDI callback and untimestamped message-thread commands never
+    // share a producer index. Both queues have exactly one consumer.
+    RealtimeMidiQueue<midiQueueSize> controlQueue;
+    std::atomic<bool> resetRequested { false };
+    std::atomic<bool> latencyProbeActive { false };
+    int probeSamplesUntilChange = 0;
+    bool probeNoteIsOn = false;
+    double currentSampleRate = 48000.0;
     RecordingService* recorder = nullptr;
     AccompanimentAudioService* accompaniment = nullptr;
     MasterOutputService* masterOutput = nullptr;
@@ -52,6 +72,11 @@ public:
     void setRecordingService(RecordingService* service) noexcept { player.setRecordingService(service); }
     void setAccompanimentService(AccompanimentAudioService* service) noexcept { player.setAccompanimentService(service); }
     void setMasterOutputService(MasterOutputService* service) noexcept { player.setMasterOutputService(service); }
+    void setLatencyProbeActive(bool active) noexcept { player.setLatencyProbeActive(active); }
+    [[nodiscard]] uint64_t getDroppedMidiEventCount() const noexcept { return player.getDroppedMidiEventCount(); }
+    [[nodiscard]] uint64_t getCallbackCount() const noexcept { return player.callbackCount.load(); }
+    [[nodiscard]] uint64_t getCallbackOverruns() const noexcept { return player.callbackOverruns.load(); }
+    [[nodiscard]] uint64_t getSignalBlocks() const noexcept { return player.signalBlocks.load(); }
 
     [[nodiscard]] bool hasPlugin() const noexcept;
     [[nodiscard]] juce::String getPluginName() const;
@@ -70,12 +95,17 @@ public:
     [[nodiscard]] juce::StringArray getProgramNames() const;
     [[nodiscard]] juce::String getCurrentProgramName() const;
     bool selectProgramByAliases(const juce::StringArray& aliases);
+    [[nodiscard]] juce::StringArray getInstrumentModelNames() const;
+    [[nodiscard]] int getCurrentInstrumentModelIndex() const noexcept;
+    [[nodiscard]] juce::String getCurrentInstrumentModelName() const;
+    bool selectInstrumentModel(int index);
+    int applySwamToneProfile(const SwamToneProfile& profile);
 
-    void noteOn(int noteNumber, float velocity) noexcept override;
-    void noteOff(int noteNumber) noexcept override;
-    void breathChanged(float value) noexcept override;
+    void noteOn(int noteNumber, float velocity, double timestampSeconds = 0.0) noexcept override;
+    void noteOff(int noteNumber, double timestampSeconds = 0.0) noexcept override;
+    void breathChanged(float value, double timestampSeconds = 0.0) noexcept override;
     void setKongExpressionMode(bool enabled) noexcept { kongExpressionMode.store(enabled); }
-    void pitchBendChanged(float bipolarValue) noexcept override;
+    void pitchBendChanged(float bipolarValue, double timestampSeconds = 0.0) noexcept override;
     void techniqueChanged(PerformanceTechnique technique, float value) noexcept override;
     void resetPerformance() noexcept override;
     void flushTechniqueValues();
@@ -83,9 +113,10 @@ public:
     [[nodiscard]] int getProcessingLatencySamples() const noexcept;
 
 private:
-    void queue(juce::MidiMessage message) noexcept;
+    void queue(juce::MidiMessage message, double timestampSeconds) noexcept;
     bool rebuildConnections();
     void resolveTechniqueParameters();
+    void resolveInstrumentModelParameter();
 
     juce::AudioPluginFormatManager formatManager;
     RecordingAudioProcessorPlayer player;
@@ -101,10 +132,13 @@ private:
     std::unique_ptr<PluginEditorWindow> effectEditorWindow;
     juce::AudioDeviceManager* attachedManager = nullptr;
     std::shared_ptr<std::atomic_bool> lifetime = std::make_shared<std::atomic_bool>(true);
-    std::array<juce::AudioProcessorParameter*, static_cast<size_t>(PerformanceTechnique::count)> techniqueParameters {};
+    std::array<std::atomic<juce::AudioProcessorParameter*>, static_cast<size_t>(PerformanceTechnique::count)> techniqueParameters {};
     std::array<std::atomic<float>, static_cast<size_t>(PerformanceTechnique::count)> techniqueValues {};
     std::array<std::atomic<bool>, static_cast<size_t>(PerformanceTechnique::count)> techniqueDirty {};
+    juce::AudioProcessorParameter* instrumentModelParameter = nullptr;
+    juce::StringArray instrumentModelNames;
     std::atomic<bool> kongExpressionMode { false };
+    std::atomic<int> lastBreathMidiValue { -1 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginHostEngine)
 };

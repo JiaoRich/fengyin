@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 0.10.0 LANGUAGES C CXX)
+project(FengYin VERSION 0.13.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -80,6 +80,7 @@ target_sources(FengYin PRIVATE
     native/Source/PluginCatalogService.h
     native/Source/PluginHostEngine.cpp
     native/Source/PluginHostEngine.h
+    native/Source/RealtimeMidiQueue.h
     native/Source/SwamPluginClassifier.h
     native/Source/KongInstrumentCatalog.h
     native/Source/SoundPresetStore.cpp
@@ -97,6 +98,7 @@ target_sources(FengYin PRIVATE
     native/Source/MasterOutputService.h
     native/Source/MasterOutputService.cpp
     native/Source/ToneStyleCatalog.h
+    native/Source/SwamToneProfile.h
     native/Source/AudioDeviceService.cpp
     native/Source/AudioDeviceService.h
 )
@@ -163,9 +165,11 @@ target_include_directories(FengYinLicenseGenerator PRIVATE native/Source)
 target_link_libraries(FengYinLicenseGenerator PRIVATE juce::juce_cryptography)
 
 if(WIN32)
+    target_link_libraries(FengYin PRIVATE setupapi advapi32)
     target_compile_definitions(FengYin PRIVATE
-        JUCE_ASIO=1
-        JUCE_ASIO_USE_EXTERNAL_SDK=0
+        # 风吟的默认用户使用板载声卡。ASIO4ALL 等 ASIO 包装驱动会绕过
+        # Windows 混音并导致其他应用无声，与产品的“永不独占”原则冲突。
+        JUCE_ASIO=0
         JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
         NOMINMAX
         WIN32_LEAN_AND_MEAN
@@ -192,6 +196,12 @@ install(FILES
 
 include(CTest)
 if(BUILD_TESTING)
+    # Tests must execute their checks (and assert expressions) in Release too.
+    if(MSVC)
+        add_compile_options(/UNDEBUG)
+    else()
+        add_compile_options(-UNDEBUG)
+    endif()
     add_executable(FengYinPresetTests
         tests/test_sound_preset_store.cpp
         native/Source/SoundPresetStore.cpp
@@ -239,6 +249,10 @@ if(BUILD_TESTING)
     add_executable(FengYinPitchKeyTests tests/test_pitch_key.cpp)
     target_include_directories(FengYinPitchKeyTests PRIVATE native/Source)
     add_test(NAME pitch_key_transpose COMMAND FengYinPitchKeyTests)
+
+    add_executable(FengYinRealtimeMidiQueueTests tests/test_realtime_midi_queue.cpp)
+    target_include_directories(FengYinRealtimeMidiQueueTests PRIVATE native/Source)
+    add_test(NAME realtime_midi_queue COMMAND FengYinRealtimeMidiQueueTests)
 
     add_executable(FengYinToneStyleTests tests/test_tone_style_catalog.cpp native/Source/MasterOutputService.cpp)
     target_include_directories(FengYinToneStyleTests PRIVATE native/Source)

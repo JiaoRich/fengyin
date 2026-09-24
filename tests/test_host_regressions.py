@@ -11,9 +11,45 @@ MASTER = (ROOT / "native" / "Source" / "MasterOutputService.cpp").read_text(enco
 PRESET = (ROOT / "native" / "Source" / "SoundPresetStore.cpp").read_text(encoding="utf-8")
 PITCH_KEY = (ROOT / "native" / "Source" / "PitchKey.h").read_text(encoding="utf-8")
 TONE_STYLES = (ROOT / "native" / "Source" / "ToneStyleCatalog.h").read_text(encoding="utf-8")
+AUDIO = (ROOT / "native" / "Source" / "AudioDeviceService.cpp").read_text(encoding="utf-8")
 
 
 class HostRegressionTests(unittest.TestCase):
+    def test_endpoint_switch_does_not_start_or_invalidate_tuning(self):
+        follow = AUDIO.split("bool AudioDeviceService::followSystemDefaultOutput()", 1)[1].split(
+            "bool AudioDeviceService::systemDefaultOutputChanged()", 1)[0]
+        self.assertNotIn("removeValue(\"automaticLatencyTunedDevice\")", follow)
+        timer = MAIN.split("if (++audioOutputSyncTicks", 1)[1].split("if (const auto tuningResult", 1)[0]
+        self.assertIn("if (! outputChanged", timer)
+        self.assertIn("audioHardwareIdentity", AUDIO)
+
+    def test_audio_tuning_stops_for_real_performance_activity(self):
+        timer = MAIN.split("snapshot = midi.getSnapshot();", 1)[1].split("if (const auto tuningResult", 1)[0]
+        self.assertIn("snapshot.breath > 0.01f", timer)
+        self.assertIn("snapshot.lastNote >= 0", timer)
+        self.assertNotIn("snapshot.breath < 4", timer)
+        self.assertIn("cancelAutomaticLatencyTuning", timer)
+
+    def test_pitch_wheel_is_not_scaled_by_saved_sensitivity(self):
+        handler = MIDI.split("void MidiInputService::handleIncomingMidiMessage", 1)[1]
+        pitch = handler.split("else if (message.isPitchWheel())", 1)[1].split(
+            "if (message.isController()", 1)[0]
+        self.assertNotIn("pitchSensitivity", pitch)
+        self.assertIn("getPitchWheelValue()", pitch)
+
+    def test_video_replacement_rejects_stale_events_and_rewinds(self):
+        self.assertIn("webVideoGeneration", MAIN)
+        self.assertIn("webVideoPosition = 0.0", MAIN)
+        self.assertIn("generation:videoGeneration", JS)
+        self.assertIn("video.currentTime = 0", JS)
+        self.assertIn("videoWantsPlaying = false", JS)
+
+    def test_custom_tone_has_independent_bass_and_direct_page(self):
+        self.assertIn('toneObject->setProperty("bass", (toneSettings.bass + 1.0f)', MAIN)
+        self.assertIn("result.bass =", MAIN)
+        self.assertIn("定制音色", JS)
+        self.assertIn("#page-chain > .panel", JS)
+
     def test_graph_has_stereo_output_before_io_nodes_are_connected(self):
         configure = HOST.index("graph->setPlayConfigDetails(0, 2, sampleRate, bufferSize)")
         output_node = HOST.index("audioOutputNode = graph->addNode", configure)
@@ -32,7 +68,7 @@ class HostRegressionTests(unittest.TestCase):
 
     def test_safe_onset_resets_expression_and_caps_velocity(self):
         self.assertIn("sink->resetPerformance()", MIDI)
-        self.assertIn("sink->breathChanged(0.035f)", MIDI)
+        self.assertIn("sink->breathChanged(0.035f, timestampSeconds)", MIDI)
         self.assertIn("0.28f + currentBreath * 0.52f", MIDI)
         self.assertIn('activeProfile.id == "yamaha-yds"', MIDI)
         self.assertIn("savedController = 11", MIDI)
@@ -69,7 +105,7 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("setVideoPlaybackState", JS)
         self.assertIn("followSystemDefaultOutput", audio_device)
         self.assertIn("getDefaultDeviceIndex(false)", audio_device)
-        self.assertIn("current->getTypeName().containsIgnoreCase(\"ASIO\")", audio_device)
+        self.assertIn("isWindowsSharedType(current->getTypeName())", audio_device)
         self.assertIn("audio.followSystemDefaultOutput()", MAIN)
         refresh = MAIN.index("videoPlaybackActive ? 6 : 3")
         self.assertGreater(MAIN.index("masterOutput.getSpectrum", refresh), refresh)
@@ -81,9 +117,9 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('containsIgnoreCase("Low Latency Mode")', audio_device)
         self.assertIn('getDefaultDeviceIndex(false)', audio_device)
         self.assertIn('automaticAudioDevice', audio_device)
-        self.assertIn("setup.sampleRate = 48000.0", audio_device)
-        self.assertIn("setup.bufferSize = 128", audio_device)
-        self.assertIn("setup.bufferSize = 256", audio_device)
+        self.assertIn("sharedMixRate(*device)", audio_device)
+        self.assertIn("minimumLegalBuffer", audio_device)
+        self.assertNotIn("recommendedInitialBuffer", audio_device)
         self.assertIn("audio.applyBestInitialSetup();", MAIN)
         self.assertIn('withEventListener("applyAudioSettings"', MAIN)
         self.assertIn('withEventListener("requestAudioSettings"', MAIN)
@@ -91,11 +127,13 @@ class HostRegressionTests(unittest.TestCase):
 
     def test_audio_setup_uses_real_driver_capabilities_and_runtime_stability(self):
         audio_device = (ROOT / "native" / "Source" / "AudioDeviceService.cpp").read_text(encoding="utf-8")
-        self.assertIn("recommendedInitialBuffer", audio_device)
-        self.assertIn('containsIgnoreCase("ASIO4ALL")', audio_device)
+        self.assertIn("sortedLegalBuffers", audio_device)
+        self.assertIn("minimumLegalBuffer", audio_device)
         self.assertIn("getAvailableBufferSizes()", audio_device)
         self.assertIn("manager.getCpuUsage() >= 0.82", audio_device)
-        self.assertIn("audio.stabiliseAfterXRuns()", MAIN)
+        self.assertIn("audio.hasSustainedRuntimeInstability()", MAIN)
+        self.assertNotIn("stabiliseAfterXRuns", audio_device)
+        self.assertNotIn("candidate <= 1024", audio_device)
 
     def test_first_run_audio_tuning_is_automatic_but_manual_controls_remain(self):
         audio_header = (ROOT / "native" / "Source" / "AudioDeviceService.h").read_text(encoding="utf-8")
@@ -103,13 +141,16 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("beginAutomaticLatencyTuning", audio_header)
         self.assertIn("pollAutomaticLatencyTuning", audio_header)
         self.assertIn("latencyCandidateTestMs", audio_device)
-        self.assertIn('if (! type->getTypeName().containsIgnoreCase("Exclusive"))', audio_device)
-        self.assertNotIn('if (! typeName.containsIgnoreCase("Exclusive")) continue;', audio_device)
+        self.assertIn("isWindowsSharedType", audio_device)
+        self.assertIn("Test only periods the active IAudioClient3 endpoint explicitly reports", audio_device)
         self.assertIn("addedXRuns == 0", audio_device)
         self.assertIn("tuningCandidateMaximumCpu < 0.65", audio_device)
         self.assertIn("tuningCandidateMaximumCpu", audio_device)
         self.assertIn('automaticLatencyTunedDevice', audio_device)
-        self.assertIn("audio.beginAutomaticLatencyTuning();", MAIN)
+        self.assertIn("pluginHost.setLatencyProbeActive(true)", MAIN)
+        self.assertIn("pluginHost.setLatencyProbeActive(false)", MAIN)
+        constructor = MAIN.split("MainComponent::MainComponent", 1)[1].split("MainComponent::~MainComponent", 1)[0]
+        self.assertNotIn("audio.beginAutomaticLatencyTuning();", constructor)
         self.assertIn('withEventListener("applyAudioSettings"', MAIN)
 
     def test_three_day_trial_unlocks_features_and_expires_safely(self):
@@ -170,9 +211,26 @@ class HostRegressionTests(unittest.TestCase):
         master = HOST.index("masterOutput->processMaster", accompaniment)
         self.assertLess(instrument, accompaniment)
         self.assertLess(accompaniment, master)
-        self.assertIn("getAccompanimentDuckGain", HOST)
         self.assertIn("instrumentReverb.processStereo", MASTER)
-        self.assertIn("glueReverb.processStereo", MASTER)
+        self.assertNotIn("glueReverb", MASTER)
+        self.assertIn("不得修改伴奏原声", MASTER)
+
+    def test_realtime_midi_preserves_timestamps_and_avoids_cross_thread_collector_writes(self):
+        header = (ROOT / "native" / "Source" / "PluginHostEngine.h").read_text(encoding="utf-8")
+        queue = (ROOT / "native" / "Source" / "RealtimeMidiQueue.h").read_text(encoding="utf-8")
+        self.assertIn("midiQueueSize = 8192", header)
+        self.assertIn("RealtimeMidiQueue<midiQueueSize>", header)
+        self.assertIn("timestampSeconds", queue)
+        self.assertIn("writeIndex", queue)
+        self.assertIn("readIndex", queue)
+        self.assertNotIn("mutex", queue.lower())
+        self.assertIn("message.getTimeStamp()", MIDI)
+        self.assertIn("player.enqueueMidi(message, timestampSeconds)", HOST)
+        self.assertIn("count < midiQueueSize && midiQueue.pop(event)", HOST)
+        self.assertIn("timestampSeconds > 0.0 ? midiQueue : controlQueue", HOST)
+        self.assertIn("ensureStorageAllocated", HOST)
+        queue_body = HOST.split("void PluginHostEngine::queue", 1)[1]
+        self.assertNotIn("getMidiMessageCollector().addMessageToQueue", queue_body)
 
     def test_transpose_is_global_and_not_part_of_sound_presets(self):
         self.assertNotIn("transposeSemitones", PRESET)
@@ -193,6 +251,21 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('"warm-jazz"', TONE_STYLES)
         self.assertIn('"cinematic"', TONE_STYLES)
         self.assertNotIn("favoritePresetButton", MAIN)
+
+    def test_swam_models_and_tone_profiles_are_real_but_never_touch_midi_mapping(self):
+        header = (ROOT / "native" / "Source" / "PluginHostEngine.h").read_text(encoding="utf-8")
+        self.assertIn("getInstrumentModelNames", header)
+        self.assertIn("selectInstrumentModel", header)
+        self.assertIn('withEventListener("setInstrumentModel"', MAIN)
+        self.assertIn('state->setProperty("instrumentModels"', MAIN)
+        self.assertIn("applySwamToneProfile", HOST)
+        self.assertIn("isProtectedPerformanceParameter", HOST)
+        for protected in ("midi", "controller", "breath", "expression", "pitchbend", "growl", "vibrato"):
+            self.assertIn(f'"{protected}"', HOST)
+        self.assertIn("parameter == instrumentModelParameter", HOST)
+        for key in ("soprano-sax", "alto-sax", "tenor-sax", "baritone-sax"):
+            block = TONE_STYLES.split(f'key == "{key}"', 1)[1].split("if (key ==", 1)[0]
+            self.assertGreaterEqual(block.count("{ true,"), 3)
 
     def test_custom_tone_settings_preserve_builtin_styles(self):
         self.assertIn('withEventListener("previewCustomTone"', MAIN)

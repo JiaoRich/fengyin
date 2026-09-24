@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MasterOutputService.h"
+#include "SwamToneProfile.h"
 #include <juce_core/juce_core.h>
 
 namespace fengyin
@@ -11,6 +12,7 @@ struct ToneStyleDefinition
     juce::String name;
     juce::String description;
     ToneStyleSettings settings;
+    SwamToneProfile swam;
 };
 
 class ToneStyleCatalog
@@ -24,17 +26,21 @@ public:
                 { 0.0f, .20f, .18f, .58f, 1.65f, .035f, .07f, .42f, .56f, .88f } };
         };
         if (key == "soprano-sax") return {
-            natural(),
-            { "silky", juce::String::fromUTF8("丝滑抒情"), juce::String::fromUTF8("温暖、柔和、浪漫大厅"), { -.12f,.58f,.36f,.52f,1.9f,.11f,.16f,.58f,.62f,.96f } },
-            { "stage", juce::String::fromUTF8("明亮舞台"), juce::String::fromUTF8("清晰、明亮、更有穿透力"), { .28f,.30f,.24f,.50f,2.1f,.07f,.12f,.44f,.55f,.90f } } };
+            ToneStyleDefinition { "natural", juce::String::fromUTF8("自然原声"), juce::String::fromUTF8("真实、均衡、保留原始动态"), { 0.0f,.20f,.18f,.58f,1.65f,.035f,.07f,.42f,.56f,.88f }, { true,.52f,.56f,.52f,.48f,.44f,.52f,.18f,.50f,.48f } },
+            ToneStyleDefinition { "silky", juce::String::fromUTF8("丝滑抒情"), juce::String::fromUTF8("温暖、柔和、浪漫大厅"), { -.12f,.58f,.36f,.52f,1.9f,.11f,.16f,.58f,.62f,.96f }, { true,.42f,.35f,.48f,.42f,.60f,.44f,.10f,.60f,.62f } },
+            ToneStyleDefinition { "stage", juce::String::fromUTF8("明亮舞台"), juce::String::fromUTF8("清晰、明亮、更有穿透力"), { .28f,.30f,.24f,.50f,2.1f,.07f,.12f,.44f,.55f,.90f }, { true,.68f,.75f,.55f,.60f,.30f,.65f,.16f,.45f,.34f } } };
         if (key == "alto-sax") return {
-            natural(),
-            { "warm-jazz", juce::String::fromUTF8("温暖爵士"), juce::String::fromUTF8("厚实、松弛、带轻微暖色"), { -.18f,.66f,.25f,.50f,2.0f,.14f,.17f,.48f,.64f,.90f } },
-            { "pop", juce::String::fromUTF8("流行穿透"), juce::String::fromUTF8("结实明快，容易融入伴奏"), { .30f,.32f,.20f,.48f,2.2f,.08f,.13f,.40f,.56f,.88f } } };
-        if (key == "tenor-sax" || key == "baritone-sax") return {
-            natural(),
-            { "smoky", juce::String::fromUTF8("烟熏爵士"), juce::String::fromUTF8("低沉、温暖、略带粗粝感"), { -.24f,.74f,.23f,.50f,2.0f,.18f,.18f,.46f,.68f,.88f } },
-            { "lyrical", juce::String::fromUTF8("深情抒情"), juce::String::fromUTF8("圆润、舒展、柔和大厅"), { -.10f,.60f,.34f,.53f,1.85f,.12f,.14f,.56f,.63f,.96f } } };
+            ToneStyleDefinition { "natural", juce::String::fromUTF8("自然原声"), juce::String::fromUTF8("真实、均衡、保留原始动态"), { 0.0f,.20f,.18f,.58f,1.65f,.035f,.07f,.42f,.56f,.88f }, { true,.50f,.50f,.50f,.52f,.44f,.50f,.20f,.54f,.44f } },
+            ToneStyleDefinition { "warm-jazz", juce::String::fromUTF8("温暖爵士"), juce::String::fromUTF8("厚实、松弛、带轻微暖色"), { -.18f,.66f,.25f,.50f,2.0f,.14f,.17f,.48f,.64f,.90f }, { true,.38f,.34f,.44f,.56f,.56f,.42f,.20f,.62f,.38f } },
+            ToneStyleDefinition { "pop", juce::String::fromUTF8("流行穿透"), juce::String::fromUTF8("结实明快，容易融入伴奏"), { .30f,.32f,.20f,.48f,2.2f,.08f,.13f,.40f,.56f,.88f }, { true,.65f,.72f,.54f,.58f,.28f,.66f,.15f,.45f,.30f } } };
+        if (key == "tenor-sax") return {
+            ToneStyleDefinition { "natural", juce::String::fromUTF8("自然原声"), juce::String::fromUTF8("真实、均衡、保留原始动态"), { 0.0f,.20f,.18f,.58f,1.65f,.035f,.07f,.42f,.56f,.88f }, { true,.48f,.48f,.50f,.54f,.44f,.50f,.22f,.56f,.46f } },
+            ToneStyleDefinition { "smoky", juce::String::fromUTF8("烟熏爵士"), juce::String::fromUTF8("低沉、温暖、略带粗粝感"), { -.24f,.74f,.23f,.50f,2.0f,.18f,.18f,.46f,.68f,.88f }, { true,.32f,.30f,.42f,.62f,.58f,.38f,.25f,.68f,.56f } },
+            ToneStyleDefinition { "lyrical", juce::String::fromUTF8("深情抒情"), juce::String::fromUTF8("圆润、舒展、柔和大厅"), { -.10f,.60f,.34f,.53f,1.85f,.12f,.14f,.56f,.63f,.96f }, { true,.42f,.38f,.48f,.50f,.62f,.44f,.14f,.65f,.50f } } };
+        if (key == "baritone-sax") return {
+            ToneStyleDefinition { "natural", juce::String::fromUTF8("自然原声"), juce::String::fromUTF8("真实、均衡、保留原始动态"), { 0.0f,.20f,.18f,.58f,1.65f,.035f,.07f,.42f,.56f,.88f }, { true,.45f,.42f,.46f,.60f,.46f,.48f,.28f,.60f,.42f } },
+            ToneStyleDefinition { "smoky", juce::String::fromUTF8("烟熏爵士"), juce::String::fromUTF8("厚重、暗暖、富有颗粒感"), { -.24f,.74f,.23f,.50f,2.0f,.18f,.18f,.46f,.68f,.88f }, { true,.28f,.25f,.38f,.70f,.60f,.34f,.32f,.72f,.48f } },
+            ToneStyleDefinition { "lyrical", juce::String::fromUTF8("深情抒情"), juce::String::fromUTF8("平滑、宽厚、柔和延展"), { -.10f,.60f,.34f,.53f,1.85f,.12f,.14f,.56f,.63f,.96f }, { true,.36f,.32f,.42f,.58f,.64f,.40f,.20f,.70f,.45f } } };
         if (key.contains("trumpet") || key.contains("flugelhorn")) return {
             natural(),
             { "bright-pop", juce::String::fromUTF8("明亮流行"), juce::String::fromUTF8("有冲击力，适合舞台与流行"), { .32f,.28f,.18f,.46f,2.25f,.07f,.20f,.38f,.58f,.86f } },

@@ -88,10 +88,13 @@ class MidiPerformanceSink
 {
 public:
     virtual ~MidiPerformanceSink() = default;
-    virtual void noteOn(int noteNumber, float velocity) noexcept = 0;
-    virtual void noteOff(int noteNumber) noexcept = 0;
-    virtual void breathChanged(float value) noexcept = 0;
-    virtual void pitchBendChanged(float bipolarValue) noexcept = 0;
+    // timestampSeconds uses the monotonic timestamp supplied by the MIDI backend.
+    // Keeping it all the way to the audio callback allows sample-offset scheduling
+    // instead of quantising every event to the start of the next audio block.
+    virtual void noteOn(int noteNumber, float velocity, double timestampSeconds = 0.0) noexcept = 0;
+    virtual void noteOff(int noteNumber, double timestampSeconds = 0.0) noexcept = 0;
+    virtual void breathChanged(float value, double timestampSeconds = 0.0) noexcept = 0;
+    virtual void pitchBendChanged(float bipolarValue, double timestampSeconds = 0.0) noexcept = 0;
     virtual void techniqueChanged(PerformanceTechnique, float) noexcept {}
     virtual void resetPerformance() noexcept {}
 };

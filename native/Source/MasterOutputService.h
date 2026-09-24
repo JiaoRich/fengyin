@@ -21,6 +21,7 @@ struct ToneStyleSettings
     float reverbDamping = 0.54f;
     float reverbWidth = 0.88f;
     float outputGain = 1.0f;
+    float bass = 0.0f; // independent low-shelf gain, -1..1 = -12..+12 dB
 };
 
 class MasterOutputService
@@ -44,9 +45,9 @@ public:
     [[nodiscard]] bool isSmartOptimisationEnabled() const noexcept { return smartOptimisation.load(); }
     [[nodiscard]] float getWarmth() const noexcept { return warmth.load(); }
     [[nodiscard]] ToneStyleSettings getToneStyle() const noexcept;
-    [[nodiscard]] float getAccompanimentDuckGain() const noexcept { return accompanimentDuckGain.load(); }
     [[nodiscard]] float getLeftPeak() const noexcept { return leftPeak.load(); }
     [[nodiscard]] float getRightPeak() const noexcept { return rightPeak.load(); }
+    [[nodiscard]] uint64_t getOverloadSamples() const noexcept { return overloadSamples.load(); }
 
     void setSampleRate(double value) noexcept;
     void processInstrument(float* const* outputs, int channels, int samples) noexcept;
@@ -80,20 +81,22 @@ private:
     std::atomic<float> styleSaturation { 0.04f }, styleHarshControl { 0.10f };
     std::atomic<float> styleRoomSize { 0.42f }, styleDamping { 0.54f }, styleWidth { 0.88f };
     std::atomic<float> styleOutputGain { 1.0f };
+    std::atomic<float> bassTone { 0.0f };
+    std::atomic<uint64_t> overloadSamples { 0 };
+    float smoothedBassGain = 1.0f;
+    float smoothedOutputGain = 1.0f;
+    std::array<float, 2> bassLowPass {};
     std::atomic<bool> smartOptimisation { true };
     std::atomic<int> instrumentProfile { static_cast<int>(InstrumentMixProfile::generic) };
-    std::atomic<float> accompanimentDuckGain { 1.0f };
     std::atomic<double> sampleRate { 48000.0 };
 
     juce::Reverb instrumentReverb;
-    juce::Reverb glueReverb;
+    std::atomic<bool> reverbParametersDirty { true };
     float lastInstrumentReverbMix = -1.0f;
     int lastInstrumentProfile = -1;
     float instrumentEnvelope = 0.0f;
     float compressorGain = 1.0f;
     float automaticTrim = 1.0f;
-    float duckGainState = 1.0f;
-    float limiterGain = 1.0f;
     std::array<float, 2> toneLowPass {};
     std::array<float, 2> rumbleLowPass {};
 

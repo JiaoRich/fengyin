@@ -5,7 +5,7 @@ class FengYinApplication final : public juce::JUCEApplication
 {
 public:
     const juce::String getApplicationName() override { return juce::String::fromUTF8("风吟"); }
-    const juce::String getApplicationVersion() override { return "0.10.0"; }
+    const juce::String getApplicationVersion() override { return JUCE_APPLICATION_VERSION_STRING; }
     bool moreThanOneInstanceAllowed() override { return false; }
 
     void initialise(const juce::String&) override

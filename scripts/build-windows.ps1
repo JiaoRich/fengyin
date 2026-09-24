@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "0.8.0",
+    [string]$Version = "0.13.0",
     [switch]$SkipInstaller
 )
 
@@ -49,6 +49,10 @@ Invoke-Checked "激活工具编译" { cmake --build $BuildDir --config Release -
 
 Write-Host "[3/5] 运行自动测试..." -ForegroundColor Cyan
 Invoke-Checked "自动测试" { ctest --test-dir $BuildDir -C Release --output-on-failure }
+if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+    throw "没有找到 Python，无法执行发布回归检查。"
+}
+Invoke-Checked "发布回归检查" { python -m unittest discover -s (Join-Path $ProjectRoot "tests") -p "test_*.py" }
 
 Write-Host "[4/5] 整理安装文件..." -ForegroundColor Cyan
 if (Test-Path $PackageDir) {
