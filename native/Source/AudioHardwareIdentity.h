@@ -34,7 +34,7 @@ inline juce::String audioHardwareIdentity()
         identities.add(juce::String(id) + "|" + juce::String(version));
     }
     SetupDiDestroyDeviceInfoList(devices);
-    identities.sort();
+    identities.sort(false);
     return identities.isEmpty() ? juce::String() : juce::String::toHexString(identities.joinIntoString("\n").hashCode64());
    #else
     return "non-windows";
