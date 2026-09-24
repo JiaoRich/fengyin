@@ -5,6 +5,16 @@
 
 namespace fengyin
 {
+class TechniqueProcessingGraph final : public juce::AudioProcessorGraph
+{
+public:
+    std::function<void()> applyTechniqueValues;
+    void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& messages) override
+    {
+        if (applyTechniqueValues) applyTechniqueValues();
+        juce::AudioProcessorGraph::processBlock(buffer, messages);
+    }
+};
 bool RecordingAudioProcessorPlayer::enqueueMidi(const juce::MidiMessage& message,
                                                 double timestampSeconds) noexcept
 {
@@ -14,7 +24,8 @@ bool RecordingAudioProcessorPlayer::enqueueMidi(const juce::MidiMessage& message
 
     const auto timestamp = timestampSeconds > 0.0
         ? timestampSeconds : juce::Time::getMillisecondCounterHiRes() * 0.001;
-    if (! midiQueue.push(message.getRawData(), size, timestamp))
+    auto& queue = timestampSeconds > 0.0 ? midiQueue : controlQueue;
+    if (! queue.push(message.getRawData(), size, timestamp))
     {
         resetRequested.store(true, std::memory_order_release);
         return false;
@@ -60,6 +71,7 @@ void RecordingAudioProcessorPlayer::addLatencyProbeMessages(int numSamples, doub
     const auto breath = juce::jlimit(18, 105, 18 + juce::roundToInt(87.0 * phase));
     send(juce::MidiMessage::controllerEvent(1, 11, breath));
     send(juce::MidiMessage::controllerEvent(1, 2, breath));
+    send(juce::MidiMessage::controllerEvent(1, 1, breath));
 
     if (probeSamplesUntilChange > 0)
         return;
@@ -106,16 +118,25 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
     if (resetRequested.exchange(false, std::memory_order_acq_rel))
         addResetMessages(nowSeconds);
     RealtimeMidiEvent event;
-    while (midiQueue.pop(event))
+    for (std::size_t count = 0; count < midiQueueSize && midiQueue.pop(event); ++count)
     {
         juce::MidiMessage message(event.bytes.data(), static_cast<int>(event.size), event.timestampSeconds);
         getMidiMessageCollector().addMessageToQueue(message);
     }
+    for (std::size_t count = 0; count < midiQueueSize && controlQueue.pop(event); ++count)
+        getMidiMessageCollector().addMessageToQueue(
+            juce::MidiMessage(event.bytes.data(), static_cast<int>(event.size), event.timestampSeconds));
     const auto probing = latencyProbeActive.load(std::memory_order_acquire);
     if (probing)
         addLatencyProbeMessages(numSamples, nowSeconds);
 
     juce::AudioProcessorPlayer::audioDeviceIOCallbackWithContext(inputs, numInputs, outputs, numOutputs, numSamples, context);
+    bool signal = false;
+    for (int channel = 0; channel < numOutputs; ++channel)
+        if (outputs[channel] != nullptr)
+            for (int i = 0; i < numSamples && ! signal; ++i)
+                signal = std::abs(outputs[channel][i]) > 0.00001f;
+    if (signal) signalBlocks.fetch_add(1, std::memory_order_relaxed);
     if (masterOutput != nullptr)
         masterOutput->processInstrument(outputs, numOutputs, numSamples);
     if (accompaniment != nullptr)
@@ -128,12 +149,16 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
                 juce::FloatVectorOperations::clear(outputs[channel], numSamples);
     if (recorder != nullptr)
         recorder->push(outputs, numOutputs, numSamples);
+    callbackCount.fetch_add(1, std::memory_order_relaxed);
+    if (juce::Time::getMillisecondCounterHiRes() * 0.001 - nowSeconds
+        > static_cast<double>(numSamples) / currentSampleRate)
+        callbackOverruns.fetch_add(1, std::memory_order_relaxed);
 }
 
 void RecordingAudioProcessorPlayer::audioDeviceAboutToStart(juce::AudioIODevice* device)
 {
     juce::AudioProcessorPlayer::audioDeviceAboutToStart(device);
-    getMidiMessageCollector().ensureStorageAllocated(64 * 1024);
+    getMidiMessageCollector().ensureStorageAllocated(256 * 1024);
     currentSampleRate = device != nullptr && device->getCurrentSampleRate() > 0.0
         ? device->getCurrentSampleRate() : 48000.0;
     probeSamplesUntilChange = 0;
@@ -198,7 +223,9 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                     completion(false, error.isNotEmpty() ? error : juce::String("VST3 load failed"));
                 return;
             }
-            graph = std::make_unique<juce::AudioProcessorGraph>();
+            auto processingGraph = std::make_unique<TechniqueProcessingGraph>();
+            processingGraph->applyTechniqueValues = [this] { flushTechniqueValues(); };
+            graph = std::move(processingGraph);
             // Configure the graph's output buses before adding the IO node. Without this,
             // the output node initially has zero input channels and silently rejects every
             // instrument-to-output connection while accompaniment audio still remains audible.
@@ -236,7 +263,7 @@ void PluginHostEngine::unload()
     graph.reset();
     currentDescription = {};
     currentEffectDescription = {};
-    techniqueParameters.fill(nullptr);
+    for (auto& parameter : techniqueParameters) parameter.store(nullptr);
     for (auto& dirty : techniqueDirty) dirty.store(false, std::memory_order_relaxed);
 }
 
@@ -443,7 +470,8 @@ void PluginHostEngine::breathChanged(float value, double timestampSeconds) noexc
 void PluginHostEngine::pitchBendChanged(float bipolarValue, double timestampSeconds) noexcept
 {
     const auto pitch = juce::jlimit(0, 16383,
-        juce::roundToInt(8192.0f + juce::jlimit(-1.0f, 1.0f, bipolarValue) * 8191.0f));
+        juce::roundToInt(8192.0f + juce::jlimit(-1.0f, 1.0f, bipolarValue)
+                         * (bipolarValue < 0.0f ? 8192.0f : 8191.0f)));
     queue(juce::MidiMessage::pitchWheel(1, pitch), timestampSeconds);
 }
 
@@ -503,7 +531,7 @@ void PluginHostEngine::flushTechniqueValues()
 {
     for (size_t index = 0; index < techniqueParameters.size(); ++index)
         if (techniqueDirty[index].exchange(false, std::memory_order_acq_rel))
-            if (auto* parameter = techniqueParameters[index])
+            if (auto* parameter = techniqueParameters[index].load(std::memory_order_acquire))
                 parameter->setValueNotifyingHost(techniqueValues[index].load(std::memory_order_relaxed));
 }
 
@@ -523,7 +551,7 @@ int PluginHostEngine::getProcessingLatencySamples() const noexcept
 
 void PluginHostEngine::resolveTechniqueParameters()
 {
-    techniqueParameters.fill(nullptr);
+    for (auto& parameter : techniqueParameters) parameter.store(nullptr);
     if (instrumentNode == nullptr) return;
     for (auto* parameter : instrumentNode->getProcessor()->getParameters())
     {

@@ -1,7 +1,7 @@
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
-const titles = {play:'开始演奏',sounds:'音色方案',chain:'音源与音效',wind:'智能适配',audio:'声音设置',settings:'软件设置'};
+const titles = {play:'开始演奏',sounds:'音色方案',chain:'定制音色',wind:'智能适配',audio:'声音设置',settings:'软件设置'};
 const presets = [
   ['高音萨克斯','SWAM Soprano Sax 3','自然原声、丝滑抒情、明亮舞台'],
   ['中音萨克斯','SWAM Alto Sax 3','自然原声、温暖爵士、流行穿透'],
@@ -58,6 +58,10 @@ let recording = false;
 let animationFrame;
 let videoUrl;
 let selectedVideoFile;
+let videoGeneration = 0;
+let videoLoading = false;
+let videoWantsPlaying = false;
+let videoPlayRequest = 0;
 let triedVideoDataFallback = false;
 let nativeAccompanimentReady = false;
 let lastVideoSyncAt = 0;
@@ -480,10 +484,12 @@ $('#tone-warmth')?.addEventListener('input', event => {
   updateBuiltinEffects();
 });
 const expertControls = [
-  ['bass','低频厚度 · Low Shelf EQ',50],['brightness','明亮度 · High Shelf EQ',50],
-  ['warmth','温暖度 · Saturation',20],['compression','动态压缩 · Compressor',35],
+  ['bass','低频 EQ · 180 Hz / ±12 dB',50],['brightness','高频色彩 · EQ',50],
+  ['warmth','温暖度 · Warmth',20],['saturation','饱和度 · Saturation',12],
+  ['compression','压缩阈值 · Threshold',35],['ratio','压缩比 · Ratio',25],
   ['harsh','去刺耳 · Harsh Control',25],['reverb','混响强度 · Reverb Mix',18],
-  ['room','空间大小 · Room Size',42],['output','输出音量 · Output Gain',80]
+  ['room','空间大小 · Room Size',42],['damping','高频阻尼 · Damping',54],
+  ['width','立体声宽度 · Width',88],['output','输出音量 · Output Gain',80]
 ];
 function toneStyleToExpert() {
   const style = toneStylesForInstrument(currentInstrument?.instrumentKey)[currentToneStyleIndex] || {};
@@ -492,10 +498,10 @@ function toneStyleToExpert() {
   return {bass:50,brightness:Math.round((Number(style.eq || 0)+100)/2),warmth:Number(style.warmth ?? 20),compression:35,harsh:25,reverb:Number(style.reverb ?? 18),room:42,output:80};
 }
 function renderExpertControls() {
-  $('#expert-grid').innerHTML = expertControls.map(([id,label,fallback]) => `<div class="expert-control"><label for="expert-${id}"><span>${label}</span><b id="expert-${id}-value">${Math.round(expertSettings?.[id] ?? fallback)}%</b></label><input id="expert-${id}" data-expert="${id}" type="range" min="0" max="100" value="${Math.round(expertSettings?.[id] ?? fallback)}"></div>`).join('');
+  $('#expert-grid').innerHTML = expertControls.map(([id,label,fallback]) => `<div class="expert-control"><label for="expert-${id}"><span>${label}</span><b id="expert-${id}-value">${expertDisplay(id,expertSettings?.[id] ?? fallback)}</b></label><input id="expert-${id}" data-expert="${id}" type="range" min="0" max="100" step="0.001" value="${expertSettings?.[id] ?? fallback}" ${currentPluginLoaded ? '' : 'disabled'}></div>`).join('');
   $$('[data-expert]').forEach(input => input.addEventListener('input', () => {
     expertSettings[input.dataset.expert] = Number(input.value);
-    $(`#expert-${input.dataset.expert}-value`).textContent = `${input.value}%`;
+    $(`#expert-${input.dataset.expert}-value`).textContent = expertDisplay(input.dataset.expert,Number(input.value));
     expertDirty = true;
     nativeEvent('previewCustomTone', expertSettings);
   }));
@@ -507,8 +513,37 @@ function closeExpert(restore = true) {
 }
 $('#tone-expert')?.addEventListener('click', () => {
   if (!currentPluginLoaded) return toast('请先加载一个乐器音源');
-  $('#expert-confirm-dialog').hidden = false;
+  showPage('chain');
+  refreshInlineExpert();
 });
+function expertDisplay(id,value) {
+  if (id === 'bass') return `${((value/50-1)*12).toFixed(1)} dB`;
+  if (id === 'ratio') return `${(1+value/100*3).toFixed(2)}:1`;
+  if (id === 'compression') return `${(20*Math.log10(.85-value/100*.55)).toFixed(1)} dB`;
+  if (id === 'output') return `${(20*Math.log10(.5+value/100*.75)).toFixed(1)} dB`;
+  return `${value.toFixed(1)}%`;
+}
+// The custom-tone editor lives on the page, not behind a warning/modal.
+document.querySelector('#page-chain > .panel').append(document.querySelector('#expert-dialog .expert-inline'));
+document.querySelector('#page-chain h2').after($('#scan-swam'));
+$('#scan-swam').className = 'custom-scan-button';
+$('#scan-label').hidden = true;
+function refreshInlineExpert() {
+  if (expertDirty || $('#expert-grid').contains(document.activeElement)) return;
+  expertSettings = toneStyleToExpert();
+  renderExpertControls();
+  $('#save-expert').textContent = editingPresetName ? '保存修改' : '保存为我的方案';
+  $('#save-expert').disabled = !currentPluginLoaded;
+  $('#save-as-expert').disabled = !currentPluginLoaded;
+}
+$('#save-as-expert').addEventListener('click', () => {
+  editingPresetName = '';
+  nativeEvent('cancelPresetEdit');
+  $('#preset-name-input').value = '';
+  $('#preset-name-dialog').hidden = false;
+  $('#preset-name-input').focus();
+});
+refreshInlineExpert();
 $('#cancel-expert-open')?.addEventListener('click', () => { $('#expert-confirm-dialog').hidden = true; });
 $('#confirm-expert-open')?.addEventListener('click', () => {
   $('#expert-confirm-dialog').hidden = true;
@@ -517,7 +552,7 @@ $('#confirm-expert-open')?.addEventListener('click', () => {
   $('#expert-base-style').textContent = `基于：${toneStylesForInstrument(currentInstrument?.instrumentKey)[currentToneStyleIndex]?.name || '自然原声'}`;
   renderExpertControls();
   $('#save-expert').textContent = editingPresetName ? '保存修改' : '保存为我的方案';
-  $('#expert-dialog').hidden = false;
+  showPage('chain');
 });
 $('#reset-expert')?.addEventListener('click', () => {
   expertSettings = toneStyleToExpert(); expertDirty = false; renderExpertControls(); nativeEvent('cancelCustomTone');
@@ -698,6 +733,8 @@ if (previewParams.get('preview') === 'sounds') showPage('sounds');
 const video = $('#video');
 const videoFileInput = $('#video-file');
 function chooseVideoFile() {
+  videoWantsPlaying = false;
+  video.pause();
   if (window.__JUCE__?.backend?.emitEvent) {
     nativeEvent('chooseVideo');
     toast('请选择一个伴奏视频');
@@ -711,6 +748,14 @@ videoFileInput.addEventListener('change', event => {
   const file = event.target.files[0];
   if (!file) return;
   selectedVideoFile = file;
+  videoLoading = true;
+  videoWantsPlaying = false;
+  ++videoPlayRequest;
+  videoGeneration += 1;
+  lastVideoSyncAt = 0;
+  $('#seek').value = 0;
+  $('#current-time').textContent = '00:00';
+  $('#duration').textContent = '00:00';
   nativeAccompanimentReady = false;
   video.muted = false;
   triedVideoDataFallback = false;
@@ -727,6 +772,8 @@ videoFileInput.addEventListener('change', event => {
   toast('正在载入视频…');
 });
 video.addEventListener('loadedmetadata', () => {
+  videoLoading = false;
+  video.currentTime = 0;
   video.style.display = 'block';
   $('#video-empty').style.display = 'none';
   $('#duration').textContent = formatTime(video.duration);
@@ -748,26 +795,37 @@ video.addEventListener('error', () => {
 
 function toggleVideo() {
   if (!video.src) return toast('请先选择一个本地视频');
-  video.paused ? video.play() : video.pause();
+  if (videoLoading || (window.__JUCE__?.backend?.emitEvent && !nativeAccompanimentReady))
+    return toast('视频正在准备，请稍候');
+  videoWantsPlaying = !videoWantsPlaying;
+  const request = ++videoPlayRequest;
+  if (!videoWantsPlaying) {
+    video.pause();
+    nativeEvent('setVideoPlaybackState',{generation:videoGeneration,playing:false,position:video.currentTime});
+  } else video.play().catch(error => {
+    if (request !== videoPlayRequest) return;
+    videoWantsPlaying = false;
+    if (error.name !== 'AbortError') toast('暂时无法播放，请重新选择视频');
+  });
 }
 $('#play-button').addEventListener('click', toggleVideo);
 $('#main-play').addEventListener('click', toggleVideo);
-video.addEventListener('play', () => { document.body.classList.add('video-playing'); nativeEvent('setVideoPlaybackState',{playing:true,position:video.currentTime}); $('#play-button').textContent='Ⅱ'; $('#main-play').textContent='Ⅱ 暂停视频'; });
-video.addEventListener('pause', () => { document.body.classList.remove('video-playing'); nativeEvent('setVideoPlaybackState',{playing:false,position:video.currentTime}); $('#play-button').textContent='▶'; $('#main-play').textContent='▶ 播放视频'; });
-video.addEventListener('ended', () => { document.body.classList.remove('video-playing'); nativeEvent('setVideoPlaybackState',{playing:false,position:video.currentTime}); });
+video.addEventListener('playing', () => { if (videoLoading || !videoWantsPlaying) { video.pause(); return; } document.body.classList.add('video-playing'); nativeEvent('setVideoPlaybackState',{generation:videoGeneration,playing:true,position:video.currentTime}); $('#play-button').textContent='Ⅱ'; $('#main-play').textContent='Ⅱ 暂停视频'; });
+video.addEventListener('pause', () => { document.body.classList.remove('video-playing'); if (!videoLoading) nativeEvent('setVideoPlaybackState',{generation:videoGeneration,playing:false,position:video.currentTime}); $('#play-button').textContent='▶'; $('#main-play').textContent='▶ 播放视频'; });
+video.addEventListener('ended', () => { videoWantsPlaying = false; document.body.classList.remove('video-playing'); nativeEvent('setVideoPlaybackState',{generation:videoGeneration,playing:false,position:video.currentTime}); });
 video.addEventListener('timeupdate', () => {
   $('#current-time').textContent = formatTime(video.currentTime);
   $('#seek').value = video.duration ? video.currentTime / video.duration * 100 : 0;
   const now = performance.now();
-  if (nativeAccompanimentReady && now-lastVideoSyncAt > 750) {
+  if (!videoLoading && videoWantsPlaying && nativeAccompanimentReady && now-lastVideoSyncAt > 750) {
     lastVideoSyncAt = now;
-    nativeEvent('syncVideoPlayback',{position:video.currentTime});
+    nativeEvent('syncVideoPlayback',{generation:videoGeneration,position:video.currentTime});
   }
 });
 $('#seek').addEventListener('input', event => {
   if(!video.duration) return;
   video.currentTime = event.target.value / 100 * video.duration;
-  nativeEvent('seekVideo',{position:video.currentTime});
+  nativeEvent('seekVideo',{generation:videoGeneration,position:video.currentTime});
 });
 $('#video-volume').addEventListener('input', event => {
   const value = event.target.value / 100;
@@ -1184,36 +1242,11 @@ $('#audio-auto-optimize').addEventListener('click', () => {
 });
 
 function showAudioOptimisationProgress() {
-  const dialog = $('#audio-optimization-dialog');
-  const messages = ['正在检查输出设备…','正在比较低延迟驱动…','正在预热软音源…','正在模拟伴奏与连续吹奏负载…','正在确认没有丢音和爆音…','正在保存这台电脑的最佳方案…'];
-  const milestones = [8,24,43,63,84,100];
-  let step = 0;
   clearInterval(optimisationTimer);
-  dialog.hidden = false;
-  const update = () => {
-    const progress = milestones[step];
-    $('#optimization-message').textContent = messages[step];
-    $('#optimization-progress-bar').style.width = `${progress}%`;
-    $('#optimization-percent').textContent = `${progress}%`;
-    $$('#optimization-steps li').forEach((item,index) => {
-      item.classList.toggle('done', index < step);
-      item.classList.toggle('active', index === step);
-    });
-    step += 1;
-    if (step < messages.length) return;
-    clearInterval(optimisationTimer);
-    window.setTimeout(() => {
-      if (!window.__JUCE__?.backend?.emitEvent) {
-        dialog.hidden = true;
-        setAudioControlsBusy(false);
-        $('#audio-latency-value').textContent = '7.2 ms · 优秀';
-        $('#audio-apply-status').textContent = '稳定性验证通过 · 可以开始吹奏';
-        toast('智能优化完成，可以开始吹奏');
-      } else $('#optimization-message').textContent = '正在完成最终稳定性验证…';
-    }, 700);
-  };
-  update();
-  optimisationTimer = window.setInterval(update, 1500);
+  $('#audio-optimization-dialog').hidden = false;
+  $('#optimization-message').textContent = '正在检测当前音源与缓冲区…';
+  $('#optimization-progress-bar').style.width = '0%';
+  $('#optimization-percent').textContent = '0%';
 }
 
 function renderSmartAdapter(state) {
@@ -1324,6 +1357,7 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
     techniquePlan = [];
     clearInstrumentArtwork();
   }
+  refreshInlineExpert();
   renderSmartAdapter(state);
   const progress = Math.round((Number(state.scanProgress) || 0) * 100);
   $('#scan-title').textContent = state.scanning ? `正在扫描 ${progress}%` : '重新扫描音源';
@@ -1388,6 +1422,7 @@ $('#copy-machine-code').addEventListener('click', () => {
   toast('机器码已复制，请发送给安装人员');
 });
 window.__JUCE__?.backend?.addEventListener('pluginLoadResult', result => {
+  if (result?.success) expertDirty = false;
   if (!pendingPresetNavigation || pendingPresetNavigation.kind !== 'plugin') return;
   const pending = pendingPresetNavigation;
   pendingPresetNavigation = null;
@@ -1396,6 +1431,7 @@ window.__JUCE__?.backend?.addEventListener('pluginLoadResult', result => {
   toast(`已应用：${pending.name}`);
 });
 window.__JUCE__?.backend?.addEventListener('presetLoadResult', result => {
+  if (result?.success) expertDirty = false;
   if (!pendingPresetNavigation || !['preset','edit'].includes(pendingPresetNavigation.kind)) return;
   const pending = pendingPresetNavigation;
   pendingPresetNavigation = null;
@@ -1417,11 +1453,19 @@ window.__JUCE__?.backend?.addEventListener('licenseStateResult', result => {
 window.__JUCE__?.backend?.addEventListener('editorResult', message => toast(String(message || '')));
 window.__JUCE__?.backend?.addEventListener('videoSelected', result => {
   if (!result?.url) return;
+  videoLoading = true;
+  videoWantsPlaying = false;
+  ++videoPlayRequest;
+  videoGeneration = Number(result.generation);
+  lastVideoSyncAt = 0;
+  $('#seek').value = 0;
+  $('#current-time').textContent = '00:00';
+  $('#duration').textContent = '00:00';
   selectedVideoFile = null;
   triedVideoDataFallback = true;
   nativeAccompanimentReady = false;
   video.pause();
-  video.muted = false;
+  video.muted = true;
   video.style.display = 'none';
   $('#video-empty').style.display = 'grid';
   if (videoUrl) URL.revokeObjectURL(videoUrl);
@@ -1433,9 +1477,10 @@ window.__JUCE__?.backend?.addEventListener('videoSelected', result => {
   toast('正在载入视频并准备伴奏音轨…');
 });
 window.__JUCE__?.backend?.addEventListener('videoAudioState', result => {
+  if (Number(result?.generation) !== videoGeneration) return;
   nativeAccompanimentReady = !!result?.ready;
   // 后台音轨准备成功后，网页只负责画面，声音统一由风吟输出并进入录音。
-  video.muted = nativeAccompanimentReady;
+  video.muted = true;
   if (result?.message) toast(result.message);
 });
 window.__JUCE__?.backend?.addEventListener('audioOptimisationResult', message => toast(String(message || '')));
@@ -1468,7 +1513,12 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   const status = $('#audio-apply-status');
   status.textContent = state?.message || (state?.automatic ? '已由风吟自动优化；也可使用上方高级选项手动调整。' : '已使用高级手动设置，软件不会自动覆盖。');
   status.classList.toggle('audio-error', state?.success === false);
-  if (state?.autoTuning && $('#audio-optimization-dialog').hidden) showAudioOptimisationProgress();
+  if (state?.autoTuning) {
+    if ($('#audio-optimization-dialog').hidden) showAudioOptimisationProgress();
+    const percent = Math.floor(Math.min(.99,Math.max(0,Number(state.tuningProgress)||0))*100);
+    $('#optimization-progress-bar').style.width = percent+'%';
+    $('#optimization-percent').textContent = percent+'%';
+  }
   if (!state?.autoTuning && !$('#audio-optimization-dialog').hidden) {
     clearInterval(optimisationTimer);
     $('#audio-optimization-dialog').hidden = true;

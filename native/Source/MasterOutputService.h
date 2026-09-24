@@ -21,6 +21,7 @@ struct ToneStyleSettings
     float reverbDamping = 0.54f;
     float reverbWidth = 0.88f;
     float outputGain = 1.0f;
+    float bass = 0.0f; // independent low-shelf gain, -1..1 = -12..+12 dB
 };
 
 class MasterOutputService
@@ -46,6 +47,7 @@ public:
     [[nodiscard]] ToneStyleSettings getToneStyle() const noexcept;
     [[nodiscard]] float getLeftPeak() const noexcept { return leftPeak.load(); }
     [[nodiscard]] float getRightPeak() const noexcept { return rightPeak.load(); }
+    [[nodiscard]] uint64_t getOverloadSamples() const noexcept { return overloadSamples.load(); }
 
     void setSampleRate(double value) noexcept;
     void processInstrument(float* const* outputs, int channels, int samples) noexcept;
@@ -79,6 +81,11 @@ private:
     std::atomic<float> styleSaturation { 0.04f }, styleHarshControl { 0.10f };
     std::atomic<float> styleRoomSize { 0.42f }, styleDamping { 0.54f }, styleWidth { 0.88f };
     std::atomic<float> styleOutputGain { 1.0f };
+    std::atomic<float> bassTone { 0.0f };
+    std::atomic<uint64_t> overloadSamples { 0 };
+    float smoothedBassGain = 1.0f;
+    float smoothedOutputGain = 1.0f;
+    std::array<float, 2> bassLowPass {};
     std::atomic<bool> smartOptimisation { true };
     std::atomic<int> instrumentProfile { static_cast<int>(InstrumentMixProfile::generic) };
     std::atomic<double> sampleRate { 48000.0 };

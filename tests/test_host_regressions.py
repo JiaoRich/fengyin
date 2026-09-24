@@ -11,9 +11,45 @@ MASTER = (ROOT / "native" / "Source" / "MasterOutputService.cpp").read_text(enco
 PRESET = (ROOT / "native" / "Source" / "SoundPresetStore.cpp").read_text(encoding="utf-8")
 PITCH_KEY = (ROOT / "native" / "Source" / "PitchKey.h").read_text(encoding="utf-8")
 TONE_STYLES = (ROOT / "native" / "Source" / "ToneStyleCatalog.h").read_text(encoding="utf-8")
+AUDIO = (ROOT / "native" / "Source" / "AudioDeviceService.cpp").read_text(encoding="utf-8")
 
 
 class HostRegressionTests(unittest.TestCase):
+    def test_endpoint_switch_does_not_start_or_invalidate_tuning(self):
+        follow = AUDIO.split("bool AudioDeviceService::followSystemDefaultOutput()", 1)[1].split(
+            "bool AudioDeviceService::systemDefaultOutputChanged()", 1)[0]
+        self.assertNotIn("removeValue(\"automaticLatencyTunedDevice\")", follow)
+        timer = MAIN.split("if (++audioOutputSyncTicks", 1)[1].split("if (const auto tuningResult", 1)[0]
+        self.assertIn("if (! outputChanged", timer)
+        self.assertIn("audioHardwareIdentity", AUDIO)
+
+    def test_audio_tuning_stops_for_real_performance_activity(self):
+        timer = MAIN.split("snapshot = midi.getSnapshot();", 1)[1].split("if (const auto tuningResult", 1)[0]
+        self.assertIn("snapshot.breath > 0.01f", timer)
+        self.assertIn("snapshot.lastNote >= 0", timer)
+        self.assertNotIn("snapshot.breath < 4", timer)
+        self.assertIn("cancelAutomaticLatencyTuning", timer)
+
+    def test_pitch_wheel_is_not_scaled_by_saved_sensitivity(self):
+        handler = MIDI.split("void MidiInputService::handleIncomingMidiMessage", 1)[1]
+        pitch = handler.split("else if (message.isPitchWheel())", 1)[1].split(
+            "if (message.isController()", 1)[0]
+        self.assertNotIn("pitchSensitivity", pitch)
+        self.assertIn("getPitchWheelValue()", pitch)
+
+    def test_video_replacement_rejects_stale_events_and_rewinds(self):
+        self.assertIn("webVideoGeneration", MAIN)
+        self.assertIn("webVideoPosition = 0.0", MAIN)
+        self.assertIn("generation:videoGeneration", JS)
+        self.assertIn("video.currentTime = 0", JS)
+        self.assertIn("videoWantsPlaying = false", JS)
+
+    def test_custom_tone_has_independent_bass_and_direct_page(self):
+        self.assertIn('toneObject->setProperty("bass", (toneSettings.bass + 1.0f)', MAIN)
+        self.assertIn("result.bass =", MAIN)
+        self.assertIn("定制音色", JS)
+        self.assertIn("#page-chain > .panel", JS)
+
     def test_graph_has_stereo_output_before_io_nodes_are_connected(self):
         configure = HOST.index("graph->setPlayConfigDetails(0, 2, sampleRate, bufferSize)")
         output_node = HOST.index("audioOutputNode = graph->addNode", configure)
@@ -190,7 +226,8 @@ class HostRegressionTests(unittest.TestCase):
         self.assertNotIn("mutex", queue.lower())
         self.assertIn("message.getTimeStamp()", MIDI)
         self.assertIn("player.enqueueMidi(message, timestampSeconds)", HOST)
-        self.assertIn("while (midiQueue.pop(event))", HOST)
+        self.assertIn("count < midiQueueSize && midiQueue.pop(event)", HOST)
+        self.assertIn("timestampSeconds > 0.0 ? midiQueue : controlQueue", HOST)
         self.assertIn("ensureStorageAllocated", HOST)
         queue_body = HOST.split("void PluginHostEngine::queue", 1)[1]
         self.assertNotIn("getMidiMessageCollector().addMessageToQueue", queue_body)

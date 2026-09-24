@@ -27,7 +27,7 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
     };
     setupNav(playNav, "◉  开始演奏", Page::play);
     setupNav(soundsNav, "♫  音色方案", Page::sounds);
-    setupNav(chainNav, "◇  音源与音效", Page::chain);
+    setupNav(chainNav, "◇  定制音色", Page::chain);
     setupNav(windNav, "✦  智能适配", Page::wind);
     setupNav(audioNav, "▣  声音设置", Page::audio);
     setupNav(softwareNav, "⚙  软件设置", Page::settings);
@@ -327,6 +327,7 @@ void MainComponent::setupWebInterface()
         .withEventListener("chooseVideo", [this](juce::var) { if (isActivated) chooseVideoForWebInterface(); })
         .withEventListener("setVideoPlaybackState", [this](juce::var payload)
         {
+            if (static_cast<int>(payload.getProperty("generation", -1)) != webVideoGeneration) return;
             if (! isActivated)
             {
                 accompaniment.pause();
@@ -337,7 +338,6 @@ void MainComponent::setupWebInterface()
             audioOutputSyncTicks = 0;
             if (videoPlaybackActive)
             {
-                followSystemAudioOutputIfNeeded();
                 if (webVideoAudioReady)
                 {
                     accompaniment.setPosition(webVideoPosition);
@@ -349,12 +349,14 @@ void MainComponent::setupWebInterface()
         })
         .withEventListener("syncVideoPlayback", [this](juce::var payload)
         {
+            if (static_cast<int>(payload.getProperty("generation", -1)) != webVideoGeneration) return;
             webVideoPosition = static_cast<double>(payload.getProperty("position", webVideoPosition));
             if (webVideoAudioReady && std::abs(accompaniment.getPosition() - webVideoPosition) > 0.35)
                 accompaniment.setPosition(webVideoPosition);
         })
         .withEventListener("seekVideo", [this](juce::var payload)
         {
+            if (static_cast<int>(payload.getProperty("generation", -1)) != webVideoGeneration) return;
             webVideoPosition = static_cast<double>(payload.getProperty("position", 0.0));
             if (webVideoAudioReady) accompaniment.setPosition(webVideoPosition);
         })
@@ -404,15 +406,16 @@ void MainComponent::setupWebInterface()
         {
             const auto enabled = static_cast<bool>(payload.getProperty("enabled", true));
             masterOutput.setSmartOptimisationEnabled(enabled);
-            if (enabled && webInterface != nullptr)
-                webInterface->emitEventIfBrowserIsVisible("audioOptimisationResult", audio.optimiseForLivePerformance());
+            // Tone assistance never reconfigures the output device.
         })
         .withEventListener("requestAudioSettings", [this](juce::var) { emitAudioSettingsState(); })
         .withEventListener("applyAudioSettings", [this](juce::var payload) { applyAudioSettingsFromWeb(payload); })
         .withEventListener("optimiseAudioSettings", [this](juce::var)
         {
-            if (recorder.isRecording()) toggleRecording();
-            if (! pluginHost.hasPlugin())
+            if (videoPlaybackActive || recorder.isRecording() || midi.getSnapshot().breath > 0.01f
+                || midi.getSnapshot().lastNote >= 0)
+                emitAudioSettingsState(false, utf8("请先暂停伴奏、录音和吹奏，再优化声音"));
+            else if (! pluginHost.hasPlugin())
                 emitAudioSettingsState(false, utf8("请先选择一个音色方案，再进行真实音源优化"));
             else if (audio.beginAutomaticLatencyTuning(true))
             {
@@ -601,6 +604,8 @@ void MainComponent::chooseVideoForWebInterface()
 
 void MainComponent::loadVideoForWebInterface(const juce::File& file)
 {
+    const auto generation = ++webVideoGeneration;
+    videoPlaybackActive = false;
     webVideoAudioExtractor.cancel();
     accompaniment.unload();
     webVideoFile = file;
@@ -612,6 +617,7 @@ void MainComponent::loadVideoForWebInterface(const juce::File& file)
         auto result = std::make_unique<juce::DynamicObject>();
         result->setProperty("url", juce::URL(file).toString(false));
         result->setProperty("name", file.getFileName());
+        result->setProperty("generation", generation);
         webInterface->emitEventIfBrowserIsVisible("videoSelected", juce::var(result.release()));
     }
 
@@ -625,9 +631,9 @@ void MainComponent::loadVideoForWebInterface(const juce::File& file)
 
     emitVideoAudioState(false, utf8("正在准备伴奏音轨，请稍候…"));
     webVideoAudioExtractor.extractAsync(file,
-        [safeThis = juce::Component::SafePointer<MainComponent>(this), file](bool success, const juce::File& audioFile, const juce::String& error)
+        [safeThis = juce::Component::SafePointer<MainComponent>(this), file, generation](bool success, const juce::File& audioFile, const juce::String& error)
         {
-            if (safeThis == nullptr || safeThis->webVideoFile != file) return;
+            if (safeThis == nullptr || safeThis->webVideoGeneration != generation || safeThis->webVideoFile != file) return;
             const auto loaded = success && safeThis->accompaniment.loadAudioFile(audioFile);
             safeThis->webVideoAudioReady = loaded;
             if (loaded)
@@ -647,6 +653,7 @@ void MainComponent::emitVideoAudioState(bool ready, const juce::String& message)
     if (webInterface == nullptr) return;
     auto result = std::make_unique<juce::DynamicObject>();
     result->setProperty("ready", ready);
+    result->setProperty("generation", webVideoGeneration);
     result->setProperty("message", message);
     webInterface->emitEventIfBrowserIsVisible("videoAudioState", juce::var(result.release()));
 }
@@ -717,7 +724,7 @@ juce::Rectangle<int> MainComponent::getContentBounds() const
 void MainComponent::showPage(Page page)
 {
     currentPage = page;
-    const juce::String names[] { utf8("开始演奏"), utf8("音色方案"), utf8("音源与音效"),
+    const juce::String names[] { utf8("开始演奏"), utf8("音色方案"), utf8("定制音色"),
                                 utf8("电吹管设置"), utf8("声音设置"), utf8("软件设置") };
     title.setText(utf8("风吟 · ") + names[static_cast<int>(page)], juce::dontSendNotification);
     updatePageVisibility();
@@ -985,24 +992,39 @@ void MainComponent::timerCallback()
         midi.pollConnection();
     }
     snapshot = midi.getSnapshot();
+    if (snapshot.breath > 0.01f || snapshot.lastNote >= 0)
+        lastPerformanceActivityMs = juce::Time::getMillisecondCounterHiRes();
+    if (audio.isAutomaticLatencyTuning()
+        && (videoPlaybackActive || recorder.isRecording() || snapshot.breath > 0.01f || snapshot.lastNote >= 0))
+    {
+        pluginHost.setLatencyProbeActive(false);
+        audio.cancelAutomaticLatencyTuning();
+        emitAudioSettingsState(false, utf8("已停止声音优化，恢复演奏"));
+    }
     if (++audioOutputSyncTicks >= 60)
     {
         audioOutputSyncTicks = 0;
         const auto outputChanged = audio.systemDefaultOutputChanged();
-        const auto safeToReconfigure = ! videoPlaybackActive && ! recorder.isRecording() && snapshot.breath < 4;
-        if (outputChanged && safeToReconfigure)
+        const auto safeToReconfigure = ! videoPlaybackActive && ! recorder.isRecording()
+            && juce::Time::getMillisecondCounterHiRes() - lastPerformanceActivityMs > 3000.0;
+        if (outputChanged)
             followSystemAudioOutputIfNeeded();
-        if (safeToReconfigure && pluginHost.hasPlugin()
-            && (outputChanged || audio.needsAutomaticLatencyTuning())
+        if (! outputChanged && safeToReconfigure && ! pluginLoading && pluginHost.hasPlugin()
+            && audio.needsAutomaticLatencyTuning()
             && audio.beginAutomaticLatencyTuning())
+        {
             pluginHost.setLatencyProbeActive(true);
+            emitAudioSettingsState(true, utf8("正在验证声音设置…"));
+        }
     }
+    if (audio.isAutomaticLatencyTuning()) emitAudioSettingsState();
+    audio.updateProbeEvidence(pluginHost.getCallbackCount(), pluginHost.getCallbackOverruns(), pluginHost.getSignalBlocks());
     if (const auto tuningResult = audio.pollAutomaticLatencyTuning(); tuningResult.has_value())
     {
         pluginHost.setLatencyProbeActive(false);
         if (webInterface != nullptr)
             webInterface->emitEventIfBrowserIsVisible("audioOptimisationResult", *tuningResult);
-        emitAudioSettingsState(! tuningResult->containsIgnoreCase(utf8("未找到")), *tuningResult);
+        emitAudioSettingsState(! tuningResult->contains(utf8("未")), *tuningResult);
     }
     if (snapshot.deviceConnected && ! wasMidiConnected)
     {
@@ -1028,7 +1050,7 @@ void MainComponent::timerCallback()
         automaticBreathDetectionActive = false;
         automaticBreathDetectionEndsAtMs = 0.0;
     }
-    pluginHost.flushTechniqueValues();
+    // Technique automation is consumed by the audio graph, not the UI timer.
     if (activeTechniqueLearn >= 0)
     {
         const auto learned = midi.consumeTechniqueLearnResult();
@@ -1124,6 +1146,8 @@ void MainComponent::timerCallback()
         state->setProperty("pluginLatency", pluginLatencyMs);
         state->setProperty("audioCpu", currentAudio.cpuUsage);
         state->setProperty("audioXruns", currentAudio.xRunCount);
+        state->setProperty("callbackOverruns", static_cast<juce::int64>(pluginHost.getCallbackOverruns()));
+        state->setProperty("overloadSamples", static_cast<juce::int64>(masterOutput.getOverloadSamples()));
         state->setProperty("droppedMidiEvents", static_cast<juce::int64>(pluginHost.getDroppedMidiEventCount()));
         state->setProperty("activated", currentLicenseStatus.activated);
         state->setProperty("featuresUnlocked", currentLicenseStatus.canUseFeatures());
@@ -1144,9 +1168,13 @@ void MainComponent::timerCallback()
         const auto toneSettings = masterOutput.getToneStyle();
         auto toneObject = std::make_unique<juce::DynamicObject>();
         toneObject->setProperty("brightness", (toneSettings.tone + 1.0f) * 50.0f);
-        toneObject->setProperty("bass", toneSettings.warmth * 100.0f);
+        toneObject->setProperty("bass", (toneSettings.bass + 1.0f) * 50.0f);
+        toneObject->setProperty("saturation", toneSettings.saturation / 0.35f * 100.0f);
         toneObject->setProperty("warmth", toneSettings.warmth * 100.0f);
         toneObject->setProperty("compression", juce::jlimit(0.0f, 100.0f, (0.85f - toneSettings.compressionThreshold) / 0.55f * 100.0f));
+        toneObject->setProperty("ratio", (toneSettings.compressionRatio - 1.0f) / 3.0f * 100.0f);
+        toneObject->setProperty("damping", toneSettings.reverbDamping * 100.0f);
+        toneObject->setProperty("width", toneSettings.reverbWidth * 100.0f);
         toneObject->setProperty("harsh", toneSettings.harshControl / 0.35f * 100.0f);
         toneObject->setProperty("reverb", toneSettings.reverbMix / 0.6f * 100.0f);
         toneObject->setProperty("room", toneSettings.reverbRoomSize * 100.0f);
@@ -1364,13 +1392,14 @@ void MainComponent::followSystemAudioOutputIfNeeded()
     const auto shouldResumeAccompaniment = videoPlaybackActive && webVideoAudioReady;
     const auto resumePosition = webVideoAudioReady ? accompaniment.getPosition() : webVideoPosition;
     accompaniment.pause();
-    if (! audio.followSystemDefaultOutput()) return;
+    const auto changed = audio.followSystemDefaultOutput();
 
     if (shouldResumeAccompaniment)
     {
         accompaniment.setPosition(resumePosition);
         accompaniment.play();
     }
+    if (! changed) return;
 
     const auto status = audio.getStatus();
     const auto message = utf8("已自动切换声音输出：") + status.deviceName;
@@ -1517,8 +1546,6 @@ void MainComponent::loadSelectedPlugin()
                                  return;
                              }
                              activatePluginOutput(message);
-                             if (audio.beginAutomaticLatencyTuning())
-                                 pluginHost.setLatencyProbeActive(true);
                              if (webInterface != nullptr)
                              {
                                  auto result = std::make_unique<juce::DynamicObject>();
@@ -1599,8 +1626,6 @@ void MainComponent::loadKongInstrument(const juce::String& instrumentKey, const 
             else
             {
                 activatePluginOutput(message);
-                if (audio.beginAutomaticLatencyTuning())
-                    pluginHost.setLatencyProbeActive(true);
                 const auto selected = pluginHost.selectProgramByAliases(aliases);
                 pluginStatus.setText(selected ? utf8("已载入：") + currentInstrumentChineseName
                                               : utf8("已打开空音，请在音源界面选择“") + currentInstrumentChineseName + utf8("”"),
@@ -1765,16 +1790,17 @@ fengyin::ToneStyleSettings MainComponent::customToneSettingsFromPayload(const ju
     };
     const auto bass = normal("bass", 0.5);
     result.tone = static_cast<float>(normal("brightness", (result.tone + 1.0f) * 0.5f) * 2.0 - 1.0);
-    result.warmth = static_cast<float>(juce::jlimit(0.0, 1.0, normal("warmth", result.warmth) * 0.82 + bass * 0.18));
+    result.bass = static_cast<float>(bass * 2.0 - 1.0);
+    result.warmth = static_cast<float>(normal("warmth", result.warmth));
     const auto compression = normal("compression", 0.35);
     result.compressionThreshold = static_cast<float>(0.85 - compression * 0.55);
-    result.compressionRatio = static_cast<float>(1.0 + compression * 2.8);
-    result.saturation = static_cast<float>(juce::jlimit(0.0, 0.35, result.saturation + (bass - 0.5) * 0.12));
+    result.compressionRatio = static_cast<float>(1.0 + normal("ratio", (result.compressionRatio - 1.0) / 3.0) * 3.0);
+    result.saturation = static_cast<float>(normal("saturation", result.saturation / 0.35f) * 0.35);
     result.harshControl = static_cast<float>(normal("harsh", result.harshControl / 0.35f) * 0.35);
     result.reverbMix = static_cast<float>(normal("reverb", result.reverbMix / 0.6f) * 0.6);
     result.reverbRoomSize = static_cast<float>(normal("room", result.reverbRoomSize));
-    result.reverbDamping = static_cast<float>(0.35 + result.warmth * 0.45);
-    result.reverbWidth = static_cast<float>(0.65 + normal("room", result.reverbRoomSize) * 0.35);
+    result.reverbDamping = static_cast<float>(normal("damping", result.reverbDamping));
+    result.reverbWidth = static_cast<float>(normal("width", result.reverbWidth));
     result.outputGain = static_cast<float>(0.5 + normal("output", 0.8) * 0.75);
     return result;
 }
@@ -1813,10 +1839,12 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
     preset.reverbDamping = settings.reverbDamping;
     preset.reverbWidth = settings.reverbWidth;
     preset.outputGain = settings.outputGain;
+    preset.bass = settings.bass;
     if (presetStore.save(preset))
     {
         currentPresetDisplayName = name;
         currentPresetIsCustom = true;
+        currentBaseToneSettings = settings;
         editingPresetId.clear();
         refreshPresetChoices();
         pluginStatus.setText(utf8("已保存我的方案：") + name, juce::dontSendNotification);
@@ -2022,8 +2050,6 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                                  return;
                              }
                              activatePluginOutput(message);
-                             if (audio.beginAutomaticLatencyTuning())
-                                 pluginHost.setLatencyProbeActive(true);
                              pluginHost.restorePluginState(preset.pluginState.getData(), preset.pluginState.getSize());
                              if (preset.pluginBrand == "kong" && preset.pluginProgramName.isNotEmpty())
                                  pluginHost.selectProgramByAliases({ preset.pluginProgramName });
@@ -2041,6 +2067,7 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                                  style.settings.reverbDamping = preset.reverbDamping;
                                  style.settings.reverbWidth = preset.reverbWidth;
                                  style.settings.outputGain = preset.outputGain;
+                                 style.settings.bass = preset.bass;
                              }
                              currentToneStyleId = preset.baseToneStyleId;
                              currentBaseToneSettings = style.settings;
@@ -2293,6 +2320,8 @@ void MainComponent::emitAudioSettingsState(bool success, const juce::String& mes
     result->setProperty("droppedMidiEvents", static_cast<juce::int64>(pluginHost.getDroppedMidiEventCount()));
     result->setProperty("automatic", audio.isAutomaticMode());
     result->setProperty("autoTuning", audio.isAutomaticLatencyTuning());
+    result->setProperty("tuningProgress", audio.getTuningProgress());
+    result->setProperty("callbackOverruns", static_cast<juce::int64>(pluginHost.getCallbackOverruns()));
     result->setProperty("lowLatencyMode", status.deviceType.containsIgnoreCase("Low Latency Mode")
                                               || status.deviceType.containsIgnoreCase(utf8("低延迟")));
 
@@ -2500,7 +2529,7 @@ void MainComponent::showExpressionSettings()
 {
     const auto current = midi.getExpressionSettings();
     expressionDialog = std::make_unique<juce::AlertWindow>(utf8("吹奏手感调节"),
-        utf8("推荐先使用“自然、均衡、标准”。气息抖动时调得更稳定，轻吹不响时调得更灵敏。"),
+        utf8("推荐先使用“自然、均衡”。气息抖动时调得更稳定，轻吹不响时调得更灵敏。弯音信号由风吟原样传给音源。"),
         juce::MessageBoxIconType::QuestionIcon);
     expressionDialog->addComboBox("response", { utf8("灵敏（轻吹更容易响）"), utf8("自然（推荐）"), utf8("稳重（强吹变化更明显）") }, utf8("气息响应"));
     expressionDialog->getComboBoxComponent("response")->setSelectedId(current.curve < 0.8f ? 1 : current.curve > 1.2f ? 3 : 2,
@@ -2511,9 +2540,6 @@ void MainComponent::showExpressionSettings()
     expressionDialog->addComboBox("threshold", { utf8("灵敏（适合轻吹）"), utf8("均衡（推荐）"), utf8("防误触（过滤微弱气流）") }, utf8("起音门槛"));
     expressionDialog->getComboBoxComponent("threshold")->setSelectedId(current.threshold < 0.018f ? 1 : current.threshold > 0.045f ? 3 : 2,
                                                                          juce::dontSendNotification);
-    expressionDialog->addComboBox("pitch", { utf8("轻柔（弯音幅度较小）"), utf8("标准（推荐）"), utf8("宽广（弯音幅度更大）") }, utf8("弯音灵敏度"));
-    expressionDialog->getComboBoxComponent("pitch")->setSelectedId(current.pitchSensitivity < 0.75f ? 1 : current.pitchSensitivity > 1.25f ? 3 : 2,
-                                                                     juce::dontSendNotification);
     expressionDialog->addButton(utf8("应用"), 1, juce::KeyPress(juce::KeyPress::returnKey));
     expressionDialog->addButton(utf8("恢复推荐"), 2);
     expressionDialog->addButton(utf8("取消"), 0, juce::KeyPress(juce::KeyPress::escapeKey));
@@ -2527,11 +2553,10 @@ void MainComponent::showExpressionSettings()
                 const float curves[] { 0.65f, 0.9f, 1.45f };
                 const float smoothing[] { 0.48f, 0.28f, 0.14f };
                 const float thresholds[] { 0.008f, 0.02f, 0.06f };
-                const float pitch[] { 0.5f, 1.0f, 1.5f };
                 const auto selected = [this](const char* name)
                 { return juce::jlimit(1, 3, expressionDialog->getComboBoxComponent(name)->getSelectedId()) - 1; };
                 next = { thresholds[selected("threshold")], curves[selected("response")],
-                         smoothing[selected("smooth")], pitch[selected("pitch")] };
+                         smoothing[selected("smooth")], 1.0f };
             }
             midi.setExpressionSettings(next);
             juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon, utf8("吹奏手感已更新"),

@@ -24,7 +24,8 @@ public:
     void setLatencyProbeActive(bool active) noexcept;
     bool enqueueMidi(const juce::MidiMessage& message, double timestampSeconds) noexcept;
     void requestPerformanceReset() noexcept { resetRequested.store(true, std::memory_order_release); }
-    [[nodiscard]] uint64_t getDroppedMidiEventCount() const noexcept { return midiQueue.droppedCount(); }
+    [[nodiscard]] uint64_t getDroppedMidiEventCount() const noexcept { return midiQueue.droppedCount() + controlQueue.droppedCount(); }
+    std::atomic<uint64_t> callbackCount { 0 }, callbackOverruns { 0 }, signalBlocks { 0 };
     void audioDeviceIOCallbackWithContext(const float* const* inputs, int numInputs, float* const* outputs,
                                           int numOutputs, int numSamples,
                                           const juce::AudioIODeviceCallbackContext& context) override;
@@ -36,6 +37,9 @@ private:
     void addLatencyProbeMessages(int numSamples, double timestampSeconds);
 
     RealtimeMidiQueue<midiQueueSize> midiQueue;
+    // Timestamped MIDI callback and untimestamped message-thread commands never
+    // share a producer index. Both queues have exactly one consumer.
+    RealtimeMidiQueue<midiQueueSize> controlQueue;
     std::atomic<bool> resetRequested { false };
     std::atomic<bool> latencyProbeActive { false };
     int probeSamplesUntilChange = 0;
@@ -69,6 +73,9 @@ public:
     void setMasterOutputService(MasterOutputService* service) noexcept { player.setMasterOutputService(service); }
     void setLatencyProbeActive(bool active) noexcept { player.setLatencyProbeActive(active); }
     [[nodiscard]] uint64_t getDroppedMidiEventCount() const noexcept { return player.getDroppedMidiEventCount(); }
+    [[nodiscard]] uint64_t getCallbackCount() const noexcept { return player.callbackCount.load(); }
+    [[nodiscard]] uint64_t getCallbackOverruns() const noexcept { return player.callbackOverruns.load(); }
+    [[nodiscard]] uint64_t getSignalBlocks() const noexcept { return player.signalBlocks.load(); }
 
     [[nodiscard]] bool hasPlugin() const noexcept;
     [[nodiscard]] juce::String getPluginName() const;
@@ -118,7 +125,7 @@ private:
     std::unique_ptr<PluginEditorWindow> effectEditorWindow;
     juce::AudioDeviceManager* attachedManager = nullptr;
     std::shared_ptr<std::atomic_bool> lifetime = std::make_shared<std::atomic_bool>(true);
-    std::array<juce::AudioProcessorParameter*, static_cast<size_t>(PerformanceTechnique::count)> techniqueParameters {};
+    std::array<std::atomic<juce::AudioProcessorParameter*>, static_cast<size_t>(PerformanceTechnique::count)> techniqueParameters {};
     std::array<std::atomic<float>, static_cast<size_t>(PerformanceTechnique::count)> techniqueValues {};
     std::array<std::atomic<bool>, static_cast<size_t>(PerformanceTechnique::count)> techniqueDirty {};
     std::atomic<bool> kongExpressionMode { false };

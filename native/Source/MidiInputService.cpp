@@ -572,8 +572,8 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
     }
     else if (message.isPitchWheel())
     {
-        const auto centred = static_cast<float>(message.getPitchWheelValue() - 8192) / 8192.0f
-                           * pitchSensitivity.load(std::memory_order_relaxed);
+        const auto raw = message.getPitchWheelValue();
+        const auto centred = static_cast<float>(raw - 8192) / (raw < 8192 ? 8192.0f : 8191.0f);
         pitchBend.store(juce::jlimit(-1.0f, 1.0f, centred), std::memory_order_relaxed);
         if (sink != nullptr) sink->pitchBendChanged(juce::jlimit(-1.0f, 1.0f, centred), timestampSeconds);
     }

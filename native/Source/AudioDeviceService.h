@@ -52,6 +52,10 @@ public:
     [[nodiscard]] bool needsAutomaticLatencyTuning();
     [[nodiscard]] bool isAutomaticMode();
     [[nodiscard]] bool isAutomaticLatencyTuning() const noexcept { return tuningActive; }
+    [[nodiscard]] double getTuningProgress() const noexcept;
+    void cancelAutomaticLatencyTuning();
+    void updateProbeEvidence(uint64_t callbacks, uint64_t overruns, uint64_t signals) noexcept
+    { probeCallbacks = callbacks; probeOverruns = overruns; probeSignals = signals; }
     // 由界面定时器非阻塞轮询；仅在调优结束时返回用户可读的结果。
     std::optional<juce::String> pollAutomaticLatencyTuning();
     [[nodiscard]] juce::AudioDeviceManager& getDeviceManager() noexcept { return manager; }
@@ -61,6 +65,7 @@ private:
     juce::String preferredLiveDeviceType();
     juce::String configureAutomaticType(const juce::String& typeName);
     juce::String currentDeviceSignature() const;
+    juce::String tuningIdentity();
     struct LatencyCandidate
     {
         juce::String typeName;
@@ -89,10 +94,15 @@ private:
     int observedXRunCount = 0;
     int unstablePolls = 0;
     bool tuningActive = false;
+    juce::String attemptedTuningIdentity;
+    juce::String cachedHardwareIdentity;
+    double hardwareIdentityCheckedAt = -100000.0;
     int tuningCandidateIndex = -1;
     double tuningCandidateStartedAtMs = 0.0;
     int tuningCandidateStartXRuns = 0;
     double tuningCandidateMaximumCpu = 0.0;
+    uint64_t probeCallbacks = 0, probeOverruns = 0, probeSignals = 0;
+    uint64_t startCallbacks = 0, startOverruns = 0, startSignals = 0;
     juce::String tuningFallbackType;
     juce::String tuningFallbackOutput;
     double tuningFallbackRate = 0.0;

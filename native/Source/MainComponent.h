@@ -87,6 +87,7 @@ private:
     fengyin::LicenseService license;
     juce::String machineCode;
     int audioOutputSyncTicks = 0;
+    double lastPerformanceActivityMs = 0.0;
     int lowLatencyMonitorTicks = 0;
     fengyin::MidiSnapshot snapshot;
     juce::TextButton detectButton;
@@ -143,6 +144,7 @@ private:
     fengyin::VideoAudioExtractor webVideoAudioExtractor;
     std::unique_ptr<juce::FileChooser> webVideoChooser;
     juce::File webVideoFile;
+    int webVideoGeneration = 0;
     bool webVideoAudioReady = false;
     double webVideoPosition = 0.0;
     float webVideoVolume = 1.0f;
