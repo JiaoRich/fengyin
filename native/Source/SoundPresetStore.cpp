@@ -11,7 +11,7 @@ SoundPresetStore::SoundPresetStore(juce::File storageDirectory)
 
 juce::Array<SoundPreset> SoundPresetStore::loadAll() const
 {
-    if (auto xml = juce::XmlDocument::parse(getFile()))
+    if (auto xml = juce::XmlDocument::parse(getFile()); xml != nullptr && xml->getIntAttribute("version") == 7)
         return fromXml(*xml);
     return {};
 }
@@ -55,15 +55,6 @@ bool SoundPresetStore::remove(const juce::String& id)
     return writeAll(presets);
 }
 
-bool SoundPresetStore::setFavorite(const juce::String& id, bool favorite)
-{
-    auto presets = loadAll();
-    bool found = false;
-    for (auto& preset : presets)
-        if (preset.id == id) { preset.favorite = favorite; found = true; }
-    return found && writeAll(presets);
-}
-
 bool SoundPresetStore::setDefaultId(const juce::String& id)
 {
     directory.createDirectory();
@@ -93,18 +84,14 @@ juce::File SoundPresetStore::getFile() const
 std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<SoundPreset>& presets)
 {
     auto root = std::make_unique<juce::XmlElement>("FENGYIN_SOUND_PRESETS");
-    root->setAttribute("version", 6);
+    root->setAttribute("version", 7);
     for (const auto& preset : presets)
     {
         auto* child = root->createNewChildElement("PRESET");
         child->setAttribute("id", preset.id);
         child->setAttribute("name", preset.name);
         child->setAttribute("plugin", preset.pluginIdentifier);
-        child->setAttribute("effect", preset.effectIdentifier);
-        child->setAttribute("effectBypassed", preset.effectBypassed);
-        child->setAttribute("breathController", preset.breathController);
-        child->setAttribute("breathCurve", static_cast<double>(preset.breathCurve));
-        child->setAttribute("breathSmoothing", static_cast<double>(preset.breathSmoothing));
+        child->setAttribute("instrumentModelIndex", preset.instrumentModelIndex);
         child->setAttribute("eqTone", static_cast<double>(preset.eqTone));
         child->setAttribute("warmth", static_cast<double>(preset.warmth));
         child->setAttribute("reverbMix", static_cast<double>(preset.reverbMix));
@@ -124,17 +111,11 @@ std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<Soun
         child->setAttribute("reverbWidth", static_cast<double>(preset.reverbWidth));
         child->setAttribute("outputGain", static_cast<double>(preset.outputGain));
         child->setAttribute("bass", static_cast<double>(preset.bass));
-        child->setAttribute("visualTheme", preset.visualTheme);
-        child->setAttribute("favorite", preset.favorite);
-        child->createNewChildElement("PLUGIN_STATE")->addTextElement(preset.pluginState.toBase64Encoding());
-        child->createNewChildElement("EFFECT_STATE")->addTextElement(preset.effectState.toBase64Encoding());
-        for (const auto& mapping : preset.techniqueMappings)
+        for (const auto& parameter : preset.toneParameters)
         {
-            auto* mapped = child->createNewChildElement("TECHNIQUE");
-            mapped->setAttribute("target", static_cast<int>(mapping.technique));
-            mapped->setAttribute("sourceType", static_cast<int>(mapping.sourceType));
-            mapped->setAttribute("sourceNumber", mapping.sourceNumber);
-            mapped->setAttribute("toggle", mapping.toggle);
+            auto* stored = child->createNewChildElement("TONE_PARAMETER");
+            stored->setAttribute("id", parameter.identifier);
+            stored->setAttribute("value", static_cast<double>(parameter.value));
         }
     }
     return root;
@@ -154,11 +135,7 @@ juce::Array<SoundPreset> SoundPresetStore::fromXml(const juce::XmlElement& root)
         preset.id = child->getStringAttribute("id");
         preset.name = child->getStringAttribute("name");
         preset.pluginIdentifier = child->getStringAttribute("plugin");
-        preset.effectIdentifier = child->getStringAttribute("effect");
-        preset.effectBypassed = child->getBoolAttribute("effectBypassed", false);
-        preset.breathController = child->getIntAttribute("breathController", 2);
-        preset.breathCurve = static_cast<float>(child->getDoubleAttribute("breathCurve", 0.9));
-        preset.breathSmoothing = static_cast<float>(child->getDoubleAttribute("breathSmoothing", 0.28));
+        preset.instrumentModelIndex = child->getIntAttribute("instrumentModelIndex", -1);
         preset.eqTone = static_cast<float>(child->getDoubleAttribute("eqTone", 0.2));
         preset.warmth = static_cast<float>(child->getDoubleAttribute("warmth", 0.2));
         preset.reverbMix = static_cast<float>(child->getDoubleAttribute("reverbMix", 0.28));
@@ -178,26 +155,13 @@ juce::Array<SoundPreset> SoundPresetStore::fromXml(const juce::XmlElement& root)
         preset.reverbWidth = static_cast<float>(child->getDoubleAttribute("reverbWidth", 0.88));
         preset.outputGain = static_cast<float>(child->getDoubleAttribute("outputGain", 1.0));
         preset.bass = static_cast<float>(child->getDoubleAttribute("bass", 0.0));
-        preset.visualTheme = child->getStringAttribute("visualTheme", "neon");
-        preset.favorite = child->getBoolAttribute("favorite", false);
-        if (auto* pluginState = child->getChildByName("PLUGIN_STATE"))
-            preset.pluginState.fromBase64Encoding(pluginState->getAllSubText());
-        else
-            preset.pluginState.fromBase64Encoding(child->getAllSubText());
-        if (auto* effectState = child->getChildByName("EFFECT_STATE"))
-            preset.effectState.fromBase64Encoding(effectState->getAllSubText());
-        for (auto* mapped : child->getChildIterator())
-            if (mapped->hasTagName("TECHNIQUE"))
+        for (auto* stored : child->getChildIterator())
+            if (stored->hasTagName("TONE_PARAMETER"))
             {
-                TechniqueMapping mapping;
-                mapping.technique = static_cast<PerformanceTechnique>(juce::jlimit(0, static_cast<int>(PerformanceTechnique::count) - 1,
-                    mapped->getIntAttribute("target", 0)));
-                mapping.sourceType = static_cast<TechniqueSourceType>(juce::jlimit(0, static_cast<int>(TechniqueSourceType::note),
-                    mapped->getIntAttribute("sourceType", 0)));
-                mapping.sourceNumber = mapped->getIntAttribute("sourceNumber", -1);
-                mapping.toggle = mapped->getBoolAttribute("toggle", false);
-                if (mapping.sourceType != TechniqueSourceType::none)
-                    preset.techniqueMappings.add(mapping);
+                ToneParameterValue parameter;
+                parameter.identifier = stored->getStringAttribute("id");
+                parameter.value = static_cast<float>(stored->getDoubleAttribute("value"));
+                if (parameter.identifier.isNotEmpty()) preset.toneParameters.add(std::move(parameter));
             }
         if (preset.id.isNotEmpty() && preset.name.isNotEmpty() && preset.pluginIdentifier.isNotEmpty())
             presets.add(std::move(preset));

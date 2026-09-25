@@ -2,7 +2,7 @@
 
 #include <juce_core/juce_core.h>
 #include <optional>
-#include "MidiPerformanceSink.h"
+#include "ToneParameterValue.h"
 
 namespace fengyin
 {
@@ -11,13 +11,8 @@ struct SoundPreset
     juce::String id;
     juce::String name;
     juce::String pluginIdentifier;
-    juce::MemoryBlock pluginState;
-    juce::String effectIdentifier;
-    juce::MemoryBlock effectState;
-    bool effectBypassed = false;
-    int breathController = 2;
-    float breathCurve = 0.9f;
-    float breathSmoothing = 0.28f;
+    juce::Array<ToneParameterValue> toneParameters;
+    int instrumentModelIndex = -1;
     float eqTone = 0.2f;
     float warmth = 0.2f;
     float reverbMix = 0.28f;
@@ -37,9 +32,6 @@ struct SoundPreset
     float reverbWidth = 0.88f;
     float outputGain = 1.0f;
     float bass = 0.0f;
-    juce::Array<TechniqueMapping> techniqueMappings;
-    juce::String visualTheme = "neon";
-    bool favorite = false; // Retained only for reading older preset files.
 };
 
 class SoundPresetStore final
@@ -51,7 +43,6 @@ public:
     [[nodiscard]] std::optional<SoundPreset> findById(const juce::String& id) const;
     bool save(const SoundPreset& preset);
     bool remove(const juce::String& id);
-    bool setFavorite(const juce::String& id, bool favorite);
     bool setDefaultId(const juce::String& id);
     [[nodiscard]] juce::String getDefaultId() const;
 

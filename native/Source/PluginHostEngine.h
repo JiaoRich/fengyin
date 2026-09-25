@@ -13,6 +13,7 @@
 #include "MasterOutputService.h"
 #include "RealtimeMidiQueue.h"
 #include "SwamToneProfile.h"
+#include "ToneParameterValue.h"
 
 namespace fengyin
 {
@@ -90,8 +91,8 @@ public:
     bool setEffectBypassed(bool shouldBypass);
     [[nodiscard]] bool isEffectBypassed() const noexcept;
     bool showPluginEditor(bool effect);
-    [[nodiscard]] juce::MemoryBlock savePluginState() const;
-    bool restorePluginState(const void* data, std::size_t size);
+    [[nodiscard]] juce::Array<ToneParameterValue> captureToneParameters() const;
+    int restoreToneParameters(const juce::Array<ToneParameterValue>& parameters);
     [[nodiscard]] juce::StringArray getProgramNames() const;
     [[nodiscard]] juce::String getCurrentProgramName() const;
     bool selectProgramByAliases(const juce::StringArray& aliases);

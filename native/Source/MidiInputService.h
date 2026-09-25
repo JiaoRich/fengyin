@@ -8,7 +8,6 @@
 #include <memory>
 #include <vector>
 
-#include "BreathMapper.h"
 #include "DeviceProfile.h"
 #include "ControllerDetector.h"
 #include "IntelligentTechniqueProcessor.h"
@@ -84,6 +83,7 @@ private:
     void loadTechniqueMappings();
     bool handleTechniqueMessage(const juce::MidiMessage& message, MidiPerformanceSink* sink);
     void updateBreathDrivenTechniques(float mappedBreath, MidiPerformanceSink* sink, double nowMs);
+    [[nodiscard]] PerformanceTechnique targetForRole(PerformanceTechnique role) const noexcept;
     static float techniqueMessageValue(const juce::MidiMessage& message) noexcept;
     void updateEffectiveTranspose();
 
@@ -91,8 +91,6 @@ private:
     juce::String connectedName;
     juce::String connectedIdentifier;
     juce::ApplicationProperties properties;
-    BreathMapper breathMapper;
-    mutable juce::SpinLock breathMapperLock;
     DeviceProfile activeProfile = DeviceProfileMatcher::match("");
     ControllerDetector controllerDetector;
     juce::SpinLock detectorLock;
@@ -112,7 +110,7 @@ private:
     std::array<int, 128> activeOutputNotes {};
     mutable juce::SpinLock techniqueLock;
     juce::Array<TechniqueMapping> techniqueMappings;
-    juce::String techniqueContext { "other" };
+    juce::String techniqueContext { "other" }; // Current family only; mappings remain global per device.
     std::array<float, static_cast<size_t>(PerformanceTechnique::count)> techniquePreviousInput {};
     std::array<bool, static_cast<size_t>(PerformanceTechnique::count)> techniqueToggleState {};
     std::array<float, static_cast<size_t>(PerformanceTechnique::count)> techniqueHardwareInput {};

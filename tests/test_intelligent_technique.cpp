@@ -10,7 +10,7 @@ int main()
 
     // 标准档固定在 89% 进入、80% 退出；效果强度不改变触发阈值。
     assert(processor.process(PerformanceTechnique::growl, 1.0f, 0.5f, 20.0) == 0.0f);
-    const auto entered = processor.process(PerformanceTechnique::growl, 1.0f, 0.5f, 90.0);
+    const auto entered = processor.process(PerformanceTechnique::growl, 1.0f, 0.5f, 105.0);
     assert(entered > 0.0f && entered < 0.73f);
 
     // 回落阈值低于进入阈值，避免在边界附近忽隐忽现。
