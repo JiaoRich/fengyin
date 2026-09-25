@@ -121,9 +121,30 @@ public:
         auto target = 0.0f;
         if (state.latched)
         {
-            const auto normalised = std::clamp((safeBreath - curve.offThreshold)
-                                             / (1.0f - curve.offThreshold), 0.0f, 1.0f);
-            target = std::pow(normalised, 1.15f) * curve.maximum;
+            if (technique == PerformanceTechnique::growl)
+            {
+                // Accepted breath-mode growl curve: 113->0, 118->22%,
+                // 123->48%, 127->72% at the default strength. Hardware mode
+                // bypasses this processor completely.
+                constexpr float x0 = 113.0f / 127.0f;
+                constexpr float x1 = 118.0f / 127.0f;
+                constexpr float x2 = 123.0f / 127.0f;
+                const auto interpolate = [](float x, float a, float b, float ya, float yb)
+                {
+                    return ya + std::clamp((x - a) / (b - a), 0.0f, 1.0f) * (yb - ya);
+                };
+                float base = 0.0f;
+                if (safeBreath < x1) base = interpolate(safeBreath, x0, x1, 0.0f, 0.22f);
+                else if (safeBreath < x2) base = interpolate(safeBreath, x1, x2, 0.22f, 0.48f);
+                else base = interpolate(safeBreath, x2, 1.0f, 0.48f, 0.72f);
+                target = base * (curve.maximum / 0.72f);
+            }
+            else
+            {
+                const auto normalised = std::clamp((safeBreath - curve.offThreshold)
+                                                 / (1.0f - curve.offThreshold), 0.0f, 1.0f);
+                target = std::pow(normalised, 1.15f) * curve.maximum;
+            }
         }
         return smooth(state, target, elapsed, target > state.value ? curve.attackMs : curve.releaseMs);
     }
@@ -162,7 +183,7 @@ private:
         return { growlOnThreshold.load(std::memory_order_relaxed),
                  growlOffThreshold.load(std::memory_order_relaxed),
                  std::min(1.0f, 0.42f + strength * 0.60f),
-                 60.0, 0.0, 85.0f, 170.0f };
+                 80.0, 0.0, 85.0f, 110.0f };
     }
 
     static float smooth(State& state, float target, double elapsedMs, float timeMs) noexcept

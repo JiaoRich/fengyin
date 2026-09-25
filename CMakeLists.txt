@@ -99,6 +99,7 @@ target_sources(FengYin PRIVATE
     native/Source/MasterOutputService.cpp
     native/Source/ToneStyleCatalog.h
     native/Source/SwamToneProfile.h
+    native/Source/ToneParameterValue.h
     native/Source/AudioDeviceService.cpp
     native/Source/AudioDeviceService.h
 )

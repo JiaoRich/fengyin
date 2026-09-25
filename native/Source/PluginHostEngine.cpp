@@ -29,6 +29,20 @@ bool isProtectedPerformanceParameter(const juce::String& name)
     return name.startsWith("cc") || name.endsWith("cc");
 }
 
+bool isMidiRoutingParameter(const juce::String& name)
+{
+    // A custom tone may legitimately include growl, vibrato, breath-noise and
+    // expression-curve parameters.  Only controller routing is owned by the
+    // smart wind-controller layer and must never travel with a tone preset.
+    static const juce::StringArray routingWords {
+        "midi", "midicc", "controller", "mapping", "keyswitch", "channel",
+        "ccnumber", "ccassign", "ccassignment", "learncc"
+    };
+    for (const auto& word : routingWords)
+        if (name.contains(word)) return true;
+    return name.startsWith("cc") || name.endsWith("cc");
+}
+
 std::optional<float> acousticToneValue(const juce::String& name, const SwamToneProfile& profile)
 {
     // SWAM's Breath Noise is an acoustic sound parameter, not the Breath /
@@ -45,6 +59,13 @@ std::optional<float> acousticToneValue(const juce::String& name, const SwamToneP
     if (name.contains("keynoise") || name.contains("mechanicalnoise")) return profile.keyNoise;
     if (name == "resonance" || name.contains("boreresonance") || name.contains("bodyresonance")) return profile.resonance;
     return std::nullopt;
+}
+
+juce::String stableParameterIdentifier(juce::AudioProcessorParameter& parameter, int index)
+{
+    if (auto* identified = dynamic_cast<juce::AudioProcessorParameterWithID*>(&parameter))
+        return "id:" + identified->paramID;
+    return "index:" + juce::String(index) + ":" + normalisedParameterName(parameter);
 }
 }
 
@@ -359,21 +380,45 @@ bool PluginHostEngine::restoreEffectState(const void* data, std::size_t size)
     return true;
 }
 
-juce::MemoryBlock PluginHostEngine::savePluginState() const
+juce::Array<ToneParameterValue> PluginHostEngine::captureToneParameters() const
 {
-    juce::MemoryBlock state;
-    if (auto* plugin = getPlugin())
-        plugin->getStateInformation(state);
-    return state;
+    juce::Array<ToneParameterValue> result;
+    auto* plugin = getPlugin();
+    if (plugin == nullptr) return result;
+    const auto& parameters = plugin->getParameters();
+    for (int index = 0; index < parameters.size(); ++index)
+    {
+        auto* parameter = parameters[index];
+        if (parameter == nullptr || parameter == instrumentModelParameter) continue;
+        if (isMidiRoutingParameter(normalisedParameterName(*parameter))) continue;
+        result.add({ stableParameterIdentifier(*parameter, index), parameter->getValue() });
+    }
+    return result;
 }
 
-bool PluginHostEngine::restorePluginState(const void* data, std::size_t size)
+int PluginHostEngine::restoreToneParameters(const juce::Array<ToneParameterValue>& stored)
 {
     auto* plugin = getPlugin();
-    if (plugin == nullptr || data == nullptr || size == 0 || size > static_cast<std::size_t>(std::numeric_limits<int>::max()))
-        return false;
-    plugin->setStateInformation(data, static_cast<int>(size));
-    return true;
+    if (plugin == nullptr) return 0;
+    int restored = 0;
+    const auto& parameters = plugin->getParameters();
+    for (int index = 0; index < parameters.size(); ++index)
+    {
+        auto* parameter = parameters[index];
+        if (parameter == nullptr || parameter == instrumentModelParameter) continue;
+        if (isMidiRoutingParameter(normalisedParameterName(*parameter))) continue;
+        const auto identifier = stableParameterIdentifier(*parameter, index);
+        for (const auto& value : stored)
+            if (value.identifier == identifier)
+            {
+                parameter->beginChangeGesture();
+                parameter->setValueNotifyingHost(juce::jlimit(0.0f, 1.0f, value.value));
+                parameter->endChangeGesture();
+                ++restored;
+                break;
+            }
+    }
+    return restored;
 }
 
 void PluginHostEngine::loadEffectAsync(const juce::PluginDescription& description, double sampleRate,
@@ -505,12 +550,11 @@ void PluginHostEngine::breathChanged(float value, double timestampSeconds) noexc
     const auto midiValue = juce::jlimit(0, 127, juce::roundToInt(value * 127.0f));
     if (lastBreathMidiValue.exchange(midiValue, std::memory_order_relaxed) == midiValue)
         return;
-    queue(juce::MidiMessage::controllerEvent(1, 11, midiValue), timestampSeconds);
-    queue(juce::MidiMessage::controllerEvent(1, 2, midiValue), timestampSeconds);
-    // Qin Engine soundbanks commonly use the modulation wheel for expression.
-    // Keep CC11 as well so user-edited programs remain playable.
-    if (kongExpressionMode.load(std::memory_order_relaxed))
-        queue(juce::MidiMessage::controllerEvent(1, 1, midiValue), timestampSeconds);
+    // The controller's raw 0..127 value is routed to exactly one expression
+    // destination. Sending CC2 and CC11 together can drive two mappings inside
+    // SWAM and is the main cause of plateaus and conflicting expression curves.
+    queue(juce::MidiMessage::controllerEvent(1,
+        kongExpressionMode.load(std::memory_order_relaxed) ? 1 : 11, midiValue), timestampSeconds);
 }
 
 void PluginHostEngine::pitchBendChanged(float bipolarValue, double timestampSeconds) noexcept

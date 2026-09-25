@@ -144,15 +144,14 @@ class PrototypeStructureTests(unittest.TestCase):
         instrument_heading = HTML.split('<div class="instrument-heading">', 1)[1].split('</div></div>', 1)[0]
         self.assertNotIn('id="transpose-key"', instrument_heading)
 
-    def test_smart_adapter_ui_filters_hardware_and_instrument_techniques(self):
+    def test_smart_adapter_ui_uses_global_technique_roles(self):
         for control_id in ("adapter-device-name", "adapter-recommendations", "adapter-reconnect",
                            "adapter-techniques", "adapter-advanced-toggle"):
             self.assertIn(f'id="{control_id}"', HTML)
-        self.assertIn("state.hasBiteSensor", JS)
         self.assertIn("mergeBackendTechniquePlan", JS)
-        self.assertIn("backend.relevant === false", JS)
-        self.assertIn("backend.pluginSupported === false", JS)
-        self.assertIn("按“电吹管型号＋具体乐器”保存", HTML)
+        self.assertIn("当前电吹管全局设置", HTML)
+        self.assertIn("映射一次，切换乐器继续使用", HTML)
+        self.assertIn("technique.roles.v2.", (ROOT / "native" / "Source" / "MidiInputService.cpp").read_text(encoding="utf-8"))
 
     def test_smart_audio_optimisation_is_user_controllable(self):
         self.assertIn('id="smart-audio"', HTML)
@@ -177,16 +176,16 @@ class PrototypeStructureTests(unittest.TestCase):
     def test_saved_presets_can_be_deleted_without_hiding_create_action(self):
         render_body = JS.split("function renderPresets()", 1)[1].split("renderPresets();", 1)[0]
         self.assertIn("innerHTML = create +", render_body)
-        self.assertIn("nativeEvent('deletePreset', {index})", JS)
+        self.assertIn("nativeEvent('deletePreset',{index:presetIndex})", JS)
         self.assertIn('class="preset preset-create"', JS)
-        self.assertIn('class="preset-delete"', JS)
+        self.assertIn("data-action=\"${isCustom?'delete-custom':'locked'}\"", JS)
         self.assertIn('.preset-create{', HTML)
 
-    def test_scanned_plugins_become_editable_preset_catalog(self):
-        self.assertIn("availableInstruments.map((instrument,index)", JS)
-        self.assertIn("supported ? 'scanned' : 'unsupported'", JS)
-        self.assertIn('class="preset-edit"', JS)
-        self.assertIn("nativeEvent('editPreset', {index})", JS)
+    def test_installed_plugins_and_custom_variants_share_instrument_cards(self):
+        self.assertIn("availableInstruments.map((instrument,pluginIndex)", JS)
+        self.assertIn('class="instrument-preset-card"', JS)
+        self.assertIn("isCustom?'edit-custom':'locked'", JS)
+        self.assertIn("nativeEvent('editPreset',{index:presetIndex})", JS)
         self.assertIn("nativeEvent('saveCustomPreset'", JS)
 
     def test_professional_settings_save_a_separate_named_plan(self):

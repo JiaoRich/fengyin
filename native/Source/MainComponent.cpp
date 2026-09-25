@@ -278,6 +278,7 @@ void MainComponent::setupWebInterface()
             const auto index = static_cast<int>(payload.getProperty("index", -1));
             if (isActivated && juce::isPositiveAndBelow(index, cachedPresets.size()))
             {
+                captureToneBeforePresetEdit();
                 editingPresetId = cachedPresets.getReference(index).id;
                 presetSelector.setSelectedId(index + 1, juce::dontSendNotification);
                 loadSelectedPreset([this](bool success, const juce::String& message)
@@ -291,7 +292,11 @@ void MainComponent::setupWebInterface()
                 });
             }
         })
-        .withEventListener("cancelPresetEdit", [this](juce::var) { editingPresetId.clear(); })
+        .withEventListener("cancelPresetEdit", [this](juce::var)
+        {
+            editingPresetId.clear();
+            restoreToneBeforePresetEdit();
+        })
         .withEventListener("deletePreset", [this](juce::var payload)
         {
             const auto index = static_cast<int>(payload.getProperty("index", -1));
@@ -380,6 +385,7 @@ void MainComponent::setupWebInterface()
                 payload.getProperty("id", "natural").toString());
             currentToneStyleId = style.id;
             currentPresetDisplayName.clear();
+            currentPresetId.clear();
             currentPresetIsCustom = false;
             currentBaseToneSettings = style.settings;
             masterOutput.setToneStyle(style.settings);
@@ -452,21 +458,6 @@ void MainComponent::setupWebInterface()
                     auto result = std::make_unique<juce::DynamicObject>();
                     result->setProperty("success", false);
                     result->setProperty("message", utf8("请先连接电吹管"));
-                    webInterface->emitEventIfBrowserIsVisible("techniqueLearnResult", juce::var(result.release()));
-                }
-                return;
-            }
-            const auto family = currentTechniqueFamily();
-            const auto target = static_cast<fengyin::PerformanceTechnique>(technique);
-            const auto advice = fengyin::TechniqueAdvisor::advise(midi.getActiveProfile(), family, target);
-            if (! pluginHost.hasPlugin() || ! advice.relevantToInstrument || ! pluginHost.supportsTechnique(target))
-            {
-                if (webInterface != nullptr)
-                {
-                    auto result = std::make_unique<juce::DynamicObject>();
-                    result->setProperty("success", false);
-                    result->setProperty("message", ! advice.relevantToInstrument ? utf8("当前乐器不需要这项技巧")
-                                                                                : utf8("当前音源没有开放这项技巧参数"));
                     webInterface->emitEventIfBrowserIsVisible("techniqueLearnResult", juce::var(result.release()));
                 }
                 return;
@@ -1090,7 +1081,7 @@ void MainComponent::timerCallback()
             {
                 auto result = std::make_unique<juce::DynamicObject>();
                 result->setProperty("success", true);
-                result->setProperty("message", utf8("识别成功；保存音色方案后会永久保留"));
+                result->setProperty("message", utf8("映射成功，已对这支电吹管全局保存"));
                 webInterface->emitEventIfBrowserIsVisible("techniqueLearnResult", juce::var(result.release()));
             }
         }
@@ -1223,33 +1214,42 @@ void MainComponent::timerCallback()
         state->setProperty("presetEditing", editingPresetId.isNotEmpty());
         state->setProperty("activePresetName", currentPresetDisplayName);
         state->setProperty("activePresetCustom", currentPresetIsCustom);
+        state->setProperty("activePresetId", currentPresetId);
+        state->setProperty("appVersion", JUCE_APPLICATION_VERSION_STRING);
+        state->setProperty("activeToneVariantId", currentPresetIsCustom && currentPresetId.isNotEmpty()
+            ? "custom:" + currentPresetId
+            : currentInstrumentKey.isNotEmpty() ? "builtin:" + currentInstrumentKey + ":" + currentToneStyleId
+                                                : juce::String());
         state->setProperty("techniqueLearning", activeTechniqueLearn);
         const auto currentFamily = currentTechniqueFamily();
         state->setProperty("instrumentFamily", utf8(fengyin::SwamPluginClassifier::familyChineseName(currentFamily)));
         juce::Array<juce::var> techniqueMappings;
-        for (int technique = 0; technique < static_cast<int>(fengyin::PerformanceTechnique::count); ++technique)
+        struct RoleDescription { fengyin::PerformanceTechnique role; const char* id; const char* name; };
+        for (const auto& role : {
+                RoleDescription { fengyin::PerformanceTechnique::vibrato, "vibrato", "颤动控制" },
+                RoleDescription { fengyin::PerformanceTechnique::growl, "growl", "质感控制" },
+                RoleDescription { fengyin::PerformanceTechnique::portamento, "portamento", "滑音控制" },
+                RoleDescription { fengyin::PerformanceTechnique::mute, "mute", "特殊技巧" } })
         {
-            const auto target = static_cast<fengyin::PerformanceTechnique>(technique);
-            const auto advice = fengyin::TechniqueAdvisor::advise(deviceProfile, currentFamily, target);
             auto item = std::make_unique<juce::DynamicObject>();
-            item->setProperty("technique", technique);
-            item->setProperty("id", fengyin::techniqueId(target));
-            item->setProperty("name", utf8(fengyin::TechniqueAdvisor::chineseName(target)));
-            item->setProperty("relevant", advice.relevantToInstrument);
-            item->setProperty("pluginSupported", pluginHost.supportsTechnique(target));
-            item->setProperty("hardwareAvailable", advice.hardwareAvailable);
-            item->setProperty("supported", advice.relevantToInstrument && pluginHost.supportsTechnique(target));
-            item->setProperty("recommendedSource", utf8(advice.recommendedSource));
-            item->setProperty("recommendationReason", utf8(advice.reason));
-            item->setProperty("defaultMode", static_cast<int>(advice.defaultMode));
-            item->setProperty("featured", advice.featured);
+            item->setProperty("technique", static_cast<int>(role.role));
+            item->setProperty("id", role.id);
+            item->setProperty("name", utf8(role.name));
+            item->setProperty("relevant", true);
+            item->setProperty("pluginSupported", true);
+            item->setProperty("hardwareAvailable", true);
+            item->setProperty("supported", true);
+            item->setProperty("recommendedSource", utf8("映射一次，切换乐器继续使用"));
+            item->setProperty("recommendationReason", utf8("全局控制角色"));
+            item->setProperty("defaultMode", static_cast<int>(fengyin::TechniqueControlMode::breath));
+            item->setProperty("featured", true);
             item->setProperty("sourceType", 0);
             item->setProperty("sourceNumber", -1);
             item->setProperty("toggle", false);
-            item->setProperty("mode", static_cast<int>(advice.defaultMode));
-            item->setProperty("strength", advice.defaultStrength);
+            item->setProperty("mode", static_cast<int>(fengyin::TechniqueControlMode::breath));
+            item->setProperty("strength", 0.5f);
             for (const auto& mapping : midi.getTechniqueMappings())
-                if (static_cast<int>(mapping.technique) == technique)
+                if (mapping.technique == role.role)
                 {
                     item->setProperty("sourceType", static_cast<int>(mapping.sourceType));
                     item->setProperty("sourceNumber", mapping.sourceNumber);
@@ -1311,11 +1311,13 @@ void MainComponent::timerCallback()
         for (const auto& preset : cachedPresets)
         {
             auto item = std::make_unique<juce::DynamicObject>();
+            item->setProperty("id", preset.id);
             item->setProperty("name", preset.name);
             item->setProperty("brand", preset.pluginBrand);
             item->setProperty("instrumentKey", preset.instrumentKey);
             item->setProperty("instrumentChineseName", preset.instrumentChineseName);
             item->setProperty("customTone", preset.customTone);
+            item->setProperty("baseToneStyleId", preset.baseToneStyleId);
             presets.add(juce::var(item.release()));
         }
         state->setProperty("presets", juce::var(presets));
@@ -1532,6 +1534,7 @@ void MainComponent::loadSelectedPlugin()
 
     const auto brand = fengyin::SupportedInstrumentClassifier::classify(chosen.name, chosen.manufacturerName);
     currentPresetDisplayName.clear();
+    currentPresetId.clear();
     currentPresetIsCustom = false;
     currentPluginBrand = brand == fengyin::SupportedInstrumentClassifier::Brand::kong ? "kong" : "swam";
     if (currentPluginBrand == "swam")
@@ -1591,6 +1594,7 @@ void MainComponent::loadKongInstrument(const juce::String& instrumentKey, const 
         currentInstrumentKey = instrumentKey;
         currentInstrumentChineseName = instrumentName.isNotEmpty() ? instrumentName : utf8(definition->chineseName);
         currentPresetDisplayName.clear();
+        currentPresetId.clear();
         currentPresetIsCustom = false;
         const auto selected = pluginHost.selectProgramByAliases(aliases);
         activatePluginOutput(pluginHost.getPluginName());
@@ -1632,6 +1636,7 @@ void MainComponent::loadKongInstrument(const juce::String& instrumentKey, const 
     }
     currentPluginBrand = "kong";
     currentPresetDisplayName.clear();
+    currentPresetId.clear();
     currentPresetIsCustom = false;
     currentInstrumentKey = instrumentKey;
     currentInstrumentChineseName = instrumentName.isNotEmpty() ? instrumentName : utf8(definition->chineseName);
@@ -1770,11 +1775,8 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
     preset.id = editingPresetId.isNotEmpty() ? editingPresetId : juce::Uuid().toString();
     preset.name = name;
     preset.pluginIdentifier = pluginHost.getPluginIdentifier();
-    preset.pluginState = pluginHost.savePluginState();
-    // 0.9 起使用内置音色引擎，新方案不再依赖外部效果器。
-    preset.effectIdentifier.clear();
-    preset.effectState.reset();
-    preset.effectBypassed = false;
+    preset.toneParameters = pluginHost.captureToneParameters();
+    preset.instrumentModelIndex = pluginHost.getCurrentInstrumentModelIndex();
     preset.eqTone = masterOutput.getEqTone();
     preset.warmth = masterOutput.getWarmth();
     preset.reverbMix = masterOutput.getReverbMix();
@@ -1784,16 +1786,13 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
     preset.instrumentKey = currentInstrumentKey;
     preset.instrumentChineseName = currentInstrumentChineseName;
     preset.pluginProgramName = pluginHost.getCurrentProgramName();
-    // 设备手感和技巧映射独立按设备保存，不进入音色方案。
-    preset.breathController = 2;
-    preset.breathCurve = 0.9f;
-    preset.breathSmoothing = 0.28f;
-    preset.techniqueMappings.clear();
+    preset.customTone = true;
 
     if (presetStore.save(preset))
     {
         const auto savedId = preset.id;
         editingPresetId.clear();
+        editingReturnValid = false;
         refreshPresetChoices();
         for (int i = 0; i < cachedPresets.size(); ++i)
             if (cachedPresets.getReference(i).id == savedId)
@@ -1844,7 +1843,8 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
     if (preset.id.isEmpty()) preset.id = juce::Uuid().toString();
     preset.name = name;
     preset.pluginIdentifier = pluginHost.getPluginIdentifier();
-    preset.pluginState = pluginHost.savePluginState();
+    preset.toneParameters = pluginHost.captureToneParameters();
+    preset.instrumentModelIndex = pluginHost.getCurrentInstrumentModelIndex();
     preset.pluginBrand = currentPluginBrand;
     preset.instrumentKey = currentInstrumentKey;
     preset.instrumentChineseName = currentInstrumentChineseName;
@@ -1868,9 +1868,11 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
     if (presetStore.save(preset))
     {
         currentPresetDisplayName = name;
+        currentPresetId = preset.id;
         currentPresetIsCustom = true;
         currentBaseToneSettings = settings;
         editingPresetId.clear();
+        editingReturnValid = false;
         refreshPresetChoices();
         pluginStatus.setText(utf8("已保存我的方案：") + name, juce::dontSendNotification);
     }
@@ -1902,6 +1904,20 @@ void MainComponent::deleteSelectedPreset()
             if (result == 1 && safe != nullptr && safe->presetStore.remove(id))
             {
                 if (safe->editingPresetId == id) safe->editingPresetId.clear();
+                if (safe->currentPresetId == id)
+                {
+                    const auto fallback = fengyin::ToneStyleCatalog::find(safe->currentInstrumentKey,
+                                                                          safe->currentToneStyleId.startsWith("custom:")
+                                                                              ? "natural" : safe->currentToneStyleId);
+                    safe->currentPresetId.clear();
+                    safe->currentPresetDisplayName.clear();
+                    safe->currentPresetIsCustom = false;
+                    safe->currentToneStyleId = fallback.id;
+                    safe->currentBaseToneSettings = fallback.settings;
+                    safe->masterOutput.setToneStyle(fallback.settings);
+                    safe->currentSwamToneParameterCount = safe->currentPluginBrand == "swam"
+                        ? safe->pluginHost.applySwamToneProfile(fallback.swam) : 0;
+                }
                 safe->refreshPresetChoices();
                 safe->pluginStatus.setText(utf8("音色方案已删除"), juce::dontSendNotification);
             }
@@ -2019,6 +2035,81 @@ void MainComponent::showSetupGuide(bool automatic)
     }), false);
 }
 
+void MainComponent::captureToneBeforePresetEdit()
+{
+    editingReturnValid = pluginHost.hasPlugin();
+    if (! editingReturnValid) return;
+    editingReturnPluginIdentifier = pluginHost.getPluginIdentifier();
+    editingReturnPresetId = currentPresetId;
+    editingReturnPresetName = currentPresetDisplayName;
+    editingReturnStyleId = currentToneStyleId;
+    editingReturnPluginBrand = currentPluginBrand;
+    editingReturnInstrumentKey = currentInstrumentKey;
+    editingReturnInstrumentName = currentInstrumentChineseName;
+    editingReturnProgramName = pluginHost.getCurrentProgramName();
+    editingReturnWasCustom = currentPresetIsCustom;
+    editingReturnModelIndex = pluginHost.getCurrentInstrumentModelIndex();
+    editingReturnToneParameters = pluginHost.captureToneParameters();
+    editingReturnToneSettings = masterOutput.getToneStyle();
+}
+
+void MainComponent::restoreToneBeforePresetEdit()
+{
+    if (! editingReturnValid) return;
+    editingReturnValid = false;
+
+    juce::PluginDescription chosen;
+    bool found = false;
+    for (const auto& candidate : pluginCatalog.getPlugins())
+        if (candidate.createIdentifierString() == editingReturnPluginIdentifier)
+        {
+            chosen = candidate;
+            found = true;
+            break;
+        }
+    if (! found) return;
+
+    const auto status = audio.getStatus();
+    const auto presetId = editingReturnPresetId;
+    const auto presetName = editingReturnPresetName;
+    const auto styleId = editingReturnStyleId;
+    const auto brand = editingReturnPluginBrand;
+    const auto instrumentKey = editingReturnInstrumentKey;
+    const auto instrumentName = editingReturnInstrumentName;
+    const auto programName = editingReturnProgramName;
+    const auto wasCustom = editingReturnWasCustom;
+    const auto modelIndex = editingReturnModelIndex;
+    const auto parameters = editingReturnToneParameters;
+    const auto toneSettings = editingReturnToneSettings;
+    pluginLoading = true;
+    pluginHost.loadAsync(chosen,
+                         status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
+                         status.bufferSize > 0 ? status.bufferSize : 128,
+                         [this, presetId, presetName, styleId, brand, instrumentKey, instrumentName,
+                          programName, wasCustom, modelIndex, parameters, toneSettings]
+                         (bool success, const juce::String& message)
+                         {
+                             pluginLoading = false;
+                             if (! success) return;
+                             currentPluginBrand = brand;
+                             currentInstrumentKey = instrumentKey;
+                             currentInstrumentChineseName = instrumentName;
+                             activatePluginOutput(message);
+                             if (brand == "kong" && programName.isNotEmpty())
+                                 pluginHost.selectProgramByAliases({ programName });
+                             if (modelIndex >= 0) pluginHost.selectInstrumentModel(modelIndex);
+                             pluginHost.restoreToneParameters(parameters);
+                             masterOutput.setToneStyle(toneSettings);
+                             currentToneStyleId = styleId;
+                             currentPresetId = presetId;
+                             currentPresetDisplayName = presetName;
+                             currentPresetIsCustom = wasCustom;
+                             currentBaseToneSettings = toneSettings;
+                             currentSwamToneParameterCount = parameters.size();
+                             pluginStatus.setText(utf8("已取消修改，恢复原音色"), juce::dontSendNotification);
+                         });
+}
+
 void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::String&)> completion)
 {
     const auto index = presetSelector.getSelectedId() - 1;
@@ -2075,7 +2166,6 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                                  return;
                              }
                              activatePluginOutput(message);
-                             pluginHost.restorePluginState(preset.pluginState.getData(), preset.pluginState.getSize());
                              if (preset.pluginBrand == "kong" && preset.pluginProgramName.isNotEmpty())
                                  pluginHost.selectProgramByAliases({ preset.pluginProgramName });
                              auto style = fengyin::ToneStyleCatalog::find(currentInstrumentKey, preset.baseToneStyleId);
@@ -2094,12 +2184,15 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                                  style.settings.outputGain = preset.outputGain;
                                  style.settings.bass = preset.bass;
                              }
-                             currentToneStyleId = preset.baseToneStyleId;
+                             if (preset.instrumentModelIndex >= 0)
+                                 pluginHost.selectInstrumentModel(preset.instrumentModelIndex);
+                             pluginHost.restoreToneParameters(preset.toneParameters);
+                             currentToneStyleId = "custom:" + preset.id;
                              currentBaseToneSettings = style.settings;
                              masterOutput.setToneStyle(style.settings);
-                             currentSwamToneParameterCount = preset.pluginBrand == "swam"
-                                ? pluginHost.applySwamToneProfile(style.swam) : 0;
+                             currentSwamToneParameterCount = preset.toneParameters.size();
                              currentPresetDisplayName = preset.name;
+                             currentPresetId = preset.id;
                              currentPresetIsCustom = preset.customTone;
                              pluginStatus.setText(utf8("已恢复音色：") + preset.name, juce::dontSendNotification);
                              pluginHost.unloadEffect();
@@ -2126,10 +2219,7 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName)
             ? utf8(fengyin::SwamPluginClassifier::instrumentChineseName(pluginName.toStdString())) : utf8("空音 Qin Engine");
     }
     pluginHost.setKongExpressionMode(currentPluginBrand == "kong");
-    const auto exactContext = (currentPluginBrand == "kong" ? currentInstrumentKey
-        : juce::String(fengyin::SwamPluginClassifier::familyKey(family))) + "."
-                            + juce::String::toHexString(pluginHost.getPluginIdentifier().hashCode64());
-    midi.setTechniqueContext(exactContext);
+    midi.setTechniqueContext(fengyin::SwamPluginClassifier::familyKey(family));
     midi.setPerformanceSink(&pluginHost);
     configureTechniqueDefaults();
     if (currentPluginBrand == "kong")
@@ -2173,18 +2263,18 @@ void MainComponent::applyCurrentSwamToneStyle()
 void MainComponent::configureTechniqueDefaults()
 {
     if (! pluginHost.hasPlugin() || ! midi.getTechniqueMappings().isEmpty()) return;
-    const auto family = currentTechniqueFamily();
-    const auto device = midi.getActiveProfile();
     juce::Array<fengyin::TechniqueMapping> defaults;
-    for (int value = 0; value < static_cast<int>(fengyin::PerformanceTechnique::count); ++value)
+    for (const auto [role, strength] : {
+            std::pair { fengyin::PerformanceTechnique::vibrato, 0.55f },
+            std::pair { fengyin::PerformanceTechnique::growl, 0.50f },
+            std::pair { fengyin::PerformanceTechnique::portamento, 0.45f },
+            std::pair { fengyin::PerformanceTechnique::mute, 0.50f } })
     {
-        const auto technique = static_cast<fengyin::PerformanceTechnique>(value);
-        const auto advice = fengyin::TechniqueAdvisor::advise(device, family, technique);
-        if (! advice.relevantToInstrument || ! pluginHost.supportsTechnique(technique)) continue;
         fengyin::TechniqueMapping mapping;
-        mapping.technique = technique;
-        mapping.mode = advice.defaultMode;
-        mapping.strength = advice.defaultStrength;
+        mapping.technique = role;
+        mapping.mode = role == fengyin::PerformanceTechnique::mute
+            ? fengyin::TechniqueControlMode::hardware : fengyin::TechniqueControlMode::breath;
+        mapping.strength = strength;
         defaults.add(mapping);
     }
     midi.setTechniqueMappings(defaults);

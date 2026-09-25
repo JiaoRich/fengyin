@@ -48,7 +48,8 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('toneObject->setProperty("bass", (toneSettings.bass + 1.0f)', MAIN)
         self.assertIn("result.bass =", MAIN)
         self.assertIn("定制音色", JS)
-        self.assertIn("#page-chain > .panel", JS)
+        self.assertIn("enterCustomToneCreate", JS)
+        self.assertIn("custom-tone-empty", (ROOT / "prototype" / "index.html").read_text(encoding="utf-8"))
 
     def test_graph_has_stereo_output_before_io_nodes_are_connected(self):
         configure = HOST.index("graph->setPlayConfigDetails(0, 2, sampleRate, bufferSize)")
@@ -66,10 +67,13 @@ class HostRegressionTests(unittest.TestCase):
         preferred_block = MIDI.split("if (preferred.isNotEmpty())", 1)[1].split("if (! devices.isEmpty())", 1)[0]
         self.assertNotIn("        return;\n    }", preferred_block)
 
-    def test_safe_onset_resets_expression_and_caps_velocity(self):
+    def test_breath_is_raw_passthrough_and_precedes_note_on(self):
         self.assertIn("sink->resetPerformance()", MIDI)
-        self.assertIn("sink->breathChanged(0.035f, timestampSeconds)", MIDI)
-        self.assertIn("0.28f + currentBreath * 0.52f", MIDI)
+        note_block = MIDI.split("if (message.isNoteOn())", 1)[1].split("else if (message.isNoteOff())", 1)[0]
+        self.assertLess(note_block.index("sink->breathChanged(currentBreath"), note_block.index("sink->noteOn"))
+        self.assertIn("const auto rawBreath = static_cast<float>(message.getControllerValue()) / 127.0f", MIDI)
+        self.assertNotIn("processMidiValue", MIDI)
+        self.assertNotIn("0.28f + currentBreath * 0.52f", MIDI)
         self.assertIn('activeProfile.id == "yamaha-yds"', MIDI)
         self.assertIn("savedController = 11", MIDI)
         self.assertIn("juce::MidiMessage::allNotesOff", HOST)
@@ -183,7 +187,7 @@ class HostRegressionTests(unittest.TestCase):
         self.assertNotIn("midi.setTechniqueMappings(preset.techniqueMappings)", MAIN)
         self.assertNotIn("midi.setBreathController(preset.breathController)", MAIN)
 
-    def test_intelligent_techniques_are_instrument_specific_and_drive_real_parameters(self):
+    def test_intelligent_techniques_use_global_roles_and_drive_real_parameters(self):
         processor = (ROOT / "native" / "Source" / "IntelligentTechniqueProcessor.h").read_text(encoding="utf-8")
         advisor = (ROOT / "native" / "Source" / "TechniqueAdvisor.h").read_text(encoding="utf-8")
         self.assertIn("setTechniqueConfiguration", MAIN)
@@ -193,7 +197,12 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('device.id == "yamaha-yds"', advisor)
         self.assertIn("TechniqueControlMode::breath", advisor)
         self.assertIn("growlOnThreshold", processor)
-        self.assertIn("60.0, 0.0", processor)
+        self.assertIn("113.0f / 127.0f", processor)
+        self.assertIn("118.0f / 127.0f", processor)
+        self.assertIn("123.0f / 127.0f", processor)
+        self.assertIn("80.0, 0.0, 85.0f, 110.0f", processor)
+        self.assertIn('return "technique.roles.v2."', MIDI)
+        self.assertIn("targetForRole", MIDI)
 
     def test_kong_and_swam_are_supported_while_other_plugins_are_blocked(self):
         self.assertIn('item->setProperty("supported", isSwam || isKong)', MAIN)
@@ -201,7 +210,7 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('pluginHost.selectProgramByAliases', MAIN)
         self.assertIn("当前版本尚未支持 Kontakt、三体等其他音源", MAIN)
         self.assertIn("SwamFamily::notSwam", MAIN)
-        self.assertIn("pluginHost.getPluginIdentifier().hashCode64()", MAIN)
+        self.assertIn('return "technique.roles.v2."', MIDI)
         self.assertIn('name.contains("portamento")', HOST)
         self.assertIn('name.contains("bowpressure")', HOST)
 

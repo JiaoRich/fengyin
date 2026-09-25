@@ -13,14 +13,9 @@ int main()
     preset.id = "test-id";
     preset.name = "Alto Sax";
     preset.pluginIdentifier = "VST3-test-plugin";
-    preset.effectIdentifier = "VST3-test-reverb";
-    preset.breathController = 11;
-    preset.breathCurve = 1.25f;
-    const char state[] = { 1, 2, 3, 4, 5 };
-    preset.pluginState.append(state, sizeof(state));
-    preset.effectState.append(state, sizeof(state));
-    preset.effectBypassed = true;
-    preset.favorite = true;
+    preset.instrumentModelIndex = 2;
+    preset.toneParameters.add({ "id:timbre", 0.72f });
+    preset.toneParameters.add({ "id:brightness", 0.44f });
     preset.eqTone = -0.12f;
     preset.warmth = 0.64f;
     preset.reverbMix = 0.42f;
@@ -35,24 +30,15 @@ int main()
     preset.harshControl = 0.22f;
     preset.outputGain = 0.92f;
     preset.bass = -0.35f;
-    fengyin::TechniqueMapping technique;
-    technique.technique = fengyin::PerformanceTechnique::growl;
-    technique.sourceType = fengyin::TechniqueSourceType::controller;
-    technique.sourceNumber = 21;
-    technique.toggle = true;
-    preset.techniqueMappings.add(technique);
 
     assert(store.save(preset));
     const auto loaded = store.findById("test-id");
     assert(loaded.has_value());
     assert(loaded->name == "Alto Sax");
-    assert(loaded->breathController == 11);
-    assert(std::abs(loaded->breathCurve - 1.25f) < 0.001f);
-    assert(loaded->pluginState == preset.pluginState);
-    assert(loaded->effectIdentifier == "VST3-test-reverb");
-    assert(loaded->effectState == preset.effectState);
-    assert(loaded->effectBypassed);
-    assert(loaded->favorite);
+    assert(loaded->instrumentModelIndex == 2);
+    assert(loaded->toneParameters.size() == 2);
+    assert(loaded->toneParameters[0].identifier == "id:timbre");
+    assert(std::abs(loaded->toneParameters[0].value - 0.72f) < 0.001f);
     assert(std::abs(loaded->eqTone + 0.12f) < 0.001f);
     assert(std::abs(loaded->warmth - 0.64f) < 0.001f);
     assert(std::abs(loaded->reverbMix - 0.42f) < 0.001f);
@@ -67,9 +53,6 @@ int main()
     assert(std::abs(loaded->harshControl - 0.22f) < 0.001f);
     assert(std::abs(loaded->outputGain - 0.92f) < 0.001f);
     assert(std::abs(loaded->bass + 0.35f) < 0.001f);
-    assert(loaded->techniqueMappings.size() == 1);
-    assert(loaded->techniqueMappings[0].sourceNumber == 21);
-    assert(loaded->techniqueMappings[0].toggle);
     assert(store.setDefaultId("test-id"));
     assert(store.getDefaultId() == "test-id");
 
@@ -77,8 +60,6 @@ int main()
     assert(store.save(preset));
     assert(store.loadAll().size() == 1);
     assert(store.findById("test-id")->name == "Alto Sax Updated");
-    assert(store.setFavorite("test-id", false));
-    assert(! store.findById("test-id")->favorite);
     assert(store.remove("test-id"));
     assert(store.loadAll().isEmpty());
 
