@@ -1561,7 +1561,7 @@ nativeEvent('webReady');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 0.13.0 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 0.13.1 · 本地运行，不会上传个人资料。';
 // 浏览器原型使用 localStorage 模拟试用；正式软件等待本地授权服务回传状态。
 // 这样已永久激活的用户启动时不会短暂看到“开始试用”遮罩。
 if (!window.__JUCE__?.backend?.emitEvent) {

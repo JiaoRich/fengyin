@@ -332,6 +332,7 @@ void PluginHostEngine::unload()
     for (auto& dirty : techniqueDirty) dirty.store(false, std::memory_order_relaxed);
     instrumentModelParameter = nullptr;
     instrumentModelNames.clear();
+    swamExpressionController.store(11, std::memory_order_relaxed);
 }
 
 bool PluginHostEngine::hasPlugin() const noexcept
@@ -419,6 +420,31 @@ int PluginHostEngine::restoreToneParameters(const juce::Array<ToneParameterValue
             }
     }
     return restored;
+}
+
+bool PluginHostEngine::applyStandardSwamExpressionCurve()
+{
+    auto* plugin = getPlugin();
+    if (plugin == nullptr) return false;
+
+    juce::MemoryBlock state;
+    plugin->getStateInformation(state);
+    const auto result = SwamExpressionCurve::applyToState(state);
+    if (! result.found) return false;
+
+    // Preserve and follow the controller already selected inside SWAM. The
+    // smart adapter translates any supported wind controller to this one
+    // destination, so changing the curve never rewrites the user's mapping.
+    if (result.controller >= 0 && result.controller <= 127)
+        swamExpressionController.store(result.controller, std::memory_order_relaxed);
+    if (result.changed)
+    {
+        plugin->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
+        resolveTechniqueParameters();
+        resolveInstrumentModelParameter();
+        resetPerformance();
+    }
+    return true;
 }
 
 void PluginHostEngine::loadEffectAsync(const juce::PluginDescription& description, double sampleRate,
@@ -554,7 +580,8 @@ void PluginHostEngine::breathChanged(float value, double timestampSeconds) noexc
     // destination. Sending CC2 and CC11 together can drive two mappings inside
     // SWAM and is the main cause of plateaus and conflicting expression curves.
     queue(juce::MidiMessage::controllerEvent(1,
-        kongExpressionMode.load(std::memory_order_relaxed) ? 1 : 11, midiValue), timestampSeconds);
+        kongExpressionMode.load(std::memory_order_relaxed)
+            ? 1 : swamExpressionController.load(std::memory_order_relaxed), midiValue), timestampSeconds);
 }
 
 void PluginHostEngine::pitchBendChanged(float bipolarValue, double timestampSeconds) noexcept

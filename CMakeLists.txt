@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 0.13.0 LANGUAGES C CXX)
+project(FengYin VERSION 0.13.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -99,6 +99,8 @@ target_sources(FengYin PRIVATE
     native/Source/MasterOutputService.cpp
     native/Source/ToneStyleCatalog.h
     native/Source/SwamToneProfile.h
+    native/Source/SwamExpressionCurve.cpp
+    native/Source/SwamExpressionCurve.h
     native/Source/ToneParameterValue.h
     native/Source/AudioDeviceService.cpp
     native/Source/AudioDeviceService.h
@@ -259,5 +261,17 @@ if(BUILD_TESTING)
     target_include_directories(FengYinToneStyleTests PRIVATE native/Source)
     target_link_libraries(FengYinToneStyleTests PRIVATE juce::juce_dsp juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
     add_test(NAME tone_style_catalog COMMAND FengYinToneStyleTests)
+
+    add_executable(FengYinSwamExpressionCurveTests
+        tests/test_swam_expression_curve.cpp
+        native/Source/SwamExpressionCurve.cpp
+    )
+    target_include_directories(FengYinSwamExpressionCurveTests PRIVATE native/Source)
+    target_link_libraries(FengYinSwamExpressionCurveTests PRIVATE
+        juce::juce_audio_processors
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags
+    )
+    add_test(NAME swam_expression_curve COMMAND FengYinSwamExpressionCurveTests)
 
 endif()

@@ -2204,7 +2204,6 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
 void MainComponent::activatePluginOutput(const juce::String& pluginName)
 {
     audio.getDeviceManager().removeAudioCallback(&testSynth);
-    pluginHost.attachTo(audio.getDeviceManager());
     const auto brand = fengyin::SupportedInstrumentClassifier::classify(pluginName, {});
     const auto family = brand == fengyin::SupportedInstrumentClassifier::Brand::swam
         ? fengyin::SwamPluginClassifier::classify(pluginName.toStdString(), {}) : fengyin::SwamFamily::notSwam;
@@ -2219,6 +2218,10 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName)
             ? utf8(fengyin::SwamPluginClassifier::instrumentChineseName(pluginName.toStdString())) : utf8("空音 Qin Engine");
     }
     pluginHost.setKongExpressionMode(currentPluginBrand == "kong");
+    if (currentPluginBrand == "swam")
+        pluginHost.applyStandardSwamExpressionCurve();
+    // Complete all plugin-state changes before the real-time callback begins.
+    pluginHost.attachTo(audio.getDeviceManager());
     midi.setTechniqueContext(fengyin::SwamPluginClassifier::familyKey(family));
     midi.setPerformanceSink(&pluginHost);
     configureTechniqueDefaults();
