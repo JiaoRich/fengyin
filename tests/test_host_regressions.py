@@ -78,6 +78,18 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("savedController = 11", MIDI)
         self.assertIn("juce::MidiMessage::allNotesOff", HOST)
         self.assertIn("controllerEvent(1, 11, 0)", HOST)
+        self.assertIn("swamExpressionController.load", HOST)
+        self.assertIn("applyStandardSwamExpressionCurve", MAIN)
+
+    def test_swam_main_expression_curve_preserves_controller_mapping(self):
+        curve = (ROOT / "native" / "Source" / "SwamExpressionCurve.cpp").read_text(encoding="utf-8")
+        header = (ROOT / "native" / "Source" / "SwamExpressionCurve.h").read_text(encoding="utf-8")
+        self.assertIn('parameterId").equalsIgnoreCase("expression")', curve)
+        self.assertIn('result.controller = element.getIntAttribute("msb", -1)', curve)
+        self.assertNotIn('setAttribute("msb"', curve)
+        self.assertNotIn('setAttribute("channel"', curve)
+        self.assertIn("outputMaximum = 116.0", header)
+        self.assertIn("shape = 0.10", header)
 
     def test_transpose_releases_active_notes_and_uses_note_map(self):
         self.assertIn("void MidiInputService::setTransposeSemitones", MIDI)

@@ -13,6 +13,7 @@
 #include "MasterOutputService.h"
 #include "RealtimeMidiQueue.h"
 #include "SwamToneProfile.h"
+#include "SwamExpressionCurve.h"
 #include "ToneParameterValue.h"
 
 namespace fengyin
@@ -101,6 +102,7 @@ public:
     [[nodiscard]] juce::String getCurrentInstrumentModelName() const;
     bool selectInstrumentModel(int index);
     int applySwamToneProfile(const SwamToneProfile& profile);
+    bool applyStandardSwamExpressionCurve();
 
     void noteOn(int noteNumber, float velocity, double timestampSeconds = 0.0) noexcept override;
     void noteOff(int noteNumber, double timestampSeconds = 0.0) noexcept override;
@@ -139,6 +141,7 @@ private:
     juce::AudioProcessorParameter* instrumentModelParameter = nullptr;
     juce::StringArray instrumentModelNames;
     std::atomic<bool> kongExpressionMode { false };
+    std::atomic<int> swamExpressionController { 11 };
     std::atomic<int> lastBreathMidiValue { -1 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginHostEngine)
