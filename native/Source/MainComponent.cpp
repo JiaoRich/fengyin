@@ -192,8 +192,6 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
 MainComponent::~MainComponent()
 {
     stopTimer();
-    containerOutputVerificationActive = false;
-    containerOutputVerificationCompletion = {};
     pluginHost.setLatencyProbeActive(false);
     webVideoAudioExtractor.cancel();
     accompaniment.pause();
@@ -657,7 +655,13 @@ juce::File MainComponent::prepareLocalWebInterface()
         "assets/instruments/instrument_oboe.png", "assets/instruments/instrument_english_horn.png",
         "assets/instruments/instrument_bassoon.png", "assets/instruments/instrument_contrabassoon.png",
         "assets/instruments/instrument_violin.png", "assets/instruments/instrument_viola.png",
-        "assets/instruments/instrument_cello.png", "assets/instruments/instrument_double_bass.png"
+        "assets/instruments/instrument_cello.png", "assets/instruments/instrument_double_bass.png",
+        "assets/instruments/instrument_kong_erhu.png", "assets/instruments/instrument_kong_guzheng.png",
+        "assets/instruments/instrument_kong_dizi.png", "assets/instruments/instrument_kong_pipa.png",
+        "assets/instruments/instrument_kong_suona.png", "assets/instruments/instrument_kong_hulusi.png",
+        "assets/instruments/instrument_kong_yangqin.png", "assets/instruments/instrument_kong_guqin.png",
+        "assets/instruments/instrument_kong_sheng.png", "assets/instruments/instrument_kong_ruan.png",
+        "assets/instruments/instrument_kong_xiao.png", "assets/instruments/instrument_kong_banhu.png"
     };
     for (const auto& relative : files)
     {
@@ -783,7 +787,19 @@ std::optional<juce::WebBrowserComponent::Resource> MainComponent::getWebResource
             { "instrument_violin.png", BinaryData::instrument_violin_png, BinaryData::instrument_violin_pngSize },
             { "instrument_viola.png", BinaryData::instrument_viola_png, BinaryData::instrument_viola_pngSize },
             { "instrument_cello.png", BinaryData::instrument_cello_png, BinaryData::instrument_cello_pngSize },
-            { "instrument_double_bass.png", BinaryData::instrument_double_bass_png, BinaryData::instrument_double_bass_pngSize }
+            { "instrument_double_bass.png", BinaryData::instrument_double_bass_png, BinaryData::instrument_double_bass_pngSize },
+            { "instrument_kong_erhu.png", BinaryData::instrument_kong_erhu_png, BinaryData::instrument_kong_erhu_pngSize },
+            { "instrument_kong_guzheng.png", BinaryData::instrument_kong_guzheng_png, BinaryData::instrument_kong_guzheng_pngSize },
+            { "instrument_kong_dizi.png", BinaryData::instrument_kong_dizi_png, BinaryData::instrument_kong_dizi_pngSize },
+            { "instrument_kong_pipa.png", BinaryData::instrument_kong_pipa_png, BinaryData::instrument_kong_pipa_pngSize },
+            { "instrument_kong_suona.png", BinaryData::instrument_kong_suona_png, BinaryData::instrument_kong_suona_pngSize },
+            { "instrument_kong_hulusi.png", BinaryData::instrument_kong_hulusi_png, BinaryData::instrument_kong_hulusi_pngSize },
+            { "instrument_kong_yangqin.png", BinaryData::instrument_kong_yangqin_png, BinaryData::instrument_kong_yangqin_pngSize },
+            { "instrument_kong_guqin.png", BinaryData::instrument_kong_guqin_png, BinaryData::instrument_kong_guqin_pngSize },
+            { "instrument_kong_sheng.png", BinaryData::instrument_kong_sheng_png, BinaryData::instrument_kong_sheng_pngSize },
+            { "instrument_kong_ruan.png", BinaryData::instrument_kong_ruan_png, BinaryData::instrument_kong_ruan_pngSize },
+            { "instrument_kong_xiao.png", BinaryData::instrument_kong_xiao_png, BinaryData::instrument_kong_xiao_pngSize },
+            { "instrument_kong_banhu.png", BinaryData::instrument_kong_banhu_png, BinaryData::instrument_kong_banhu_pngSize }
         };
         for (const auto& image : images)
             if (requested.endsWith(image.file))
@@ -1064,7 +1080,6 @@ void MainComponent::resized()
 
 void MainComponent::timerCallback()
 {
-    pollContainerOutputVerification();
     if (superLowLatencyRunning && ++superLowLatencyPollTicks >= 30)
     {
         superLowLatencyPollTicks = 0;
@@ -1103,7 +1118,7 @@ void MainComponent::timerCallback()
             && juce::Time::getMillisecondCounterHiRes() - lastPerformanceActivityMs > 3000.0;
         if (outputChanged)
             followSystemAudioOutputIfNeeded();
-        if (! outputChanged && safeToReconfigure && ! pluginLoading && ! containerOutputVerificationActive
+        if (! outputChanged && safeToReconfigure && ! pluginLoading
             && pluginHost.hasPlugin()
             && audio.needsAutomaticLatencyTuning()
             && audio.beginAutomaticLatencyTuning())
@@ -1981,42 +1996,6 @@ void MainComponent::cancelContainerInstrument()
     restoreToneBeforePresetEdit();
 }
 
-void MainComponent::beginContainerOutputVerification(
-    std::function<void(bool, const juce::String&)> completion)
-{
-    if (containerOutputVerificationActive)
-    {
-        pluginHost.setLatencyProbeActive(false);
-        if (containerOutputVerificationCompletion)
-            containerOutputVerificationCompletion(false, utf8("上一次空音验证已取消"));
-    }
-    audio.cancelAutomaticLatencyTuning();
-    containerOutputVerificationCompletion = std::move(completion);
-    containerOutputVerificationStartSignals = pluginHost.getSignalBlocks();
-    // Large KAI banks can take noticeably longer on an HDD. Keep probing
-    // silently instead of declaring success as soon as the graph is wired.
-    containerOutputVerificationDeadlineMs = juce::Time::getMillisecondCounterHiRes() + 30000.0;
-    containerOutputVerificationActive = true;
-    pluginHost.setLatencyProbeActive(true);
-}
-
-void MainComponent::pollContainerOutputVerification()
-{
-    if (! containerOutputVerificationActive) return;
-    const auto signalDetected = pluginHost.getSignalBlocks() >= containerOutputVerificationStartSignals + 3;
-    const auto timedOut = juce::Time::getMillisecondCounterHiRes() >= containerOutputVerificationDeadlineMs;
-    if (! signalDetected && ! timedOut) return;
-
-    containerOutputVerificationActive = false;
-    pluginHost.setLatencyProbeActive(false);
-    auto completion = std::move(containerOutputVerificationCompletion);
-    containerOutputVerificationCompletion = {};
-    if (completion)
-        completion(signalDetected, signalDetected
-            ? utf8("已确认空音有声音输出")
-            : utf8("空音已打开，但未检测到乐器声音。请重新打开原厂界面，检查乐器、MIDI 通道和第一组立体声输出。"));
-}
-
 void MainComponent::loadSelectedEffect()
 {
     const auto index = effectSelector.getSelectedId() - 1;
@@ -2432,13 +2411,11 @@ void MainComponent::captureToneBeforePresetEdit()
     editingReturnModelIndex = pluginHost.getCurrentInstrumentModelIndex();
     editingReturnToneParameters = pluginHost.captureToneParameters();
     editingReturnSamplerState = currentPluginBrand == "kong" ? pluginHost.captureKongState() : juce::MemoryBlock();
-    editingReturnContainerProjectState.reset();
     if (currentPluginBrand == "kong")
         for (const auto& preset : cachedPresets)
             if ((currentPresetId.isNotEmpty() && preset.id == currentPresetId)
                 || (currentPresetId.isEmpty() && preset.instrumentKey == currentInstrumentKey))
             {
-                editingReturnContainerProjectState = preset.containerProjectState;
                 break;
             }
     editingReturnToneSettings = masterOutput.getToneStyle();
@@ -2484,15 +2461,13 @@ void MainComponent::restoreToneBeforePresetEdit()
     const auto modelIndex = editingReturnModelIndex;
     const auto parameters = editingReturnToneParameters;
     const auto samplerState = editingReturnSamplerState;
-    const auto containerProjectState = editingReturnContainerProjectState;
     const auto toneSettings = editingReturnToneSettings;
     pluginLoading = true;
     pluginHost.loadAsync(chosen,
                          status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
                          status.bufferSize > 0 ? status.bufferSize : 128,
                          [this, presetId, presetName, styleId, brand, instrumentKey, instrumentName,
-                          programName, wasCustom, modelIndex, parameters, toneSettings, samplerState,
-                          containerProjectState]
+                          programName, wasCustom, modelIndex, parameters, toneSettings, samplerState]
                          (bool success, const juce::String& message)
                          {
                              pluginLoading = false;
@@ -2502,8 +2477,7 @@ void MainComponent::restoreToneBeforePresetEdit()
                              currentInstrumentChineseName = instrumentName;
                              if (brand == "kong")
                              {
-                                 if (containerProjectState.getSize() > 0) pluginHost.restoreContainerState(containerProjectState);
-                                 else if (samplerState.getSize() > 0) pluginHost.restoreKongState(samplerState);
+                                 if (samplerState.getSize() > 0) pluginHost.restoreKongState(samplerState);
                                  else if (programName.isNotEmpty()) pluginHost.selectProgramByAliases({ programName });
                              }
                              activatePluginOutput(message);
@@ -2522,6 +2496,11 @@ void MainComponent::restoreToneBeforePresetEdit()
 
 void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::String&)> completion)
 {
+    if (pluginLoading)
+    {
+        if (completion) completion(false, utf8("音源正在加载，请稍候，不要重复点击"));
+        return;
+    }
     const auto index = presetSelector.getSelectedId() - 1;
     if (! juce::isPositiveAndBelow(index, cachedPresets.size()))
     {
@@ -2590,14 +2569,13 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                              const auto isContainer = preset.containerInstrument || preset.pluginBrand == "kong";
                              if (isContainer)
                              {
-                                 // Prefer QinEngine's own compact KAM rack project. It contains the
-                                 // KAI bank, preset and routing that generic VST state may omit.
-                                 const auto restored = preset.containerProjectState.getSize() > 0
-                                     ? pluginHost.restoreContainerState(preset.containerProjectState)
-                                     : preset.samplerState.getSize() > 0
-                                     ? (preset.containerInstrument ? pluginHost.restoreContainerState(preset.samplerState)
-                                                                   : pluginHost.restoreKongState(preset.samplerState))
-                                     : preset.pluginProgramName.isNotEmpty() && pluginHost.selectProgramByAliases({ preset.pluginProgramName });
+                                 // setStateInformation only accepts state produced by the VST itself.
+                                 // A .KAM project is retained as portable metadata, but feeding its raw
+                                 // bytes into this API can block or crash QinEngine after an app restart.
+                                 const auto restored = preset.samplerState.getSize() > 0
+                                     ? pluginHost.restoreKongState(preset.samplerState)
+                                     : preset.pluginProgramName.isNotEmpty()
+                                         && pluginHost.selectProgramByAliases({ preset.pluginProgramName });
                                  if (! restored)
                                  {
                                      const auto error = utf8("此空音方案缺少可恢复的乐器状态，请重新定制保存");
@@ -2607,44 +2585,6 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                                  }
                              }
                              activatePluginOutput(message);
-                             if (isContainer)
-                             {
-                                 pluginStatus.setText(utf8("正在等待空音采样加载并验证声音……"),
-                                                      juce::dontSendNotification);
-                                 beginContainerOutputVerification(
-                                     [this, preset, completion](bool audible, const juce::String& verificationMessage)
-                                     {
-                                         if (! audible)
-                                         {
-                                             // Some Qin builds wrap their full VST state differently. If native
-                                             // KAM restore did not produce audio, retry the captured state once.
-                                             if (preset.containerProjectState.getSize() > 0
-                                                 && preset.samplerState.getSize() > 0
-                                                 && pluginHost.restoreContainerState(preset.samplerState))
-                                             {
-                                                 pluginStatus.setText(utf8("KAM 未出声，正在尝试完整状态……"),
-                                                                      juce::dontSendNotification);
-                                                 beginContainerOutputVerification(
-                                                     [this, preset, completion](bool fallbackAudible,
-                                                                                const juce::String& fallbackMessage)
-                                                     {
-                                                         if (fallbackAudible) completeLoadedPreset(preset, completion);
-                                                         else
-                                                         {
-                                                             pluginStatus.setText(fallbackMessage, juce::dontSendNotification);
-                                                             if (completion) completion(false, fallbackMessage);
-                                                         }
-                                                     });
-                                                 return;
-                                             }
-                                             pluginStatus.setText(verificationMessage, juce::dontSendNotification);
-                                             if (completion) completion(false, verificationMessage);
-                                             return;
-                                         }
-                                         completeLoadedPreset(preset, completion);
-                                     });
-                                 return;
-                             }
                              completeLoadedPreset(preset, completion);
                          });
 }
@@ -2683,7 +2623,7 @@ void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
     pluginHost.unloadEffect();
     effectStatus.setText(utf8("内置音色引擎已启用"), juce::dontSendNotification);
     if (completion) completion(true, preset.containerInstrument || preset.pluginBrand == "kong"
-        ? utf8("空音方案已载入并通过发声验证") : utf8("音色方案已载入"));
+        ? utf8("空音乐器状态已恢复，可以开始吹奏") : utf8("音色方案已载入"));
 }
 
 void MainComponent::activatePluginOutput(const juce::String& pluginName)

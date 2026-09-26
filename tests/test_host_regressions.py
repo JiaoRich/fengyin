@@ -242,8 +242,12 @@ class HostRegressionTests(unittest.TestCase):
         adapters = (ROOT / "native" / "Source" / "ContainerPluginAdapter.h").read_text(encoding="utf-8")
         self.assertIn('withEventListener("beginContainerInstrument"', MAIN)
         self.assertIn('withEventListener("commitContainerInstrument"', MAIN)
-        self.assertIn("beginContainerOutputVerification", MAIN)
-        self.assertIn("containerOutputVerificationStartSignals", MAIN_HEADER)
+        self.assertNotIn("beginContainerOutputVerification", MAIN)
+        self.assertNotIn("containerOutputVerificationStartSignals", MAIN_HEADER)
+        self.assertIn("preset.samplerState.getSize() > 0", MAIN)
+        self.assertIn("pluginHost.restoreKongState(preset.samplerState)", MAIN)
+        self.assertNotIn("pluginHost.restoreContainerState(preset.containerProjectState)", MAIN)
+        self.assertIn("不要重复点击", MAIN)
         self.assertIn("currentPresetId == preset.id", MAIN)
         self.assertIn("closePluginEditor(false)", MAIN)
         self.assertIn("captureContainerState", MAIN)
@@ -253,6 +257,11 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('"falcon"', adapters)
         self.assertIn('"three-body"', adapters)
         self.assertIn("inventory must not create", (ROOT / "tests" / "ui_next_version.cjs").read_text(encoding="utf-8"))
+
+    def test_packaged_web_runtime_contains_kong_instrument_artwork(self):
+        for filename in ("instrument_kong_erhu.png", "instrument_kong_dizi.png"):
+            self.assertGreaterEqual(MAIN.count(filename), 2,
+                f"{filename} must be copied to the runtime and served by the resource provider")
 
     def test_swam_instrument_models_support_continuous_vst3_selectors(self):
         self.assertIn("instrumentModelValues", HOST)
