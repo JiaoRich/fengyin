@@ -631,10 +631,16 @@ juce::String PluginHostEngine::getCurrentProgramName() const
 
 juce::MemoryBlock PluginHostEngine::captureKongState()
 {
-    juce::MemoryBlock state;
     if (! hasPlugin() || fengyin::SupportedInstrumentClassifier::classify(currentDescription.name,
         currentDescription.manufacturerName, currentDescription.fileOrIdentifier)
-            != fengyin::SupportedInstrumentClassifier::Brand::kong) return state;
+            != fengyin::SupportedInstrumentClassifier::Brand::kong) return {};
+    return captureContainerState();
+}
+
+juce::MemoryBlock PluginHostEngine::captureContainerState()
+{
+    juce::MemoryBlock state;
+    if (! hasPlugin()) return state;
     auto* manager = attachedManager;
     detach();
     getPlugin()->getStateInformation(state);
@@ -648,6 +654,12 @@ bool PluginHostEngine::restoreKongState(const juce::MemoryBlock& state)
         || fengyin::SupportedInstrumentClassifier::classify(currentDescription.name,
             currentDescription.manufacturerName, currentDescription.fileOrIdentifier)
             != fengyin::SupportedInstrumentClassifier::Brand::kong) return false;
+    return restoreContainerState(state);
+}
+
+bool PluginHostEngine::restoreContainerState(const juce::MemoryBlock& state)
+{
+    if (! hasPlugin() || state.getSize() == 0 || state.getSize() > 16 * 1024 * 1024) return false;
     auto* manager = attachedManager;
     detach();
     getPlugin()->setStateInformation(state.getData(), static_cast<int>(state.getSize()));

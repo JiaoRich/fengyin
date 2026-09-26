@@ -14,6 +14,7 @@
 #include "MasterOutputService.h"
 #include "ToneStyleCatalog.h"
 #include "KongInstrumentCatalog.h"
+#include "ContainerPluginAdapter.h"
 #include "TechniqueAdvisor.h"
 #include "VideoAudioExtractor.h"
 
@@ -44,6 +45,9 @@ private:
     void refreshPluginChoices();
     void loadSelectedPlugin();
     void loadKongInstrument(const juce::String& instrumentKey, const juce::String& instrumentName);
+    void beginContainerInstrument(const juce::String& adapter);
+    void commitContainerInstrument(const juce::String& name);
+    void cancelContainerInstrument();
     void loadSelectedEffect();
     void removeEffect();
     void useTestSynth();
@@ -156,6 +160,9 @@ private:
     juce::String currentPresetDisplayName;
     juce::String currentPresetId;
     bool currentPresetIsCustom = false;
+    bool containerInstrumentDraftActive = false;
+    juce::String containerInstrumentDraftAdapter;
+    juce::MemoryBlock containerInstrumentStateBeforeSelection;
     fengyin::ToneStyleSettings currentBaseToneSettings;
     int currentSwamToneParameterCount = 0;
     juce::Array<juce::PluginDescription> cachedInstrumentPlugins;

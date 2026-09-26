@@ -51,6 +51,7 @@
   <style>
     .custom-tone-empty{display:grid;min-height:440px;place-items:center}.custom-tone-empty[hidden],.custom-tone-editor[hidden],.custom-tone-step[hidden]{display:none!important}
     .custom-tone-empty .primary-button{min-width:240px;min-height:62px;border:1px solid var(--accent);border-radius:18px;background:linear-gradient(135deg,var(--accent),var(--accent-2));box-shadow:0 12px 34px var(--glow);color:#fff;font-size:18px;font-weight:800;cursor:pointer}
+    .container-instrument-dialog{width:min(560px,calc(100vw - 48px))}.container-instrument-dialog h2{margin:0 0 8px}.container-instrument-dialog p{margin:0;color:var(--muted);line-height:1.65}.container-instrument-steps{display:grid;gap:9px;margin:18px 0;padding:14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.035)}.container-instrument-steps span{display:flex;gap:9px;align-items:flex-start;color:var(--text);font-size:13px}.container-instrument-steps b{display:grid;flex:0 0 22px;width:22px;height:22px;place-items:center;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:11px}.container-instrument-dialog input{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#0d1d30;color:var(--text);font:inherit}.container-instrument-status{min-height:20px;margin-top:10px!important;color:var(--accent)!important;font-size:12px}.container-instrument-dialog .primary-button:disabled{opacity:.45;cursor:wait}
     .custom-tone-editor{display:grid;gap:16px;max-width:1080px}.custom-tone-step{padding:20px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.025)}.custom-tone-step>span{color:var(--accent);font-size:11px}.custom-tone-step h3{margin:3px 0 14px}.custom-source-row{display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:10px}.custom-source-row select,.custom-source-row button{min-height:48px;border:1px solid var(--line);border-radius:12px;background:#10243a;color:var(--text);padding:0 14px;font:inherit}.custom-source-row button:not(:disabled){border-color:var(--accent);cursor:pointer}.custom-source-row button:disabled{opacity:.38}.custom-tone-step .load-state{display:block;margin-top:10px;color:var(--muted);font-size:12px}.custom-tone-step .load-state.loaded{color:var(--good)}
     @media(max-width:760px){.preset-grid{grid-template-columns:1fr}.custom-source-row{grid-template-columns:1fr}.technique-list{grid-template-columns:1fr}}
   </style>
@@ -194,7 +195,7 @@
         <div class="audio-setting"><label for="audio-rate-select">采样率</label><select id="audio-rate-select"><option value="48000">48000 Hz（推荐）</option></select><small id="audio-rate-help">伴奏视频和软音源统一使用 48000 Hz</small></div>
         <div class="audio-setting"><label for="audio-buffer-select">缓冲区</label><select id="audio-buffer-select"><option value="128">128（推荐）</option></select><small id="audio-buffer-help">128 延迟低；出现爆音时可改为 256</small></div>
       </div><div class="audio-summary"><div><span>当前预计延迟</span><strong class="green" id="audio-latency-value">正在检测…</strong></div><p id="audio-apply-status">首次启动和更换耳机、音响或声卡后会自动完成稳定性预检。</p><button id="audio-auto-optimize" type="button">智能优化</button></div></div></section>
-      <section class="page" id="page-settings"><div class="panel glass"><div class="activation"><div><p>试用与永久授权</p><h3 id="license-title">可开始3天完整试用</h3><div class="machine-code-row"><span id="machine-code">本机识别码：FY-8K2M-4R7P</span><button id="copy-machine-code" type="button">复制机器码</button></div></div><div class="license-actions"><button id="start-trial" type="button">开始3天完整试用</button><input id="license-code" placeholder="请输入唯一激活码"><button id="activate" class="primary-button">永久激活</button></div></div><div class="settings-grid"><label class="toggle-row">智能音频优化（推荐）<input id="smart-audio" type="checkbox" checked><i></i></label><label class="toggle-row">低性能电脑模式<input id="low-performance" type="checkbox"><i></i></label><label class="toggle-row">启动时进入演奏页面<input type="checkbox" checked><i></i></label><label class="toggle-row">自动保存设置<input type="checkbox" checked><i></i></label><label class="toggle-row">检查软件更新<input type="checkbox" checked><i></i></label></div><p class="prototype-note">风吟 0.15.0 · 本地运行，不会保存或上传个人资料。</p></div></section>
+      <section class="page" id="page-settings"><div class="panel glass"><div class="activation"><div><p>试用与永久授权</p><h3 id="license-title">可开始3天完整试用</h3><div class="machine-code-row"><span id="machine-code">本机识别码：FY-8K2M-4R7P</span><button id="copy-machine-code" type="button">复制机器码</button></div></div><div class="license-actions"><button id="start-trial" type="button">开始3天完整试用</button><input id="license-code" placeholder="请输入唯一激活码"><button id="activate" class="primary-button">永久激活</button></div></div><div class="settings-grid"><label class="toggle-row">智能音频优化（推荐）<input id="smart-audio" type="checkbox" checked><i></i></label><label class="toggle-row">低性能电脑模式<input id="low-performance" type="checkbox"><i></i></label><label class="toggle-row">启动时进入演奏页面<input type="checkbox" checked><i></i></label><label class="toggle-row">自动保存设置<input type="checkbox" checked><i></i></label><label class="toggle-row">检查软件更新<input type="checkbox" checked><i></i></label></div><p class="prototype-note">风吟 0.15.1 · 本地运行，不会保存或上传个人资料。</p></div></section>
     </main>
   </div>
   <div class="license-lock" id="license-lock" hidden>
@@ -247,7 +248,17 @@
   <div class="dialog-backdrop" id="preset-name-dialog" hidden>
     <section class="technique-dialog name-dialog" role="dialog" aria-modal="true" aria-labelledby="preset-name-title"><h2 id="preset-name-title">给新方案起个名字</h2><input id="preset-name-input" type="text" autocomplete="off" placeholder="例如：我的抒情高音萨克斯"><div class="dialog-actions"><button id="cancel-preset-name" type="button">取消</button><button id="confirm-preset-name" class="primary-button" type="button">保存</button></div></section>
   </div>
+  <div class="dialog-backdrop" id="container-instrument-dialog" hidden>
+    <section class="technique-dialog container-instrument-dialog" role="dialog" aria-modal="true" aria-labelledby="container-instrument-title">
+      <h2 id="container-instrument-title">添加空音乐器</h2>
+      <p>风吟会保存您在原厂音源中实际选择的乐器，保存后即可从音色方案直接演奏。</p>
+      <div class="container-instrument-steps"><span><b>1</b>在空音窗口点击“＋”，选择一个想演奏的乐器</span><span><b>2</b>确认 MIDI 通道和第一组立体声输出</span><span><b>3</b>回到这里填写乐器名称并完成添加</span></div>
+      <input id="container-instrument-name" type="text" autocomplete="off" placeholder="例如：二胡、古筝、竹笛">
+      <p class="container-instrument-status" id="container-instrument-status">正在打开 QinEngineV3……</p>
+      <div class="dialog-actions"><button id="cancel-container-instrument" type="button">取消</button><button id="confirm-container-instrument" class="primary-button" type="button" disabled>完成添加</button></div>
+    </section>
+  </div>
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=0131-adapter-review"></script>
+  <script src="app.js?v=0151-container-instruments"></script>
 </body>
 </html>

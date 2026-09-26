@@ -236,6 +236,19 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('name.contains("portamento")', HOST)
         self.assertIn('name.contains("bowpressure")', HOST)
 
+    def test_container_instruments_are_created_only_after_user_selection(self):
+        preset = (ROOT / "native" / "Source" / "SoundPresetStore.h").read_text(encoding="utf-8")
+        adapters = (ROOT / "native" / "Source" / "ContainerPluginAdapter.h").read_text(encoding="utf-8")
+        self.assertIn('withEventListener("beginContainerInstrument"', MAIN)
+        self.assertIn('withEventListener("commitContainerInstrument"', MAIN)
+        self.assertIn("captureContainerState", MAIN)
+        self.assertIn("containerInstrument", preset)
+        self.assertIn('"kong-v3"', adapters)
+        self.assertIn('"kontakt"', adapters)
+        self.assertIn('"falcon"', adapters)
+        self.assertIn('"three-body"', adapters)
+        self.assertIn("inventory must not create", (ROOT / "tests" / "ui_next_version.cjs").read_text(encoding="utf-8"))
+
     def test_swam_instrument_models_support_continuous_vst3_selectors(self):
         self.assertIn("instrumentModelValues", HOST)
         self.assertIn("for (int index = 0; index <= 512; ++index)", HOST)

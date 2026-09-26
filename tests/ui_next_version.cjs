@@ -93,12 +93,26 @@ const path = require('node:path');
     assert.ok((await page.locator('#preset-grid').innerText()).includes('D:\\音乐 & 自选库'));
     await page.locator('[data-action="kong-library"]').click();
     assert.equal(await page.evaluate(()=>window.sent.filter(x=>x.name==='chooseKongLibrary').length),2);
-    assert.equal(await page.locator('.instrument-preset-card').count(),2,'KAI inventory must create named cards');
-    assert.equal(await page.locator('.instrument-preset-card button').filter({hasText:'待适配'}).count(),2,
-      'inventory cards must not pretend to be playable');
+    assert.equal(await page.locator('.instrument-preset-card').count(),0,
+      'KAI inventory must not create misleading playable instrument cards');
+    await page.locator('[data-action="add-container-instrument"]').click();
+    assert.equal(await page.evaluate(()=>window.sent.filter(x=>x.name==='beginContainerInstrument').length),1);
+    await page.evaluate(()=>window.listeners.containerInstrumentResult({success:true,stage:'ready',message:'请选择乐器'}));
+    await page.locator('#container-instrument-name').fill('二胡');
+    await page.locator('#confirm-container-instrument').click();
+    assert.deepEqual(await page.evaluate(()=>window.sent.filter(x=>x.name==='commitContainerInstrument').at(-1)?.payload),{name:'二胡'});
+    await page.evaluate(()=>window.listeners.containerInstrumentResult({success:true,stage:'saved',message:'已添加：二胡'}));
+    await page.evaluate(()=>{
+      window.testState.presets=[{id:'kong-user-1',name:'原厂音色',brand:'kong',pluginId:'qin-test',
+        instrumentKey:'container:kong-v3:kong-user-1',instrumentChineseName:'二胡',containerInstrument:true,containerAdapter:'kong-v3'}];
+      window.listeners.backendState(window.testState);
+    });
+    assert.equal(await page.locator('.instrument-preset-card').count(),1,'only user-created Qin instruments become cards');
+    assert.equal(await page.locator('.instrument-preset-card h3').innerText(),'二胡');
+    assert.equal(await page.locator('.instrument-preset-card button').filter({hasText:'待适配'}).count(),0);
     await page.evaluate(()=>{
       window.testState.pluginLoaded=true; window.testState.pluginBrand='kong';
-      window.testState.instrumentKey='kong-erhu-2'; window.testState.instrumentChineseName='二胡二';
+      window.testState.instrumentKey='container:kong-v3:kong-user-1'; window.testState.instrumentChineseName='二胡';
       window.testState.instrumentModels=[]; window.listeners.backendState(window.testState);
     });
     await page.locator('[data-page="play"]').click();

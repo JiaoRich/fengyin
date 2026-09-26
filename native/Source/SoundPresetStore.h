@@ -22,7 +22,11 @@ struct SoundPreset
     juce::String instrumentKey;
     juce::String instrumentChineseName;
     juce::String pluginProgramName;
-    juce::MemoryBlock samplerState; // Qin sample assignments are not VST program names.
+    // Full state for a user-created instrument inside a container plug-in.  Qin is
+    // the first adapter; Kontakt/Falcon and other containers use the same field.
+    juce::MemoryBlock samplerState;
+    bool containerInstrument = false;
+    juce::String containerAdapter;
     bool customTone = false;
     float compressionThreshold = 0.58f;
     float compressionRatio = 1.7f;

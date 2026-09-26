@@ -338,9 +338,22 @@ function isSupportedInstrument(item = {}) {
 
 function showInstrumentArtwork(key, chineseName = '') {
   const picture = $('#instrument-picture');
-  if (key.startsWith('kong-')) {
+  if (key.startsWith('kong-') || key.startsWith('container:kong-v3:')) {
     currentArtworkKey = key;
-    const artwork = kongInstrumentArtwork[key];
+    const name = String(chineseName || '').toLowerCase();
+    const artwork = kongInstrumentArtwork[key]
+      || (/二胡|高胡|中胡|马头琴/.test(name) ? 'instrument_kong_erhu.png'
+        : /板胡|京胡/.test(name) ? 'instrument_kong_banhu.png'
+        : /古筝/.test(name) ? 'instrument_kong_guzheng.png'
+        : /古琴/.test(name) ? 'instrument_kong_guqin.png'
+        : /琵琶/.test(name) ? 'instrument_kong_pipa.png'
+        : /扬琴/.test(name) ? 'instrument_kong_yangqin.png'
+        : /中阮|阮|柳琴|三弦/.test(name) ? 'instrument_kong_ruan.png'
+        : /唢呐/.test(name) ? 'instrument_kong_suona.png'
+        : /葫芦丝/.test(name) ? 'instrument_kong_hulusi.png'
+        : /笙/.test(name) ? 'instrument_kong_sheng.png'
+        : /箫/.test(name) ? 'instrument_kong_xiao.png'
+        : /笛|巴乌|管子|埙/.test(name) ? 'instrument_kong_dizi.png' : null);
     picture.hidden = !artwork;
     if (artwork) {
       picture.src = `../assets/instruments/${artwork}`;
@@ -348,7 +361,7 @@ function showInstrumentArtwork(key, chineseName = '') {
     } else picture.removeAttribute('src');
     $('#instrument-art').classList.remove('empty');
     $('#instrument-art').classList.toggle('folk', !artwork);
-    $('#instrument-empty').querySelector('span').textContent = kongPresets.find(item => item[1] === key)?.[2] || '乐';
+    $('#instrument-empty').querySelector('span').textContent = kongPresets.find(item => item[1] === key)?.[2] || chineseName?.slice(0,1) || '乐';
     $('#instrument-empty').querySelector('strong').textContent = chineseName;
     $('#instrument-empty').querySelector('small').textContent = '空音 Qin Engine V3 · 气息与技巧已适配';
     $('.breath-track').classList.remove('inactive');
@@ -850,23 +863,18 @@ function renderPresets() {
     return;
   }
   updateLibraryContext();
-  const installedKong = Array.isArray(latestBackendState.kongInstruments) ? latestBackendState.kongInstruments : [];
-  const inventoriedKong = Array.isArray(latestBackendState.kongLibrary?.instruments) ? latestBackendState.kongLibrary.instruments : [];
-  const create = '<button class="preset preset-create" data-action="create"><i aria-hidden="true">＋</i><h3>定制我的音色</h3><b>选择音源并实时试听</b></button>';
+  const create = activeLibraryTab === 'kong'
+    ? '<button class="preset preset-create" data-action="add-container-instrument"><i aria-hidden="true">＋</i><h3>添加空音乐器</h3><b>在原厂界面选择后创建</b></button>'
+    : '<button class="preset preset-create" data-action="create"><i aria-hidden="true">＋</i><h3>定制我的音色</h3><b>选择音源并实时试听</b></button>';
   const swamCards = availableInstruments.map((instrument,pluginIndex)=>({instrument,pluginIndex}))
     .filter(({instrument}) => instrument.brand === 'swam' || instrument.isSwam === true)
     .map(({instrument,pluginIndex}) => ({key:instrument.instrumentKey || inferInstrumentKey(instrument.name),name:instrument.chineseName || instrument.name,originalName:instrument.label || instrument.name,pluginIndex,brand:'swam'}));
-  const kongCards = installedKong.map((instrument,kongIndex)=>({key:instrument.key,name:instrument.name,originalName:instrument.pluginName || instrument.originalName || `空音 Qin Engine V3 · ${instrument.name}`,program:instrument.program,kongIndex,brand:'kong'}));
-  for (const item of inventoriedKong) {
-    if (kongCards.some(card=>card.key===item.key)) continue;
-    kongCards.push({key:item.key,name:item.name,originalName:`${item.file} · ${item.recognised?'已识别音色库':'名称待确认'}`,
-      brand:'kong',inventoryOnly:true});
-  }
+  const kongCards = [];
   for (const preset of savedPresets) {
     if (preset.brand !== 'kong' || !preset.instrumentKey || kongCards.some(card=>card.key===preset.instrumentKey)) continue;
     const plugin=availableInstruments.find(item=>item.brand==='kong' && item.pluginId===preset.pluginId);
     if (plugin) kongCards.push({key:preset.instrumentKey,name:preset.instrumentChineseName || '空音自定义音色',
-      originalName:plugin.name,brand:'kong',customOnly:true});
+      originalName:`${plugin.name} · 用户添加`,brand:'kong',customOnly:true,containerInstrument:!!preset.containerInstrument});
   }
   const rawCards = (activeLibraryTab === 'kong' ? kongCards : swamCards).filter((item,index,array)=>array.findIndex(other=>other.key===item.key)===index);
   const storedOrder = Array.isArray(latestBackendState.instrumentCardOrder)
@@ -880,9 +888,7 @@ function renderPresets() {
   const instrumentCards = cards.map(card => {
     const customs = savedPresets.map((preset,index)=>({preset,index})).filter(({preset})=>preset.instrumentKey===card.key)
       .map(({preset,index})=>({id:`custom:${preset.id ?? index}`,name:preset.name,custom:true,presetIndex:index}));
-    const builtins = card.customOnly ? [] : card.inventoryOnly
-      ? [{id:'inventory',name:'尚未建立可演奏方案',custom:false,presetIndex:-1,inventoryOnly:true}]
-      : toneStylesForInstrument(card.key).map(style=>({...style,custom:false,presetIndex:-1}));
+    const builtins = card.customOnly ? [] : toneStylesForInstrument(card.key).map(style=>({...style,custom:false,presetIndex:-1}));
     const tones = [...customs,...builtins];
     const activeId = latestBackendState.activeToneVariantId;
     if (!presetCardToneIndex.has(card.key)) {
@@ -895,8 +901,8 @@ function renderPresets() {
     const active = activeId === (tone.custom ? tone.id : `builtin:${card.key}:${tone.id}`);
     return `<section class="instrument-preset-card compact ${active?'active':''}" data-card-key="${escapeHtml(card.key)}" draggable="true" title="按住卡片空白处可拖动排序">
       <header><h3>${escapeHtml(card.name)}</h3><small class="plugin-original-name">${escapeHtml(card.originalName)}</small><span class="card-drag-handle" aria-label="拖动调整位置">⠿</span></header>
-      <div class="preset-variant-stepper"><button data-action="tone-prev" type="button" aria-label="上一个音色" ${tone.inventoryOnly?'disabled':''}>‹</button><div class="preset-variant-current"><strong>${escapeHtml(tone.name)}</strong><small>${tone.custom?'我的方案':tone.inventoryOnly?'音色库已识别':'默认方案'}</small></div><button data-action="tone-next" type="button" aria-label="下一个音色" ${tone.inventoryOnly?'disabled':''}>›</button></div>
-      <div class="preset-card-actions"><button data-action="${tone.custom?'perform-custom':'perform-builtin'}" data-preset-index="${tone.presetIndex}" data-plugin-index="${card.pluginIndex ?? -1}" data-kong-index="${card.kongIndex ?? -1}" data-style-id="${escapeHtml(tone.id)}" ${tone.inventoryOnly?'disabled':''}>${tone.inventoryOnly?'待适配':'演奏'}</button><button data-action="edit-custom" data-preset-index="${tone.presetIndex}" ${tone.custom?'':'disabled'}>编辑</button><button data-action="delete-custom" data-preset-index="${tone.presetIndex}" ${tone.custom?'':'disabled'}>删除</button></div>
+      <div class="preset-variant-stepper"><button data-action="tone-prev" type="button" aria-label="上一个音色">‹</button><div class="preset-variant-current"><strong>${escapeHtml(tone.name)}</strong><small>${tone.custom?'我的方案':'默认方案'}</small></div><button data-action="tone-next" type="button" aria-label="下一个音色">›</button></div>
+      <div class="preset-card-actions"><button data-action="${tone.custom?'perform-custom':'perform-builtin'}" data-preset-index="${tone.presetIndex}" data-plugin-index="${card.pluginIndex ?? -1}" data-style-id="${escapeHtml(tone.id)}">演奏</button><button data-action="edit-custom" data-preset-index="${tone.presetIndex}" ${tone.custom?'':'disabled'}>编辑</button><button data-action="delete-custom" data-preset-index="${tone.presetIndex}" ${tone.custom?'':'disabled'}>删除</button></div>
     </section>`;
   }).join('');
   const library = latestBackendState.kongLibrary || {};
@@ -915,13 +921,21 @@ function renderPresets() {
       toast('正在扫描本机音源…');
       return;
     }
+    if (action === 'add-container-instrument') {
+      $('#container-instrument-dialog').hidden=false;
+      $('#container-instrument-name').value='';
+      $('#container-instrument-status').textContent='正在打开 QinEngineV3……';
+      $('#confirm-container-instrument').disabled=true;
+      nativeEvent('beginContainerInstrument',{adapter:'kong-v3'});
+      return;
+    }
     if (action === 'create') {
       editingPresetName=''; showPage('chain'); enterCustomToneCreate(); return;
     }
     if (action === 'tone-prev' || action === 'tone-next') {
       const card=button.closest('.instrument-preset-card'); const key=card.dataset.cardKey;
       const targetCard=cards.find(item=>item.key===key);
-      const count=(targetCard?.customOnly ? 0 : targetCard?.inventoryOnly ? 1 : toneStylesForInstrument(key).length)+savedPresets.filter(preset=>preset.instrumentKey===key).length;
+      const count=(targetCard?.customOnly ? 0 : toneStylesForInstrument(key).length)+savedPresets.filter(preset=>preset.instrumentKey===key).length;
       const offset=action==='tone-next'?1:-1; presetCardToneIndex.set(key,((presetCardToneIndex.get(key)||0)+offset+count)%count);
       renderPresets(); return;
     }
@@ -940,9 +954,7 @@ function renderPresets() {
     if (action === 'perform-builtin') {
       const styleId=button.dataset.styleId;
       pendingPresetNavigation={kind:'plugin',name:button.closest('.instrument-preset-card').querySelector('h3').textContent,styleId};
-      if (Number(button.dataset.kongIndex)>=0) {
-        const item=installedKong[Number(button.dataset.kongIndex)]; nativeEvent('loadKongInstrument',{instrumentKey:item.key,instrumentName:item.name});
-      } else nativeEvent('loadPlugin',{index:Number(button.dataset.pluginIndex)});
+      nativeEvent('loadPlugin',{index:Number(button.dataset.pluginIndex)});
       return toast('正在载入音色…');
     }
   }));
@@ -1760,6 +1772,31 @@ $('#copy-machine-code').addEventListener('click', () => {
   toast('机器码已复制，请发送给安装人员');
 });
 window.__JUCE__?.backend?.addEventListener('kongLibraryResult', result => toast(result?.message || '音色库位置已更新'));
+$('#cancel-container-instrument')?.addEventListener('click', () => {
+  nativeEvent('cancelContainerInstrument');
+  $('#container-instrument-dialog').hidden=true;
+});
+$('#confirm-container-instrument')?.addEventListener('click', () => {
+  const name=$('#container-instrument-name').value.trim();
+  if (!name) return toast('请填写乐器名称');
+  $('#confirm-container-instrument').disabled=true;
+  $('#container-instrument-status').textContent='正在保存原厂乐器状态……';
+  nativeEvent('commitContainerInstrument',{name});
+});
+window.__JUCE__?.backend?.addEventListener('containerInstrumentResult', result => {
+  const status=$('#container-instrument-status');
+  if (status) status.textContent=result?.message || '';
+  if (result?.stage === 'ready') {
+    $('#confirm-container-instrument').disabled=false;
+    $('#container-instrument-name').focus();
+  } else if (result?.stage === 'saved' && result?.success) {
+    $('#container-instrument-dialog').hidden=true;
+    toast(result.message || '空音乐器已添加');
+  } else if (!result?.success) {
+    $('#confirm-container-instrument').disabled=false;
+    toast(result?.message || '空音乐器添加失败');
+  }
+});
 window.__JUCE__?.backend?.addEventListener('pluginLoadResult', result => {
   if (result?.success) expertDirty = false;
   if (!pendingPresetNavigation || !['plugin','custom-create'].includes(pendingPresetNavigation.kind)) return;
@@ -1896,7 +1933,7 @@ nativeEvent('webReady');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 0.15.0 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 0.15.1 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

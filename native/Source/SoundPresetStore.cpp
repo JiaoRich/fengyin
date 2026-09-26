@@ -103,7 +103,9 @@ std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<Soun
         child->setAttribute("instrumentKey", preset.instrumentKey);
         child->setAttribute("instrumentChineseName", preset.instrumentChineseName);
         child->setAttribute("pluginProgramName", preset.pluginProgramName);
-        if (preset.pluginBrand == "kong" && preset.samplerState.getSize() > 0)
+        child->setAttribute("containerInstrument", preset.containerInstrument);
+        child->setAttribute("containerAdapter", preset.containerAdapter);
+        if ((preset.containerInstrument || preset.pluginBrand == "kong") && preset.samplerState.getSize() > 0)
             child->createNewChildElement("SAMPLER_STATE")->addTextElement(preset.samplerState.toBase64Encoding());
         child->setAttribute("customTone", preset.customTone);
         child->setAttribute("compressionThreshold", static_cast<double>(preset.compressionThreshold));
@@ -149,7 +151,9 @@ juce::Array<SoundPreset> SoundPresetStore::fromXml(const juce::XmlElement& root)
         preset.instrumentKey = child->getStringAttribute("instrumentKey");
         preset.instrumentChineseName = child->getStringAttribute("instrumentChineseName");
         preset.pluginProgramName = child->getStringAttribute("pluginProgramName");
-        if (preset.pluginBrand == "kong")
+        preset.containerInstrument = child->getBoolAttribute("containerInstrument", false);
+        preset.containerAdapter = child->getStringAttribute("containerAdapter");
+        if (preset.containerInstrument || preset.pluginBrand == "kong")
             if (const auto* state = child->getChildByName("SAMPLER_STATE"))
             {
                 const auto encoded = state->getAllSubText();

@@ -266,6 +266,20 @@ void MainComponent::setupWebInterface()
                 loadKongInstrument(payload.getProperty("instrumentKey", {}).toString(),
                                    payload.getProperty("instrumentName", {}).toString());
         })
+        .withEventListener("beginContainerInstrument", [this](juce::var payload)
+        {
+            if (isActivated)
+                beginContainerInstrument(payload.getProperty("adapter", "kong-v3").toString());
+        })
+        .withEventListener("commitContainerInstrument", [this](juce::var payload)
+        {
+            if (isActivated)
+                commitContainerInstrument(payload.getProperty("name", {}).toString().trim());
+        })
+        .withEventListener("cancelContainerInstrument", [this](juce::var)
+        {
+            cancelContainerInstrument();
+        })
         .withEventListener("openPlugin", [this](juce::var)
         {
             const auto opened = isActivated && pluginHost.showPluginEditor(false);
@@ -1372,6 +1386,8 @@ void MainComponent::timerCallback()
             item->setProperty("instrumentChineseName", preset.instrumentChineseName);
             item->setProperty("customTone", preset.customTone);
             item->setProperty("baseToneStyleId", preset.baseToneStyleId);
+            item->setProperty("containerInstrument", preset.containerInstrument);
+            item->setProperty("containerAdapter", preset.containerAdapter);
             presets.add(juce::var(item.release()));
         }
         state->setProperty("presets", juce::var(presets));
@@ -1708,6 +1724,178 @@ void MainComponent::loadKongInstrument(const juce::String& instrumentKey, const 
         });
 }
 
+void MainComponent::beginContainerInstrument(const juce::String& adapter)
+{
+    const auto emit = [this](bool success, const juce::String& stage, const juce::String& message)
+    {
+        if (webInterface == nullptr) return;
+        auto result = std::make_unique<juce::DynamicObject>();
+        result->setProperty("success", success);
+        result->setProperty("stage", stage);
+        result->setProperty("message", message);
+        webInterface->emitEventIfBrowserIsVisible("containerInstrumentResult", juce::var(result.release()));
+    };
+    if (pluginLoading) { emit(false, "error", utf8("音源正在加载，请稍候重试")); return; }
+    const auto* adapterDefinition = fengyin::ContainerPluginAdapterCatalog::find(adapter);
+    if (adapterDefinition == nullptr || ! adapterDefinition->enabled)
+    {
+        emit(false, "error", utf8("该容器音源适配器尚未启用"));
+        return;
+    }
+
+    juce::PluginDescription chosen;
+    bool found = false;
+    for (const auto& candidate : cachedInstrumentPlugins)
+        if (fengyin::SupportedInstrumentClassifier::classify(candidate.name, candidate.manufacturerName,
+                                                              candidate.fileOrIdentifier)
+            == fengyin::SupportedInstrumentClassifier::Brand::kong)
+        {
+            chosen = candidate;
+            found = true;
+            break;
+        }
+    if (! found)
+    {
+        emit(false, "error", utf8("没有找到 QinEngineV3，请先扫描音源"));
+        return;
+    }
+
+    captureToneBeforePresetEdit();
+    const auto ready = [this, emit]()
+    {
+        currentPluginBrand = "kong";
+        currentInstrumentKey = "container-draft";
+        currentInstrumentChineseName = utf8("正在添加空音乐器");
+        currentPresetDisplayName.clear();
+        currentPresetId.clear();
+        currentPresetIsCustom = false;
+        containerInstrumentDraftActive = true;
+        containerInstrumentDraftAdapter = "kong-v3";
+        containerInstrumentStateBeforeSelection = pluginHost.captureContainerState();
+        activatePluginOutput(pluginHost.getPluginName());
+        const auto opened = pluginHost.showPluginEditor(false);
+        emit(opened, opened ? "ready" : "error", opened
+            ? utf8("请在空音窗口点击“＋”并选择乐器，完成后返回风吟")
+            : utf8("无法打开空音原厂界面"));
+    };
+
+    // Always create a fresh container instance. Reusing the currently sounding
+    // instance would retain its slots and could make two instruments respond to
+    // the same MIDI channel after the user presses “+”.
+    const auto status = audio.getStatus();
+    pluginLoading = true;
+    emit(true, "loading", utf8("正在打开 QinEngineV3……"));
+    pluginHost.loadAsync(chosen, status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
+        status.bufferSize > 0 ? status.bufferSize : 128,
+        [this, ready, emit](bool success, const juce::String& message)
+        {
+            pluginLoading = false;
+            if (! success)
+            {
+                emit(false, "error", utf8("空音加载失败：") + message);
+                restoreToneBeforePresetEdit();
+                return;
+            }
+            ready();
+        });
+}
+
+void MainComponent::commitContainerInstrument(const juce::String& name)
+{
+    const auto emit = [this](bool success, const juce::String& stage, const juce::String& message)
+    {
+        if (webInterface == nullptr) return;
+        auto result = std::make_unique<juce::DynamicObject>();
+        result->setProperty("success", success);
+        result->setProperty("stage", stage);
+        result->setProperty("message", message);
+        webInterface->emitEventIfBrowserIsVisible("containerInstrumentResult", juce::var(result.release()));
+    };
+    if (! containerInstrumentDraftActive || ! pluginHost.hasPlugin())
+    {
+        emit(false, "error", utf8("添加流程已失效，请重新点击“添加空音乐器”"));
+        return;
+    }
+    if (name.isEmpty()) { emit(false, "error", utf8("请填写乐器名称")); return; }
+    for (const auto& existing : cachedPresets)
+        if (existing.containerInstrument && existing.pluginBrand == "kong"
+            && existing.instrumentChineseName.equalsIgnoreCase(name))
+        {
+            emit(false, "error", utf8("已经添加过同名乐器，请换一个名称"));
+            return;
+        }
+
+    const auto state = pluginHost.captureContainerState();
+    if (state.getSize() == 0)
+    {
+        emit(false, "error", utf8("没有读取到空音乐器状态，请在原厂界面重新选择乐器"));
+        return;
+    }
+    const auto unchanged = state.getSize() == containerInstrumentStateBeforeSelection.getSize()
+        && (state.getSize() == 0 || std::memcmp(state.getData(), containerInstrumentStateBeforeSelection.getData(),
+                                                state.getSize()) == 0);
+    if (unchanged)
+    {
+        emit(false, "error", utf8("尚未检测到新乐器，请先在空音窗口点击“＋”选择乐器"));
+        return;
+    }
+
+    fengyin::SoundPreset preset;
+    preset.id = juce::Uuid().toString();
+    preset.name = utf8("原厂音色");
+    preset.pluginIdentifier = pluginHost.getPluginIdentifier();
+    preset.pluginBrand = "kong";
+    preset.containerInstrument = true;
+    preset.containerAdapter = containerInstrumentDraftAdapter;
+    preset.instrumentKey = "container:" + containerInstrumentDraftAdapter + ":" + preset.id;
+    preset.instrumentChineseName = name;
+    preset.samplerState = state;
+    preset.customTone = true;
+    preset.baseToneStyleId = "natural";
+    preset.toneStyleId = "natural";
+    const auto settings = masterOutput.getToneStyle();
+    preset.eqTone = settings.tone;
+    preset.warmth = settings.warmth;
+    preset.reverbMix = settings.reverbMix;
+    preset.compressionThreshold = settings.compressionThreshold;
+    preset.compressionRatio = settings.compressionRatio;
+    preset.saturation = settings.saturation;
+    preset.harshControl = settings.harshControl;
+    preset.reverbRoomSize = settings.reverbRoomSize;
+    preset.reverbDamping = settings.reverbDamping;
+    preset.reverbWidth = settings.reverbWidth;
+    preset.outputGain = settings.outputGain;
+    preset.bass = settings.bass;
+    if (! presetStore.save(preset))
+    {
+        emit(false, "error", utf8("保存失败，请检查磁盘空间"));
+        return;
+    }
+
+    currentPluginBrand = "kong";
+    currentInstrumentKey = preset.instrumentKey;
+    currentInstrumentChineseName = name;
+    currentPresetDisplayName = preset.name;
+    currentPresetId = preset.id;
+    currentPresetIsCustom = true;
+    containerInstrumentDraftActive = false;
+    containerInstrumentDraftAdapter.clear();
+    containerInstrumentStateBeforeSelection.reset();
+    editingReturnValid = false;
+    refreshPresetChoices();
+    pluginStatus.setText(utf8("已添加空音乐器：") + name, juce::dontSendNotification);
+    emit(true, "saved", utf8("已添加：") + name);
+}
+
+void MainComponent::cancelContainerInstrument()
+{
+    if (! containerInstrumentDraftActive) return;
+    containerInstrumentDraftActive = false;
+    containerInstrumentDraftAdapter.clear();
+    containerInstrumentStateBeforeSelection.reset();
+    restoreToneBeforePresetEdit();
+}
+
 void MainComponent::loadSelectedEffect()
 {
     const auto index = effectSelector.getSelectedId() - 1;
@@ -1812,7 +2000,7 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
     preset.name = name;
     preset.pluginIdentifier = pluginHost.getPluginIdentifier();
     preset.toneParameters = pluginHost.captureToneParameters();
-    preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureKongState() : juce::MemoryBlock();
+    preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureContainerState() : juce::MemoryBlock();
     preset.instrumentModelIndex = pluginHost.getCurrentInstrumentModelIndex();
     preset.eqTone = masterOutput.getEqTone();
     preset.warmth = masterOutput.getWarmth();
@@ -1824,6 +2012,11 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
     preset.instrumentChineseName = currentInstrumentChineseName;
     preset.pluginProgramName = pluginHost.getCurrentProgramName();
     preset.customTone = true;
+    if (preset.containerAdapter.isEmpty() && currentInstrumentKey.startsWith("container:"))
+    {
+        preset.containerInstrument = true;
+        preset.containerAdapter = "kong-v3";
+    }
 
     if (presetStore.save(preset))
     {
@@ -1881,13 +2074,18 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
     preset.name = name;
     preset.pluginIdentifier = pluginHost.getPluginIdentifier();
     preset.toneParameters = pluginHost.captureToneParameters();
-    preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureKongState() : juce::MemoryBlock();
+    preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureContainerState() : juce::MemoryBlock();
     preset.instrumentModelIndex = pluginHost.getCurrentInstrumentModelIndex();
     preset.pluginBrand = currentPluginBrand;
     preset.instrumentKey = currentInstrumentKey;
     preset.instrumentChineseName = currentInstrumentChineseName;
     preset.pluginProgramName = pluginHost.getCurrentProgramName();
     preset.customTone = true;
+    if (preset.containerAdapter.isEmpty() && currentInstrumentKey.startsWith("container:"))
+    {
+        preset.containerInstrument = true;
+        preset.containerAdapter = "kong-v3";
+    }
     preset.baseToneStyleId = baseStyleId;
     preset.toneStyleId = baseStyleId;
     const auto settings = masterOutput.getToneStyle();
@@ -2222,10 +2420,11 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                                  if (completion) completion(false, utf8("方案载入失败：") + message);
                                  return;
                              }
-                             if (preset.pluginBrand == "kong")
+                             if (preset.containerInstrument || preset.pluginBrand == "kong")
                              {
                                  const auto restored = preset.samplerState.getSize() > 0
-                                     ? pluginHost.restoreKongState(preset.samplerState)
+                                     ? (preset.containerInstrument ? pluginHost.restoreContainerState(preset.samplerState)
+                                                                   : pluginHost.restoreKongState(preset.samplerState))
                                      : preset.pluginProgramName.isNotEmpty() && pluginHost.selectProgramByAliases({ preset.pluginProgramName });
                                  if (! restored)
                                  {
@@ -2255,7 +2454,7 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                              }
                              if (preset.instrumentModelIndex >= 0)
                                  pluginHost.selectInstrumentModel(preset.instrumentModelIndex);
-                             if (preset.pluginBrand != "kong" || preset.samplerState.getSize() == 0)
+                             if ((! preset.containerInstrument && preset.pluginBrand != "kong") || preset.samplerState.getSize() == 0)
                                  pluginHost.restoreToneParameters(preset.toneParameters);
                              currentToneStyleId = "custom:" + preset.id;
                              currentBaseToneSettings = style.settings;
@@ -2280,7 +2479,10 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName)
     if (brand == fengyin::SupportedInstrumentClassifier::Brand::kong) currentPluginBrand = "kong";
     else if (brand == fengyin::SupportedInstrumentClassifier::Brand::swam) currentPluginBrand = "swam";
     else if (currentPluginBrand.isEmpty()) currentPluginBrand = "swam";
-    if (currentPluginBrand == "swam" || currentInstrumentKey.isEmpty() || ! currentInstrumentKey.startsWith("kong-"))
+    const auto hasContainerInstrumentIdentity = currentInstrumentKey.startsWith("container:");
+    if (currentPluginBrand == "swam" || currentInstrumentKey.isEmpty()
+        || (! currentInstrumentKey.startsWith("kong-") && ! hasContainerInstrumentIdentity
+            && currentInstrumentKey != "container-draft"))
     {
         currentInstrumentKey = currentPluginBrand == "swam"
             ? utf8(fengyin::SwamPluginClassifier::instrumentKey(pluginName.toStdString())) : "kong-engine";

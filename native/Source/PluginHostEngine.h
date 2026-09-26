@@ -99,6 +99,8 @@ public:
     [[nodiscard]] juce::String getCurrentProgramName() const;
     [[nodiscard]] juce::MemoryBlock captureKongState();
     bool restoreKongState(const juce::MemoryBlock& state);
+    [[nodiscard]] juce::MemoryBlock captureContainerState();
+    bool restoreContainerState(const juce::MemoryBlock& state);
     bool selectProgramByAliases(const juce::StringArray& aliases);
     [[nodiscard]] juce::StringArray getInstrumentModelNames() const;
     [[nodiscard]] int getCurrentInstrumentModelIndex() const noexcept;
