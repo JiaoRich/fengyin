@@ -74,7 +74,7 @@ private:
     void applyAudioSettingsFromWeb(const juce::var& payload);
     void followSystemAudioOutputIfNeeded();
     void showMidiSetup();
-    void startBreathDetection(const juce::String& deviceIdentifier);
+    void startBreathDetection(const juce::String& deviceIdentifier, bool webOnly = false);
     void showExpressionSettings();
     static juce::String midiNoteName(int note);
 
@@ -185,6 +185,7 @@ private:
     juce::Array<juce::File> managedRecordings;
     std::vector<juce::MidiDeviceInfo> midiDialogDevices;
     bool breathDetectionActive = false;
+    bool webBreathDetectionActive = false;
     double breathDetectionEndsAtMs = 0.0;
     bool automaticBreathDetectionActive = false;
     bool wasMidiConnected = false;
