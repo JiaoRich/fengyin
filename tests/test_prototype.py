@@ -98,6 +98,15 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertIn("addEventListener('audioSettingsState'", JS)
         self.assertNotIn("document.querySelectorAll('#page-audio button')", JS)
 
+    def test_super_low_latency_driver_workflow_is_explicit_and_reversible(self):
+        for control_id in ("super-latency-optimize", "restore-audio-driver",
+                           "super-latency-confirm-dialog", "super-latency-ack"):
+            self.assertIn(f'id="{control_id}"', HTML)
+        self.assertIn("startSuperLowLatencyOptimisation", JS)
+        self.assertIn("restoreOriginalAudioDriver", JS)
+        self.assertIn("恢复原驱动", HTML)
+        self.assertIn("Dolby/Nahimic", HTML)
+
     def test_instrument_artwork_covers_every_swam_family(self):
         for key in (
             "soprano-sax", "alto-sax", "tenor-sax", "baritone-sax",
@@ -221,10 +230,10 @@ class PrototypeStructureTests(unittest.TestCase):
     def test_release_version_is_consistent(self):
         cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
         build_script = (ROOT / "scripts" / "build-windows.ps1").read_text(encoding="utf-8")
-        self.assertIn("project(FengYin VERSION 0.15.3", cmake)
-        self.assertIn("0.15.3", build_script)
-        self.assertIn("0.15.3", JS)
-        self.assertIn("风吟 0.15.3", HTML)
+        self.assertIn("project(FengYin VERSION 0.16.0", cmake)
+        self.assertIn("0.16.0", build_script)
+        self.assertIn("0.16.0", JS)
+        self.assertIn("风吟 0.16.0", HTML)
 
     def test_professional_settings_save_a_separate_named_plan(self):
         for control_id in ("tone-expert", "expert-confirm-dialog", "expert-dialog", "preset-name-dialog",

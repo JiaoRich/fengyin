@@ -17,6 +17,7 @@
 #include "ContainerPluginAdapter.h"
 #include "TechniqueAdvisor.h"
 #include "VideoAudioExtractor.h"
+#include "WindowsLowLatencyOptimizer.h"
 
 class MainComponent final : public juce::Component, private juce::Timer
 {
@@ -80,6 +81,8 @@ private:
     void showDeviceSettings();
     void emitAudioSettingsState(bool success = true, const juce::String& message = {});
     void applyAudioSettingsFromWeb(const juce::var& payload);
+    void emitSuperLowLatencyState(const juce::String& overrideMessage = {});
+    void startSuperLowLatencyOptimisation(bool restore);
     void followSystemAudioOutputIfNeeded();
     void showMidiSetup();
     void startBreathDetection(const juce::String& deviceIdentifier, bool webOnly = false);
@@ -88,6 +91,7 @@ private:
 
     fengyin::MidiInputService midi;
     fengyin::AudioDeviceService audio;
+    fengyin::WindowsLowLatencyOptimizer windowsLowLatencyOptimizer;
     fengyin::AccompanimentAudioService accompaniment;
     fengyin::RecordingService recorder;
     fengyin::MasterOutputService masterOutput;
@@ -98,6 +102,8 @@ private:
     fengyin::LicenseService license;
     juce::String machineCode;
     int audioOutputSyncTicks = 0;
+    int superLowLatencyPollTicks = 0;
+    bool superLowLatencyRunning = false;
     double lastPerformanceActivityMs = 0.0;
     int lowLatencyMonitorTicks = 0;
     fengyin::MidiSnapshot snapshot;

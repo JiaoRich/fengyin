@@ -219,6 +219,7 @@ void MainComponent::setupWebInterface()
             webInterfaceReady = true;
             emitAudioSettingsState(true, audio.isAutomaticLatencyTuning()
                 ? utf8("正在自动优化声音，无需操作…") : juce::String());
+            emitSuperLowLatencyState();
         })
         .withEventListener("scanPlugins", [this](juce::var) { if (isActivated) startPluginScan(); })
         .withEventListener("choosePluginFolder", [this](juce::var)
@@ -483,6 +484,15 @@ void MainComponent::setupWebInterface()
         })
         .withEventListener("requestAudioSettings", [this](juce::var) { emitAudioSettingsState(); })
         .withEventListener("applyAudioSettings", [this](juce::var payload) { applyAudioSettingsFromWeb(payload); })
+        .withEventListener("requestSuperLowLatencyStatus", [this](juce::var) { emitSuperLowLatencyState(); })
+        .withEventListener("startSuperLowLatencyOptimisation", [this](juce::var)
+        {
+            startSuperLowLatencyOptimisation(false);
+        })
+        .withEventListener("restoreOriginalAudioDriver", [this](juce::var)
+        {
+            startSuperLowLatencyOptimisation(true);
+        })
         .withEventListener("optimiseAudioSettings", [this](juce::var)
         {
             if (videoPlaybackActive || recorder.isRecording() || midi.getSnapshot().breath > 0.01f
@@ -1055,6 +1065,16 @@ void MainComponent::resized()
 void MainComponent::timerCallback()
 {
     pollContainerOutputVerification();
+    if (superLowLatencyRunning && ++superLowLatencyPollTicks >= 30)
+    {
+        superLowLatencyPollTicks = 0;
+        const auto systemStatus = windowsLowLatencyOptimizer.getStatus();
+        if (systemStatus.state != "idle")
+        {
+            superLowLatencyRunning = false;
+            emitSuperLowLatencyState();
+        }
+    }
     if (++licensePollTicks >= 300)
     {
         licensePollTicks = 0;
@@ -1492,6 +1512,61 @@ void MainComponent::timerCallback()
                             juce::dontSendNotification);
     }
     repaint();
+}
+
+void MainComponent::emitSuperLowLatencyState(const juce::String& overrideMessage)
+{
+    if (webInterface == nullptr) return;
+    auto status = windowsLowLatencyOptimizer.getStatus();
+    status.running = superLowLatencyRunning;
+    auto result = std::make_unique<juce::DynamicObject>();
+    result->setProperty("supported", status.supported);
+    result->setProperty("eligibleDeviceFound", status.eligibleDeviceFound);
+    result->setProperty("running", status.running);
+    result->setProperty("canRestore", status.canRestore);
+    result->setProperty("restartRequired", status.restartRequired);
+    result->setProperty("deviceName", status.deviceName);
+    result->setProperty("state", status.running ? "running" : status.state);
+    result->setProperty("message", overrideMessage.isNotEmpty() ? overrideMessage : status.message);
+    webInterface->emitEventIfBrowserIsVisible("superLowLatencyState", juce::var(result.release()));
+}
+
+void MainComponent::startSuperLowLatencyOptimisation(bool restore)
+{
+    if (superLowLatencyRunning) return;
+    if (videoPlaybackActive || recorder.isRecording() || midi.getSnapshot().breath > 0.01f
+        || midi.getSnapshot().lastNote >= 0)
+    {
+        emitSuperLowLatencyState(utf8("请先暂停伴奏、录音和吹奏，再修改系统声卡驱动。"));
+        return;
+    }
+    const auto status = windowsLowLatencyOptimizer.getStatus();
+    if (! status.supported)
+    {
+        emitSuperLowLatencyState(status.message);
+        return;
+    }
+    if (restore && ! status.canRestore)
+    {
+        emitSuperLowLatencyState(utf8("没有找到可恢复的原驱动备份。"));
+        return;
+    }
+    if (! restore && ! status.eligibleDeviceFound)
+    {
+        emitSuperLowLatencyState(utf8("未找到适用的 Realtek / Senary / C-Media 板载声卡，未修改系统。"));
+        return;
+    }
+    const auto launched = restore ? windowsLowLatencyOptimizer.launchRestore()
+                                  : windowsLowLatencyOptimizer.launchOptimisation();
+    if (! launched)
+    {
+        emitSuperLowLatencyState(utf8("未获得管理员权限，系统设置没有更改。"));
+        return;
+    }
+    superLowLatencyRunning = true;
+    superLowLatencyPollTicks = 0;
+    emitSuperLowLatencyState(restore ? utf8("正在恢复原声卡驱动…")
+                                     : utf8("正在备份原驱动并切换微软低延迟驱动…"));
 }
 
 void MainComponent::followSystemAudioOutputIfNeeded()

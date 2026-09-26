@@ -42,6 +42,15 @@ const path = require('node:path');
     }
     assert.equal(await page.evaluate(()=>window.sent.filter(x=>x.name==='beginTechniqueLearn').length),60);
     await page.locator('#close-technique-dialog-top').click();
+    await page.locator('[data-page="audio"]').click();
+    await page.locator('#super-latency-optimize').click();
+    assert.equal(await page.locator('#super-latency-confirm-dialog').isVisible(),true);
+    assert.equal(await page.locator('#confirm-super-latency').isDisabled(),true);
+    await page.locator('#super-latency-ack').check();
+    assert.equal(await page.locator('#confirm-super-latency').isEnabled(),true);
+    assert.match(await page.locator('#super-latency-confirm-dialog').innerText(),/Dolby\/Nahimic/);
+    await page.locator('#cancel-super-latency').click();
+    assert.equal(await page.locator('#super-latency-confirm-dialog').isVisible(),false);
     await page.locator('[data-page="sounds"]').click();
     await page.waitForTimeout(100);
     const columns = await page.locator('#preset-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);

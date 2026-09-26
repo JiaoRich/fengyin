@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 0.15.3 LANGUAGES C CXX)
+project(FengYin VERSION 0.16.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -119,6 +119,8 @@ target_sources(FengYin PRIVATE
     native/Source/KongProjectFile.h
     native/Source/AudioDeviceService.cpp
     native/Source/AudioDeviceService.h
+    native/Source/WindowsLowLatencyOptimizer.cpp
+    native/Source/WindowsLowLatencyOptimizer.h
 )
 
 target_compile_definitions(FengYin PRIVATE
@@ -183,7 +185,7 @@ target_include_directories(FengYinLicenseGenerator PRIVATE native/Source)
 target_link_libraries(FengYinLicenseGenerator PRIVATE juce::juce_cryptography)
 
 if(WIN32)
-    target_link_libraries(FengYin PRIVATE setupapi advapi32)
+    target_link_libraries(FengYin PRIVATE setupapi advapi32 shell32)
     target_compile_definitions(FengYin PRIVATE
         # 风吟的默认用户使用板载声卡。ASIO4ALL 等 ASIO 包装驱动会绕过
         # Windows 混音并导致其他应用无声，与产品的“永不独占”原则冲突。

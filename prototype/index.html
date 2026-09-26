@@ -194,8 +194,9 @@
         <div class="audio-setting"><label for="audio-output-select">输出设备</label><select id="audio-output-select"><option>系统默认扬声器</option></select><small>请选择实际使用的耳机、音响或声卡</small></div>
         <div class="audio-setting"><label for="audio-rate-select">采样率</label><select id="audio-rate-select"><option value="48000">48000 Hz（推荐）</option></select><small id="audio-rate-help">伴奏视频和软音源统一使用 48000 Hz</small></div>
         <div class="audio-setting"><label for="audio-buffer-select">缓冲区</label><select id="audio-buffer-select"><option value="128">128（推荐）</option></select><small id="audio-buffer-help">128 延迟低；出现爆音时可改为 256</small></div>
-      </div><div class="audio-summary"><div><span>当前预计延迟</span><strong class="green" id="audio-latency-value">正在检测…</strong></div><p id="audio-apply-status">首次启动和更换耳机、音响或声卡后会自动完成稳定性预检。</p><button id="audio-auto-optimize" type="button">智能优化</button></div></div></section>
-      <section class="page" id="page-settings"><div class="panel glass"><div class="activation"><div><p>试用与永久授权</p><h3 id="license-title">可开始3天完整试用</h3><div class="machine-code-row"><span id="machine-code">本机识别码：FY-8K2M-4R7P</span><button id="copy-machine-code" type="button">复制机器码</button></div></div><div class="license-actions"><button id="start-trial" type="button">开始3天完整试用</button><input id="license-code" placeholder="请输入唯一激活码"><button id="activate" class="primary-button">永久激活</button></div></div><div class="settings-grid"><label class="toggle-row">智能音频优化（推荐）<input id="smart-audio" type="checkbox" checked><i></i></label><label class="toggle-row">低性能电脑模式<input id="low-performance" type="checkbox"><i></i></label><label class="toggle-row">启动时进入演奏页面<input type="checkbox" checked><i></i></label><label class="toggle-row">自动保存设置<input type="checkbox" checked><i></i></label><label class="toggle-row">检查软件更新<input type="checkbox" checked><i></i></label></div><p class="prototype-note">风吟 0.15.3 · 本地运行，不会保存或上传个人资料。</p></div></section>
+      </div><div class="audio-summary"><div><span>当前预计延迟</span><strong class="green" id="audio-latency-value">正在检测…</strong></div><p id="audio-apply-status">首次启动和更换耳机、音响或声卡后会自动完成稳定性预检。</p><button id="audio-auto-optimize" type="button">智能优化</button></div>
+      <div class="super-latency-card"><div><span>板载声卡进阶优化</span><strong>超级低延迟优化</strong><p id="super-latency-status">正在检查系统声卡…</p></div><div class="super-latency-actions"><button id="restore-audio-driver" type="button" hidden>恢复原驱动</button><button id="super-latency-optimize" class="primary-button" type="button">开始优化</button></div></div></div></section>
+      <section class="page" id="page-settings"><div class="panel glass"><div class="activation"><div><p>试用与永久授权</p><h3 id="license-title">可开始3天完整试用</h3><div class="machine-code-row"><span id="machine-code">本机识别码：FY-8K2M-4R7P</span><button id="copy-machine-code" type="button">复制机器码</button></div></div><div class="license-actions"><button id="start-trial" type="button">开始3天完整试用</button><input id="license-code" placeholder="请输入唯一激活码"><button id="activate" class="primary-button">永久激活</button></div></div><div class="settings-grid"><label class="toggle-row">智能音频优化（推荐）<input id="smart-audio" type="checkbox" checked><i></i></label><label class="toggle-row">低性能电脑模式<input id="low-performance" type="checkbox"><i></i></label><label class="toggle-row">启动时进入演奏页面<input type="checkbox" checked><i></i></label><label class="toggle-row">自动保存设置<input type="checkbox" checked><i></i></label><label class="toggle-row">检查软件更新<input type="checkbox" checked><i></i></label></div><p class="prototype-note">风吟 0.16.0 · 本地运行，不会保存或上传个人资料。</p></div></section>
     </main>
   </div>
   <div class="license-lock" id="license-lock" hidden>
@@ -237,6 +238,14 @@
   <div class="dialog-backdrop" id="audio-optimization-dialog" hidden>
     <section class="technique-dialog optimization-dialog" role="dialog" aria-modal="true" aria-labelledby="optimization-title">
       <div class="optimization-spinner"></div><p class="technique-eyebrow">正在检测当前声音配置</p><h2 id="optimization-title">正在为这台电脑准备低延迟声音</h2><p id="optimization-message">正在检查输出设备…</p><div class="optimization-progress"><i id="optimization-progress-bar"></i></div><div class="optimization-percent" id="optimization-percent">0%</div><ol id="optimization-steps"><li>检查设备</li><li>测试当前音源</li><li>验证缓冲稳定性</li></ol><small>请暂时停止吹奏和伴奏。</small>
+    </section>
+  </div>
+  <div class="dialog-backdrop" id="super-latency-confirm-dialog" hidden>
+    <section class="technique-dialog super-latency-dialog" role="dialog" aria-modal="true" aria-labelledby="super-latency-title">
+      <div class="transpose-warning-icon">!</div><p class="technique-eyebrow">修改 Windows 系统驱动</p><h2 id="super-latency-title">确认启用超级低延迟优化？</h2>
+      <ul><li>将先完整备份当前声卡驱动，再切换为 Windows 自带驱动。</li><li>优化后需重启电脑，期间可能暂时无声。</li><li>部分电脑可能失去 Dolby/Nahimic 音效、耳机孔检测或厂商控制面板。</li><li>如出现无声、爆音或耳机无法识别，可点击“恢复原驱动”。</li></ul>
+      <label class="risk-ack"><input id="super-latency-ack" type="checkbox"> 我已了解风险，并同意风吟请求管理员权限</label>
+      <div class="dialog-actions"><button id="cancel-super-latency" type="button">取消</button><button id="confirm-super-latency" class="primary-button" type="button" disabled>备份并开始优化</button></div>
     </section>
   </div>
   <div class="dialog-backdrop" id="expert-confirm-dialog" hidden>

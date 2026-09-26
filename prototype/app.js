@@ -1607,6 +1607,44 @@ $('#audio-auto-optimize').addEventListener('click', () => {
   nativeEvent('optimiseAudioSettings');
 });
 
+const superLatencyDialog = $('#super-latency-confirm-dialog');
+$('#super-latency-optimize').addEventListener('click', () => {
+  $('#super-latency-ack').checked = false;
+  $('#confirm-super-latency').disabled = true;
+  superLatencyDialog.hidden = false;
+});
+$('#super-latency-ack').addEventListener('change', event => {
+  $('#confirm-super-latency').disabled = !event.target.checked;
+});
+$('#cancel-super-latency').addEventListener('click', () => { superLatencyDialog.hidden = true; });
+$('#confirm-super-latency').addEventListener('click', () => {
+  if (!$('#super-latency-ack').checked) return;
+  superLatencyDialog.hidden = true;
+  $('#super-latency-optimize').disabled = true;
+  $('#super-latency-status').textContent = '正在请求管理员权限…';
+  if (!window.__JUCE__?.backend?.emitEvent) return toast('Windows 安装版才能修改系统驱动');
+  nativeEvent('startSuperLowLatencyOptimisation');
+});
+$('#restore-audio-driver').addEventListener('click', () => {
+  if (!window.confirm('恢复原声卡驱动后需重启电脑，确定继续？')) return;
+  $('#restore-audio-driver').disabled = true;
+  nativeEvent('restoreOriginalAudioDriver');
+});
+
+function renderSuperLowLatencyState(state = {}) {
+  const running = state.running === true || state.state === 'running';
+  const button = $('#super-latency-optimize');
+  button.disabled = running || state.supported === false || (state.eligibleDeviceFound === false && !state.canRestore);
+  button.textContent = running ? '正在优化…' : state.restartRequired ? '重启后生效' : '开始优化';
+  $('#restore-audio-driver').hidden = state.canRestore !== true;
+  $('#restore-audio-driver').disabled = running;
+  const message = state.message || (state.supported === false ? '仅支持 Windows 板载声卡' : '正在检查系统声卡…');
+  $('#super-latency-status').textContent = message;
+  $('#super-latency-status').classList.toggle('audio-error', state.state === 'error');
+}
+
+window.__JUCE__?.backend?.addEventListener('superLowLatencyState', renderSuperLowLatencyState);
+
 function showAudioOptimisationProgress() {
   clearInterval(optimisationTimer);
   $('#audio-optimization-dialog').hidden = false;
@@ -1949,10 +1987,11 @@ window.__JUCE__?.backend?.addEventListener('breathMatchResult', result => {
   if (result?.message) toast(result.message);
 });
 nativeEvent('webReady');
+nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 0.15.3 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 0.16.0 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

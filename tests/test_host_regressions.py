@@ -352,6 +352,16 @@ class HostRegressionTests(unittest.TestCase):
         self.assertNotIn("detach();", capture)
         self.assertIn("suspendProcessing(true)", capture)
 
+    def test_super_low_latency_script_backs_up_and_can_restore_before_driver_removal(self):
+        optimiser = (ROOT / "native" / "Source" / "WindowsLowLatencyOptimizer.cpp").read_text(encoding="utf-8")
+        self.assertLess(optimiser.index("/export-driver"), optimiser.index("/delete-driver"))
+        self.assertIn("backup-manifest.json", optimiser)
+        self.assertIn("/add-driver", optimiser)
+        self.assertIn("Realtek|Senary|C-Media", optimiser)
+        self.assertIn("Nahimic|A-Volute|Dolby", optimiser)
+        self.assertNotIn("Invoke-WebRequest", optimiser)
+        self.assertIn('L"runas"', optimiser)
+
 
 if __name__ == "__main__":
     unittest.main()
