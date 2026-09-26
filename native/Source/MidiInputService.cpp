@@ -166,6 +166,18 @@ juce::String MidiInputService::getConnectedDeviceName() const
     return connectedName;
 }
 
+juce::String MidiInputService::getConnectedDeviceIdentifier() const
+{
+    return connectedIdentifier;
+}
+
+bool MidiInputService::hasCompletedBreathMatch()
+{
+    if (connectedIdentifier.isEmpty() || properties.getUserSettings() == nullptr)
+        return false;
+    return properties.getUserSettings()->getBoolValue(controllerSettingKey() + ".matched", false);
+}
+
 DeviceProfile MidiInputService::getActiveProfile() const
 {
     return activeProfile;
@@ -177,6 +189,11 @@ void MidiInputService::setBreathController(int controllerNumber)
     breathController.store(value);
     activeProfile.breathController = value;
     savePreferences();
+    if (connectedIdentifier.isNotEmpty() && properties.getUserSettings() != nullptr)
+    {
+        properties.getUserSettings()->setValue(controllerSettingKey() + ".matched", true);
+        properties.getUserSettings()->saveIfNeeded();
+    }
 }
 
 juce::String MidiInputService::controllerSettingKey() const
@@ -228,13 +245,22 @@ void MidiInputService::beginBreathDetection() noexcept
     detectingBreath.store(true, std::memory_order_release);
 }
 
-int MidiInputService::finishBreathDetection() noexcept
+int MidiInputService::finishBreathDetection(bool markCompleted) noexcept
 {
     detectingBreath.store(false, std::memory_order_release);
     const juce::SpinLock::ScopedLockType lock(detectorLock);
     const auto detected = controllerDetector.bestContinuousController();
     if (detected >= 0)
-        setBreathController(detected);
+    {
+        breathController.store(juce::jlimit(0, 127, detected), std::memory_order_relaxed);
+        activeProfile.breathController = breathController.load(std::memory_order_relaxed);
+        savePreferences();
+        if (markCompleted && connectedIdentifier.isNotEmpty() && properties.getUserSettings() != nullptr)
+        {
+            properties.getUserSettings()->setValue(controllerSettingKey() + ".matched", true);
+            properties.getUserSettings()->saveIfNeeded();
+        }
+    }
     return detected;
 }
 

@@ -53,6 +53,8 @@ public:
     void pollConnection();
     [[nodiscard]] MidiSnapshot getSnapshot() const noexcept;
     [[nodiscard]] juce::String getConnectedDeviceName() const;
+    [[nodiscard]] juce::String getConnectedDeviceIdentifier() const;
+    [[nodiscard]] bool hasCompletedBreathMatch();
     [[nodiscard]] DeviceProfile getActiveProfile() const;
     [[nodiscard]] int getBreathController() const noexcept { return breathController.load(std::memory_order_relaxed); }
     [[nodiscard]] ExpressionSettings getExpressionSettings() const;
@@ -60,7 +62,7 @@ public:
     void setBreathController(int controllerNumber);
     void setPerformanceSink(MidiPerformanceSink* sink) noexcept;
     void beginBreathDetection() noexcept;
-    [[nodiscard]] int finishBreathDetection() noexcept;
+    [[nodiscard]] int finishBreathDetection(bool markCompleted = false) noexcept;
     void setTargetKey(int pitchClass);
     void setTransposeSemitones(int semitones); // 兼容旧设置：视为以 C 调为来源的目标偏移。
     [[nodiscard]] int getTargetKey() const noexcept { return targetKey.load(std::memory_order_relaxed); }

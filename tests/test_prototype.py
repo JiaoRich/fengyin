@@ -145,10 +145,15 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertNotIn('id="transpose-key"', instrument_heading)
 
     def test_smart_adapter_ui_uses_global_technique_roles(self):
-        for control_id in ("adapter-device-name", "adapter-recommendations", "adapter-reconnect",
-                           "adapter-techniques", "adapter-advanced-toggle"):
+        for control_id in ("adapter-device-name", "adapter-match", "adapter-inline-guide",
+                           "adapter-technique-grid"):
             self.assertIn(f'id="{control_id}"', HTML)
+        self.assertIn('data-adapter-mode="hardware"', HTML)
+        self.assertIn('data-adapter-mode="breath"', HTML)
+        self.assertIn("beginInlineAdapterMatch", JS)
         self.assertIn("mergeBackendTechniquePlan", JS)
+        self.assertIn("button.addEventListener('click'", JS)
+        self.assertNotIn("button.addEventListener('pointerup'", JS)
         self.assertIn("当前电吹管全局设置", HTML)
         self.assertIn("映射一次，切换乐器继续使用", HTML)
         self.assertIn("technique.roles.v2.", (ROOT / "native" / "Source" / "MidiInputService.cpp").read_text(encoding="utf-8"))
@@ -178,15 +183,45 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertIn("innerHTML = create +", render_body)
         self.assertIn("nativeEvent('deletePreset',{index:presetIndex})", JS)
         self.assertIn('class="preset preset-create"', JS)
-        self.assertIn("data-action=\"${isCustom?'delete-custom':'locked'}\"", JS)
+        self.assertIn('data-action="delete-custom"', JS)
+        self.assertIn("${tone.custom?'':'disabled'}", JS)
         self.assertIn('.preset-create{', HTML)
 
     def test_installed_plugins_and_custom_variants_share_instrument_cards(self):
         self.assertIn("availableInstruments.map((instrument,pluginIndex)", JS)
-        self.assertIn('class="instrument-preset-card"', JS)
-        self.assertIn("isCustom?'edit-custom':'locked'", JS)
+        self.assertIn('class="instrument-preset-card compact', JS)
+        self.assertIn("data-action=\"edit-custom\"", JS)
+        self.assertIn("const tones = [...customs,...builtins]", JS)
         self.assertIn("nativeEvent('editPreset',{index:presetIndex})", JS)
         self.assertIn("nativeEvent('saveCustomPreset'", JS)
+
+    def test_sound_plan_page_is_compact_and_exposes_rescan(self):
+        sound_page = HTML.split('id="page-sounds"', 1)[1].split('id="page-chain"', 1)[0]
+        self.assertNotIn('<h2>音色方案</h2>', sound_page)
+        self.assertIn('data-action="scan-sounds"', JS)
+        self.assertIn('当前版本支持 SWAM、空音系列', JS)
+        self.assertIn('class="plugin-original-name"', JS)
+        self.assertIn('originalName:instrument.label || instrument.name', JS)
+        self.assertIn('.preset-grid{grid-template-columns:repeat(3,minmax(280px,1fr))', HTML)
+        self.assertIn('draggable="true"', JS)
+        self.assertIn("nativeEvent('reorderInstrumentCards'", JS)
+
+    def test_global_header_has_dynamic_greeting_and_no_duplicate_page_titles(self):
+        self.assertIn('id="time-greeting"', HTML)
+        self.assertIn('function updateTimeGreeting', JS)
+        self.assertIn('更好用的智能软音源平台', HTML)
+        self.assertIn('公众号：风吟软音源', HTML)
+        self.assertIn('.app-shell{position:relative;z-index:1;grid-template-columns:220px 1fr}', HTML)
+        for page_id, title in (("page-chain", "定制音色"), ("page-audio", "声音设置"), ("page-settings", "软件设置")):
+            page = HTML.split(f'id="{page_id}"', 1)[1].split('</section>', 1)[0]
+            self.assertNotIn(f'<h2>{title}</h2>', page)
+
+    def test_release_version_is_consistent(self):
+        cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        build_script = (ROOT / "scripts" / "build-windows.ps1").read_text(encoding="utf-8")
+        self.assertIn("project(FengYin VERSION 0.14.0", cmake)
+        self.assertIn("0.14.0", build_script)
+        self.assertIn("0.14.0", JS)
 
     def test_professional_settings_save_a_separate_named_plan(self):
         for control_id in ("tone-expert", "expert-confirm-dialog", "expert-dialog", "preset-name-dialog",

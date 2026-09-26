@@ -187,6 +187,16 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("midi.finishBreathDetection()", MAIN)
         self.assertIn("automaticBreathDetection", MAIN)
 
+    def test_inline_breath_match_is_persisted_without_a_modal(self):
+        self.assertIn('withEventListener("beginBreathMatch"', MAIN)
+        self.assertIn('"breathMatchResult"', MAIN)
+        self.assertIn("midi.finishBreathDetection(true)", MAIN)
+        self.assertIn('state->setProperty("deviceMatched"', MAIN)
+        self.assertIn("midi.hasCompletedBreathMatch()", MAIN)
+        self.assertIn('controllerSettingKey() + ".matched"', MIDI)
+        self.assertIn("bool markCompleted", MIDI)
+        self.assertIn("webBreathDetectionActive", MAIN)
+
     def test_technique_learning_and_swam_parameter_control_are_connected(self):
         self.assertIn("beginTechniqueLearn", MIDI)
         self.assertIn("handleTechniqueMessage", MIDI)

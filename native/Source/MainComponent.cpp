@@ -442,6 +442,21 @@ void MainComponent::setupWebInterface()
             else
                 emitAudioSettingsState(false, utf8("当前无法开始自动优化，请检查声音输出设备"));
         })
+        .withEventListener("beginBreathMatch", [this](juce::var)
+        {
+            if (! midi.getSnapshot().deviceConnected)
+            {
+                if (webInterface != nullptr)
+                {
+                    auto result = std::make_unique<juce::DynamicObject>();
+                    result->setProperty("success", false);
+                    result->setProperty("message", utf8("请先连接电吹管"));
+                    webInterface->emitEventIfBrowserIsVisible("breathMatchResult", juce::var(result.release()));
+                }
+                return;
+            }
+            startBreathDetection(midi.getConnectedDeviceIdentifier(), true);
+        })
         .withEventListener("beginTechniqueLearn", [this](juce::var payload)
         {
             const auto requestedId = payload.getProperty("techniqueId", {}).toString().toStdString();
@@ -1039,6 +1054,19 @@ void MainComponent::timerCallback()
     }
     else if (! snapshot.deviceConnected && wasMidiConnected)
     {
+        if (breathDetectionActive)
+        {
+            (void) midi.finishBreathDetection(false);
+            breathDetectionActive = false;
+            webBreathDetectionActive = false;
+            if (webInterface != nullptr)
+            {
+                auto result = std::make_unique<juce::DynamicObject>();
+                result->setProperty("success", false);
+                result->setProperty("message", utf8("电吹管已断开，请重新连接后再匹配"));
+                webInterface->emitEventIfBrowserIsVisible("breathMatchResult", juce::var(result.release()));
+            }
+        }
         automaticBreathDetectionActive = false;
         automaticBreathDetectionEndsAtMs = 0.0;
     }
@@ -1125,6 +1153,9 @@ void MainComponent::timerCallback()
         auto state = std::make_unique<juce::DynamicObject>();
         state->setProperty("deviceConnected", snapshot.deviceConnected);
         state->setProperty("deviceName", midi.getConnectedDeviceName());
+        state->setProperty("deviceIdentifier", midi.getConnectedDeviceIdentifier());
+        state->setProperty("deviceMatched", snapshot.deviceConnected && midi.hasCompletedBreathMatch());
+        state->setProperty("breathMatching", breathDetectionActive && webBreathDetectionActive);
         const auto deviceProfile = midi.getActiveProfile();
         state->setProperty("deviceProfileName", utf8(deviceProfile.displayName.c_str()));
         state->setProperty("deviceProfileId", utf8(deviceProfile.id.c_str()));
@@ -1378,12 +1409,24 @@ void MainComponent::timerCallback()
         if (juce::Time::getMillisecondCounterHiRes() >= breathDetectionEndsAtMs)
         {
             breathDetectionActive = false;
-            const auto controller = midi.finishBreathDetection();
-            juce::AlertWindow::showMessageBoxAsync(controller >= 0 ? juce::MessageBoxIconType::InfoIcon
-                                                                    : juce::MessageBoxIconType::WarningIcon,
-                controller >= 0 ? utf8("识别成功") : utf8("没有识别到气息"),
-                controller >= 0 ? utf8("已自动设置气息控制器 CC") + juce::String(controller)
-                                : utf8("请确认电吹管已经连接，再吹一个音量由弱到强的长音。"));
+            const auto controller = midi.finishBreathDetection(true);
+            if (webBreathDetectionActive && webInterface != nullptr)
+            {
+                auto result = std::make_unique<juce::DynamicObject>();
+                result->setProperty("success", controller >= 0);
+                result->setProperty("controller", controller);
+                result->setProperty("message", controller >= 0
+                    ? utf8("匹配完成，可以开始吹奏")
+                    : utf8("没有识别到气息，请确认电吹管已连接后重试"));
+                webInterface->emitEventIfBrowserIsVisible("breathMatchResult", juce::var(result.release()));
+            }
+            else
+                juce::AlertWindow::showMessageBoxAsync(controller >= 0 ? juce::MessageBoxIconType::InfoIcon
+                                                                        : juce::MessageBoxIconType::WarningIcon,
+                    controller >= 0 ? utf8("识别成功") : utf8("没有识别到气息"),
+                    controller >= 0 ? utf8("已自动设置气息控制器 CC") + juce::String(controller)
+                                    : utf8("请确认电吹管已经连接，再吹一个音量由弱到强的长音。"));
+            webBreathDetectionActive = false;
         }
     }
     else if (snapshot.deviceConnected)
@@ -2649,12 +2692,13 @@ void MainComponent::showMidiSetup()
     }), false);
 }
 
-void MainComponent::startBreathDetection(const juce::String&)
+void MainComponent::startBreathDetection(const juce::String&, bool webOnly)
 {
     automaticBreathDetectionActive = false;
     automaticBreathDetectionEndsAtMs = 0.0;
     midi.beginBreathDetection();
     breathDetectionActive = true;
+    webBreathDetectionActive = webOnly;
     breathDetectionEndsAtMs = juce::Time::getMillisecondCounterHiRes() + 6000.0;
 }
 
