@@ -924,9 +924,9 @@ function renderPresets() {
     if (action === 'add-container-instrument') {
       $('#container-instrument-dialog').hidden=false;
       $('#container-instrument-name').value='';
-      $('#container-instrument-status').textContent='正在打开 QinEngineV3……';
+      $('#container-instrument-status').textContent='请先看完上方步骤，再开始选择乐器。';
+      $('#open-container-instrument').disabled=false;
       $('#confirm-container-instrument').disabled=true;
-      nativeEvent('beginContainerInstrument',{adapter:'kong-v3'});
       return;
     }
     if (action === 'create') {
@@ -1776,6 +1776,12 @@ $('#cancel-container-instrument')?.addEventListener('click', () => {
   nativeEvent('cancelContainerInstrument');
   $('#container-instrument-dialog').hidden=true;
 });
+$('#open-container-instrument')?.addEventListener('click', () => {
+  $('#open-container-instrument').disabled=true;
+  $('#confirm-container-instrument').disabled=true;
+  $('#container-instrument-status').textContent='正在打开 QinEngineV3……';
+  nativeEvent('beginContainerInstrument',{adapter:'kong-v3'});
+});
 $('#confirm-container-instrument')?.addEventListener('click', () => {
   const name=$('#container-instrument-name').value.trim();
   if (!name) return toast('请填写乐器名称');
@@ -1788,11 +1794,12 @@ window.__JUCE__?.backend?.addEventListener('containerInstrumentResult', result =
   if (status) status.textContent=result?.message || '';
   if (result?.stage === 'ready') {
     $('#confirm-container-instrument').disabled=false;
-    $('#container-instrument-name').focus();
+    $('#container-instrument-status').textContent='请在空音窗口选择并试听；选好后关闭原厂窗口，再返回创建乐器。';
   } else if (result?.stage === 'saved' && result?.success) {
     $('#container-instrument-dialog').hidden=true;
     toast(result.message || '空音乐器已添加');
   } else if (!result?.success) {
+    $('#open-container-instrument').disabled=false;
     $('#confirm-container-instrument').disabled=false;
     toast(result?.message || '空音乐器添加失败');
   }
@@ -1933,7 +1940,7 @@ nativeEvent('webReady');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 0.15.1 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 0.15.2 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

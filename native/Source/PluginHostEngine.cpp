@@ -117,6 +117,13 @@ void RecordingAudioProcessorPlayer::addResetMessages(double timestampSeconds)
 void RecordingAudioProcessorPlayer::setLatencyProbeActive(bool active) noexcept
 {
     latencyProbeActive.store(active, std::memory_order_release);
+    if (active)
+    {
+        probeSamplesUntilChange = 0;
+        probeNoteIsOn = false;
+        probeNoteIndex = 0;
+        probeCurrentNote = 67;
+    }
     if (! active)
         requestPerformanceReset();
 }
@@ -143,12 +150,17 @@ void RecordingAudioProcessorPlayer::addLatencyProbeMessages(int numSamples, doub
     probeNoteIsOn = ! probeNoteIsOn;
     if (probeNoteIsOn)
     {
-        send(juce::MidiMessage::noteOn(1, 67, static_cast<juce::uint8>(82)));
+        // Cover low, middle and high mappings. Container sample players may
+        // expose a narrow playable range or map percussion to only part of the
+        // keyboard, so probing only G4 can incorrectly report silence.
+        static constexpr std::array<int, 6> probeNotes { 48, 55, 60, 67, 72, 79 };
+        probeCurrentNote = probeNotes[static_cast<size_t>(probeNoteIndex++ % static_cast<int>(probeNotes.size()))];
+        send(juce::MidiMessage::noteOn(1, probeCurrentNote, static_cast<juce::uint8>(82)));
         probeSamplesUntilChange = juce::roundToInt(currentSampleRate * 0.8);
     }
     else
     {
-        send(juce::MidiMessage::noteOff(1, 67));
+        send(juce::MidiMessage::noteOff(1, probeCurrentNote));
         probeSamplesUntilChange = juce::roundToInt(currentSampleRate * 0.15);
     }
 }
@@ -228,6 +240,8 @@ void RecordingAudioProcessorPlayer::audioDeviceAboutToStart(juce::AudioIODevice*
         ? device->getCurrentSampleRate() : 48000.0;
     probeSamplesUntilChange = 0;
     probeNoteIsOn = false;
+    probeNoteIndex = 0;
+    probeCurrentNote = 67;
     if (accompaniment != nullptr && device != nullptr)
         accompaniment->prepare(device->getCurrentSampleRate(), device->getCurrentBufferSizeSamples());
     if (masterOutput != nullptr && device != nullptr)
@@ -530,6 +544,14 @@ bool PluginHostEngine::showPluginEditor(bool effect)
                                                          : juce::String::fromUTF8("音源 · ")) + processor->getName(),
                                                    std::move(editor));
     return true;
+}
+
+void PluginHostEngine::closePluginEditor(bool effect)
+{
+    auto& window = effect ? effectEditorWindow : instrumentEditorWindow;
+    // Destroying the editor gives container plug-ins a chance to commit the
+    // selection made in their native UI before getStateInformation is called.
+    window.reset();
 }
 
 bool PluginHostEngine::rebuildConnections()

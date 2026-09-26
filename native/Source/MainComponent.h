@@ -48,6 +48,8 @@ private:
     void beginContainerInstrument(const juce::String& adapter);
     void commitContainerInstrument(const juce::String& name);
     void cancelContainerInstrument();
+    void beginContainerOutputVerification(std::function<void(bool, const juce::String&)> completion);
+    void pollContainerOutputVerification();
     void loadSelectedEffect();
     void removeEffect();
     void useTestSynth();
@@ -57,6 +59,8 @@ private:
     void commitCustomPreset(const juce::String& name, const juce::String& baseStyleId);
     fengyin::ToneStyleSettings customToneSettingsFromPayload(const juce::var& payload) const;
     void loadSelectedPreset(std::function<void(bool, const juce::String&)> completion = {});
+    void completeLoadedPreset(const fengyin::SoundPreset& preset,
+                              std::function<void(bool, const juce::String&)> completion);
     void captureToneBeforePresetEdit();
     void restoreToneBeforePresetEdit();
     void makePresetDefault();
@@ -163,6 +167,10 @@ private:
     bool containerInstrumentDraftActive = false;
     juce::String containerInstrumentDraftAdapter;
     juce::MemoryBlock containerInstrumentStateBeforeSelection;
+    bool containerOutputVerificationActive = false;
+    uint64_t containerOutputVerificationStartSignals = 0;
+    double containerOutputVerificationDeadlineMs = 0.0;
+    std::function<void(bool, const juce::String&)> containerOutputVerificationCompletion;
     fengyin::ToneStyleSettings currentBaseToneSettings;
     int currentSwamToneParameterCount = 0;
     juce::Array<juce::PluginDescription> cachedInstrumentPlugins;

@@ -195,7 +195,7 @@
         <div class="audio-setting"><label for="audio-rate-select">采样率</label><select id="audio-rate-select"><option value="48000">48000 Hz（推荐）</option></select><small id="audio-rate-help">伴奏视频和软音源统一使用 48000 Hz</small></div>
         <div class="audio-setting"><label for="audio-buffer-select">缓冲区</label><select id="audio-buffer-select"><option value="128">128（推荐）</option></select><small id="audio-buffer-help">128 延迟低；出现爆音时可改为 256</small></div>
       </div><div class="audio-summary"><div><span>当前预计延迟</span><strong class="green" id="audio-latency-value">正在检测…</strong></div><p id="audio-apply-status">首次启动和更换耳机、音响或声卡后会自动完成稳定性预检。</p><button id="audio-auto-optimize" type="button">智能优化</button></div></div></section>
-      <section class="page" id="page-settings"><div class="panel glass"><div class="activation"><div><p>试用与永久授权</p><h3 id="license-title">可开始3天完整试用</h3><div class="machine-code-row"><span id="machine-code">本机识别码：FY-8K2M-4R7P</span><button id="copy-machine-code" type="button">复制机器码</button></div></div><div class="license-actions"><button id="start-trial" type="button">开始3天完整试用</button><input id="license-code" placeholder="请输入唯一激活码"><button id="activate" class="primary-button">永久激活</button></div></div><div class="settings-grid"><label class="toggle-row">智能音频优化（推荐）<input id="smart-audio" type="checkbox" checked><i></i></label><label class="toggle-row">低性能电脑模式<input id="low-performance" type="checkbox"><i></i></label><label class="toggle-row">启动时进入演奏页面<input type="checkbox" checked><i></i></label><label class="toggle-row">自动保存设置<input type="checkbox" checked><i></i></label><label class="toggle-row">检查软件更新<input type="checkbox" checked><i></i></label></div><p class="prototype-note">风吟 0.15.1 · 本地运行，不会保存或上传个人资料。</p></div></section>
+      <section class="page" id="page-settings"><div class="panel glass"><div class="activation"><div><p>试用与永久授权</p><h3 id="license-title">可开始3天完整试用</h3><div class="machine-code-row"><span id="machine-code">本机识别码：FY-8K2M-4R7P</span><button id="copy-machine-code" type="button">复制机器码</button></div></div><div class="license-actions"><button id="start-trial" type="button">开始3天完整试用</button><input id="license-code" placeholder="请输入唯一激活码"><button id="activate" class="primary-button">永久激活</button></div></div><div class="settings-grid"><label class="toggle-row">智能音频优化（推荐）<input id="smart-audio" type="checkbox" checked><i></i></label><label class="toggle-row">低性能电脑模式<input id="low-performance" type="checkbox"><i></i></label><label class="toggle-row">启动时进入演奏页面<input type="checkbox" checked><i></i></label><label class="toggle-row">自动保存设置<input type="checkbox" checked><i></i></label><label class="toggle-row">检查软件更新<input type="checkbox" checked><i></i></label></div><p class="prototype-note">风吟 0.15.2 · 本地运行，不会保存或上传个人资料。</p></div></section>
     </main>
   </div>
   <div class="license-lock" id="license-lock" hidden>
@@ -254,11 +254,11 @@
       <p>风吟会保存您在原厂音源中实际选择的乐器，保存后即可从音色方案直接演奏。</p>
       <div class="container-instrument-steps"><span><b>1</b>在空音窗口点击“＋”，选择一个想演奏的乐器</span><span><b>2</b>确认 MIDI 通道和第一组立体声输出</span><span><b>3</b>回到这里填写乐器名称并完成添加</span></div>
       <input id="container-instrument-name" type="text" autocomplete="off" placeholder="例如：二胡、古筝、竹笛">
-      <p class="container-instrument-status" id="container-instrument-status">正在打开 QinEngineV3……</p>
-      <div class="dialog-actions"><button id="cancel-container-instrument" type="button">取消</button><button id="confirm-container-instrument" class="primary-button" type="button" disabled>完成添加</button></div>
+      <p class="container-instrument-status" id="container-instrument-status">请先看完上方步骤，再开始选择乐器。</p>
+      <div class="dialog-actions"><button id="cancel-container-instrument" type="button">取消</button><button id="open-container-instrument" type="button">开始选择乐器</button><button id="confirm-container-instrument" class="primary-button" type="button" disabled>创建乐器</button></div>
     </section>
   </div>
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=0151-container-instruments"></script>
+  <script src="app.js?v=0152-container-restore"></script>
 </body>
 </html>

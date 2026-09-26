@@ -96,6 +96,10 @@ const path = require('node:path');
     assert.equal(await page.locator('.instrument-preset-card').count(),0,
       'KAI inventory must not create misleading playable instrument cards');
     await page.locator('[data-action="add-container-instrument"]').click();
+    assert.equal(await page.evaluate(()=>window.sent.filter(x=>x.name==='beginContainerInstrument').length),0,
+      'opening the guide must not cover it with the native editor');
+    assert.match(await page.locator('#container-instrument-status').innerText(),/先看完/);
+    await page.locator('#open-container-instrument').click();
     assert.equal(await page.evaluate(()=>window.sent.filter(x=>x.name==='beginContainerInstrument').length),1);
     await page.evaluate(()=>window.listeners.containerInstrumentResult({success:true,stage:'ready',message:'请选择乐器'}));
     await page.locator('#container-instrument-name').fill('二胡');
@@ -123,6 +127,6 @@ const path = require('node:path');
       window.listeners.backendState(window.testState);});
     assert.ok((await page.locator('#preset-grid').innerText()).includes('原音色库目录不可用'));
     assert.deepEqual(errors,[]);
-    console.log('PASS: 60 mapping clicks (inline + modal) under 25Hz refresh, mapping without plugin, 3 columns, drag/reorder/persistence, edge scroll, cancel rollback, adaptive titles, blank custom source.');
+    console.log('PASS: mapping, 3-column cards, drag/reorder, container guide-before-editor workflow, and user-created instruments.');
   } finally { await browser.close(); }
 })().catch(error=>{console.error(error);process.exitCode=1;});

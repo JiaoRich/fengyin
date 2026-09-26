@@ -48,6 +48,8 @@ private:
     std::atomic<bool> latencyProbeActive { false };
     int probeSamplesUntilChange = 0;
     bool probeNoteIsOn = false;
+    int probeNoteIndex = 0;
+    int probeCurrentNote = 67;
     double currentSampleRate = 48000.0;
     RecordingService* recorder = nullptr;
     AccompanimentAudioService* accompaniment = nullptr;
@@ -93,6 +95,7 @@ public:
     bool setEffectBypassed(bool shouldBypass);
     [[nodiscard]] bool isEffectBypassed() const noexcept;
     bool showPluginEditor(bool effect);
+    void closePluginEditor(bool effect = false);
     [[nodiscard]] juce::Array<ToneParameterValue> captureToneParameters() const;
     int restoreToneParameters(const juce::Array<ToneParameterValue>& parameters);
     [[nodiscard]] juce::StringArray getProgramNames() const;

@@ -192,6 +192,9 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
 MainComponent::~MainComponent()
 {
     stopTimer();
+    containerOutputVerificationActive = false;
+    containerOutputVerificationCompletion = {};
+    pluginHost.setLatencyProbeActive(false);
     webVideoAudioExtractor.cancel();
     accompaniment.pause();
     webInterface.reset();
@@ -1051,6 +1054,7 @@ void MainComponent::resized()
 
 void MainComponent::timerCallback()
 {
+    pollContainerOutputVerification();
     if (++licensePollTicks >= 300)
     {
         licensePollTicks = 0;
@@ -1079,7 +1083,8 @@ void MainComponent::timerCallback()
             && juce::Time::getMillisecondCounterHiRes() - lastPerformanceActivityMs > 3000.0;
         if (outputChanged)
             followSystemAudioOutputIfNeeded();
-        if (! outputChanged && safeToReconfigure && ! pluginLoading && pluginHost.hasPlugin()
+        if (! outputChanged && safeToReconfigure && ! pluginLoading && ! containerOutputVerificationActive
+            && pluginHost.hasPlugin()
             && audio.needsAutomaticLatencyTuning()
             && audio.beginAutomaticLatencyTuning())
         {
@@ -1825,6 +1830,9 @@ void MainComponent::commitContainerInstrument(const juce::String& name)
             return;
         }
 
+    // Closing the native editor first lets QinEngine commit the selected slot,
+    // channel and output routing before the VST3 state is captured.
+    pluginHost.closePluginEditor(false);
     const auto state = pluginHost.captureContainerState();
     if (state.getSize() == 0)
     {
@@ -1894,6 +1902,42 @@ void MainComponent::cancelContainerInstrument()
     containerInstrumentDraftAdapter.clear();
     containerInstrumentStateBeforeSelection.reset();
     restoreToneBeforePresetEdit();
+}
+
+void MainComponent::beginContainerOutputVerification(
+    std::function<void(bool, const juce::String&)> completion)
+{
+    if (containerOutputVerificationActive)
+    {
+        pluginHost.setLatencyProbeActive(false);
+        if (containerOutputVerificationCompletion)
+            containerOutputVerificationCompletion(false, utf8("上一次空音验证已取消"));
+    }
+    audio.cancelAutomaticLatencyTuning();
+    containerOutputVerificationCompletion = std::move(completion);
+    containerOutputVerificationStartSignals = pluginHost.getSignalBlocks();
+    // Large KAI banks can take noticeably longer on an HDD. Keep probing
+    // silently instead of declaring success as soon as the graph is wired.
+    containerOutputVerificationDeadlineMs = juce::Time::getMillisecondCounterHiRes() + 30000.0;
+    containerOutputVerificationActive = true;
+    pluginHost.setLatencyProbeActive(true);
+}
+
+void MainComponent::pollContainerOutputVerification()
+{
+    if (! containerOutputVerificationActive) return;
+    const auto signalDetected = pluginHost.getSignalBlocks() >= containerOutputVerificationStartSignals + 3;
+    const auto timedOut = juce::Time::getMillisecondCounterHiRes() >= containerOutputVerificationDeadlineMs;
+    if (! signalDetected && ! timedOut) return;
+
+    containerOutputVerificationActive = false;
+    pluginHost.setLatencyProbeActive(false);
+    auto completion = std::move(containerOutputVerificationCompletion);
+    containerOutputVerificationCompletion = {};
+    if (completion)
+        completion(signalDetected, signalDetected
+            ? utf8("已确认空音有声音输出")
+            : utf8("空音已打开，但未检测到乐器声音。请重新打开原厂界面，检查乐器、MIDI 通道和第一组立体声输出。"));
 }
 
 void MainComponent::loadSelectedEffect()
@@ -2375,6 +2419,18 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
     }
     const auto preset = cachedPresets.getReference(index);
 
+    // A newly-created container instrument is already the live, audible
+    // QinEngine instance. Recreating it here discards that known-good instance
+    // and introduces an unnecessary state round-trip.
+    if (preset.containerInstrument && pluginHost.hasPlugin()
+        && currentPresetId == preset.id && currentInstrumentKey == preset.instrumentKey)
+    {
+        pluginStatus.setText(utf8("当前空音乐器已就绪：") + preset.instrumentChineseName,
+                             juce::dontSendNotification);
+        if (completion) completion(true, utf8("空音乐器已就绪"));
+        return;
+    }
+
     juce::PluginDescription chosen;
     bool found = false;
     for (const auto& candidate : pluginCatalog.getPlugins())
@@ -2420,7 +2476,8 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                                  if (completion) completion(false, utf8("方案载入失败：") + message);
                                  return;
                              }
-                             if (preset.containerInstrument || preset.pluginBrand == "kong")
+                             const auto isContainer = preset.containerInstrument || preset.pluginBrand == "kong";
+                             if (isContainer)
                              {
                                  const auto restored = preset.samplerState.getSize() > 0
                                      ? (preset.containerInstrument ? pluginHost.restoreContainerState(preset.samplerState)
@@ -2428,7 +2485,6 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                                      : preset.pluginProgramName.isNotEmpty() && pluginHost.selectProgramByAliases({ preset.pluginProgramName });
                                  if (! restored)
                                  {
-                                     useTestSynth();
                                      const auto error = utf8("此空音方案缺少可恢复的乐器状态，请重新定制保存");
                                      pluginStatus.setText(error, juce::dontSendNotification);
                                      if (completion) completion(false, error);
@@ -2436,38 +2492,62 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                                  }
                              }
                              activatePluginOutput(message);
-                             auto style = fengyin::ToneStyleCatalog::find(currentInstrumentKey, preset.baseToneStyleId);
-                             style.settings.tone = preset.eqTone;
-                             style.settings.warmth = preset.warmth;
-                             style.settings.reverbMix = preset.reverbMix;
-                             if (preset.customTone)
+                             if (isContainer)
                              {
-                                 style.settings.compressionThreshold = preset.compressionThreshold;
-                                 style.settings.compressionRatio = preset.compressionRatio;
-                                 style.settings.saturation = preset.saturation;
-                                 style.settings.harshControl = preset.harshControl;
-                                 style.settings.reverbRoomSize = preset.reverbRoomSize;
-                                 style.settings.reverbDamping = preset.reverbDamping;
-                                 style.settings.reverbWidth = preset.reverbWidth;
-                                 style.settings.outputGain = preset.outputGain;
-                                 style.settings.bass = preset.bass;
+                                 pluginStatus.setText(utf8("正在等待空音采样加载并验证声音……"),
+                                                      juce::dontSendNotification);
+                                 beginContainerOutputVerification(
+                                     [this, preset, completion](bool audible, const juce::String& verificationMessage)
+                                     {
+                                         if (! audible)
+                                         {
+                                             pluginStatus.setText(verificationMessage, juce::dontSendNotification);
+                                             if (completion) completion(false, verificationMessage);
+                                             return;
+                                         }
+                                         completeLoadedPreset(preset, completion);
+                                     });
+                                 return;
                              }
-                             if (preset.instrumentModelIndex >= 0)
-                                 pluginHost.selectInstrumentModel(preset.instrumentModelIndex);
-                             if ((! preset.containerInstrument && preset.pluginBrand != "kong") || preset.samplerState.getSize() == 0)
-                                 pluginHost.restoreToneParameters(preset.toneParameters);
-                             currentToneStyleId = "custom:" + preset.id;
-                             currentBaseToneSettings = style.settings;
-                             masterOutput.setToneStyle(style.settings);
-                             currentSwamToneParameterCount = preset.toneParameters.size();
-                             currentPresetDisplayName = preset.name;
-                             currentPresetId = preset.id;
-                             currentPresetIsCustom = preset.customTone;
-                             pluginStatus.setText(utf8("已恢复音色：") + preset.name, juce::dontSendNotification);
-                             pluginHost.unloadEffect();
-                             effectStatus.setText(utf8("内置音色引擎已启用"), juce::dontSendNotification);
-                             if (completion) completion(true, utf8("音色方案已载入"));
+                             completeLoadedPreset(preset, completion);
                          });
+}
+
+void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
+                                         std::function<void(bool, const juce::String&)> completion)
+{
+    auto style = fengyin::ToneStyleCatalog::find(currentInstrumentKey, preset.baseToneStyleId);
+    style.settings.tone = preset.eqTone;
+    style.settings.warmth = preset.warmth;
+    style.settings.reverbMix = preset.reverbMix;
+    if (preset.customTone)
+    {
+        style.settings.compressionThreshold = preset.compressionThreshold;
+        style.settings.compressionRatio = preset.compressionRatio;
+        style.settings.saturation = preset.saturation;
+        style.settings.harshControl = preset.harshControl;
+        style.settings.reverbRoomSize = preset.reverbRoomSize;
+        style.settings.reverbDamping = preset.reverbDamping;
+        style.settings.reverbWidth = preset.reverbWidth;
+        style.settings.outputGain = preset.outputGain;
+        style.settings.bass = preset.bass;
+    }
+    if (preset.instrumentModelIndex >= 0)
+        pluginHost.selectInstrumentModel(preset.instrumentModelIndex);
+    if ((! preset.containerInstrument && preset.pluginBrand != "kong") || preset.samplerState.getSize() == 0)
+        pluginHost.restoreToneParameters(preset.toneParameters);
+    currentToneStyleId = "custom:" + preset.id;
+    currentBaseToneSettings = style.settings;
+    masterOutput.setToneStyle(style.settings);
+    currentSwamToneParameterCount = preset.toneParameters.size();
+    currentPresetDisplayName = preset.name;
+    currentPresetId = preset.id;
+    currentPresetIsCustom = preset.customTone;
+    pluginStatus.setText(utf8("已恢复音色：") + preset.name, juce::dontSendNotification);
+    pluginHost.unloadEffect();
+    effectStatus.setText(utf8("内置音色引擎已启用"), juce::dontSendNotification);
+    if (completion) completion(true, preset.containerInstrument || preset.pluginBrand == "kong"
+        ? utf8("空音方案已载入并通过发声验证") : utf8("音色方案已载入"));
 }
 
 void MainComponent::activatePluginOutput(const juce::String& pluginName)
