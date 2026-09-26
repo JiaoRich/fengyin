@@ -338,6 +338,20 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('preset.customTone = true', MAIN)
         self.assertIn('child->setAttribute("customTone"', PRESET)
 
+    def test_qin_kam_projects_are_bound_and_restored_without_detaching_audio(self):
+        project = (ROOT / "native" / "Source" / "KongProjectFile.h").read_text(encoding="utf-8")
+        catalog = (ROOT / "native" / "Source" / "PluginCatalogService.cpp").read_text(encoding="utf-8")
+        self.assertIn('ValueTree root("KAMFileRoot")', project)
+        self.assertIn('slot.setProperty("KAI"', project)
+        self.assertIn('slot.setProperty("Preset"', project)
+        self.assertIn("createKongProjectForInstrument", catalog)
+        self.assertIn("preset.containerProjectState", MAIN)
+        self.assertIn('createNewChildElement("KAM_PROJECT")', PRESET)
+        capture = HOST.split("juce::MemoryBlock PluginHostEngine::captureContainerState()", 1)[1].split(
+            "bool PluginHostEngine::restoreKongState", 1)[0]
+        self.assertNotIn("detach();", capture)
+        self.assertIn("suspendProcessing(true)", capture)
+
 
 if __name__ == "__main__":
     unittest.main()

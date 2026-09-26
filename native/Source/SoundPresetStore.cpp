@@ -12,7 +12,8 @@ SoundPresetStore::SoundPresetStore(juce::File storageDirectory)
 juce::Array<SoundPreset> SoundPresetStore::loadAll() const
 {
     if (auto xml = juce::XmlDocument::parse(getFile()); xml != nullptr
-        && (xml->getIntAttribute("version") == 7 || xml->getIntAttribute("version") == 8))
+        && (xml->getIntAttribute("version") == 7 || xml->getIntAttribute("version") == 8
+            || xml->getIntAttribute("version") == 9))
         return fromXml(*xml);
     return {};
 }
@@ -29,7 +30,8 @@ bool SoundPresetStore::save(const SoundPreset& preset)
 {
     if (preset.id.isEmpty() || preset.name.isEmpty() || preset.pluginIdentifier.isEmpty())
         return false;
-    if (preset.samplerState.getSize() > 16 * 1024 * 1024) return false;
+    if (preset.samplerState.getSize() > 16 * 1024 * 1024
+        || preset.containerProjectState.getSize() > 1024 * 1024) return false;
 
     auto presets = loadAll();
     bool replaced = false;
@@ -86,7 +88,7 @@ juce::File SoundPresetStore::getFile() const
 std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<SoundPreset>& presets)
 {
     auto root = std::make_unique<juce::XmlElement>("FENGYIN_SOUND_PRESETS");
-    root->setAttribute("version", 8);
+    root->setAttribute("version", 9);
     for (const auto& preset : presets)
     {
         auto* child = root->createNewChildElement("PRESET");
@@ -107,6 +109,8 @@ std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<Soun
         child->setAttribute("containerAdapter", preset.containerAdapter);
         if ((preset.containerInstrument || preset.pluginBrand == "kong") && preset.samplerState.getSize() > 0)
             child->createNewChildElement("SAMPLER_STATE")->addTextElement(preset.samplerState.toBase64Encoding());
+        if (preset.containerInstrument && preset.containerProjectState.getSize() > 0)
+            child->createNewChildElement("KAM_PROJECT")->addTextElement(preset.containerProjectState.toBase64Encoding());
         child->setAttribute("customTone", preset.customTone);
         child->setAttribute("compressionThreshold", static_cast<double>(preset.compressionThreshold));
         child->setAttribute("compressionRatio", static_cast<double>(preset.compressionRatio));
@@ -159,6 +163,14 @@ juce::Array<SoundPreset> SoundPresetStore::fromXml(const juce::XmlElement& root)
                 const auto encoded = state->getAllSubText();
                 if (encoded.length() <= 24 * 1024 * 1024 && ! preset.samplerState.fromBase64Encoding(encoded))
                     preset.samplerState.reset();
+            }
+        if (preset.containerInstrument)
+            if (const auto* project = child->getChildByName("KAM_PROJECT"))
+            {
+                const auto encoded = project->getAllSubText();
+                if (encoded.length() <= 2 * 1024 * 1024
+                    && ! preset.containerProjectState.fromBase64Encoding(encoded))
+                    preset.containerProjectState.reset();
             }
         preset.customTone = child->getBoolAttribute("customTone", false);
         preset.compressionThreshold = static_cast<float>(child->getDoubleAttribute("compressionThreshold", 0.58));

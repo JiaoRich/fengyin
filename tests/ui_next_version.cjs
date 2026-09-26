@@ -117,9 +117,13 @@ const path = require('node:path');
     await page.evaluate(()=>{
       window.testState.pluginLoaded=true; window.testState.pluginBrand='kong';
       window.testState.instrumentKey='container:kong-v3:kong-user-1'; window.testState.instrumentChineseName='二胡';
+      window.testState.activePresetName='原厂音色'; window.testState.activePresetCustom=true;
+      window.testState.activePresetId='kong-user-1'; window.testState.activeToneVariantId='custom:kong-user-1';
       window.testState.instrumentModels=[]; window.listeners.backendState(window.testState);
     });
     await page.locator('[data-page="play"]').click();
+    assert.equal(await page.locator('#sound-name').innerText(),'二胡','main title must remain the instrument name');
+    assert.equal(await page.locator('#tone-style-name').innerText(),'原厂音色','preset name belongs in the style switcher');
     assert.equal(await page.locator('#instrument-model-switcher').isVisible(),false,
       'Kong instruments must not show the SWAM model selector');
     assert.match(await page.locator('#instrument-picture').getAttribute('src'),/instrument_kong_erhu\.png$/);
@@ -127,6 +131,6 @@ const path = require('node:path');
       window.listeners.backendState(window.testState);});
     assert.ok((await page.locator('#preset-grid').innerText()).includes('原音色库目录不可用'));
     assert.deepEqual(errors,[]);
-    console.log('PASS: mapping, 3-column cards, drag/reorder, container guide-before-editor workflow, and user-created instruments.');
+    console.log('PASS: mapping, 3-column cards, drag/reorder, KAM container workflow, and unified instrument display.');
   } finally { await browser.close(); }
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -1,4 +1,5 @@
 #include "SoundPresetStore.h"
+#include "KongProjectFile.h"
 #include <cassert>
 #include <cmath>
 
@@ -29,6 +30,16 @@ int main()
     preset.containerAdapter = "kong-v3";
     const unsigned char samplerBytes[] { 0, 1, 127, 128, 255, 0, 42 };
     preset.samplerState = juce::MemoryBlock(samplerBytes, sizeof(samplerBytes));
+    preset.containerProjectState = fengyin::KongProjectFile::create("ErHu");
+    // Matches the supplied QinEngine 3.11 二胡.KAM ValueTree payload size.
+    assert(preset.containerProjectState.getSize() == 367);
+    const auto referencePath = juce::SystemStats::getEnvironmentVariable("FENGYIN_REFERENCE_KAM", {});
+    if (referencePath.isNotEmpty())
+    {
+        juce::MemoryBlock reference;
+        assert(juce::File(referencePath).loadFileAsData(reference));
+        assert(reference == preset.containerProjectState);
+    }
     preset.customTone = true;
     preset.compressionRatio = 2.4f;
     preset.harshControl = 0.22f;
@@ -55,6 +66,13 @@ int main()
     assert(loaded->containerInstrument);
     assert(loaded->containerAdapter == "kong-v3");
     assert(loaded->samplerState == preset.samplerState);
+    assert(loaded->containerProjectState == preset.containerProjectState);
+    const auto project = fengyin::KongProjectFile::describe(loaded->containerProjectState);
+    assert(project.has_value());
+    assert(project->kai == "ErHu");
+    assert(project->preset == "Sus_Main");
+    assert(project->midiChannel == 0);
+    assert(project->audioOutput == 0);
     assert(loaded->customTone);
     assert(std::abs(loaded->compressionRatio - 2.4f) < 0.001f);
     assert(std::abs(loaded->harshControl - 0.22f) < 0.001f);
@@ -72,6 +90,7 @@ int main()
     preset.pluginBrand = "swam";
     preset.containerInstrument = false;
     preset.containerAdapter.clear();
+    preset.containerProjectState.reset();
     assert(store.save(preset));
     assert(store.findById("test-id")->samplerState.getSize() == 0);
 

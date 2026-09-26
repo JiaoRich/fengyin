@@ -68,7 +68,8 @@ class PrototypeStructureTests(unittest.TestCase):
     def test_reverb_and_custom_preset_state_are_not_reset_by_polling(self):
         self.assertIn("let reverbDragging = false", JS)
         self.assertIn("if (reset || instrumentChanged) applyToneStyle", JS)
-        self.assertIn("state.activePresetCustom && state.activePresetName", JS)
+        self.assertIn("state.instrumentChineseName || state.pluginName", JS)
+        self.assertIn("state.activeToneVariantId || state.toneStyleId", JS)
         self.assertIn("key.startsWith('horn-')", JS)
         self.assertNotIn("key.includes('horn') || key === 'euphonium'", JS)
 
@@ -220,10 +221,10 @@ class PrototypeStructureTests(unittest.TestCase):
     def test_release_version_is_consistent(self):
         cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
         build_script = (ROOT / "scripts" / "build-windows.ps1").read_text(encoding="utf-8")
-        self.assertIn("project(FengYin VERSION 0.15.2", cmake)
-        self.assertIn("0.15.2", build_script)
-        self.assertIn("0.15.2", JS)
-        self.assertIn("风吟 0.15.2", HTML)
+        self.assertIn("project(FengYin VERSION 0.15.3", cmake)
+        self.assertIn("0.15.3", build_script)
+        self.assertIn("0.15.3", JS)
+        self.assertIn("风吟 0.15.3", HTML)
 
     def test_professional_settings_save_a_separate_named_plan(self):
         for control_id in ("tone-expert", "expert-confirm-dialog", "expert-dialog", "preset-name-dialog",

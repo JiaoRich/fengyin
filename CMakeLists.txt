@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 0.15.2 LANGUAGES C CXX)
+project(FengYin VERSION 0.15.3 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -116,6 +116,7 @@ target_sources(FengYin PRIVATE
     native/Source/SwamExpressionCurve.h
     native/Source/ToneParameterValue.h
     native/Source/KongLibraryLocator.h
+    native/Source/KongProjectFile.h
     native/Source/AudioDeviceService.cpp
     native/Source/AudioDeviceService.h
 )
@@ -226,7 +227,7 @@ if(BUILD_TESTING)
     )
     target_include_directories(FengYinPresetTests PRIVATE native/Source)
     target_link_libraries(FengYinPresetTests PRIVATE
-        juce::juce_core
+        juce::juce_data_structures
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags
     )

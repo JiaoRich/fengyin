@@ -233,7 +233,7 @@ const techniqueLibrary = {
 };
 
 function instrumentFamily(key = '') {
-  if (key.startsWith('kong-')) {
+  if (key.startsWith('kong-') || key.startsWith('container:kong-v3:')) {
     if (key.startsWith('kong-suona')) return 'brass';
     if (['kong-dizi','kong-dizi-2','kong-xiao','kong-nanxiao','kong-xun','kong-guanzi','kong-hulusi','kong-hulusi-2','kong-bawu','kong-sheng'].includes(key)) return 'woodwind';
     if (key !== 'kong-misc') return 'strings';
@@ -457,7 +457,7 @@ function escapeHtml(value) {
 
 function toneStylesForInstrument(key = '') {
   if (!key) return [{id:'none',name:'请先加载音色',description:'加载乐器后即可选择音色风格',eq:0,reverb:18,warmth:20}];
-  if (key.startsWith('kong-')) {
+  if (key.startsWith('kong-') || key.startsWith('container:kong-v3:')) {
     const folkName = currentInstrument?.chineseName || '民乐';
     const windLandscape = key.startsWith('kong-dizi') || ['kong-xiao','kong-nanxiao','kong-xun'].includes(key);
     const festiveWind = key.startsWith('kong-suona') || key === 'kong-guanzi';
@@ -585,7 +585,8 @@ function instrumentModelsForCurrentInstrument() {
 function renderInstrumentModelSwitcher(reset = false) {
   const models = instrumentModelsForCurrentInstrument();
   const key = currentInstrument?.instrumentKey || '';
-  const isKong = latestBackendState?.pluginBrand === 'kong' || currentInstrument?.brand === 'kong' || key.startsWith('kong-');
+  const isKong = latestBackendState?.pluginBrand === 'kong' || currentInstrument?.brand === 'kong'
+    || key.startsWith('kong-') || key.startsWith('container:kong-v3:');
   const modelSwitcher = $('#instrument-model-switcher');
   modelSwitcher.hidden = isKong;
   const enabled = !!currentPluginLoaded && !isKong && models.length > 0;
@@ -745,11 +746,15 @@ $('#confirm-preset-name')?.addEventListener('click', () => {
   const name = $('#preset-name-input').value.trim();
   if (!name) return toast('请输入方案名称');
   const duplicate = savedPresets.some(item => String(item.name || '').toLowerCase() === name.toLowerCase()
-    && (item.brand || 'swam') === (currentInstrument?.instrumentKey?.startsWith('kong-') ? 'kong' : 'swam'));
+    && (item.brand || 'swam') === ((currentInstrument?.brand === 'kong'
+      || currentInstrument?.instrumentKey?.startsWith('kong-')
+      || currentInstrument?.instrumentKey?.startsWith('container:kong-v3:')) ? 'kong' : 'swam'));
   if (duplicate && !window.confirm(`已有名为“${name}”的方案。\n\n点击“确定”覆盖，点击“取消”返回改名。`)) return;
   nativeEvent('saveCustomPreset', {name,settings:expertSettings,baseStyleId:toneStylesForInstrument(currentInstrument?.instrumentKey)[currentToneStyleIndex]?.id || 'natural'});
   if (!window.__JUCE__?.backend?.emitEvent) {
-    savedPresets.unshift({name,brand:currentInstrument?.instrumentKey?.startsWith('kong-')?'kong':'swam',instrumentChineseName:currentInstrument?.chineseName});
+    savedPresets.unshift({name,brand:(currentInstrument?.brand === 'kong'
+      || currentInstrument?.instrumentKey?.startsWith('kong-')
+      || currentInstrument?.instrumentKey?.startsWith('container:kong-v3:'))?'kong':'swam',instrumentChineseName:currentInstrument?.chineseName});
     renderPresets();
   }
   $('#preset-name-dialog').hidden = true;
@@ -871,7 +876,10 @@ function renderPresets() {
     .map(({instrument,pluginIndex}) => ({key:instrument.instrumentKey || inferInstrumentKey(instrument.name),name:instrument.chineseName || instrument.name,originalName:instrument.label || instrument.name,pluginIndex,brand:'swam'}));
   const kongCards = [];
   for (const preset of savedPresets) {
-    if (preset.brand !== 'kong' || !preset.instrumentKey || kongCards.some(card=>card.key===preset.instrumentKey)) continue;
+    if (preset.brand !== 'kong' || !preset.containerInstrument || !preset.instrumentKey
+      || preset.instrumentKey === 'kong-engine' || preset.instrumentKey === 'container-draft'
+      || preset.instrumentChineseName === '空音 Qin Engine'
+      || kongCards.some(card=>card.key===preset.instrumentKey)) continue;
     const plugin=availableInstruments.find(item=>item.brand==='kong' && item.pluginId===preset.pluginId);
     if (plugin) kongCards.push({key:preset.instrumentKey,name:preset.instrumentChineseName || '空音自定义音色',
       originalName:`${plugin.name} · 用户添加`,brand:'kong',customOnly:true,containerInstrument:!!preset.containerInstrument});
@@ -1688,13 +1696,14 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   currentPluginLoaded = !!state.pluginLoaded;
   const sound = $('#sound-name');
   if (sound) sound.textContent = currentPluginLoaded
-    ? (state.activePresetCustom && state.activePresetName ? state.activePresetName : (state.instrumentChineseName || state.pluginName))
+    ? (state.instrumentChineseName || state.pluginName)
     : '尚未选择音色';
   $('#source-plugin-name').textContent = currentPluginLoaded ? (state.pluginName || '') : '请先到“音色方案”选择并加载';
   currentInstrument = currentPluginLoaded ? {
     name:state.pluginName,
     chineseName:state.instrumentChineseName || state.pluginName,
-    instrumentKey:state.instrumentKey || inferInstrumentKey(state.pluginName)
+    instrumentKey:state.instrumentKey || inferInstrumentKey(state.pluginName),
+    brand:state.pluginBrand
   } : null;
   if (currentPluginLoaded)
     techniquePlan = mergeBackendTechniquePlan(currentInstrument.instrumentKey, state, techniqueMappings);
@@ -1731,7 +1740,10 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   if (signature !== pluginListSignature) {
     pluginListSignature = signature;
     if (availableInstruments.length) {
-      const supported = availableInstruments.map((item,index) => ({item,index})).filter(({item}) => isSupportedInstrument(item));
+      // QinEngine is a container, not an individual playable instrument. Its
+      // instruments enter this editor through their saved instrument cards.
+      const supported = availableInstruments.map((item,index) => ({item,index}))
+        .filter(({item}) => isSupportedInstrument(item) && item.brand !== 'kong');
       const swam = supported.filter(({item}) => item.brand === 'swam' || item.isSwam === true);
       const kong = supported.filter(({item}) => item.brand === 'kong');
       const unsupported = availableInstruments.map((item,index) => ({item,index})).filter(({item}) => !isSupportedInstrument(item));
@@ -1940,7 +1952,7 @@ nativeEvent('webReady');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 0.15.2 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 0.15.3 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

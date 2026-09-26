@@ -1830,9 +1830,6 @@ void MainComponent::commitContainerInstrument(const juce::String& name)
             return;
         }
 
-    // Closing the native editor first lets QinEngine commit the selected slot,
-    // channel and output routing before the VST3 state is captured.
-    pluginHost.closePluginEditor(false);
     const auto state = pluginHost.captureContainerState();
     if (state.getSize() == 0)
     {
@@ -1858,6 +1855,7 @@ void MainComponent::commitContainerInstrument(const juce::String& name)
     preset.instrumentKey = "container:" + containerInstrumentDraftAdapter + ":" + preset.id;
     preset.instrumentChineseName = name;
     preset.samplerState = state;
+    preset.containerProjectState = pluginCatalog.createKongProjectForInstrument(name);
     preset.customTone = true;
     preset.baseToneStyleId = "natural";
     preset.toneStyleId = "natural";
@@ -1879,6 +1877,10 @@ void MainComponent::commitContainerInstrument(const juce::String& name)
         emit(false, "error", utf8("保存失败，请检查磁盘空间"));
         return;
     }
+
+    // Saving must not tear down the instance that was just proven audible.
+    // The editor can be closed only after both VST and KAM state are retained.
+    pluginHost.closePluginEditor(false);
 
     currentPluginBrand = "kong";
     currentInstrumentKey = preset.instrumentKey;
@@ -2045,6 +2047,17 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
     preset.pluginIdentifier = pluginHost.getPluginIdentifier();
     preset.toneParameters = pluginHost.captureToneParameters();
     preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureContainerState() : juce::MemoryBlock();
+    if (currentPluginBrand == "kong")
+    {
+        for (const auto& existing : cachedPresets)
+            if (existing.instrumentKey == currentInstrumentKey && existing.containerProjectState.getSize() > 0)
+            {
+                preset.containerProjectState = existing.containerProjectState;
+                break;
+            }
+        if (preset.containerProjectState.getSize() == 0)
+            preset.containerProjectState = pluginCatalog.createKongProjectForInstrument(currentInstrumentChineseName);
+    }
     preset.instrumentModelIndex = pluginHost.getCurrentInstrumentModelIndex();
     preset.eqTone = masterOutput.getEqTone();
     preset.warmth = masterOutput.getWarmth();
@@ -2119,6 +2132,17 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
     preset.pluginIdentifier = pluginHost.getPluginIdentifier();
     preset.toneParameters = pluginHost.captureToneParameters();
     preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureContainerState() : juce::MemoryBlock();
+    if (currentPluginBrand == "kong")
+    {
+        for (const auto& existing : cachedPresets)
+            if (existing.instrumentKey == currentInstrumentKey && existing.containerProjectState.getSize() > 0)
+            {
+                preset.containerProjectState = existing.containerProjectState;
+                break;
+            }
+        if (preset.containerProjectState.getSize() == 0)
+            preset.containerProjectState = pluginCatalog.createKongProjectForInstrument(currentInstrumentChineseName);
+    }
     preset.instrumentModelIndex = pluginHost.getCurrentInstrumentModelIndex();
     preset.pluginBrand = currentPluginBrand;
     preset.instrumentKey = currentInstrumentKey;
@@ -2333,6 +2357,15 @@ void MainComponent::captureToneBeforePresetEdit()
     editingReturnModelIndex = pluginHost.getCurrentInstrumentModelIndex();
     editingReturnToneParameters = pluginHost.captureToneParameters();
     editingReturnSamplerState = currentPluginBrand == "kong" ? pluginHost.captureKongState() : juce::MemoryBlock();
+    editingReturnContainerProjectState.reset();
+    if (currentPluginBrand == "kong")
+        for (const auto& preset : cachedPresets)
+            if ((currentPresetId.isNotEmpty() && preset.id == currentPresetId)
+                || (currentPresetId.isEmpty() && preset.instrumentKey == currentInstrumentKey))
+            {
+                editingReturnContainerProjectState = preset.containerProjectState;
+                break;
+            }
     editingReturnToneSettings = masterOutput.getToneStyle();
 }
 
@@ -2376,13 +2409,15 @@ void MainComponent::restoreToneBeforePresetEdit()
     const auto modelIndex = editingReturnModelIndex;
     const auto parameters = editingReturnToneParameters;
     const auto samplerState = editingReturnSamplerState;
+    const auto containerProjectState = editingReturnContainerProjectState;
     const auto toneSettings = editingReturnToneSettings;
     pluginLoading = true;
     pluginHost.loadAsync(chosen,
                          status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
                          status.bufferSize > 0 ? status.bufferSize : 128,
                          [this, presetId, presetName, styleId, brand, instrumentKey, instrumentName,
-                          programName, wasCustom, modelIndex, parameters, toneSettings, samplerState]
+                          programName, wasCustom, modelIndex, parameters, toneSettings, samplerState,
+                          containerProjectState]
                          (bool success, const juce::String& message)
                          {
                              pluginLoading = false;
@@ -2392,7 +2427,8 @@ void MainComponent::restoreToneBeforePresetEdit()
                              currentInstrumentChineseName = instrumentName;
                              if (brand == "kong")
                              {
-                                 if (samplerState.getSize() > 0) pluginHost.restoreKongState(samplerState);
+                                 if (containerProjectState.getSize() > 0) pluginHost.restoreContainerState(containerProjectState);
+                                 else if (samplerState.getSize() > 0) pluginHost.restoreKongState(samplerState);
                                  else if (programName.isNotEmpty()) pluginHost.selectProgramByAliases({ programName });
                              }
                              activatePluginOutput(message);
@@ -2479,7 +2515,11 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                              const auto isContainer = preset.containerInstrument || preset.pluginBrand == "kong";
                              if (isContainer)
                              {
-                                 const auto restored = preset.samplerState.getSize() > 0
+                                 // Prefer QinEngine's own compact KAM rack project. It contains the
+                                 // KAI bank, preset and routing that generic VST state may omit.
+                                 const auto restored = preset.containerProjectState.getSize() > 0
+                                     ? pluginHost.restoreContainerState(preset.containerProjectState)
+                                     : preset.samplerState.getSize() > 0
                                      ? (preset.containerInstrument ? pluginHost.restoreContainerState(preset.samplerState)
                                                                    : pluginHost.restoreKongState(preset.samplerState))
                                      : preset.pluginProgramName.isNotEmpty() && pluginHost.selectProgramByAliases({ preset.pluginProgramName });
@@ -2501,6 +2541,27 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                                      {
                                          if (! audible)
                                          {
+                                             // Some Qin builds wrap their full VST state differently. If native
+                                             // KAM restore did not produce audio, retry the captured state once.
+                                             if (preset.containerProjectState.getSize() > 0
+                                                 && preset.samplerState.getSize() > 0
+                                                 && pluginHost.restoreContainerState(preset.samplerState))
+                                             {
+                                                 pluginStatus.setText(utf8("KAM 未出声，正在尝试完整状态……"),
+                                                                      juce::dontSendNotification);
+                                                 beginContainerOutputVerification(
+                                                     [this, preset, completion](bool fallbackAudible,
+                                                                                const juce::String& fallbackMessage)
+                                                     {
+                                                         if (fallbackAudible) completeLoadedPreset(preset, completion);
+                                                         else
+                                                         {
+                                                             pluginStatus.setText(fallbackMessage, juce::dontSendNotification);
+                                                             if (completion) completion(false, fallbackMessage);
+                                                         }
+                                                     });
+                                                 return;
+                                             }
                                              pluginStatus.setText(verificationMessage, juce::dontSendNotification);
                                              if (completion) completion(false, verificationMessage);
                                              return;

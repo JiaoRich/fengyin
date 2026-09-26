@@ -1,5 +1,6 @@
 #include "PluginCatalogService.h"
 #include "KongInstrumentCatalog.h"
+#include "KongProjectFile.h"
 
 namespace fengyin
 {
@@ -255,6 +256,29 @@ juce::var PluginCatalogService::getKongLibraryState() const
     }
     result->setProperty("instruments", juce::var(instruments));
     return juce::var(result.release());
+}
+
+juce::MemoryBlock PluginCatalogService::createKongProjectForInstrument(const juce::String& instrumentName) const
+{
+    const juce::ScopedLock lock(stateLock);
+    const auto wanted = instrumentName.trim();
+    juce::String bestStem;
+    int bestScore = -1;
+    for (const auto& file : kongLibrary.files)
+    {
+        const auto description = KongLibraryLocator::describe(file);
+        const auto candidate = description.chineseName.trim();
+        int score = -1;
+        if (candidate.equalsIgnoreCase(wanted)) score = 10000 + candidate.length();
+        else if (wanted.containsIgnoreCase(candidate) || candidate.containsIgnoreCase(wanted))
+            score = candidate.length();
+        if (score > bestScore)
+        {
+            bestScore = score;
+            bestStem = juce::File(file).getFileNameWithoutExtension();
+        }
+    }
+    return bestStem.isNotEmpty() ? KongProjectFile::create(bestStem) : juce::MemoryBlock();
 }
 
 juce::File PluginCatalogService::getCatalogFile() const

@@ -34,6 +34,7 @@ public:
     void addScanPath(const juce::File& folder);
     bool setKongLibraryPath(const juce::File& folder);
     [[nodiscard]] juce::var getKongLibraryState() const;
+    [[nodiscard]] juce::MemoryBlock createKongProjectForInstrument(const juce::String& instrumentName) const;
     [[nodiscard]] juce::KnownPluginList& getKnownPlugins() noexcept { return knownPlugins; }
 
 private:

@@ -156,6 +156,7 @@ private:
     int editingReturnModelIndex = -1;
     juce::Array<fengyin::ToneParameterValue> editingReturnToneParameters;
     juce::MemoryBlock editingReturnSamplerState;
+    juce::MemoryBlock editingReturnContainerProjectState;
     fengyin::ToneStyleSettings editingReturnToneSettings;
     juce::String currentToneStyleId { "natural" };
     juce::String currentPluginBrand { "swam" };

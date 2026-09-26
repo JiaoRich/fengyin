@@ -663,10 +663,13 @@ juce::MemoryBlock PluginHostEngine::captureContainerState()
 {
     juce::MemoryBlock state;
     if (! hasPlugin()) return state;
-    auto* manager = attachedManager;
-    detach();
-    getPlugin()->getStateInformation(state);
-    if (manager != nullptr) attachTo(*manager);
+    // Do not detach the audible instance merely to save it. QinEngine can lose
+    // its live rack/output routing during that detach/attach cycle. JUCE's
+    // suspended flag prevents processBlock from racing this message-thread save.
+    auto* processor = getPlugin();
+    processor->suspendProcessing(true);
+    processor->getStateInformation(state);
+    processor->suspendProcessing(false);
     return state;
 }
 
@@ -682,13 +685,12 @@ bool PluginHostEngine::restoreKongState(const juce::MemoryBlock& state)
 bool PluginHostEngine::restoreContainerState(const juce::MemoryBlock& state)
 {
     if (! hasPlugin() || state.getSize() == 0 || state.getSize() > 16 * 1024 * 1024) return false;
-    auto* manager = attachedManager;
-    detach();
-    getPlugin()->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
-    const auto connected = rebuildConnections();
+    auto* processor = getPlugin();
+    processor->suspendProcessing(true);
+    processor->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
+    processor->suspendProcessing(false);
     resetPerformance();
-    if (manager != nullptr) attachTo(*manager);
-    return connected; // setStateInformation has no success result; soundbank availability requires playback testing.
+    return true; // setStateInformation has no result; soundbank availability is verified by the caller.
 }
 
 bool PluginHostEngine::selectProgramByAliases(const juce::StringArray& aliases)

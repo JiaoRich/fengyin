@@ -25,6 +25,9 @@ struct SoundPreset
     // Full state for a user-created instrument inside a container plug-in.  Qin is
     // the first adapter; Kontakt/Falcon and other containers use the same field.
     juce::MemoryBlock samplerState;
+    // Native QinEngine rack project (.KAM), retained separately from generic
+    // plug-in state so the engine's selected KAI slot can be restored reliably.
+    juce::MemoryBlock containerProjectState;
     bool containerInstrument = false;
     juce::String containerAdapter;
     bool customTone = false;
