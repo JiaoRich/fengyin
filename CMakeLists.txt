@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 0.14.0 LANGUAGES C CXX)
+project(FengYin VERSION 0.15.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -59,6 +59,18 @@ juce_add_binary_data(FengYinWebAssets SOURCES
     assets/instruments/instrument_viola.png
     assets/instruments/instrument_cello.png
     assets/instruments/instrument_double_bass.png
+    assets/instruments/instrument_kong_erhu.png
+    assets/instruments/instrument_kong_guzheng.png
+    assets/instruments/instrument_kong_dizi.png
+    assets/instruments/instrument_kong_pipa.png
+    assets/instruments/instrument_kong_suona.png
+    assets/instruments/instrument_kong_hulusi.png
+    assets/instruments/instrument_kong_yangqin.png
+    assets/instruments/instrument_kong_guqin.png
+    assets/instruments/instrument_kong_sheng.png
+    assets/instruments/instrument_kong_ruan.png
+    assets/instruments/instrument_kong_xiao.png
+    assets/instruments/instrument_kong_banhu.png
 )
 
 target_sources(FengYin PRIVATE
@@ -102,6 +114,7 @@ target_sources(FengYin PRIVATE
     native/Source/SwamExpressionCurve.cpp
     native/Source/SwamExpressionCurve.h
     native/Source/ToneParameterValue.h
+    native/Source/KongLibraryLocator.h
     native/Source/AudioDeviceService.cpp
     native/Source/AudioDeviceService.h
 )

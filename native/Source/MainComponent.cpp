@@ -218,6 +218,39 @@ void MainComponent::setupWebInterface()
                 ? utf8("正在自动优化声音，无需操作…") : juce::String());
         })
         .withEventListener("scanPlugins", [this](juce::var) { if (isActivated) startPluginScan(); })
+        .withEventListener("choosePluginFolder", [this](juce::var)
+        {
+            if (! isActivated || pluginCatalog.getProgress().scanning) return;
+            pluginFolderChooser = std::make_unique<juce::FileChooser>(utf8("选择 VST3 音源所在文件夹"));
+            const juce::Component::SafePointer<MainComponent> safeThis(this);
+            pluginFolderChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+                [safeThis](const juce::FileChooser& chooser)
+                {
+                    if (safeThis == nullptr || ! chooser.getResult().isDirectory()) return;
+                    safeThis->pluginCatalog.addScanPath(chooser.getResult());
+                    safeThis->startPluginScan();
+                });
+        })
+        .withEventListener("chooseKongLibrary", [this](juce::var)
+        {
+            if (! isActivated || pluginCatalog.getProgress().scanning) return;
+            pluginFolderChooser = std::make_unique<juce::FileChooser>(utf8("选择空音设置中显示的音色库目录（包含 KAI 文件）"));
+            const juce::Component::SafePointer<MainComponent> safeThis(this);
+            pluginFolderChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+                [safeThis](const juce::FileChooser& chooser)
+                {
+                    if (safeThis == nullptr || chooser.getResult() == juce::File()) return;
+                    const auto success = safeThis->pluginCatalog.setKongLibraryPath(chooser.getResult());
+                    if (safeThis->webInterface != nullptr)
+                    {
+                        auto message = std::make_unique<juce::DynamicObject>();
+                        message->setProperty("success", success);
+                        message->setProperty("message", success ? utf8("已记住空音音色库位置")
+                            : utf8("未找到 KAI 文件或无法保存，请选择空音设置中显示的音色库文件夹"));
+                        safeThis->webInterface->emitEventIfBrowserIsVisible("kongLibraryResult", juce::var(message.release()));
+                    }
+                });
+        })
         .withEventListener("loadPlugin", [this](juce::var payload)
         {
             const auto index = static_cast<int>(payload.getProperty("index", -1));
@@ -291,6 +324,12 @@ void MainComponent::setupWebInterface()
                     webInterface->emitEventIfBrowserIsVisible("presetLoadResult", juce::var(result.release()));
                 });
             }
+        })
+        .withEventListener("beginCustomTone", [this](juce::var)
+        {
+            if (! isActivated || pluginLoading) return;
+            editingPresetId.clear();
+            captureToneBeforePresetEdit();
         })
         .withEventListener("cancelPresetEdit", [this](juce::var)
         {
@@ -1295,11 +1334,12 @@ void MainComponent::timerCallback()
         juce::Array<juce::var> instruments;
         for (const auto& plugin : cachedInstrumentPlugins)
         {
-            const auto brand = fengyin::SupportedInstrumentClassifier::classify(plugin.name, plugin.manufacturerName);
+            const auto brand = fengyin::SupportedInstrumentClassifier::classify(plugin.name, plugin.manufacturerName, plugin.fileOrIdentifier);
             const auto isSwam = brand == fengyin::SupportedInstrumentClassifier::Brand::swam;
             const auto isKong = brand == fengyin::SupportedInstrumentClassifier::Brand::kong;
             auto item = std::make_unique<juce::DynamicObject>();
             item->setProperty("name", plugin.name);
+            item->setProperty("pluginId", plugin.createIdentifierString());
             item->setProperty("isSwam", isSwam);
             item->setProperty("brand", isKong ? "kong" : isSwam ? "swam" : "unsupported");
             item->setProperty("supported", isSwam || isKong);
@@ -1317,26 +1357,8 @@ void MainComponent::timerCallback()
         juce::Array<juce::var> effects;
         for (const auto& effect : cachedEffectPlugins) effects.add(effect.name);
         state->setProperty("instruments", juce::var(instruments));
-        juce::Array<juce::var> kongInstruments;
-        if (pluginHost.hasPlugin() && currentPluginBrand == "kong")
-        {
-            auto programs = pluginHost.getProgramNames();
-            const auto currentProgram = pluginHost.getCurrentProgramName();
-            if (currentProgram.isNotEmpty()) programs.addIfNotAlreadyThere(currentProgram);
-            juce::StringArray addedKeys;
-            for (const auto& program : programs)
-                if (const auto* definition = fengyin::KongInstrumentCatalog::matchProgram(program))
-                    if (! addedKeys.contains(definition->key))
-                    {
-                        auto item = std::make_unique<juce::DynamicObject>();
-                        item->setProperty("key", definition->key);
-                        item->setProperty("name", utf8(definition->chineseName));
-                        item->setProperty("program", program);
-                        kongInstruments.add(juce::var(item.release()));
-                        addedKeys.add(definition->key);
-                    }
-        }
-        state->setProperty("kongInstruments", juce::var(kongInstruments));
+        state->setProperty("kongInstruments", juce::var(pluginCatalog.getKongInstruments()));
+        state->setProperty("kongLibrary", pluginCatalog.getKongLibraryState());
         state->setProperty("effects", juce::var(effects));
         juce::Array<juce::var> presets;
         for (const auto& preset : cachedPresets)
@@ -1345,6 +1367,7 @@ void MainComponent::timerCallback()
             item->setProperty("id", preset.id);
             item->setProperty("name", preset.name);
             item->setProperty("brand", preset.pluginBrand);
+            item->setProperty("pluginId", preset.pluginIdentifier);
             item->setProperty("instrumentKey", preset.instrumentKey);
             item->setProperty("instrumentChineseName", preset.instrumentChineseName);
             item->setProperty("customTone", preset.customTone);
@@ -1482,7 +1505,7 @@ void MainComponent::startPluginScan()
 {
     pluginChoicesLoaded = false;
     pluginSelector.clear(juce::dontSendNotification);
-    pluginCatalog.startScan(pluginCatalog.getRecommendedVst3Paths(), false);
+    pluginCatalog.startScan(pluginCatalog.getRecommendedVst3Paths(), true);
     pluginStatus.setText(utf8("正在准备扫描……"), juce::dontSendNotification);
 }
 
@@ -1521,10 +1544,10 @@ void MainComponent::refreshPluginChoices()
         for (const auto& swam : swamPlugins)
             if (swam.createIdentifierString() == plugin.createIdentifierString())
                 isSwam = true;
-        if (! isSwam && plugin.isInstrument)
+        const auto isKong = fengyin::SupportedInstrumentClassifier::classify(plugin.name, plugin.manufacturerName, plugin.fileOrIdentifier)
+                          == fengyin::SupportedInstrumentClassifier::Brand::kong;
+        if (! isSwam && (plugin.isInstrument || isKong))
         {
-            const auto isKong = fengyin::SupportedInstrumentClassifier::classify(plugin.name, plugin.manufacturerName)
-                              == fengyin::SupportedInstrumentClassifier::Brand::kong;
             if (isKong && ! kongHeadingAdded)
             {
                 pluginSelector.addSectionHeading(utf8("中国民乐 · 空音"));
@@ -1539,7 +1562,7 @@ void MainComponent::refreshPluginChoices()
             pluginSelector.addItem(isKong ? utf8("空音 Qin Engine · ") + plugin.name
                                           : plugin.name + utf8("（当前版本暂未支持）"), itemId++);
         }
-        if (! plugin.isInstrument)
+        if (! plugin.isInstrument && ! isKong)
         {
             cachedEffectPlugins.add(plugin);
             effectSelector.addItem(plugin.name, cachedEffectPlugins.size());
@@ -1561,7 +1584,7 @@ void MainComponent::loadSelectedPlugin()
     }
 
     const auto chosen = cachedInstrumentPlugins.getReference(selectedIndex);
-    if (! fengyin::SupportedInstrumentClassifier::isSupported(chosen.name, chosen.manufacturerName))
+    if (! fengyin::SupportedInstrumentClassifier::isSupported(chosen.name, chosen.manufacturerName, chosen.fileOrIdentifier))
     {
         const auto message = utf8("当前版本尚未支持 Kontakt、三体等其他音源，请关注后续版本升级。");
         pluginStatus.setText(message, juce::dontSendNotification);
@@ -1575,7 +1598,7 @@ void MainComponent::loadSelectedPlugin()
         return;
     }
 
-    const auto brand = fengyin::SupportedInstrumentClassifier::classify(chosen.name, chosen.manufacturerName);
+    const auto brand = fengyin::SupportedInstrumentClassifier::classify(chosen.name, chosen.manufacturerName, chosen.fileOrIdentifier);
     currentPresetDisplayName.clear();
     currentPresetId.clear();
     currentPresetIsCustom = false;
@@ -1627,91 +1650,61 @@ void MainComponent::loadSelectedPlugin()
                          });
 }
 
-void MainComponent::loadKongInstrument(const juce::String& instrumentKey, const juce::String& instrumentName)
+void MainComponent::loadKongInstrument(const juce::String& instrumentKey, const juce::String&)
 {
-    const auto* definition = fengyin::KongInstrumentCatalog::find(instrumentKey);
-    if (definition == nullptr) return;
-    const auto aliases = juce::StringArray::fromTokens(definition->programAliases, "|", "");
-    if (pluginHost.hasPlugin() && currentPluginBrand == "kong")
+    if (pluginLoading) return;
+    juce::var entry;
+    for (const auto& candidate : pluginCatalog.getKongInstruments())
+        if (candidate.getProperty("key", {}).toString() == instrumentKey) { entry = candidate; break; }
+    const auto report = [this](bool success, const juce::String& message)
     {
-        currentInstrumentKey = instrumentKey;
-        currentInstrumentChineseName = instrumentName.isNotEmpty() ? instrumentName : utf8(definition->chineseName);
-        currentPresetDisplayName.clear();
-        currentPresetId.clear();
-        currentPresetIsCustom = false;
-        const auto selected = pluginHost.selectProgramByAliases(aliases);
-        activatePluginOutput(pluginHost.getPluginName());
-        pluginStatus.setText(selected ? utf8("已载入：") + currentInstrumentChineseName
-                                      : utf8("请在空音界面选择“") + currentInstrumentChineseName + utf8("”"),
-                             juce::dontSendNotification);
-        if (! selected) pluginHost.showPluginEditor(false);
-        if (webInterface != nullptr)
+        pluginStatus.setText(message, juce::dontSendNotification);
+        if (webInterface == nullptr) return;
+        auto result = std::make_unique<juce::DynamicObject>();
+        result->setProperty("success", success);
+        result->setProperty("message", message);
+        webInterface->emitEventIfBrowserIsVisible("pluginLoadResult", juce::var(result.release()));
+    };
+    if (entry.isVoid()) { report(false, utf8("未找到该乐器的扫描记录，请重新扫描音源")); return; }
+    const auto identifier = entry.getProperty("pluginId", {}).toString();
+    const auto program = entry.getProperty("program", {}).toString();
+    const auto name = entry.getProperty("name", {}).toString();
+    const auto select = [this, instrumentKey, program, name, report]()
+    {
+        // Select while detached: a sampler may perform disk IO in setCurrentProgram.
+        pluginHost.detach();
+        const auto selected = pluginHost.selectProgramByAliases({ program });
+        if (selected)
         {
-            auto result = std::make_unique<juce::DynamicObject>();
-            result->setProperty("success", true);
-            result->setProperty("message", pluginStatus.getText());
-            webInterface->emitEventIfBrowserIsVisible("pluginLoadResult", juce::var(result.release()));
+            currentPluginBrand = "kong";
+            currentInstrumentKey = instrumentKey;
+            currentInstrumentChineseName = name;
+            currentPresetDisplayName.clear();
+            currentPresetId.clear();
+            currentPresetIsCustom = false;
         }
-        return;
-    }
+        activatePluginOutput(pluginHost.getPluginName());
+        report(selected, selected ? utf8("已载入：") + name
+                                  : utf8("空音乐器选择失败，请重新扫描或检查音色库是否完整安装"));
+    };
+    if (pluginHost.hasPlugin() && pluginHost.getPluginIdentifier() == identifier) { select(); return; }
     juce::PluginDescription chosen;
     bool found = false;
     for (const auto& candidate : cachedInstrumentPlugins)
-        if (fengyin::SupportedInstrumentClassifier::classify(candidate.name, candidate.manufacturerName)
-            == fengyin::SupportedInstrumentClassifier::Brand::kong)
-        {
-            chosen = candidate;
-            found = true;
-            break;
-        }
-    if (! found)
-    {
-        const auto message = utf8("未找到空音 Qin Engine V3，请先安装后重新扫描音源。");
-        pluginStatus.setText(message, juce::dontSendNotification);
-        if (webInterface != nullptr)
-        {
-            auto result = std::make_unique<juce::DynamicObject>();
-            result->setProperty("success", false);
-            result->setProperty("message", message);
-            webInterface->emitEventIfBrowserIsVisible("pluginLoadResult", juce::var(result.release()));
-        }
-        return;
-    }
-    currentPluginBrand = "kong";
-    currentPresetDisplayName.clear();
-    currentPresetId.clear();
-    currentPresetIsCustom = false;
-    currentInstrumentKey = instrumentKey;
-    currentInstrumentChineseName = instrumentName.isNotEmpty() ? instrumentName : utf8(definition->chineseName);
+        if (candidate.createIdentifierString() == identifier) { chosen = candidate; found = true; break; }
+    if (! found) { report(false, utf8("未找到对应的空音插件，请重新扫描")); return; }
     const auto status = audio.getStatus();
     pluginLoading = true;
-    pluginStatus.setText(utf8("正在载入空音·") + currentInstrumentChineseName, juce::dontSendNotification);
     pluginHost.loadAsync(chosen, status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
         status.bufferSize > 0 ? status.bufferSize : 128,
-        [this, aliases](bool success, const juce::String& message)
+        [this, select, report](bool success, const juce::String& message)
         {
             pluginLoading = false;
-            if (! success)
-            {
-                useTestSynth();
-                pluginStatus.setText(utf8("空音载入失败：") + message, juce::dontSendNotification);
-            }
-            else
-            {
-                activatePluginOutput(message);
-                const auto selected = pluginHost.selectProgramByAliases(aliases);
-                pluginStatus.setText(selected ? utf8("已载入：") + currentInstrumentChineseName
-                                              : utf8("已打开空音，请在音源界面选择“") + currentInstrumentChineseName + utf8("”"),
-                                     juce::dontSendNotification);
-                if (! selected) pluginHost.showPluginEditor(false);
-            }
-            if (webInterface != nullptr)
-            {
-                auto result = std::make_unique<juce::DynamicObject>();
-                result->setProperty("success", success);
-                result->setProperty("message", pluginStatus.getText());
-                webInterface->emitEventIfBrowserIsVisible("pluginLoadResult", juce::var(result.release()));
-            }
+            if (! success) { useTestSynth(); report(false, utf8("空音载入失败：") + message); return; }
+            currentPluginBrand = "kong";
+            currentInstrumentKey = "kong-engine";
+            currentInstrumentChineseName = utf8("空音 Qin Engine");
+            select();
         });
 }
 
@@ -1819,6 +1812,7 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
     preset.name = name;
     preset.pluginIdentifier = pluginHost.getPluginIdentifier();
     preset.toneParameters = pluginHost.captureToneParameters();
+    preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureKongState() : juce::MemoryBlock();
     preset.instrumentModelIndex = pluginHost.getCurrentInstrumentModelIndex();
     preset.eqTone = masterOutput.getEqTone();
     preset.warmth = masterOutput.getWarmth();
@@ -1887,6 +1881,7 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
     preset.name = name;
     preset.pluginIdentifier = pluginHost.getPluginIdentifier();
     preset.toneParameters = pluginHost.captureToneParameters();
+    preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureKongState() : juce::MemoryBlock();
     preset.instrumentModelIndex = pluginHost.getCurrentInstrumentModelIndex();
     preset.pluginBrand = currentPluginBrand;
     preset.instrumentKey = currentInstrumentKey;
@@ -2080,8 +2075,10 @@ void MainComponent::showSetupGuide(bool automatic)
 
 void MainComponent::captureToneBeforePresetEdit()
 {
-    editingReturnValid = pluginHost.hasPlugin();
-    if (! editingReturnValid) return;
+    if (editingReturnValid) return;
+    editingReturnValid = true;
+    editingReturnHadPlugin = pluginHost.hasPlugin();
+    if (! editingReturnHadPlugin) return;
     editingReturnPluginIdentifier = pluginHost.getPluginIdentifier();
     editingReturnPresetId = currentPresetId;
     editingReturnPresetName = currentPresetDisplayName;
@@ -2093,6 +2090,7 @@ void MainComponent::captureToneBeforePresetEdit()
     editingReturnWasCustom = currentPresetIsCustom;
     editingReturnModelIndex = pluginHost.getCurrentInstrumentModelIndex();
     editingReturnToneParameters = pluginHost.captureToneParameters();
+    editingReturnSamplerState = currentPluginBrand == "kong" ? pluginHost.captureKongState() : juce::MemoryBlock();
     editingReturnToneSettings = masterOutput.getToneStyle();
 }
 
@@ -2100,6 +2098,18 @@ void MainComponent::restoreToneBeforePresetEdit()
 {
     if (! editingReturnValid) return;
     editingReturnValid = false;
+    if (! editingReturnHadPlugin)
+    {
+        pluginHost.unload();
+        currentPresetId.clear();
+        currentPresetDisplayName.clear();
+        currentPresetIsCustom = false;
+        currentInstrumentKey.clear();
+        currentInstrumentChineseName.clear();
+        currentPluginBrand.clear();
+        useTestSynth();
+        return;
+    }
 
     juce::PluginDescription chosen;
     bool found = false;
@@ -2123,13 +2133,14 @@ void MainComponent::restoreToneBeforePresetEdit()
     const auto wasCustom = editingReturnWasCustom;
     const auto modelIndex = editingReturnModelIndex;
     const auto parameters = editingReturnToneParameters;
+    const auto samplerState = editingReturnSamplerState;
     const auto toneSettings = editingReturnToneSettings;
     pluginLoading = true;
     pluginHost.loadAsync(chosen,
                          status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
                          status.bufferSize > 0 ? status.bufferSize : 128,
                          [this, presetId, presetName, styleId, brand, instrumentKey, instrumentName,
-                          programName, wasCustom, modelIndex, parameters, toneSettings]
+                          programName, wasCustom, modelIndex, parameters, toneSettings, samplerState]
                          (bool success, const juce::String& message)
                          {
                              pluginLoading = false;
@@ -2137,11 +2148,14 @@ void MainComponent::restoreToneBeforePresetEdit()
                              currentPluginBrand = brand;
                              currentInstrumentKey = instrumentKey;
                              currentInstrumentChineseName = instrumentName;
+                             if (brand == "kong")
+                             {
+                                 if (samplerState.getSize() > 0) pluginHost.restoreKongState(samplerState);
+                                 else if (programName.isNotEmpty()) pluginHost.selectProgramByAliases({ programName });
+                             }
                              activatePluginOutput(message);
-                             if (brand == "kong" && programName.isNotEmpty())
-                                 pluginHost.selectProgramByAliases({ programName });
                              if (modelIndex >= 0) pluginHost.selectInstrumentModel(modelIndex);
-                             pluginHost.restoreToneParameters(parameters);
+                             if (brand != "kong" || samplerState.getSize() == 0) pluginHost.restoreToneParameters(parameters);
                              masterOutput.setToneStyle(toneSettings);
                              currentToneStyleId = styleId;
                              currentPresetId = presetId;
@@ -2181,7 +2195,7 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
         if (completion) completion(false, message);
         return;
     }
-    if (! fengyin::SupportedInstrumentClassifier::isSupported(chosen.name, chosen.manufacturerName))
+    if (! fengyin::SupportedInstrumentClassifier::isSupported(chosen.name, chosen.manufacturerName, chosen.fileOrIdentifier))
     {
         const auto message = utf8("当前版本尚未支持 Kontakt、三体等其他音源，请关注后续版本升级。");
         pluginStatus.setText(message, juce::dontSendNotification);
@@ -2208,9 +2222,21 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                                  if (completion) completion(false, utf8("方案载入失败：") + message);
                                  return;
                              }
+                             if (preset.pluginBrand == "kong")
+                             {
+                                 const auto restored = preset.samplerState.getSize() > 0
+                                     ? pluginHost.restoreKongState(preset.samplerState)
+                                     : preset.pluginProgramName.isNotEmpty() && pluginHost.selectProgramByAliases({ preset.pluginProgramName });
+                                 if (! restored)
+                                 {
+                                     useTestSynth();
+                                     const auto error = utf8("此空音方案缺少可恢复的乐器状态，请重新定制保存");
+                                     pluginStatus.setText(error, juce::dontSendNotification);
+                                     if (completion) completion(false, error);
+                                     return;
+                                 }
+                             }
                              activatePluginOutput(message);
-                             if (preset.pluginBrand == "kong" && preset.pluginProgramName.isNotEmpty())
-                                 pluginHost.selectProgramByAliases({ preset.pluginProgramName });
                              auto style = fengyin::ToneStyleCatalog::find(currentInstrumentKey, preset.baseToneStyleId);
                              style.settings.tone = preset.eqTone;
                              style.settings.warmth = preset.warmth;
@@ -2229,7 +2255,8 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                              }
                              if (preset.instrumentModelIndex >= 0)
                                  pluginHost.selectInstrumentModel(preset.instrumentModelIndex);
-                             pluginHost.restoreToneParameters(preset.toneParameters);
+                             if (preset.pluginBrand != "kong" || preset.samplerState.getSize() == 0)
+                                 pluginHost.restoreToneParameters(preset.toneParameters);
                              currentToneStyleId = "custom:" + preset.id;
                              currentBaseToneSettings = style.settings;
                              masterOutput.setToneStyle(style.settings);

@@ -11,7 +11,8 @@ SoundPresetStore::SoundPresetStore(juce::File storageDirectory)
 
 juce::Array<SoundPreset> SoundPresetStore::loadAll() const
 {
-    if (auto xml = juce::XmlDocument::parse(getFile()); xml != nullptr && xml->getIntAttribute("version") == 7)
+    if (auto xml = juce::XmlDocument::parse(getFile()); xml != nullptr
+        && (xml->getIntAttribute("version") == 7 || xml->getIntAttribute("version") == 8))
         return fromXml(*xml);
     return {};
 }
@@ -28,6 +29,7 @@ bool SoundPresetStore::save(const SoundPreset& preset)
 {
     if (preset.id.isEmpty() || preset.name.isEmpty() || preset.pluginIdentifier.isEmpty())
         return false;
+    if (preset.samplerState.getSize() > 16 * 1024 * 1024) return false;
 
     auto presets = loadAll();
     bool replaced = false;
@@ -84,7 +86,7 @@ juce::File SoundPresetStore::getFile() const
 std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<SoundPreset>& presets)
 {
     auto root = std::make_unique<juce::XmlElement>("FENGYIN_SOUND_PRESETS");
-    root->setAttribute("version", 7);
+    root->setAttribute("version", 8);
     for (const auto& preset : presets)
     {
         auto* child = root->createNewChildElement("PRESET");
@@ -101,6 +103,8 @@ std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<Soun
         child->setAttribute("instrumentKey", preset.instrumentKey);
         child->setAttribute("instrumentChineseName", preset.instrumentChineseName);
         child->setAttribute("pluginProgramName", preset.pluginProgramName);
+        if (preset.pluginBrand == "kong" && preset.samplerState.getSize() > 0)
+            child->createNewChildElement("SAMPLER_STATE")->addTextElement(preset.samplerState.toBase64Encoding());
         child->setAttribute("customTone", preset.customTone);
         child->setAttribute("compressionThreshold", static_cast<double>(preset.compressionThreshold));
         child->setAttribute("compressionRatio", static_cast<double>(preset.compressionRatio));
@@ -145,6 +149,13 @@ juce::Array<SoundPreset> SoundPresetStore::fromXml(const juce::XmlElement& root)
         preset.instrumentKey = child->getStringAttribute("instrumentKey");
         preset.instrumentChineseName = child->getStringAttribute("instrumentChineseName");
         preset.pluginProgramName = child->getStringAttribute("pluginProgramName");
+        if (preset.pluginBrand == "kong")
+            if (const auto* state = child->getChildByName("SAMPLER_STATE"))
+            {
+                const auto encoded = state->getAllSubText();
+                if (encoded.length() <= 24 * 1024 * 1024 && ! preset.samplerState.fromBase64Encoding(encoded))
+                    preset.samplerState.reset();
+            }
         preset.customTone = child->getBoolAttribute("customTone", false);
         preset.compressionThreshold = static_cast<float>(child->getDoubleAttribute("compressionThreshold", 0.58));
         preset.compressionRatio = static_cast<float>(child->getDoubleAttribute("compressionRatio", 1.7));

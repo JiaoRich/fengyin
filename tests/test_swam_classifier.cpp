@@ -18,4 +18,9 @@ int main()
     assert(std::string(SwamPluginClassifier::instrumentChineseName("SWAM Euphonium")) == "上低音号");
     assert(std::string(SwamPluginClassifier::instrumentKey("SWAM Baritone Sax")) == "baritone-sax");
     assert(std::string(SwamPluginClassifier::instrumentKey("SWAM Tenor Bass Trombone")) == "tenor-bass-trombone");
+    assert(std::string(SwamPluginClassifier::instrumentChineseName("SWAM Violin")) == "小提琴独奏");
+    assert(std::string(SwamPluginClassifier::instrumentChineseName("SWAM Violin Section")) == "小提琴重奏");
+    assert(std::string(SwamPluginClassifier::instrumentChineseName("SWAM Cello")) == "大提琴独奏");
+    assert(std::string(SwamPluginClassifier::instrumentChineseName("SWAM Cello Section")) == "大提琴重奏");
+    assert(std::string(SwamPluginClassifier::instrumentKey("SWAM Violin Section")) == "violin-section");
 }

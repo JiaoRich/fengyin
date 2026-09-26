@@ -99,10 +99,11 @@ public:
         if (contains(text, "oboe")) return "双簧管";
         if (contains(text, "contrabassoon")) return "倍低音巴松管";
         if (contains(text, "bassoon")) return "巴松管";
-        if (contains(text, "double bass")) return "低音提琴";
-        if (contains(text, "violin")) return "小提琴";
-        if (contains(text, "viola")) return "中提琴";
-        if (contains(text, "cello")) return "大提琴";
+        const auto section = contains(text, "section") || contains(text, "ensemble");
+        if (contains(text, "double bass")) return section ? "低音提琴重奏" : "低音提琴独奏";
+        if (contains(text, "violin")) return section ? "小提琴重奏" : "小提琴独奏";
+        if (contains(text, "viola")) return section ? "中提琴重奏" : "中提琴独奏";
+        if (contains(text, "cello")) return section ? "大提琴重奏" : "大提琴独奏";
         return "SWAM 乐器";
     }
 
@@ -139,10 +140,11 @@ public:
         if (contains(text, "oboe")) return "oboe";
         if (contains(text, "contrabassoon")) return "contrabassoon";
         if (contains(text, "bassoon")) return "bassoon";
-        if (contains(text, "double bass")) return "double-bass";
-        if (contains(text, "violin")) return "violin";
-        if (contains(text, "viola")) return "viola";
-        if (contains(text, "cello")) return "cello";
+        const auto section = contains(text, "section") || contains(text, "ensemble");
+        if (contains(text, "double bass")) return section ? "double-bass-section" : "double-bass";
+        if (contains(text, "violin")) return section ? "violin-section" : "violin";
+        if (contains(text, "viola")) return section ? "viola-section" : "viola";
+        if (contains(text, "cello")) return section ? "cello-section" : "cello";
         return "alto-sax";
     }
 

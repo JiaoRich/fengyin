@@ -66,6 +66,7 @@ public:
         int bestLength = 0;
         for (const auto& item : all())
         {
+            if (normalised == juce::String::fromUTF8(item.chineseName)) return &item;
             const auto aliases = juce::StringArray::fromTokens(item.programAliases, "|", "");
             for (const auto& alias : aliases)
             {
@@ -86,17 +87,23 @@ class SupportedInstrumentClassifier
 public:
     enum class Brand { unsupported, swam, kong };
 
-    static Brand classify(const juce::String& name, const juce::String& manufacturer = {})
+    static Brand classify(const juce::String& name, const juce::String& manufacturer = {},
+                          const juce::String& fileOrIdentifier = {})
     {
         const auto text = (name + " " + manufacturer).toLowerCase().removeCharacters(" ._-()");
         if (text.contains("swam") || text.contains("audiomodeling")) return Brand::swam;
-        if (text.contains("kongaudio") || text.contains("qinengine") || text.contains("qin3")) return Brand::kong;
+        if (text.contains("kongaudio") || text.contains("qinengine") || text.contains("qin3")
+            || text.contains(juce::String::fromUTF8("空音"))) return Brand::kong;
+        const auto filename = fileOrIdentifier.replaceCharacter('\\', '/')
+            .fromLastOccurrenceOf("/", false, false);
+        if (filename.equalsIgnoreCase("QinEngineV3.vst3")) return Brand::kong;
         return Brand::unsupported;
     }
 
-    static bool isSupported(const juce::String& name, const juce::String& manufacturer = {})
+    static bool isSupported(const juce::String& name, const juce::String& manufacturer = {},
+                            const juce::String& fileOrIdentifier = {})
     {
-        return classify(name, manufacturer) != Brand::unsupported;
+        return classify(name, manufacturer, fileOrIdentifier) != Brand::unsupported;
     }
 };
 }

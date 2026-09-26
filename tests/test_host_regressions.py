@@ -236,6 +236,21 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('name.contains("portamento")', HOST)
         self.assertIn('name.contains("bowpressure")', HOST)
 
+    def test_swam_instrument_models_support_continuous_vst3_selectors(self):
+        self.assertIn("instrumentModelValues", HOST)
+        self.assertIn("for (int index = 0; index <= 512; ++index)", HOST)
+        self.assertIn('name == "instrumentbody"', HOST)
+        self.assertIn("instrumentModelValues[static_cast<size_t>(index)]", HOST)
+
+    def test_kong_hides_model_switcher_and_uses_real_artwork(self):
+        self.assertIn("modelSwitcher.hidden = isKong", JS)
+        self.assertIn("const kongInstrumentArtwork", JS)
+        self.assertIn("picture.hidden = !artwork", JS)
+        assets = ROOT / "assets" / "instruments"
+        for name in ("erhu", "guzheng", "dizi", "pipa", "suona", "hulusi",
+                     "yangqin", "guqin", "sheng", "ruan", "xiao", "banhu"):
+            self.assertTrue((assets / f"instrument_kong_{name}.png").is_file())
+
     def test_smart_mix_separates_instrument_and_accompaniment(self):
         instrument = HOST.index("masterOutput->processInstrument")
         accompaniment = HOST.index("accompaniment->mixInto", instrument)

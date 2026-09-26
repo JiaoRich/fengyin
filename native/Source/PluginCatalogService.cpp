@@ -1,12 +1,67 @@
 #include "PluginCatalogService.h"
+#include "KongInstrumentCatalog.h"
 
 namespace fengyin
 {
+namespace
+{
+class IsolatedScanner final : public juce::KnownPluginList::CustomScanner
+{
+public:
+    explicit IsolatedScanner(std::function<void(const juce::XmlElement&)> callback)
+        : onScanned(std::move(callback)) {}
+
+    bool findPluginTypesFor(juce::AudioPluginFormat&, juce::OwnedArray<juce::PluginDescription>& result,
+                            const juce::String& path) override
+    {
+        juce::TemporaryFile report(".xml");
+        juce::ChildProcess child;
+        if (! child.start(juce::StringArray {
+                juce::File::getSpecialLocation(juce::File::currentExecutableFile).getFullPathName(),
+                "--scan-plugin", path, report.getFile().getFullPathName() }, 0)) return false;
+        const auto deadline = juce::Time::getMillisecondCounterHiRes() + 45000.0;
+        while (child.isRunning())
+        {
+            if (shouldExit() || juce::Thread::currentThreadShouldExit()
+                || juce::Time::getMillisecondCounterHiRes() >= deadline)
+            {
+                child.kill();
+                return false;
+            }
+            juce::Thread::sleep(40);
+        }
+        auto xml = juce::XmlDocument::parse(report.getFile());
+        if (child.getExitCode() != 0 || xml == nullptr || ! xml->hasTagName("PLUGIN_SCAN")) return false;
+        for (const auto* element : xml->getChildIterator())
+        {
+            auto description = std::make_unique<juce::PluginDescription>();
+            if (description->loadFromXml(*element)) result.add(description.release());
+        }
+        onScanned(*xml);
+        return true;
+    }
+private:
+    std::function<void(const juce::XmlElement&)> onScanned;
+};
+}
+
 PluginCatalogService::PluginCatalogService()
     : juce::Thread("VST3 scanner")
 {
     juce::addDefaultFormatsToManager(formatManager);
     loadCatalog();
+    refreshKongLibrary();
+    knownPlugins.setCustomScanner(std::make_unique<IsolatedScanner>([this](const juce::XmlElement& report)
+    {
+        const juce::ScopedLock lock(stateLock);
+        for (const auto* bank : report.getChildWithTagNameIterator("PROGRAMS"))
+        {
+            for (int index = programCatalog.getNumChildElements(); --index >= 0;)
+                if (programCatalog.getChildElement(index)->getStringAttribute("pluginId") == bank->getStringAttribute("pluginId"))
+                    programCatalog.removeChildElement(programCatalog.getChildElement(index), true);
+            programCatalog.addChildElement(new juce::XmlElement(*bank));
+        }
+    }));
 }
 
 PluginCatalogService::~PluginCatalogService()
@@ -70,21 +125,68 @@ juce::Array<juce::PluginDescription> PluginCatalogService::getSwamPlugins() cons
     return result;
 }
 
+juce::Array<juce::var> PluginCatalogService::getKongInstruments() const
+{
+    const juce::ScopedLock lock(stateLock);
+    juce::Array<juce::var> result;
+    const auto plugins = knownPlugins.getTypes();
+    for (const auto* bank : programCatalog.getChildIterator())
+    {
+        const auto pluginId = bank->getStringAttribute("pluginId");
+        bool installed = false;
+        for (const auto& plugin : plugins)
+            if (plugin.createIdentifierString() == pluginId && juce::File(plugin.fileOrIdentifier).exists()) installed = true;
+        if (! installed) continue;
+        juce::StringArray added;
+        for (const auto* program : bank->getChildWithTagNameIterator("PROGRAM"))
+            if (const auto* definition = KongInstrumentCatalog::matchProgram(program->getStringAttribute("name")))
+                if (! added.contains(definition->key))
+                {
+                    auto item = std::make_unique<juce::DynamicObject>();
+                    item->setProperty("key", definition->key);
+                    item->setProperty("name", juce::String::fromUTF8(definition->chineseName));
+                    item->setProperty("program", program->getStringAttribute("name"));
+                    item->setProperty("programIndex", program->getIntAttribute("index"));
+                    item->setProperty("pluginId", pluginId);
+                    item->setProperty("pluginName", bank->getStringAttribute("pluginName"));
+                    result.add(juce::var(item.release()));
+                    added.add(definition->key);
+                }
+    }
+    return result;
+}
+
 juce::FileSearchPath PluginCatalogService::getRecommendedVst3Paths() const
 {
     juce::FileSearchPath paths;
    #if JUCE_WINDOWS
     paths.add(juce::File("C:\\Program Files\\Common Files\\VST3"));
+    const auto local = juce::SystemStats::getEnvironmentVariable("LOCALAPPDATA", {});
+    if (local.isNotEmpty()) paths.add(juce::File(local).getChildFile("Programs/Common/VST3"));
    #elif JUCE_MAC
     paths.add(juce::File("/Library/Audio/Plug-Ins/VST3"));
     paths.add(juce::File::getSpecialLocation(juce::File::userHomeDirectory)
                   .getChildFile("Library/Audio/Plug-Ins/VST3"));
    #endif
+    const juce::FileSearchPath additional(getCatalogFile().getSiblingFile("scan-paths.txt").loadFileAsString());
+    for (int index = 0; index < additional.getNumPaths(); ++index)
+        if (additional[index].isDirectory()) paths.addIfNotAlreadyThere(additional[index]);
     return paths;
+}
+
+void PluginCatalogService::addScanPath(const juce::File& folder)
+{
+    if (! folder.isDirectory()) return;
+    const auto file = getCatalogFile().getSiblingFile("scan-paths.txt");
+    juce::FileSearchPath paths(file.loadFileAsString());
+    paths.addIfNotAlreadyThere(folder);
+    file.getParentDirectory().createDirectory();
+    file.replaceWithText(paths.toString());
 }
 
 void PluginCatalogService::run()
 {
+    refreshKongLibrary();
     while (! threadShouldExit() && scanner != nullptr)
     {
         juce::String current;
@@ -107,6 +209,54 @@ void PluginCatalogService::run()
     progress.pluginCount = knownPlugins.getNumTypes();
 }
 
+void PluginCatalogService::refreshKongLibrary()
+{
+    const auto documents = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
+    auto result = KongLibraryLocator::resolve(getCatalogFile().getSiblingFile("kong-library-path.txt"),
+        documents.getChildFile("Kong Audio/config"), documents.getChildFile("Kong Audio Soundbank"));
+    const juce::ScopedLock lock(stateLock);
+    kongLibrary = std::move(result);
+}
+
+bool PluginCatalogService::setKongLibraryPath(const juce::File& folder)
+{
+    auto result = KongLibraryLocator::inspect(folder, "selected");
+    if (! result.ready()) return false;
+    const auto file = getCatalogFile().getSiblingFile("kong-library-path.txt");
+    if (file.getParentDirectory().createDirectory().failed()) return false;
+    juce::TemporaryFile temporary(file);
+    if (! temporary.getFile().replaceWithText(folder.getFullPathName())
+        || ! temporary.overwriteTargetFileWithTemporary()) return false;
+    const juce::ScopedLock lock(stateLock);
+    kongLibrary = std::move(result);
+    return true;
+}
+
+juce::var PluginCatalogService::getKongLibraryState() const
+{
+    const juce::ScopedLock lock(stateLock);
+    auto result = std::make_unique<juce::DynamicObject>();
+    result->setProperty("path", kongLibrary.source.isEmpty() ? juce::String() : kongLibrary.directory.getFullPathName());
+    result->setProperty("source", kongLibrary.source);
+    result->setProperty("exists", kongLibrary.exists);
+    result->setProperty("ready", kongLibrary.ready());
+    result->setProperty("fileCount", kongLibrary.files.size());
+    result->setProperty("truncated", kongLibrary.truncated);
+    juce::Array<juce::var> instruments;
+    for (const auto& file : kongLibrary.files)
+    {
+        const auto description = KongLibraryLocator::describe(file);
+        auto item = std::make_unique<juce::DynamicObject>();
+        item->setProperty("key", description.key);
+        item->setProperty("name", description.chineseName);
+        item->setProperty("file", description.originalName);
+        item->setProperty("recognised", description.recognised);
+        instruments.add(juce::var(item.release()));
+    }
+    result->setProperty("instruments", juce::var(instruments));
+    return juce::var(result.release());
+}
+
 juce::File PluginCatalogService::getCatalogFile() const
 {
     return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
@@ -123,6 +273,8 @@ void PluginCatalogService::loadCatalog()
     const auto file = getCatalogFile();
     if (auto xml = juce::XmlDocument::parse(file))
         knownPlugins.recreateFromXml(*xml);
+    if (auto xml = juce::XmlDocument::parse(file.getSiblingFile("instrument-programs.xml")))
+        programCatalog = *xml;
 }
 
 void PluginCatalogService::saveCatalog()
@@ -131,5 +283,7 @@ void PluginCatalogService::saveCatalog()
     file.getParentDirectory().createDirectory();
     if (auto xml = knownPlugins.createXml())
         xml->writeTo(file);
+    const juce::ScopedLock lock(stateLock);
+    programCatalog.writeTo(file.getSiblingFile("instrument-programs.xml"));
 }
 }

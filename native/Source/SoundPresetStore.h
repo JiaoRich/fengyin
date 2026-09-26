@@ -22,6 +22,7 @@ struct SoundPreset
     juce::String instrumentKey;
     juce::String instrumentChineseName;
     juce::String pluginProgramName;
+    juce::MemoryBlock samplerState; // Qin sample assignments are not VST program names.
     bool customTone = false;
     float compressionThreshold = 0.58f;
     float compressionRatio = 1.7f;

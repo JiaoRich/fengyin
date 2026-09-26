@@ -1,4 +1,5 @@
 #include "PluginHostEngine.h"
+#include "KongInstrumentCatalog.h"
 
 #include <algorithm>
 #include <limits>
@@ -332,6 +333,7 @@ void PluginHostEngine::unload()
     for (auto& dirty : techniqueDirty) dirty.store(false, std::memory_order_relaxed);
     instrumentModelParameter = nullptr;
     instrumentModelNames.clear();
+    instrumentModelValues.clear();
     swamExpressionController.store(11, std::memory_order_relaxed);
 }
 
@@ -627,6 +629,34 @@ juce::String PluginHostEngine::getCurrentProgramName() const
     return {};
 }
 
+juce::MemoryBlock PluginHostEngine::captureKongState()
+{
+    juce::MemoryBlock state;
+    if (! hasPlugin() || fengyin::SupportedInstrumentClassifier::classify(currentDescription.name,
+        currentDescription.manufacturerName, currentDescription.fileOrIdentifier)
+            != fengyin::SupportedInstrumentClassifier::Brand::kong) return state;
+    auto* manager = attachedManager;
+    detach();
+    getPlugin()->getStateInformation(state);
+    if (manager != nullptr) attachTo(*manager);
+    return state;
+}
+
+bool PluginHostEngine::restoreKongState(const juce::MemoryBlock& state)
+{
+    if (! hasPlugin() || state.getSize() == 0 || state.getSize() > 16 * 1024 * 1024
+        || fengyin::SupportedInstrumentClassifier::classify(currentDescription.name,
+            currentDescription.manufacturerName, currentDescription.fileOrIdentifier)
+            != fengyin::SupportedInstrumentClassifier::Brand::kong) return false;
+    auto* manager = attachedManager;
+    detach();
+    getPlugin()->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
+    const auto connected = rebuildConnections();
+    resetPerformance();
+    if (manager != nullptr) attachTo(*manager);
+    return connected; // setStateInformation has no success result; soundbank availability requires playback testing.
+}
+
 bool PluginHostEngine::selectProgramByAliases(const juce::StringArray& aliases)
 {
     auto* processor = getPlugin();
@@ -635,10 +665,10 @@ bool PluginHostEngine::selectProgramByAliases(const juce::StringArray& aliases)
     {
         const auto candidate = processor->getProgramName(index).toLowerCase().removeCharacters(" ._-");
         for (const auto& alias : aliases)
-            if (candidate.contains(alias.toLowerCase().removeCharacters(" ._-")))
+            if (candidate == alias.toLowerCase().removeCharacters(" ._-"))
             {
                 processor->setCurrentProgram(index);
-                return true;
+                return processor->getCurrentProgram() == index;
             }
     }
     return false;
@@ -651,9 +681,19 @@ juce::StringArray PluginHostEngine::getInstrumentModelNames() const
 
 int PluginHostEngine::getCurrentInstrumentModelIndex() const noexcept
 {
-    if (instrumentModelParameter == nullptr || instrumentModelNames.size() < 2) return -1;
-    return juce::jlimit(0, instrumentModelNames.size() - 1,
-        juce::roundToInt(instrumentModelParameter->getValue() * static_cast<float>(instrumentModelNames.size() - 1)));
+    if (instrumentModelParameter == nullptr || instrumentModelNames.size() < 2
+        || instrumentModelValues.size() != static_cast<size_t>(instrumentModelNames.size())) return -1;
+    const auto value = instrumentModelParameter->getValue();
+    int nearest = 0;
+    auto distance = std::abs(value - instrumentModelValues.front());
+    for (int index = 1; index < instrumentModelNames.size(); ++index)
+        if (const auto candidate = std::abs(value - instrumentModelValues[static_cast<size_t>(index)]);
+            candidate < distance)
+        {
+            nearest = index;
+            distance = candidate;
+        }
+    return nearest;
 }
 
 juce::String PluginHostEngine::getCurrentInstrumentModelName() const
@@ -664,9 +704,10 @@ juce::String PluginHostEngine::getCurrentInstrumentModelName() const
 
 bool PluginHostEngine::selectInstrumentModel(int index)
 {
-    if (instrumentModelParameter == nullptr || ! juce::isPositiveAndBelow(index, instrumentModelNames.size()))
+    if (instrumentModelParameter == nullptr || ! juce::isPositiveAndBelow(index, instrumentModelNames.size())
+        || instrumentModelValues.size() != static_cast<size_t>(instrumentModelNames.size()))
         return false;
-    const auto value = static_cast<float>(index) / static_cast<float>(instrumentModelNames.size() - 1);
+    const auto value = instrumentModelValues[static_cast<size_t>(index)];
     instrumentModelParameter->beginChangeGesture();
     instrumentModelParameter->setValueNotifyingHost(value);
     instrumentModelParameter->endChangeGesture();
@@ -769,6 +810,7 @@ void PluginHostEngine::resolveInstrumentModelParameter()
 {
     instrumentModelParameter = nullptr;
     instrumentModelNames.clear();
+    instrumentModelValues.clear();
     if (instrumentNode == nullptr) return;
     int bestScore = 0;
     for (auto* parameter : instrumentNode->getProcessor()->getParameters())
@@ -777,29 +819,40 @@ void PluginHostEngine::resolveInstrumentModelParameter()
         const auto name = normalisedParameterName(*parameter);
         if (isProtectedPerformanceParameter(name)) continue;
         int score = 0;
-        if (name == "instrumentmodel" || name == "saxmodel") score = 120;
-        else if (name == "instrument" || name == "model") score = 100;
+        if (name == "instrumentmodel" || name == "saxmodel" || name == "instrumentbody") score = 120;
+        else if (name == "instrument" || name == "model" || name == "body") score = 100;
         else if (name.contains("instrumentmodel") || name.contains("saxmodel")) score = 90;
-        else if (name == "bodymodel") score = 80;
+        else if (name == "bodymodel" || name == "bodytype" || name == "instrumenttype") score = 80;
         if (score <= bestScore) continue;
         const auto steps = parameter->getNumSteps();
-        if (steps < 2 || steps > 64) continue;
         juce::StringArray names;
-        for (int index = 0; index < steps; ++index)
+        std::vector<float> values;
+        const auto collectAt = [&] (float value)
         {
-            const auto value = static_cast<float>(index) / static_cast<float>(steps - 1);
             auto label = parameter->getText(value, 96).trim();
-            if (label.isEmpty()) label = juce::String::fromUTF8("型号 ") + juce::String(index + 1);
+            if (label.isEmpty() || (! names.isEmpty() && names[names.size() - 1] == label)) return;
             names.add(label);
+            values.push_back(value);
+        };
+        if (steps >= 2 && steps <= 128)
+            for (int index = 0; index < steps; ++index)
+                collectAt(static_cast<float>(index) / static_cast<float>(steps - 1));
+        else
+        {
+            // Some SWAM VST3 builds expose the instrument/body selector as a
+            // continuous parameter even though its text is a discrete list.
+            // Sample the host-visible text so the same choices shown by the
+            // factory UI remain available in FengYin.
+            for (int index = 0; index <= 512; ++index)
+                collectAt(static_cast<float>(index) / 512.0f);
         }
-        // Keep the array step-aligned. Removing duplicate labels would change the
-        // normalised value used for later entries and could select the wrong model.
         auto distinctNames = names;
         distinctNames.removeDuplicates(false);
-        if (distinctNames.size() < 2) continue;
+        if (distinctNames.size() < 2 || distinctNames.size() > 64) continue;
         bestScore = score;
         instrumentModelParameter = parameter;
         instrumentModelNames = names;
+        instrumentModelValues = std::move(values);
     }
 }
 

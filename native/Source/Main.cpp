@@ -1,19 +1,30 @@
 #include <juce_gui_extra/juce_gui_extra.h>
 #include "MainComponent.h"
+#include "PluginScanWorker.h"
 
 class FengYinApplication final : public juce::JUCEApplication
 {
 public:
     const juce::String getApplicationName() override { return juce::String::fromUTF8("风吟"); }
     const juce::String getApplicationVersion() override { return JUCE_APPLICATION_VERSION_STRING; }
-    bool moreThanOneInstanceAllowed() override { return false; }
-
-    void initialise(const juce::String&) override
+    bool moreThanOneInstanceAllowed() override
     {
+        return juce::JUCEApplication::getCommandLineParameters().startsWith("--scan-plugin ");
+    }
+
+    void initialise(const juce::String& commandLine) override
+    {
+        auto arguments = juce::StringArray::fromTokens(commandLine, true);
+        arguments.removeEmptyStrings();
+        if (arguments.size() == 3 && arguments[0] == "--scan-plugin")
+        {
+            scanWorker = std::make_unique<PluginScanWorker>(arguments[1].unquoted(), juce::File(arguments[2].unquoted()));
+            return;
+        }
         mainWindow = std::make_unique<MainWindow>(getApplicationName());
     }
 
-    void shutdown() override { mainWindow.reset(); }
+    void shutdown() override { scanWorker.reset(); mainWindow.reset(); }
     void systemRequestedQuit() override { quit(); }
 
 private:
@@ -42,6 +53,7 @@ private:
     };
 
     std::unique_ptr<MainWindow> mainWindow;
+    std::unique_ptr<PluginScanWorker> scanWorker;
 };
 
 START_JUCE_APPLICATION(FengYinApplication)

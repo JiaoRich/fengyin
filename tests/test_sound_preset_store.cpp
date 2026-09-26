@@ -25,6 +25,8 @@ int main()
     preset.instrumentKey = "kong-erhu";
     preset.instrumentChineseName = juce::String::fromUTF8("二胡");
     preset.pluginProgramName = "Erhu";
+    const unsigned char samplerBytes[] { 0, 1, 127, 128, 255, 0, 42 };
+    preset.samplerState = juce::MemoryBlock(samplerBytes, sizeof(samplerBytes));
     preset.customTone = true;
     preset.compressionRatio = 2.4f;
     preset.harshControl = 0.22f;
@@ -48,6 +50,7 @@ int main()
     assert(loaded->instrumentKey == "kong-erhu");
     assert(loaded->instrumentChineseName == juce::String::fromUTF8("二胡"));
     assert(loaded->pluginProgramName == "Erhu");
+    assert(loaded->samplerState == preset.samplerState);
     assert(loaded->customTone);
     assert(std::abs(loaded->compressionRatio - 2.4f) < 0.001f);
     assert(std::abs(loaded->harshControl - 0.22f) < 0.001f);
@@ -62,6 +65,9 @@ int main()
     assert(store.findById("test-id")->name == "Alto Sax Updated");
     assert(store.remove("test-id"));
     assert(store.loadAll().isEmpty());
+    preset.pluginBrand = "swam";
+    assert(store.save(preset));
+    assert(store.findById("test-id")->samplerState.getSize() == 0);
 
     directory.deleteRecursively();
 }

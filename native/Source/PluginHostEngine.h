@@ -6,6 +6,7 @@
 #include <memory>
 #include <atomic>
 #include <array>
+#include <vector>
 
 #include "MidiPerformanceSink.h"
 #include "RecordingService.h"
@@ -96,6 +97,8 @@ public:
     int restoreToneParameters(const juce::Array<ToneParameterValue>& parameters);
     [[nodiscard]] juce::StringArray getProgramNames() const;
     [[nodiscard]] juce::String getCurrentProgramName() const;
+    [[nodiscard]] juce::MemoryBlock captureKongState();
+    bool restoreKongState(const juce::MemoryBlock& state);
     bool selectProgramByAliases(const juce::StringArray& aliases);
     [[nodiscard]] juce::StringArray getInstrumentModelNames() const;
     [[nodiscard]] int getCurrentInstrumentModelIndex() const noexcept;
@@ -140,6 +143,7 @@ private:
     std::array<std::atomic<bool>, static_cast<size_t>(PerformanceTechnique::count)> techniqueDirty {};
     juce::AudioProcessorParameter* instrumentModelParameter = nullptr;
     juce::StringArray instrumentModelNames;
+    std::vector<float> instrumentModelValues;
     std::atomic<bool> kongExpressionMode { false };
     std::atomic<int> swamExpressionController { 11 };
     std::atomic<int> lastBreathMidiValue { -1 };

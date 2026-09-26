@@ -135,6 +135,7 @@ private:
     juce::Array<fengyin::SoundPreset> cachedPresets;
     juce::String editingPresetId;
     bool editingReturnValid = false;
+    bool editingReturnHadPlugin = false;
     juce::String editingReturnPluginIdentifier;
     juce::String editingReturnPresetId;
     juce::String editingReturnPresetName;
@@ -146,6 +147,7 @@ private:
     bool editingReturnWasCustom = false;
     int editingReturnModelIndex = -1;
     juce::Array<fengyin::ToneParameterValue> editingReturnToneParameters;
+    juce::MemoryBlock editingReturnSamplerState;
     fengyin::ToneStyleSettings editingReturnToneSettings;
     juce::String currentToneStyleId { "natural" };
     juce::String currentPluginBrand { "swam" };
@@ -161,6 +163,7 @@ private:
     fengyin::VideoPlayerPanel videoPlayer;
     fengyin::VideoAudioExtractor webVideoAudioExtractor;
     std::unique_ptr<juce::FileChooser> webVideoChooser;
+    std::unique_ptr<juce::FileChooser> pluginFolderChooser;
     juce::File webVideoFile;
     int webVideoGeneration = 0;
     bool webVideoAudioReady = false;

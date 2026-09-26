@@ -5,6 +5,7 @@
 #include <functional>
 #include <memory>
 #include "SwamPluginClassifier.h"
+#include "KongLibraryLocator.h"
 
 namespace fengyin
 {
@@ -29,6 +30,10 @@ public:
     [[nodiscard]] juce::Array<juce::PluginDescription> getPlugins() const;
     [[nodiscard]] juce::Array<juce::PluginDescription> getSwamPlugins() const;
     [[nodiscard]] juce::FileSearchPath getRecommendedVst3Paths() const;
+    [[nodiscard]] juce::Array<juce::var> getKongInstruments() const;
+    void addScanPath(const juce::File& folder);
+    bool setKongLibraryPath(const juce::File& folder);
+    [[nodiscard]] juce::var getKongLibraryState() const;
     [[nodiscard]] juce::KnownPluginList& getKnownPlugins() noexcept { return knownPlugins; }
 
 private:
@@ -37,6 +42,7 @@ private:
     juce::File getDeadMansPedalFile() const;
     void loadCatalog();
     void saveCatalog();
+    void refreshKongLibrary();
 
     juce::AudioPluginFormatManager formatManager;
     juce::KnownPluginList knownPlugins;
@@ -44,5 +50,7 @@ private:
     mutable juce::CriticalSection stateLock;
     Progress progress;
     bool shouldRescanExisting = false;
+    juce::XmlElement programCatalog { "INSTRUMENT_PROGRAMS" };
+    KongLibraryLocator::Result kongLibrary;
 };
 }

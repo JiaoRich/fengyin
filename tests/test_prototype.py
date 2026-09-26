@@ -199,7 +199,8 @@ class PrototypeStructureTests(unittest.TestCase):
         sound_page = HTML.split('id="page-sounds"', 1)[1].split('id="page-chain"', 1)[0]
         self.assertNotIn('<h2>音色方案</h2>', sound_page)
         self.assertIn('data-action="scan-sounds"', JS)
-        self.assertIn('当前版本支持 SWAM、空音系列', JS)
+        self.assertIn('支持 SWAM、空音 VST3', JS)
+        self.assertIn('data-action="scan-folder"', JS)
         self.assertIn('class="plugin-original-name"', JS)
         self.assertIn('originalName:instrument.label || instrument.name', JS)
         self.assertIn('.preset-grid{grid-template-columns:repeat(3,minmax(280px,1fr))', HTML)
@@ -219,9 +220,10 @@ class PrototypeStructureTests(unittest.TestCase):
     def test_release_version_is_consistent(self):
         cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
         build_script = (ROOT / "scripts" / "build-windows.ps1").read_text(encoding="utf-8")
-        self.assertIn("project(FengYin VERSION 0.14.0", cmake)
-        self.assertIn("0.14.0", build_script)
-        self.assertIn("0.14.0", JS)
+        self.assertIn("project(FengYin VERSION 0.15.0", cmake)
+        self.assertIn("0.15.0", build_script)
+        self.assertIn("0.15.0", JS)
+        self.assertIn("风吟 0.15.0", HTML)
 
     def test_professional_settings_save_a_separate_named_plan(self):
         for control_id in ("tone-expert", "expert-confirm-dialog", "expert-dialog", "preset-name-dialog",
