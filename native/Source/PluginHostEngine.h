@@ -60,12 +60,6 @@ private:
 class PluginHostEngine final : public MidiPerformanceSink
 {
 public:
-    struct KongPresetActivation
-    {
-        juce::String parameterName;
-        float value = 0.0f;
-    };
-
     using LoadCallback = std::function<void(bool success, const juce::String& message)>;
 
     PluginHostEngine();
@@ -108,11 +102,9 @@ public:
     [[nodiscard]] juce::StringArray getProgramNames() const;
     [[nodiscard]] juce::String getCurrentProgramName() const;
     [[nodiscard]] juce::MemoryBlock captureKongState();
-    bool restoreKongState(const juce::MemoryBlock& state);
+    bool restoreKongProject(const juce::MemoryBlock& project);
     [[nodiscard]] juce::MemoryBlock captureContainerState();
     bool restoreContainerState(const juce::MemoryBlock& state);
-    [[nodiscard]] std::optional<KongPresetActivation> getActiveKongPresetActivation() const;
-    bool setKongPresetActivation(const KongPresetActivation& activation, bool clearFirstStage);
     bool selectProgramByAliases(const juce::StringArray& aliases);
     [[nodiscard]] juce::StringArray getInstrumentModelNames() const;
     [[nodiscard]] int getCurrentInstrumentModelIndex() const noexcept;

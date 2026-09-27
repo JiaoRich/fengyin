@@ -1,5 +1,6 @@
 #include "PluginHostEngine.h"
 #include "KongInstrumentCatalog.h"
+#include "KongProjectFile.h"
 
 #include <algorithm>
 #include <cmath>
@@ -674,13 +675,15 @@ juce::MemoryBlock PluginHostEngine::captureContainerState()
     return state;
 }
 
-bool PluginHostEngine::restoreKongState(const juce::MemoryBlock& state)
+bool PluginHostEngine::restoreKongProject(const juce::MemoryBlock& project)
 {
-    if (! hasPlugin() || state.getSize() == 0 || state.getSize() > 16 * 1024 * 1024
+    if (! hasPlugin()
         || fengyin::SupportedInstrumentClassifier::classify(currentDescription.name,
             currentDescription.manufacturerName, currentDescription.fileOrIdentifier)
-            != fengyin::SupportedInstrumentClassifier::Brand::kong) return false;
-    return restoreContainerState(state);
+            != fengyin::SupportedInstrumentClassifier::Brand::kong)
+        return false;
+    const auto state = KongProjectFile::toPluginState(project);
+    return state.getSize() > 0 && restoreContainerState(state);
 }
 
 bool PluginHostEngine::restoreContainerState(const juce::MemoryBlock& state)
@@ -692,66 +695,6 @@ bool PluginHostEngine::restoreContainerState(const juce::MemoryBlock& state)
     processor->suspendProcessing(false);
     resetPerformance();
     return true; // setStateInformation has no result; soundbank availability is verified by the caller.
-}
-
-std::optional<PluginHostEngine::KongPresetActivation> PluginHostEngine::getActiveKongPresetActivation() const
-{
-    const auto* processor = getPlugin();
-    if (processor == nullptr
-        || fengyin::SupportedInstrumentClassifier::classify(currentDescription.name,
-            currentDescription.manufacturerName, currentDescription.fileOrIdentifier)
-            != fengyin::SupportedInstrumentClassifier::Brand::kong)
-        return std::nullopt;
-
-    // QinEngine exposes one KAI_ID_n / Preset_ID_n pair for every rack slot.
-    // A restored state can display the correct preset while its sample engine is
-    // still dormant, so retain the exact active Preset_ID value for a later,
-    // notified re-activation.  Prefer a slot whose KAI is also populated.
-    const auto parameters = processor->getParameters();
-    auto findByName = [&parameters](const juce::String& name) -> juce::AudioProcessorParameter*
-    {
-        for (auto* parameter : parameters)
-            if (parameter != nullptr && parameter->getName(128).equalsIgnoreCase(name))
-                return parameter;
-        return nullptr;
-    };
-
-    std::optional<KongPresetActivation> fallback;
-    for (auto* parameter : parameters)
-    {
-        if (parameter == nullptr) continue;
-        const auto name = parameter->getName(128);
-        if (! name.startsWithIgnoreCase("Preset_ID_")) continue;
-        const auto value = parameter->getValue();
-        if (! std::isfinite(value) || value <= 0.0f) continue;
-        KongPresetActivation candidate { name, value };
-        if (! fallback.has_value()) fallback = candidate;
-        const auto suffix = name.fromFirstOccurrenceOf("Preset_ID_", false, true);
-        if (auto* kai = findByName("KAI_ID_" + suffix); kai != nullptr && kai->getValue() > 0.0f)
-            return candidate;
-    }
-    return fallback;
-}
-
-bool PluginHostEngine::setKongPresetActivation(const KongPresetActivation& activation, bool clearFirstStage)
-{
-    auto* processor = getPlugin();
-    if (processor == nullptr || activation.parameterName.isEmpty()
-        || fengyin::SupportedInstrumentClassifier::classify(currentDescription.name,
-            currentDescription.manufacturerName, currentDescription.fileOrIdentifier)
-            != fengyin::SupportedInstrumentClassifier::Brand::kong)
-        return false;
-
-    for (auto* parameter : processor->getParameters())
-    {
-        if (parameter == nullptr || ! parameter->getName(128).equalsIgnoreCase(activation.parameterName)) continue;
-        const auto value = clearFirstStage ? 0.0f : activation.value;
-        parameter->beginChangeGesture();
-        parameter->setValueNotifyingHost(value);
-        parameter->endChangeGesture();
-        return true;
-    }
-    return false;
 }
 
 bool PluginHostEngine::selectProgramByAliases(const juce::StringArray& aliases)
