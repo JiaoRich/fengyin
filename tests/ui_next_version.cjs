@@ -111,10 +111,13 @@ const path = require('node:path');
     await page.locator('#open-container-instrument').click();
     assert.equal(await page.evaluate(()=>window.sent.filter(x=>x.name==='beginContainerInstrument').length),1);
     await page.evaluate(()=>window.listeners.containerInstrumentResult({success:true,stage:'ready',message:'请选择乐器'}));
-    await page.locator('#container-instrument-name').fill('二胡');
     await page.locator('#confirm-container-instrument').click();
-    assert.deepEqual(await page.evaluate(()=>window.sent.filter(x=>x.name==='commitContainerInstrument').at(-1)?.payload),{name:'二胡'});
-    await page.evaluate(()=>window.listeners.containerInstrumentResult({success:true,stage:'saved',message:'已添加：二胡'}));
+    assert.deepEqual(await page.evaluate(()=>window.sent.filter(x=>x.name==='commitContainerInstrument').at(-1)?.payload),{name:''});
+    await page.evaluate(()=>window.listeners.containerInstrumentResult({success:true,stage:'captured',message:'请命名'}));
+    await page.locator('#container-instrument-name').fill('二胡直音主奏');
+    await page.locator('#confirm-container-instrument').click();
+    assert.deepEqual(await page.evaluate(()=>window.sent.filter(x=>x.name==='commitContainerInstrument').at(-1)?.payload),{name:'二胡直音主奏'});
+    await page.evaluate(()=>window.listeners.containerInstrumentResult({success:true,stage:'saved',message:'已添加：二胡直音主奏'}));
     await page.evaluate(()=>{
       window.testState.presets=[{id:'kong-user-1',name:'原厂音色',brand:'kong',pluginId:'qin-test',
         instrumentKey:'container:kong-v3:kong-user-1',instrumentChineseName:'二胡',containerInstrument:true,containerAdapter:'kong-v3'}];
