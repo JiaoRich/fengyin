@@ -2498,8 +2498,11 @@ void MainComponent::restoreToneBeforePresetEdit()
     const auto samplerState = editingReturnSamplerState;
     const auto projectState = editingReturnContainerProjectState;
     const auto toneSettings = editingReturnToneSettings;
+    // QinEngine's generic VST3 state describes the visible rack, but omits the
+    // KAM-only IsSelected flag that activates the audible slot. Always restore
+    // container instruments from the paired native KAM representation.
     const auto initialState = brand == "kong"
-        ? (samplerState.getSize() > 0 ? samplerState : fengyin::KongProjectFile::toPluginState(projectState))
+        ? fengyin::KongProjectFile::toPluginState(projectState)
         : juce::MemoryBlock();
     pluginLoading = true;
     pluginHost.loadAsync(chosen,
@@ -2596,10 +2599,12 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
     currentInstrumentChineseName = preset.instrumentChineseName;
     pluginStatus.setText(utf8("正在恢复音色方案……"), juce::dontSendNotification);
     pluginLoading = true;
+    // Do not prefer samplerState here. QinEngine omits IsSelected from its
+    // generic VST3 state, leaving the restored rack visible but silent until
+    // the user changes articulation. The native KAM contains that activation
+    // flag and is the authoritative load source.
     const auto initialContainerState = preset.containerInstrument || preset.pluginBrand == "kong"
-        ? (preset.samplerState.getSize() > 0
-            ? preset.samplerState
-            : fengyin::KongProjectFile::toPluginState(preset.containerProjectState))
+        ? fengyin::KongProjectFile::toPluginState(preset.containerProjectState)
         : juce::MemoryBlock();
     pluginHost.loadAsync(chosen,
                          status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
