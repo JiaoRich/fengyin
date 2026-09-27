@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 0.16.8 LANGUAGES C CXX)
+project(FengYin VERSION 0.16.9 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -296,5 +296,11 @@ if(BUILD_TESTING)
     target_link_libraries(FengYinBendRangeTests PRIVATE juce::juce_audio_processors
         juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
     add_test(NAME bend_range_parameters COMMAND FengYinBendRangeTests)
+
+    add_executable(FengYinPerformanceResetTests tests/test_performance_reset.cpp)
+    target_include_directories(FengYinPerformanceResetTests PRIVATE native/Source)
+    target_link_libraries(FengYinPerformanceResetTests PRIVATE juce::juce_audio_basics
+        juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
+    add_test(NAME performance_reset_controllers COMMAND FengYinPerformanceResetTests)
 
 endif()

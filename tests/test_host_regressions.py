@@ -77,10 +77,18 @@ class HostRegressionTests(unittest.TestCase):
         self.assertNotIn("0.28f + currentBreath * 0.52f", MIDI)
         self.assertIn('activeProfile.id == "yamaha-yds"', MIDI)
         self.assertIn("savedController = 11", MIDI)
-        self.assertIn("juce::MidiMessage::allNotesOff", HOST)
-        self.assertIn("controllerEvent(1, 11, 0)", HOST)
+        reset = (ROOT / "native" / "Source" / "PerformanceReset.h").read_text(encoding="utf-8")
+        self.assertIn("juce::MidiMessage::allNotesOff", reset)
+        self.assertIn("controllerEvent(1, 11, kong ? 127 : 0)", reset)
+        self.assertIn("sendPerformanceReset(kongResetMode.load", HOST)
         self.assertIn("swamExpressionController.load", HOST)
         self.assertIn("applyStandardSwamExpressionCurve", MAIN)
+
+    def test_qin_reset_policy_is_set_before_audio_is_exposed(self):
+        load = HOST.split("const juce::MemoryBlock& initialState,", 1)[1].split("void PluginHostEngine::unload()", 1)[0]
+        self.assertLess(load.index("setKongExpressionMode("), load.index("player.setProcessor(graph.get())"))
+        header = (ROOT / "native" / "Source" / "PluginHostEngine.h").read_text(encoding="utf-8")
+        self.assertIn("player.setKongResetMode(enabled)", header)
 
     def test_qin_restore_uses_native_kam_as_the_single_source_of_truth(self):
         project = (ROOT / "native" / "Source" / "KongProjectFile.h").read_text(encoding="utf-8")
