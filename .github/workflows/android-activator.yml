@@ -23,6 +23,9 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+          log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
@@ -93,6 +96,7 @@ jobs:
           script: |
             adb install -r apks/debug/app-debug.apk
             adb install -r apks/androidTest/debug/app-debug-androidTest.apk
+            adb shell locksettings set-pin 2468
             adb shell am instrument -w cn.fengyin.activator.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
             grep -q 'OK (' instrumentation.txt
             ! grep -q 'FAILURES\|INSTRUMENTATION_FAILED' instrumentation.txt
