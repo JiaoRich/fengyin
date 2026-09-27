@@ -96,7 +96,12 @@ LicenseStatus LicenseService::validate(const juce::String& rawCode, const juce::
     { result.message = juce::String::fromUTF8("此激活码不属于当前电脑"); return result; }
     juce::BigInteger verified;
     verified.parseString(code.substring(separator + 1), 16);
-    if (verified.isZero() || ! publicKey.applyToValue(verified) || verified.toString(16) != digestFor(payload))
+    // Compare the RSA result numerically: toString(16) drops leading zeroes,
+    // while SHA256 always returns 64 hex digits. String comparison rejected
+    // valid signatures whenever the payload digest began with zero.
+    juce::BigInteger expectedDigest;
+    expectedDigest.parseString(digestFor(payload), 16);
+    if (verified.isZero() || ! publicKey.applyToValue(verified) || verified != expectedDigest)
     { result.message = juce::String::fromUTF8("激活码签名无效，请检查是否复制完整"); return result; }
     result.activated = true;
     result.licenseId = fields[2];
