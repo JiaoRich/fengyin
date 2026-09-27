@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 0.16.9 LANGUAGES C CXX)
+project(FengYin VERSION 0.16.10 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -290,6 +290,12 @@ if(BUILD_TESTING)
         juce::juce_recommended_warning_flags
     )
     add_test(NAME swam_expression_curve COMMAND FengYinSwamExpressionCurveTests)
+
+    add_executable(FengYinToneDiagnosticTests tests/test_tone_diagnostic.cpp)
+    target_include_directories(FengYinToneDiagnosticTests PRIVATE native/Source)
+    target_link_libraries(FengYinToneDiagnosticTests PRIVATE juce::juce_audio_processors
+        juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
+    add_test(NAME tone_diagnostic_snapshot COMMAND FengYinToneDiagnosticTests)
 
     add_executable(FengYinBendRangeTests tests/test_bend_range.cpp)
     target_include_directories(FengYinBendRangeTests PRIVATE native/Source)

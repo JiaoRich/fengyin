@@ -38,6 +38,7 @@ private:
     static std::optional<juce::WebBrowserComponent::Resource> getWebResource(const juce::String& path);
     static juce::File prepareLocalWebInterface();
     void chooseVideoForWebInterface();
+    void exportCurrentToneDiagnostic();
     void loadVideoForWebInterface(const juce::File& file);
     void emitVideoAudioState(bool ready, const juce::String& message);
     juce::Rectangle<int> getContentBounds() const;
@@ -187,6 +188,8 @@ private:
     fengyin::VideoAudioExtractor webVideoAudioExtractor;
     std::unique_ptr<juce::FileChooser> webVideoChooser;
     std::unique_ptr<juce::FileChooser> pluginFolderChooser;
+    std::unique_ptr<juce::FileChooser> toneDiagnosticChooser;
+    bool toneDiagnosticExportPending = false;
     juce::File webVideoFile;
     int webVideoGeneration = 0;
     bool webVideoAudioReady = false;
