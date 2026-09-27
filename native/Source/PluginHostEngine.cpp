@@ -2,6 +2,7 @@
 #include "KongInstrumentCatalog.h"
 #include "KongProjectFile.h"
 #include "BendRangeParameters.h"
+#include "PerformanceReset.h"
 
 #include <algorithm>
 #include <cmath>
@@ -109,12 +110,7 @@ void RecordingAudioProcessorPlayer::addResetMessages(double timestampSeconds)
         message.setTimeStamp(timestampSeconds);
         collector.addMessageToQueue(message);
     };
-    send(juce::MidiMessage::allNotesOff(1));
-    send(juce::MidiMessage::allSoundOff(1));
-    send(juce::MidiMessage::controllerEvent(1, 11, 0));
-    send(juce::MidiMessage::controllerEvent(1, 2, 0));
-    send(juce::MidiMessage::controllerEvent(1, 1, 0));
-    send(juce::MidiMessage::pitchWheel(1, 8192));
+    sendPerformanceReset(kongResetMode.load(std::memory_order_acquire), send);
 }
 
 void RecordingAudioProcessorPlayer::setLatencyProbeActive(bool active) noexcept
@@ -356,6 +352,11 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                     completion(false, juce::String::fromUTF8("音源已打开，但无法连接到声音输出，请重新选择声音设备"));
                 return;
             }
+            // Set the reset policy before exposing the new processor to an
+            // already-running device callback (including SWAM -> Qin switches).
+            setKongExpressionMode(fengyin::SupportedInstrumentClassifier::classify(
+                description.name, description.manufacturerName, description.fileOrIdentifier)
+                    == fengyin::SupportedInstrumentClassifier::Brand::kong);
             player.setProcessor(graph.get());
             juce::Logger::writeToLog("Plugin graph ready " + juce::String(generation));
             resetPerformance();

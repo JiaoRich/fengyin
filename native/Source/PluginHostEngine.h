@@ -29,6 +29,7 @@ public:
     void setLatencyProbeActive(bool active) noexcept;
     bool enqueueMidi(const juce::MidiMessage& message, double timestampSeconds) noexcept;
     void requestPerformanceReset() noexcept { resetRequested.store(true, std::memory_order_release); }
+    void setKongResetMode(bool enabled) noexcept { kongResetMode.store(enabled, std::memory_order_release); }
     [[nodiscard]] uint64_t getDroppedMidiEventCount() const noexcept { return midiQueue.droppedCount() + controlQueue.droppedCount(); }
     std::atomic<uint64_t> callbackCount { 0 }, callbackOverruns { 0 }, signalBlocks { 0 };
     void audioDeviceIOCallbackWithContext(const float* const* inputs, int numInputs, float* const* outputs,
@@ -46,6 +47,7 @@ private:
     // share a producer index. Both queues have exactly one consumer.
     RealtimeMidiQueue<midiQueueSize> controlQueue;
     std::atomic<bool> resetRequested { false };
+    std::atomic<bool> kongResetMode { false };
     std::atomic<bool> latencyProbeActive { false };
     int probeSamplesUntilChange = 0;
     bool probeNoteIsOn = false;
@@ -122,7 +124,11 @@ public:
     void noteOn(int noteNumber, float velocity, double timestampSeconds = 0.0) noexcept override;
     void noteOff(int noteNumber, double timestampSeconds = 0.0) noexcept override;
     void breathChanged(float value, double timestampSeconds = 0.0) noexcept override;
-    void setKongExpressionMode(bool enabled) noexcept { kongExpressionMode.store(enabled); }
+    void setKongExpressionMode(bool enabled) noexcept
+    {
+        kongExpressionMode.store(enabled);
+        player.setKongResetMode(enabled);
+    }
     void pitchBendChanged(float bipolarValue, double timestampSeconds = 0.0) noexcept override;
     void techniqueChanged(PerformanceTechnique technique, float value) noexcept override;
     void resetPerformance() noexcept override;

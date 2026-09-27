@@ -230,10 +230,12 @@ class PrototypeStructureTests(unittest.TestCase):
     def test_release_version_is_consistent(self):
         cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
         build_script = (ROOT / "scripts" / "build-windows.ps1").read_text(encoding="utf-8")
-        self.assertIn("project(FengYin VERSION 0.16.8", cmake)
-        self.assertIn("0.16.8", build_script)
-        self.assertIn("0.16.8", JS)
-        self.assertIn("风吟 0.16.8", HTML)
+        match = re.search(r"project\(FengYin VERSION (\d+\.\d+\.\d+)", cmake)
+        self.assertIsNotNone(match)
+        version = match.group(1)
+        self.assertIn(f'$Version = "{version}"', build_script)
+        self.assertIn(f"风吟 {version}", JS)
+        self.assertIn(f"风吟 {version}", HTML)
 
     def test_professional_settings_save_a_separate_named_plan(self):
         for control_id in ("tone-expert", "expert-confirm-dialog", "expert-dialog", "preset-name-dialog",
