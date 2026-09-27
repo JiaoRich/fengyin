@@ -171,6 +171,8 @@ private:
     bool containerInstrumentDraftActive = false;
     juce::String containerInstrumentDraftAdapter;
     juce::MemoryBlock containerInstrumentStateBeforeSelection;
+    juce::MemoryBlock containerInstrumentPendingState;
+    juce::MemoryBlock containerInstrumentPendingProject;
     fengyin::ToneStyleSettings currentBaseToneSettings;
     int currentSwamToneParameterCount = 0;
     juce::Array<juce::PluginDescription> cachedInstrumentPlugins;
