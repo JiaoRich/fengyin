@@ -87,7 +87,13 @@ public:
     {
         if (pluginState.getSize() == 0) return {};
         const auto state = juce::ValueTree::readFromData(pluginState.getData(), pluginState.getSize());
-        if (! state.isValid() || ! state.hasType("State")) return {};
+        if (! state.isValid()) return {};
+        // Some QinEngine builds return their native project payload directly
+        // from getStateInformation. Preserve it rather than rejecting a valid
+        // KAM merely because the wrapper root differs between platforms.
+        if (state.hasType("KAMFileRoot"))
+            return hasSelectedPreset(state.getChildWithName("PresetList")) ? pluginState : juce::MemoryBlock();
+        if (! state.hasType("State")) return {};
         const auto sourceRack = state.getChildWithName("RackParam");
         const auto sourceList = state.getChildWithName("PresetList");
         if (! sourceRack.isValid() || ! sourceList.isValid() || ! hasSelectedPreset(sourceList)) return {};
