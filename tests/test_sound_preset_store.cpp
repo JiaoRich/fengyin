@@ -40,6 +40,10 @@ int main()
         assert(juce::File(referencePath).loadFileAsData(reference));
         assert(reference == preset.containerProjectState);
     }
+    // Windows QinEngine builds may return the native KAM payload directly.
+    // It must be accepted unchanged instead of failing creation.
+    assert(fengyin::KongProjectFile::fromPluginState(preset.containerProjectState)
+           == preset.containerProjectState);
     preset.customTone = true;
     preset.compressionRatio = 2.4f;
     preset.harshControl = 0.22f;
