@@ -39,7 +39,7 @@ public:
             { "kong-ruan", "中阮一", "阮", "ruan_1|ruan 1|ruan1|zhongruan 1|ruan", InstrumentMixProfile::strings },
             { "kong-ruan-2", "中阮二", "阮", "ruan_2|ruan 2|ruan2|zhongruan 2", InstrumentMixProfile::strings },
             { "kong-sanxian", "三弦", "弦", "sanxian|san xian", InstrumentMixProfile::strings },
-            { "kong-erhu", "二胡一", "胡", "erhu_1|erhu 1|erhu1|er hu 1|erhu", InstrumentMixProfile::strings },
+            { "kong-erhu", "二胡", "胡", "erhu_1|erhu 1|erhu1|er hu 1|erhu", InstrumentMixProfile::strings },
             { "kong-erhu-2", "二胡二", "胡", "erhu_2|erhu 2|erhu2|er hu 2", InstrumentMixProfile::strings },
             { "kong-gaohu", "高胡", "高", "gaohu|gao hu", InstrumentMixProfile::strings },
             { "kong-jinghu", "京胡", "京", "jinghu|jing hu", InstrumentMixProfile::strings },
