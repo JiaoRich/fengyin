@@ -1,0 +1,103 @@
+name: 安卓离线激活工具
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['codex/android-activator-1.0.0']
+    paths: ['android-activator/**', '.github/workflows/android-activator.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: android-activator
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: 准备 Android SDK
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: 恢复 APK 签名证书（不是激活私钥）
+        env:
+          FY_ANDROID_SIGNING_STORE: ${{ secrets.FY_ANDROID_SIGNING_STORE }}
+        run: |
+          python3 - <<'PY'
+          import os,base64,pathlib
+          value=os.environ['FY_ANDROID_SIGNING_STORE']
+          if not value: raise SystemExit('缺少 APK 签名证书')
+          target=pathlib.Path(os.environ['RUNNER_TEMP'])/'fengyin-activator.p12'
+          target.write_bytes(base64.b64decode(value,validate=True))
+          target.chmod(0o600)
+          with open(os.environ['GITHUB_ENV'],'a') as f: f.write('FY_ANDROID_KEYSTORE='+str(target)+'\n')
+          PY
+      - name: 单元测试、静态检查、构建
+        env:
+          FY_ANDROID_SIGNING_PASSWORD: ${{ secrets.FY_ANDROID_SIGNING_PASSWORD }}
+        run: gradle --no-daemon testReleaseUnitTest lintRelease assembleRelease assembleDebug assembleDebugAndroidTest
+      - name: 验证 APK 签名
+        run: $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
+      - name: 上传安卓安装包
+        uses: actions/upload-artifact@v5
+        with:
+          name: 风吟-安卓离线激活工具-1.0.0
+          path: android-activator/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+      - name: 上传测试用 APK
+        uses: actions/upload-artifact@v5
+        with:
+          name: android-test-apks
+          path: |
+            android-activator/app/build/outputs/apk/debug/*.apk
+            android-activator/app/build/outputs/apk/androidTest/debug/*.apk
+      - name: 保存检查报告
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: android-reports
+          path: |
+            android-activator/app/build/reports
+            android-activator/app/build/test-results
+      - name: 清理签名证书
+        if: always()
+        run: python3 -c "import os,pathlib; pathlib.Path(os.environ['RUNNER_TEMP'],'fengyin-activator.p12').unlink(missing_ok=True)"
+  device-test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: android-test-apks
+          path: apks
+      - name: 启用 KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          disable-animations: true
+          script: |
+            adb install -r apks/debug/app-debug.apk
+            adb install -r apks/androidTest/debug/app-debug-androidTest.apk
+            adb shell am instrument -w cn.fengyin.activator.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
+            grep -q 'OK (' instrumentation.txt
+            ! grep -q 'FAILURES\|INSTRUMENTATION_FAILED' instrumentation.txt
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: android-device-test-results
+          path: instrumentation.txt

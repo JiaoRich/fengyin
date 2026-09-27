@@ -1,0 +1,11 @@
+<resources>
+    <style name="Theme.FengYinActivator" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@color/fy_background</item>
+        <item name="android:navigationBarColor">@color/fy_background</item>
+        <item name="android:colorAccent">@color/fy_accent</item>
+        <item name="android:windowBackground">@color/fy_background</item>
+    </style>
+</resources>
+

@@ -1,0 +1,166 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/fy_background"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="风吟"
+            android:textColor="@color/fy_accent"
+            android:textSize="32sp"
+            android:textStyle="bold|italic" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="离线激活工具 · 仅供商家使用"
+            android:textColor="@color/fy_muted"
+            android:textSize="14sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/panel"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/keyStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="尚未导入激活私钥"
+                android:textColor="@color/fy_muted"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/importKey"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/button_secondary"
+                android:text="首次使用：从文件导入私钥"
+                android:textAllCaps="false"
+                android:textColor="@color/fy_text" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="客户本机识别码"
+            android:textColor="@color/fy_text"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/machineCode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="7dp"
+            android:background="@drawable/panel"
+            android:hint="例如：94AD-3C56-73FB-4161-8385"
+            android:inputType="textCapCharacters"
+            android:singleLine="true"
+            android:textColor="@color/fy_text"
+            android:textColorHint="@color/fy_muted" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="订单编号"
+            android:textColor="@color/fy_text"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/orderId"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="7dp"
+            android:background="@drawable/panel"
+            android:hint="例如：FY-000001"
+            android:inputType="textCapCharacters"
+            android:singleLine="true"
+            android:textColor="@color/fy_text"
+            android:textColorHint="@color/fy_muted" />
+
+        <Button
+            android:id="@+id/generate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/button_primary"
+            android:text="验证身份并生成永久激活码"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/resultLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="生成结果"
+            android:textColor="@color/fy_text"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/result"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="7dp"
+            android:background="@drawable/panel"
+            android:minHeight="110dp"
+            android:text="尚未生成"
+            android:textColor="@color/fy_muted"
+            android:textIsSelectable="true" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/copy"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/button_secondary"
+                android:text="复制激活码"
+                android:textAllCaps="false"
+                android:textColor="@color/fy_text" />
+
+            <Space android:layout_width="10dp" android:layout_height="1dp" />
+
+            <Button
+                android:id="@+id/share"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/button_secondary"
+                android:text="发送给客户"
+                android:textAllCaps="false"
+                android:textColor="@color/fy_text" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/history"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:paddingBottom="24dp"
+            android:text="最近生成记录：暂无"
+            android:textColor="@color/fy_muted"
+            android:textSize="12sp" />
+    </LinearLayout>
+</ScrollView>
+

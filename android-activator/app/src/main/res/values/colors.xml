@@ -1,0 +1,10 @@
+<resources>
+    <color name="fy_background">#07101D</color>
+    <color name="fy_panel">#102238</color>
+    <color name="fy_accent">#43D9FF</color>
+    <color name="fy_accent_dark">#12677C</color>
+    <color name="fy_text">#EEF7FF</color>
+    <color name="fy_muted">#8FA7BD</color>
+    <color name="fy_good">#55E6A5</color>
+</resources>
+
