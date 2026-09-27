@@ -37,6 +37,8 @@ public: // Exposed for deterministic persistence tests; not part of the customer
     };
 
 private:
+    juce::String getLegacyMachineCode() const;
+    LicenseStatus validateForThisDevice(const juce::String&) const;
     juce::File getStorageDirectory() const;
     juce::File getLicenseFile() const;
     juce::Array<juce::File> getTrialFiles() const;

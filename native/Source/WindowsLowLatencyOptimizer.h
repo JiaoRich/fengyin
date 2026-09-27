@@ -22,6 +22,7 @@ struct WindowsLowLatencyStatus
 class WindowsLowLatencyOptimizer final
 {
 public:
+    ~WindowsLowLatencyOptimizer();
     WindowsLowLatencyStatus getStatus() const;
     bool launchOptimisation();
     bool launchRestore();
@@ -31,7 +32,8 @@ private:
     static juce::File getScriptFile();
     static juce::File getResultFile();
     static juce::File getManifestFile();
-    static bool launchElevated(const juce::String& mode);
+    bool launchElevated(const juce::String& mode);
     static bool writeEmbeddedScript();
+    void* processHandle = nullptr;
 };
 }

@@ -34,6 +34,25 @@ int main()
 
     fengyin::LicenseService restarted(publicKey.toString(), trialFolder, [&now] { return now; });
     assert(restarted.getStatus().trialExpired);
+
+    // New licences use firmware identity, not the filesystem/OS installation.
+    const auto hardware = juce::SystemStats::getUniqueDeviceID().trim();
+    assert(hardware.isNotEmpty());
+    const auto hardwareMachine = fengyin::LicenseService::createMachineCode({ "FY-HARDWARE-2", hardware });
+    assert(restarted.getMachineCode() == hardwareMachine);
+    const auto hardwareCode = fengyin::LicenseService::createActivationCode(hardwareMachine, "HW-TEST", privateKey);
+    assert(restarted.activate(hardwareCode).activated);
+    fengyin::LicenseService reopened(publicKey.toString(), trialFolder, [&now] { return now; });
+    assert(reopened.getStatus().activated);
+
+    // Upgrade must not revoke an old signed licence on the same installation.
+    using Flags = juce::SystemStats::MachineIdFlags;
+    auto legacyIds = juce::SystemStats::getMachineIdentifiers(Flags::uniqueId | Flags::fileSystemId);
+    if (legacyIds.isEmpty()) legacyIds.add(juce::SystemStats::getComputerName());
+    const auto legacyMachine = fengyin::LicenseService::createMachineCode(legacyIds);
+    const auto legacyCode = fengyin::LicenseService::createActivationCode(legacyMachine, "LEGACY-TEST", privateKey);
+    assert(reopened.activate(legacyCode).activated);
+    assert(reopened.getStatus().licenseId == "LEGACY-TEST");
     trialFolder.deleteRecursively();
     return 0;
 }

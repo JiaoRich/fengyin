@@ -73,6 +73,8 @@ let presetListSignature = '';
 let hardwareBreath = null;
 let currentArtworkKey = '';
 let currentInstrument = null;
+let bendState = {pluginLoaded:false}, bendDialogKey = '', bendSelection = 0, bendBusy = false;
+let bendHintTimer = null, lastBendKey = '';
 let currentPluginLoaded = false;
 let pendingPresetNavigation = null;
 let customToneMode = 'idle';
@@ -400,6 +402,9 @@ function clearInstrumentArtwork() {
 function applyPrototypeInstrument(key, chineseName, pluginName) {
   currentPluginLoaded = true;
   currentInstrument = {name:pluginName, chineseName, instrumentKey:key};
+  const recommended = /qin|kong/i.test(pluginName) ? 3 : 1;
+  renderBendRange({pluginLoaded:true,instrumentChineseName:chineseName,bendPreferenceKey:`preview:${key}`,
+    bendRecommended:recommended,bendRange:recommended,bendRangeApplied:true});
   techniquePlan = buildAdaptiveTechniquePlan(key, latestBackendState);
   $('#sound-name').textContent = chineseName;
   $('#source-plugin-name').textContent = pluginName;
@@ -1149,6 +1154,75 @@ $('#transpose-grid').addEventListener('click', event => {
 $('#cancel-transpose').addEventListener('click', () => { transposeDialog.hidden = true; });
 transposeDialog.addEventListener('click', event => { if (event.target === transposeDialog) transposeDialog.hidden = true; });
 updateTransposeDisplay(0);
+function renderBendRange(state) {
+  bendState = state;
+  const loaded = !!state.pluginLoaded && !state.pluginLoading;
+  const key = state.bendPreferenceKey || '';
+  const recommended = Number(state.bendRecommended) === 3 ? 3 : 1;
+  $('#bend-range-button').disabled = !loaded;
+  $('#bend-range-value').textContent = !loaded ? '—' : state.bendRangeApplied ? `±${state.bendRange}` : '待设置';
+  $('#bend-range-button').title = loaded && !state.bendRangeApplied ? '音源弯音参数尚未确认，请打开设置查看' : '';
+  if (key !== lastBendKey) {
+    clearTimeout(bendHintTimer);
+    $('#bend-hint').textContent = state.bendRangeRemembered && state.bendRangeApplied
+      ? `已记住弯音范围±${state.bendRange}，可在此修改` : `推荐弯音范围±${recommended}，可在此修改`;
+    $('#bend-hint').hidden = !loaded;
+    bendHintTimer = setTimeout(() => { $('#bend-hint').hidden = true; }, 8000);
+    lastBendKey = key;
+    if (!$('#bend-range-dialog').hidden) {
+      $('#bend-range-dialog').hidden = true;
+      bendBusy = false;
+      toast('乐器已切换，请重新打开弯音设置');
+    }
+  }
+}
+function showBendConfirmation() {
+  const name = bendState.instrumentChineseName || '当前';
+  $('#bend-confirm-message').textContent = `确定将${name}乐器的弯音范围修改为±${bendSelection}？点击确定系统将记住您的选择，下次再演奏${name}乐器时自动切换到您设定的弯音范围。`;
+  $$('#bend-range-options button').forEach(button => button.classList.toggle('active', Number(button.dataset.bend) === bendSelection));
+  $('#confirm-bend-range').disabled = bendBusy;
+}
+$('#bend-range-button').addEventListener('click', () => {
+  bendDialogKey = bendState.bendPreferenceKey;
+  bendSelection = bendState.bendRange || bendState.bendRecommended || 1;
+  bendBusy = false;
+  $('#bend-result-message').textContent = '';
+  $('#reset-bend-range').disabled = false;
+  showBendConfirmation();
+  $('#bend-range-dialog').hidden = false;
+  $('#close-bend-range').focus();
+});
+$('#bend-range-options').addEventListener('click', event => {
+  const button = event.target.closest('[data-bend]');
+  if (!button || bendBusy) return;
+  bendSelection = Number(button.dataset.bend);
+  showBendConfirmation();
+});
+function commitBendRange(reset) {
+  if (bendBusy || bendDialogKey !== bendState.bendPreferenceKey) return;
+  bendBusy = true;
+  $('#confirm-bend-range').disabled = true;
+  $('#reset-bend-range').disabled = true;
+  $('#bend-result-message').textContent = '正在设置…';
+  nativeEvent('setBendRange', {key:bendDialogKey, value:bendSelection, reset});
+  if (!window.__JUCE__?.backend?.emitEvent) {
+    renderBendRange({...bendState,bendRange:reset?bendState.bendRecommended:bendSelection,bendRangeApplied:true,bendRangeRemembered:!reset});
+    $('#bend-range-dialog').hidden = true;
+    bendBusy = false;
+    toast('原型演示：安装版会修改音源并记住选择');
+  }
+}
+$('#confirm-bend-range').addEventListener('click', () => commitBendRange(false));
+$('#reset-bend-range').addEventListener('click', () => commitBendRange(true));
+$('#close-bend-range').addEventListener('click', () => { $('#bend-range-dialog').hidden = true; $('#bend-range-button').focus(); });
+$('#bend-range-dialog').addEventListener('keydown', event => { if (event.key === 'Escape') $('#close-bend-range').click(); });
+window.__JUCE__?.backend?.addEventListener('bendRangeResult', result => {
+  bendBusy = false;
+  $('#confirm-bend-range').disabled = false;
+  $('#reset-bend-range').disabled = false;
+  $('#bend-result-message').textContent = result.message || '';
+  if (result.success) { $('#bend-range-dialog').hidden = true; toast(result.message); }
+});
 const performanceReverb = $('#performance-reverb');
 performanceReverb.addEventListener('pointerdown', () => { reverbDragging = true; });
 performanceReverb.addEventListener('pointerup', () => { reverbDragging = false; });
@@ -1647,6 +1721,11 @@ function renderSuperLowLatencyState(state = {}) {
 }
 
 window.__JUCE__?.backend?.addEventListener('superLowLatencyState', renderSuperLowLatencyState);
+window.__JUCE__?.backend?.addEventListener('pauseForDriverChange', () => {
+  videoWantsPlaying = false;
+  ++videoPlayRequest;
+  video.pause();
+});
 
 function showAudioOptimisationProgress() {
   clearInterval(optimisationTimer);
@@ -1677,6 +1756,7 @@ function renderSmartAdapter(state) {
 }
 
 window.__JUCE__?.backend?.addEventListener('backendState', state => {
+  renderBendRange(state);
   latestBackendState = state || {};
   const connected = !!state.deviceConnected;
   const adapterDeviceKey = String(state.deviceIdentifier || state.deviceId || state.deviceName || state.deviceProfileName || 'connected-device');
@@ -2001,7 +2081,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 0.16.7 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 0.16.8 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

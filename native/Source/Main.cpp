@@ -21,10 +21,17 @@ public:
             scanWorker = std::make_unique<PluginScanWorker>(arguments[1].unquoted(), juce::File(arguments[2].unquoted()));
             return;
         }
+        logger.reset(juce::FileLogger::createDefaultAppLogger("FengYin", "plugin-host.log",
+            "FengYin " + getApplicationVersion() + " started"));
+        juce::Logger::setCurrentLogger(logger.get());
         mainWindow = std::make_unique<MainWindow>(getApplicationName());
     }
 
-    void shutdown() override { scanWorker.reset(); mainWindow.reset(); }
+    void shutdown() override
+    {
+        scanWorker.reset(); mainWindow.reset();
+        juce::Logger::setCurrentLogger(nullptr); logger.reset();
+    }
     void systemRequestedQuit() override { quit(); }
 
 private:
@@ -54,6 +61,7 @@ private:
 
     std::unique_ptr<MainWindow> mainWindow;
     std::unique_ptr<PluginScanWorker> scanWorker;
+    std::unique_ptr<juce::FileLogger> logger;
 };
 
 START_JUCE_APPLICATION(FengYinApplication)

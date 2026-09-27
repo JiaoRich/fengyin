@@ -569,7 +569,15 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
         { const juce::SpinLock::ScopedLockType lock(noteMapLock);
           const auto sourceNote = static_cast<size_t>(message.getNoteNumber());
           if (activeOutputNotes[sourceNote] >= 0) outputNote = activeOutputNotes[sourceNote];
-          activeOutputNotes[sourceNote] = -1; }
+          activeOutputNotes[sourceNote] = -1;
+          if (lastNote.load(std::memory_order_relaxed) == outputNote)
+          {
+              int remainingNote = -1;
+              for (const auto activeNote : activeOutputNotes)
+                  if (activeNote >= 0) remainingNote = activeNote;
+              lastNote.store(remainingNote, std::memory_order_relaxed);
+          }
+        }
         velocity.store(0.0f, std::memory_order_relaxed);
         if (activeNoteCount > 0 && --activeNoteCount == 0)
             intelligentTechniques.noteEnded();

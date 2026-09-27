@@ -39,10 +39,33 @@ juce::String LicenseService::createMachineCode(const juce::StringArray& sourceId
 }
 juce::String LicenseService::getMachineCode() const
 {
+    // Hardware firmware identity only: the Windows volume serial changes when
+    // a system partition is reformatted. Never include it in new licences.
+    const auto hardware = juce::SystemStats::getUniqueDeviceID().trim();
+    if (hardware.isEmpty()) return {};
+    return createMachineCode({ "FY-HARDWARE-2", hardware });
+}
+juce::String LicenseService::getLegacyMachineCode() const
+{
     using Flags = juce::SystemStats::MachineIdFlags;
     auto identifiers = juce::SystemStats::getMachineIdentifiers(Flags::uniqueId | Flags::fileSystemId);
     if (identifiers.isEmpty()) identifiers.add(juce::SystemStats::getComputerName());
     return createMachineCode(identifiers);
+}
+LicenseStatus LicenseService::validateForThisDevice(const juce::String& code) const
+{
+    const auto machine = getMachineCode();
+    if (machine.isEmpty())
+        return { false, false, false, 0, juce::String::fromUTF8("无法读取硬件标识，请联系支持"), {} };
+    auto result = validate(code, machine);
+    // Existing signed licences remain valid on their original installation.
+    // This does NOT re-sign or convert old OS-bound licences for a reinstall.
+    if (! result.activated)
+    {
+        auto legacy = validate(code, getLegacyMachineCode());
+        if (legacy.activated) return legacy;
+    }
+    return result;
 }
 juce::String LicenseService::createActivationCode(const juce::String& machineCode, const juce::String& licenseId,
                                                    const juce::RSAKey& privateKey)
@@ -85,13 +108,15 @@ LicenseStatus LicenseService::getStatus()
     const auto file = getLicenseFile();
     if (file.existsAsFile())
     {
-        auto permanent = validate(file.loadFileAsString(), getMachineCode());
+        auto permanent = validateForThisDevice(file.loadFileAsString());
         if (permanent.activated) return permanent;
     }
     return getTrialStatus();
 }
 LicenseStatus LicenseService::startTrial()
 {
+    if (getMachineCode().isEmpty())
+        return { false, false, false, 0, juce::String::fromUTF8("无法读取硬件标识，请联系支持"), {} };
     auto status = getStatus();
     if (status.activated || status.trialActive || status.trialExpired)
         return status;
@@ -104,7 +129,7 @@ LicenseStatus LicenseService::startTrial()
 }
 LicenseStatus LicenseService::activate(const juce::String& activationCode)
 {
-    auto status = validate(activationCode, getMachineCode());
+    auto status = validateForThisDevice(activationCode);
     if (status.activated && ! saveCode(activationCode.removeCharacters("\r\n \t")))
     { status.activated = false; status.message = juce::String::fromUTF8("激活码正确，但无法保存到本机"); }
     return status;
@@ -156,7 +181,9 @@ std::optional<LicenseService::TrialRecord> LicenseService::readTrialRecord(const
     record.lastSeenAtMs = fields[3].getLargeIntValue();
     record.expired = fields[4] == "1";
     const auto payload = fields[0] + "|" + fields[1] + "|" + fields[2] + "|" + fields[3] + "|" + fields[4];
-    if (record.machineCode != normaliseMachineCode(getMachineCode()) || record.startedAtMs <= 0
+    const auto matchesDevice = record.machineCode == normaliseMachineCode(getMachineCode())
+                           || record.machineCode == normaliseMachineCode(getLegacyMachineCode());
+    if (! matchesDevice || record.startedAtMs <= 0
         || record.lastSeenAtMs < record.startedAtMs || fields[5] != digestFor(payload + "|" + trialSecret))
         return TrialRecord { getMachineCode(), 1, nowMillis(), true };
     return record;

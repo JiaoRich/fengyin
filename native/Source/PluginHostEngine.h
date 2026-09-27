@@ -117,6 +117,7 @@ public:
     bool selectInstrumentModel(int index);
     int applySwamToneProfile(const SwamToneProfile& profile);
     bool applyStandardSwamExpressionCurve();
+    bool setBendRange(int semitones);
 
     void noteOn(int noteNumber, float velocity, double timestampSeconds = 0.0) noexcept override;
     void noteOff(int noteNumber, double timestampSeconds = 0.0) noexcept override;
@@ -149,6 +150,8 @@ private:
     std::unique_ptr<PluginEditorWindow> effectEditorWindow;
     juce::AudioDeviceManager* attachedManager = nullptr;
     std::shared_ptr<std::atomic_bool> lifetime = std::make_shared<std::atomic_bool>(true);
+    uint64_t loadGeneration = 0;
+    uint64_t effectLoadGeneration = 0;
     std::array<std::atomic<juce::AudioProcessorParameter*>, static_cast<size_t>(PerformanceTechnique::count)> techniqueParameters {};
     std::array<std::atomic<float>, static_cast<size_t>(PerformanceTechnique::count)> techniqueValues {};
     std::array<std::atomic<bool>, static_cast<size_t>(PerformanceTechnique::count)> techniqueDirty {};

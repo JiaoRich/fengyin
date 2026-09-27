@@ -1,6 +1,7 @@
 #include "PluginHostEngine.h"
 #include "KongInstrumentCatalog.h"
 #include "KongProjectFile.h"
+#include "BendRangeParameters.h"
 
 #include <algorithm>
 #include <cmath>
@@ -300,26 +301,26 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                                  LoadCallback callback)
 {
     unload();
+    const auto generation = loadGeneration;
+    juce::Logger::writeToLog("Plugin load request " + juce::String(generation) + ": " + description.name);
     formatManager.createPluginInstanceAsync(
         description, sampleRate, bufferSize,
-        [this, description, sampleRate, bufferSize, initialState,
+        [this, description, sampleRate, bufferSize, initialState, generation,
          guard = lifetime, completion = std::move(callback)]
         (std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error) mutable
         {
             if (! guard->load(std::memory_order_acquire))
                 return;
+            if (generation != loadGeneration) return;
+            juce::Logger::writeToLog("Plugin instance ready " + juce::String(generation));
             if (instance == nullptr)
             {
                 if (completion)
                     completion(false, error.isNotEmpty() ? error : juce::String("VST3 load failed"));
                 return;
             }
-            // Restore component/controller state before AudioProcessorPlayer
-            // prepares and starts the graph. QinEngine can update its visible
-            // rack when state is injected into a running instance without
-            // constructing the selected KAI voice; changing articulation in
-            // the editor then appears to "fix" it. Mature hosts restore project
-            // state at this pre-activation point instead.
+            // Restore the original plugin-produced VST state, never a synthetic
+            // translation of the manufacturer's separate project-file format.
             if (initialState.getSize() > 0)
             {
                 if (initialState.getSize() > 16 * 1024 * 1024)
@@ -328,8 +329,10 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                         completion(false, juce::String::fromUTF8("音源状态文件异常"));
                     return;
                 }
+                juce::Logger::writeToLog("Plugin state restore begin; bytes=" + juce::String(initialState.getSize()));
                 instance->setStateInformation(initialState.getData(),
                                               static_cast<int>(initialState.getSize()));
+                juce::Logger::writeToLog("Plugin state restore returned");
             }
             auto processingGraph = std::make_unique<TechniqueProcessingGraph>();
             processingGraph->applyTechniqueValues = [this] { flushTechniqueValues(); };
@@ -354,6 +357,7 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                 return;
             }
             player.setProcessor(graph.get());
+            juce::Logger::writeToLog("Plugin graph ready " + juce::String(generation));
             resetPerformance();
             if (completion)
                 completion(true, instrumentNode->getProcessor()->getName());
@@ -362,9 +366,13 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
 
 void PluginHostEngine::unload()
 {
+    juce::Logger::writeToLog("Plugin unload begin");
+    ++loadGeneration;
+    ++effectLoadGeneration;
+    player.setProcessor(nullptr);
+    // Stop audio before destroying third-party editors and their processors.
     instrumentEditorWindow.reset();
     effectEditorWindow.reset();
-    player.setProcessor(nullptr);
     effectNode = nullptr;
     instrumentNode = nullptr;
     audioOutputNode = nullptr;
@@ -378,6 +386,7 @@ void PluginHostEngine::unload()
     instrumentModelNames.clear();
     instrumentModelValues.clear();
     swamExpressionController.store(11, std::memory_order_relaxed);
+    juce::Logger::writeToLog("Plugin unload complete");
 }
 
 bool PluginHostEngine::hasPlugin() const noexcept
@@ -500,11 +509,15 @@ void PluginHostEngine::loadEffectAsync(const juce::PluginDescription& descriptio
         if (callback) callback(false, juce::String::fromUTF8("请先加载音源"));
         return;
     }
+    const auto generation = loadGeneration;
+    const auto effectGeneration = ++effectLoadGeneration;
     formatManager.createPluginInstanceAsync(description, sampleRate, bufferSize,
-        [this, description, guard = lifetime, completion = std::move(callback)](std::unique_ptr<juce::AudioPluginInstance> instance,
+        [this, description, generation, effectGeneration, guard = lifetime, completion = std::move(callback)](std::unique_ptr<juce::AudioPluginInstance> instance,
                                                                                 const juce::String& error) mutable
         {
             if (! guard->load(std::memory_order_acquire)) return;
+            if (generation != loadGeneration || effectGeneration != effectLoadGeneration
+                || graph == nullptr || instrumentNode == nullptr) return;
             if (instance == nullptr)
             {
                 if (completion) completion(false, error.isNotEmpty() ? error : juce::String::fromUTF8("效果器加载失败"));
@@ -532,6 +545,7 @@ void PluginHostEngine::loadEffectAsync(const juce::PluginDescription& descriptio
 
 void PluginHostEngine::unloadEffect()
 {
+    ++effectLoadGeneration;
     if (graph == nullptr || effectNode == nullptr) return;
     player.setProcessor(nullptr);
     effectEditorWindow.reset();
@@ -696,6 +710,7 @@ juce::MemoryBlock PluginHostEngine::captureContainerState()
     // its live rack/output routing during that detach/attach cycle. JUCE's
     // suspended flag prevents processBlock from racing this message-thread save.
     auto* processor = getPlugin();
+    const juce::ScopedLock lock(processor->getCallbackLock());
     processor->suspendProcessing(true);
     processor->getStateInformation(state);
     processor->suspendProcessing(false);
@@ -717,11 +732,48 @@ bool PluginHostEngine::restoreContainerState(const juce::MemoryBlock& state)
 {
     if (! hasPlugin() || state.getSize() == 0 || state.getSize() > 16 * 1024 * 1024) return false;
     auto* processor = getPlugin();
+    const juce::ScopedLock lock(processor->getCallbackLock());
     processor->suspendProcessing(true);
     processor->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
     processor->suspendProcessing(false);
     resetPerformance();
     return true; // setStateInformation has no result; soundbank availability is verified by the caller.
+}
+
+bool PluginHostEngine::setBendRange(int semitones)
+{
+    auto* plugin = getPlugin();
+    if (plugin == nullptr || semitones < 1 || semitones > 4) return false;
+    struct Change { juce::AudioProcessorParameter* parameter; float value; float old; };
+    std::vector<Change> changes;
+    bool foundUp = false, foundDown = false;
+    for (auto* parameter : plugin->getParameters())
+    {
+        if (parameter == nullptr) continue;
+        const auto role = BendRangeParameters::role(parameter->getName(160));
+        if (role == BendRangeParameters::none) continue;
+        const auto value = BendRangeParameters::valueFor(*parameter, semitones);
+        if (! value) return false;
+        changes.push_back({ parameter, *value, parameter->getValue() });
+        foundUp |= role == BendRangeParameters::up || role == BendRangeParameters::both;
+        foundDown |= role == BendRangeParameters::down || role == BendRangeParameters::both;
+    }
+    if (! foundUp || ! foundDown) return false;
+    const juce::ScopedLock lock(plugin->getCallbackLock());
+    pitchBendChanged(0.0f);
+    for (const auto& change : changes)
+    {
+        change.parameter->beginChangeGesture();
+        change.parameter->setValueNotifyingHost(change.value);
+        change.parameter->endChangeGesture();
+    }
+    for (const auto& change : changes)
+        if (! BendRangeParameters::displays(change.parameter->getText(change.parameter->getValue(), 128), semitones))
+        {
+            for (const auto& rollback : changes) rollback.parameter->setValueNotifyingHost(rollback.old);
+            return false;
+        }
+    return true;
 }
 
 bool PluginHostEngine::selectProgramByAliases(const juce::StringArray& aliases)

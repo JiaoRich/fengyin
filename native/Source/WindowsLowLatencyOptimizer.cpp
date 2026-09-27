@@ -23,7 +23,7 @@ function Write-Result([string]$State, [string]$Code, [bool]$CanRestore, [bool]$R
 }
 function Invoke-Pnp([string[]]$Arguments) {
     $output = & "$env:windir\System32\pnputil.exe" @Arguments 2>&1
-    if ($LASTEXITCODE -ne 0) { throw ($output -join "`n") }
+    if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 3010) { throw ($output -join "`n") }
     return ($output -join "`n")
 }
 function Get-HdaDrivers {
@@ -37,19 +37,27 @@ try {
     if ($Mode -eq 'Restore') {
         if (-not (Test-Path -LiteralPath $ManifestPath)) { Write-Result 'error' 'no-backup' $false $false; exit 2 }
         $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
+        if ($manifest.backupSubdirectory) {
+            if ([string]$manifest.backupSubdirectory -notmatch '^[0-9a-fA-F-]{36}$') { throw 'Invalid backup identifier' }
+            $BackupDir = Join-Path $BackupDir ([string]$manifest.backupSubdirectory)
+        }
         $infFiles = @(Get-ChildItem -LiteralPath $BackupDir -Filter '*.inf' -Recurse -File)
         if ($infFiles.Count -eq 0) { Write-Result 'error' 'backup-missing' $false $false; exit 3 }
         foreach ($inf in $infFiles) { Invoke-Pnp @('/add-driver', $inf.FullName, '/install') | Out-Null }
         Invoke-Pnp @('/scan-devices') | Out-Null
         if ($manifest.powerScheme) { & "$env:windir\System32\powercfg.exe" /setactive $manifest.powerScheme | Out-Null }
-        Write-Result 'success' 'restore-complete' $true $true ([string]$manifest.deviceName)
+        $restored = @(Get-HdaDrivers | Where-Object { $_.DeviceID -eq $manifest.deviceId }) | Select-Object -First 1
+        if ($restored -and $restored.DriverProviderName -eq $manifest.provider -and $restored.DriverVersion -eq $manifest.driverVersion) {
+            Write-Result 'success' 'restore-complete' $true $true ([string]$manifest.deviceName)
+        } else {
+            Write-Result 'error' 'restore-not-verified' $true $true ([string]$manifest.deviceName)
+        }
         exit 0
     }
 
-    $conflicts = @(Get-Service -ErrorAction SilentlyContinue | Where-Object {
-        $_.Name -match 'Nahimic|A-Volute|Dolby' -or $_.DisplayName -match 'Nahimic|A-Volute|Dolby'
-    })
-    if ($conflicts.Count -gt 0) { Write-Result 'error' 'enhancement-conflict' (Test-Path $ManifestPath) $false; exit 4 }
+    # Dolby/Nahimic service presence alone does not prove a conflict. The user
+    # has acknowledged the compatibility risk; do not require uninstallation
+    # or silently disable unrelated system services.
 
     $eligible = @(Get-HdaDrivers | Where-Object {
         ($_.DeviceName + ' ' + $_.Manufacturer + ' ' + $_.DriverProviderName) -match 'Realtek|Senary|C-Media'
@@ -62,11 +70,14 @@ try {
     if (-not ($device.InfName -match '^oem\d+\.inf$')) { Write-Result 'error' 'invalid-driver-package' (Test-Path $ManifestPath) $false $device.DeviceName; exit 6 }
     if (-not (Test-Path "$env:windir\INF\hdaudio.inf")) { Write-Result 'error' 'inbox-driver-missing' (Test-Path $ManifestPath) $false $device.DeviceName; exit 7 }
 
-    if (Test-Path -LiteralPath $BackupDir) { Remove-Item -LiteralPath $BackupDir -Recurse -Force }
+    # Retain earlier rollback packages. A failed retry must not erase the only
+    # working OEM driver backup.
+    $backupId = [guid]::NewGuid().ToString()
+    $BackupDir = Join-Path $BackupDir $backupId
     New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
     Invoke-Pnp @('/export-driver', [string]$device.InfName, $BackupDir) | Out-Null
     if (@(Get-ChildItem -LiteralPath $BackupDir -Filter '*.inf' -Recurse -File).Count -eq 0) {
-        Write-Result 'error' 'backup-failed' $false $false $device.DeviceName; exit 8
+        Write-Result 'error' 'backup-failed' (Test-Path -LiteralPath $ManifestPath) $false $device.DeviceName; exit 8
     }
 
     $schemeText = (& "$env:windir\System32\powercfg.exe" /getactivescheme 2>$null) -join ' '
@@ -74,7 +85,7 @@ try {
     [ordered]@{
         deviceName=[string]$device.DeviceName; deviceId=[string]$device.DeviceID;
         infName=[string]$device.InfName; provider=[string]$device.DriverProviderName;
-        driverVersion=[string]$device.DriverVersion; powerScheme=$scheme
+        driverVersion=[string]$device.DriverVersion; powerScheme=$scheme; backupSubdirectory=$backupId
     } | ConvertTo-Json | Set-Content -LiteralPath $ManifestPath -Encoding UTF8
 
     # High performance is reversible and avoids clock throttling during real-time audio.
@@ -107,8 +118,8 @@ juce::String resultMessage(const juce::String& code, const juce::String& device)
     const auto suffix = device.isNotEmpty() ? " (" + device + ")" : juce::String();
     if (code == "optimisation-complete") return juce::String::fromUTF8("系统驱动已切换，请重启电脑后打开风吟完成延迟测试。") + suffix;
     if (code == "restore-complete") return juce::String::fromUTF8("原声卡驱动已恢复，请重启电脑。") + suffix;
+    if (code == "restore-not-verified") return juce::String::fromUTF8("已重新安装备份，但尚未确认声卡已使用原驱动；请重启并检查，备份仍保留。") + suffix;
     if (code == "no-backup" || code == "backup-missing") return juce::String::fromUTF8("没有找到可恢复的原驱动备份。");
-    if (code == "enhancement-conflict") return juce::String::fromUTF8("检测到 Dolby 或 Nahimic 等音效服务。请先卸载这类音效后再优化，否则可能无声或爆音。");
     if (code == "no-eligible-device") return juce::String::fromUTF8("未找到可安全切换的 Realtek / Senary / C-Media 板载声卡。");
     if (code == "multiple-devices") return juce::String::fromUTF8("检测到多个候选板载声卡，为避免更改错设备，已取消自动切换。");
     if (code == "backup-failed") return juce::String::fromUTF8("原声卡驱动备份失败，已中止，未更改系统驱动。");
@@ -122,6 +133,12 @@ juce::String resultMessage(const juce::String& code, const juce::String& device)
 
 namespace fengyin
 {
+WindowsLowLatencyOptimizer::~WindowsLowLatencyOptimizer()
+{
+   #if JUCE_WINDOWS
+    if (processHandle != nullptr) CloseHandle(static_cast<HANDLE>(processHandle));
+   #endif
+}
 juce::File WindowsLowLatencyOptimizer::getWorkDirectory()
 {
     return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
@@ -184,6 +201,11 @@ WindowsLowLatencyStatus WindowsLowLatencyOptimizer::getStatus() const
         status.message = status.eligibleDeviceFound
             ? juce::String::fromUTF8("已检测到可优化的板载声卡：") + status.deviceName
             : juce::String::fromUTF8("当前未检测到适用的板载声卡。");
+        if (processHandle != nullptr && WaitForSingleObject(static_cast<HANDLE>(processHandle), 0) == WAIT_OBJECT_0)
+        {
+            status.state = "error";
+            status.message = juce::String::fromUTF8("驱动操作已结束，但未返回完整结果。请检查系统声音；原驱动备份仍保留。");
+        }
     }
    #else
     status.message = juce::String::fromUTF8("该功能仅用于 Windows 板载声卡。");
@@ -202,6 +224,8 @@ bool WindowsLowLatencyOptimizer::launchElevated(const juce::String& mode)
 {
    #if JUCE_WINDOWS
     if (! writeEmbeddedScript()) return false;
+    if (processHandle != nullptr) CloseHandle(static_cast<HANDLE>(processHandle));
+    processHandle = nullptr;
     getResultFile().deleteFile();
     const auto parameters = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \""
         + getScriptFile().getFullPathName() + "\" -Mode " + mode + " -WorkDir \""
@@ -211,7 +235,7 @@ bool WindowsLowLatencyOptimizer::launchElevated(const juce::String& mode)
     const auto wide = parameters.toWideCharPointer(); info.lpParameters = wide;
     info.nShow = SW_SHOWNORMAL;
     if (! ShellExecuteExW(&info)) return false;
-    if (info.hProcess != nullptr) CloseHandle(info.hProcess);
+    processHandle = info.hProcess;
     return true;
    #else
     juce::ignoreUnused(mode);
