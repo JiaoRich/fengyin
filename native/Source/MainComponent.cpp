@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "ToneDiagnostic.h"
 #include "BinaryData.h"
 #include "KongProjectFile.h"
 #include <algorithm>
@@ -288,6 +289,10 @@ void MainComponent::setupWebInterface()
             const auto opened = isActivated && pluginHost.showPluginEditor(false);
             if (webInterface != nullptr)
                 webInterface->emitEventIfBrowserIsVisible("editorResult", opened ? utf8("音源界面已打开") : utf8("请先加载一个音源"));
+        })
+        .withEventListener("exportCurrentToneDiagnostic", [this](juce::var)
+        {
+            exportCurrentToneDiagnostic();
         })
         .withEventListener("loadEffect", [this](juce::var payload)
         {
@@ -2743,6 +2748,83 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName)
     pluginStatus.setText(utf8("当前音源：") + pluginName, juce::dontSendNotification);
     if (! pluginHost.hasEffect())
         effectStatus.setText(utf8("效果器：未使用"), juce::dontSendNotification);
+}
+
+void MainComponent::exportCurrentToneDiagnostic()
+{
+    const auto reply = [this](const juce::String& message)
+    {
+        if (webInterface != nullptr)
+            webInterface->emitEventIfBrowserIsVisible("toneDiagnosticResult", message);
+    };
+    if (toneDiagnosticExportPending) return;
+    if (! isActivated || pluginLoading || ! pluginHost.hasPlugin() || currentPluginBrand != "swam")
+    {
+        reply(utf8("请先加载一个 SWAM 音色，加载完成后再导出"));
+        return;
+    }
+    if (recorder.isRecording())
+    {
+        reply(utf8("请先结束录音，再导出参数，避免影响录音"));
+        return;
+    }
+    auto* plugin = pluginHost.getPlugin();
+    auto diagnostic = fengyin::ToneDiagnostic::capture(*plugin);
+    auto* data = diagnostic.getDynamicObject();
+    juce::PluginDescription description;
+    plugin->fillInPluginDescription(description);
+    data->setProperty("appVersion", JUCE_APPLICATION_VERSION_STRING);
+    data->setProperty("pluginName", description.name);
+    data->setProperty("pluginVersion", description.version);
+    data->setProperty("pluginFormat", description.pluginFormatName);
+    data->setProperty("manufacturer", description.manufacturerName);
+    data->setProperty("instrumentKey", currentInstrumentKey);
+    data->setProperty("instrumentName", currentInstrumentChineseName);
+    data->setProperty("instrumentModel", pluginHost.getCurrentInstrumentModelName());
+    data->setProperty("styleId", currentToneStyleId);
+    const auto styleName = currentPresetIsCustom ? currentPresetDisplayName
+        : fengyin::ToneStyleCatalog::find(currentInstrumentKey, currentToneStyleId).name;
+    data->setProperty("styleName", styleName);
+    data->setProperty("customPreset", currentPresetIsCustom);
+    data->setProperty("styleParameterMatchCount", currentSwamToneParameterCount);
+    const auto fx = masterOutput.getToneStyle();
+    auto effect = std::make_unique<juce::DynamicObject>();
+    effect->setProperty("tone", fx.tone);
+    effect->setProperty("warmth", fx.warmth);
+    effect->setProperty("reverbMix", fx.reverbMix);
+    effect->setProperty("compressionThreshold", fx.compressionThreshold);
+    effect->setProperty("compressionRatio", fx.compressionRatio);
+    effect->setProperty("saturation", fx.saturation);
+    effect->setProperty("harshControl", fx.harshControl);
+    effect->setProperty("reverbRoomSize", fx.reverbRoomSize);
+    effect->setProperty("reverbDamping", fx.reverbDamping);
+    effect->setProperty("reverbWidth", fx.reverbWidth);
+    effect->setProperty("outputGain", fx.outputGain);
+    effect->setProperty("bass", fx.bass);
+    data->setProperty("fengyinEffects", juce::var(effect.release()));
+    const auto json = juce::JSON::toString(diagnostic, false);
+    const auto name = juce::File::createLegalFileName(currentInstrumentChineseName + "-" + styleName
+        + "-" + juce::Time::getCurrentTime().formatted("%Y%m%d-%H%M%S")) + ".fytone.json";
+    toneDiagnosticExportPending = true;
+    toneDiagnosticChooser = std::make_unique<juce::FileChooser>(utf8("保存当前音色参数"),
+        juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile(name), "*.json");
+    const auto safe = juce::Component::SafePointer<MainComponent>(this);
+    const bool stateAvailable = static_cast<bool>(data->getProperty("stateAvailable"));
+    toneDiagnosticChooser->launchAsync(juce::FileBrowserComponent::saveMode
+        | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting,
+        [safe, json, stateAvailable](const juce::FileChooser& chooser)
+        {
+            if (safe == nullptr) return;
+            safe->toneDiagnosticExportPending = false;
+            const auto file = chooser.getResult();
+            const auto message = file == juce::File() ? utf8("已取消导出")
+                : file.replaceWithText(json) ? (stateAvailable
+                    ? utf8("参数和插件状态已导出：") + file.getFullPathName()
+                    : utf8("参数已导出，但插件未返回完整状态：") + file.getFullPathName())
+                : utf8("保存失败，请选择有写入权限的文件夹重试");
+            if (safe->webInterface != nullptr)
+                safe->webInterface->emitEventIfBrowserIsVisible("toneDiagnosticResult", message);
+        });
 }
 
 void MainComponent::applyCurrentSwamToneStyle()

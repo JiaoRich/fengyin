@@ -27,3 +27,7 @@ body.low-performance .brand-glyph{animation:none!important}
 .bend-range-options button.active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
 #bend-confirm-message{line-height:1.8;max-width:560px}
 #bend-result-message{color:var(--accent);min-height:1.5em}
+.tone-diagnostic-section { margin-top: 20px; }
+.tone-diagnostic-section button { padding: 10px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--accent-soft); color: var(--accent); cursor: pointer; }
+.tone-diagnostic-section button:disabled { opacity: .45; cursor: not-allowed; }
+.tone-diagnostic-section p { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }

@@ -1756,6 +1756,7 @@ function renderSmartAdapter(state) {
 }
 
 window.__JUCE__?.backend?.addEventListener('backendState', state => {
+  $('#export-current-tone').disabled = !state.pluginLoaded || !!state.pluginLoading || state.pluginBrand !== 'swam';
   renderBendRange(state);
   latestBackendState = state || {};
   const connected = !!state.deviceConnected;
@@ -1899,6 +1900,21 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   $('#record').textContent = recording ? '■ 停止录音' : '● 开始录音';
   $('#record').style.color = recording ? 'var(--danger)' : '';
 });
+const toneDiagnosticButton = $('#export-current-tone');
+const toneDiagnosticStatus = $('#tone-diagnostic-status');
+let toneDiagnosticBusy = false;
+toneDiagnosticButton.addEventListener('click', () => {
+  if (toneDiagnosticBusy) return;
+  if (!window.confirm('请先停止吹奏。导出会短暂读取插件状态，不会修改当前音色。\n文件可能包含插件保存的本地路径等信息，请仅发给可信的技术支持。\n\n是否导出当前已加载音色的参数？')) return;
+  toneDiagnosticBusy = true;
+  toneDiagnosticStatus.textContent = '正在读取当前音色，请选择保存位置…';
+  nativeEvent('exportCurrentToneDiagnostic');
+});
+window.__JUCE__?.backend?.addEventListener('toneDiagnosticResult', message => {
+  toneDiagnosticBusy = false;
+  toneDiagnosticStatus.textContent = String(message);
+});
+
 $('#copy-machine-code').addEventListener('click', () => {
   if (!latestBackendState.machineCode) return toast('尚未取得本机识别码');
   nativeEvent('copyMachineCode');
@@ -2081,7 +2097,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 0.16.9 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 0.16.10 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},
