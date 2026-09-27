@@ -1877,6 +1877,10 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   }
   renderToneStyleSwitcher();
   if (currentPluginLoaded && (state.activeToneVariantId || state.toneStyleId)) {
+    const failedStyle = state.swamToneIncomplete ? `${state.toneStyleId}|${state.instrumentModelName}` : '';
+    if (failedStyle && window.lastFailedSwamStyle !== failedStyle)
+      toast('当前 SWAM 未能完整应用此风格，已保留原音色。请导出当前音色参数供检查。');
+    window.lastFailedSwamStyle = failedStyle;
     const styles = toneVariantsForCurrentInstrument();
     const wantedVariant = state.activeToneVariantId || state.toneStyleId;
     const backendStyleIndex = styles.findIndex(style => style.id === wantedVariant || style.id === state.toneStyleId);
@@ -2097,7 +2101,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 0.16.10 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 0.16.11 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

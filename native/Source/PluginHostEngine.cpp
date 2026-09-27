@@ -836,8 +836,16 @@ bool PluginHostEngine::selectInstrumentModel(int index)
 
 int PluginHostEngine::applySwamToneProfile(const SwamToneProfile& profile)
 {
+    swamToneAudit = juce::var();
     auto* plugin = getPlugin();
     if (plugin == nullptr || ! profile.enabled) return 0;
+    if (! profile.displayTargets.empty())
+    {
+        SwamToneApplication application;
+        const auto verified = application.apply(plugin->getParameters(), profile);
+        swamToneAudit = application.diagnostic();
+        return verified;
+    }
     int changed = 0;
     for (auto* parameter : plugin->getParameters())
     {

@@ -26,9 +26,9 @@ public:
                 { 0.0f, .20f, .18f, .58f, 1.65f, .035f, .07f, .42f, .56f, .88f } };
         };
         if (key == "soprano-sax") return {
-            ToneStyleDefinition { "natural", juce::String::fromUTF8("自然原声"), juce::String::fromUTF8("真实、均衡、保留原始动态"), { 0.0f,.20f,.18f,.58f,1.65f,.035f,.07f,.42f,.56f,.88f }, { true,.52f,.56f,.52f,.48f,.44f,.52f,.18f,.50f,.48f } },
-            ToneStyleDefinition { "silky", juce::String::fromUTF8("丝滑抒情"), juce::String::fromUTF8("温暖、柔和、浪漫大厅"), { -.12f,.58f,.36f,.52f,1.9f,.11f,.16f,.58f,.62f,.96f }, { true,.42f,.35f,.48f,.42f,.60f,.44f,.10f,.60f,.62f } },
-            ToneStyleDefinition { "stage", juce::String::fromUTF8("明亮舞台"), juce::String::fromUTF8("清晰、明亮、更有穿透力"), { .28f,.30f,.24f,.50f,2.1f,.07f,.12f,.44f,.55f,.90f }, { true,.68f,.75f,.55f,.60f,.30f,.65f,.16f,.45f,.34f } } };
+            ToneStyleDefinition { "natural", juce::String::fromUTF8("自然原声"), juce::String::fromUTF8("真实、均衡、保留原始动态"), { 0.0f,.20f,.18f,.58f,1.65f,.035f,.07f,.42f,.56f,.88f }, SwamToneProfile::soprano(0) },
+            ToneStyleDefinition { "silky", juce::String::fromUTF8("丝滑抒情"), juce::String::fromUTF8("温暖、柔和、浪漫大厅"), { -.12f,.58f,.36f,.52f,1.9f,.11f,.16f,.58f,.62f,.96f }, SwamToneProfile::soprano(1) },
+            ToneStyleDefinition { "stage", juce::String::fromUTF8("明亮舞台"), juce::String::fromUTF8("清晰、明亮、更有穿透力"), { .28f,.30f,.24f,.50f,2.1f,.07f,.12f,.44f,.55f,.90f }, SwamToneProfile::soprano(2) } };
         if (key == "alto-sax") return {
             ToneStyleDefinition { "natural", juce::String::fromUTF8("自然原声"), juce::String::fromUTF8("真实、均衡、保留原始动态"), { 0.0f,.20f,.18f,.58f,1.65f,.035f,.07f,.42f,.56f,.88f }, { true,.50f,.50f,.50f,.52f,.44f,.50f,.20f,.54f,.44f } },
             ToneStyleDefinition { "warm-jazz", juce::String::fromUTF8("温暖爵士"), juce::String::fromUTF8("厚实、松弛、带轻微暖色"), { -.18f,.66f,.25f,.50f,2.0f,.14f,.17f,.48f,.64f,.90f }, { true,.38f,.34f,.44f,.56f,.56f,.42f,.20f,.62f,.38f } },

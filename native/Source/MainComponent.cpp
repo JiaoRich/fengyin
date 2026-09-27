@@ -1349,6 +1349,9 @@ void MainComponent::timerCallback()
         state->setProperty("instrumentModelId", pluginHost.getCurrentInstrumentModelIndex());
         state->setProperty("instrumentModelName", pluginHost.getCurrentInstrumentModelName());
         state->setProperty("swamToneParameterCount", currentSwamToneParameterCount);
+        state->setProperty("swamToneIncomplete", ! currentPresetIsCustom && currentInstrumentKey == "soprano-sax"
+            && pluginHost.hasPlugin() && pluginHost.getSwamToneAudit().isObject()
+            && static_cast<int>(pluginHost.getSwamToneAudit()["verifiedAtApply"]) != 22);
         state->setProperty("scanning", scanProgress.scanning);
         state->setProperty("scanProgress", scanProgress.fraction);
         state->setProperty("pluginStatus", pluginStatus.getText());
@@ -2787,6 +2790,8 @@ void MainComponent::exportCurrentToneDiagnostic()
     data->setProperty("styleName", styleName);
     data->setProperty("customPreset", currentPresetIsCustom);
     data->setProperty("styleParameterMatchCount", currentSwamToneParameterCount);
+    if (! currentPresetIsCustom && currentInstrumentKey == "soprano-sax")
+        data->setProperty("styleParameterAudit", pluginHost.getSwamToneAudit());
     const auto fx = masterOutput.getToneStyle();
     auto effect = std::make_unique<juce::DynamicObject>();
     effect->setProperty("tone", fx.tone);
