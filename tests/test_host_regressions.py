@@ -82,23 +82,17 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("swamExpressionController.load", HOST)
         self.assertIn("applyStandardSwamExpressionCurve", MAIN)
 
-    def test_qin_restore_reactivates_secondary_preset_before_reporting_success(self):
-        self.assertIn("getActiveKongPresetActivation", HOST)
-        self.assertIn('name.startsWithIgnoreCase("Preset_ID_")', HOST)
-        self.assertIn('findByName("KAI_ID_" + suffix)', HOST)
-        self.assertIn("setValueNotifyingHost(value)", HOST)
-        restore = MAIN.split("void MainComponent::reactivateKongPreset", 1)[1].split(
-            "void MainComponent::completeLoadedPreset", 1)[0]
-        self.assertIn("setKongPresetActivation(activation, true)", restore)
-        self.assertGreaterEqual(restore.count("setKongPresetActivation(activation, false)"), 2)
-        self.assertGreaterEqual(restore.count("getActiveKongPresetActivation()"), 2)
-        load = MAIN.split("void MainComponent::loadSelectedPreset", 1)[1].split(
-            "void MainComponent::reactivateKongPreset", 1)[0]
-        self.assertLess(load.index("reactivateKongPreset"), load.index("completeLoadedPreset(preset"))
-        self.assertIn("正在激活空音奏法", load)
-        cancel_restore = MAIN.split("void MainComponent::restoreToneBeforePresetEdit", 1)[1].split(
-            "void MainComponent::loadSelectedPreset", 1)[0]
-        self.assertIn("reactivateKongPreset", cancel_restore)
+    def test_qin_restore_uses_native_kam_as_the_single_source_of_truth(self):
+        project = (ROOT / "native" / "Source" / "KongProjectFile.h").read_text(encoding="utf-8")
+        self.assertIn('ValueTree state("State")', project)
+        self.assertIn('ValueTree zoom("Zoom")', project)
+        self.assertIn('setProperty("Tuning"', project)
+        self.assertIn('setProperty("TuningType"', project)
+        self.assertIn("KongProjectFile::toPluginState", HOST)
+        self.assertIn("pluginHost.restoreKongProject(preset.containerProjectState)", MAIN)
+        self.assertIn("KongProjectFile::fromPluginState(state)", MAIN)
+        self.assertNotIn("reactivateKongPreset", MAIN)
+        self.assertNotIn("setKongPresetActivation", HOST)
 
     def test_swam_main_expression_curve_preserves_controller_mapping(self):
         curve = (ROOT / "native" / "Source" / "SwamExpressionCurve.cpp").read_text(encoding="utf-8")
@@ -262,8 +256,8 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('withEventListener("commitContainerInstrument"', MAIN)
         self.assertNotIn("beginContainerOutputVerification", MAIN)
         self.assertNotIn("containerOutputVerificationStartSignals", MAIN_HEADER)
-        self.assertIn("preset.samplerState.getSize() > 0", MAIN)
-        self.assertIn("pluginHost.restoreKongState(preset.samplerState)", MAIN)
+        self.assertIn("preset.containerProjectState.getSize() == 0", MAIN)
+        self.assertIn("pluginHost.restoreKongProject(preset.containerProjectState)", MAIN)
         self.assertNotIn("pluginHost.restoreContainerState(preset.containerProjectState)", MAIN)
         self.assertIn("不要重复点击", MAIN)
         self.assertIn("currentPresetId == preset.id", MAIN)
@@ -371,11 +365,13 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('ValueTree root("KAMFileRoot")', project)
         self.assertIn('slot.setProperty("KAI"', project)
         self.assertIn('slot.setProperty("Preset"', project)
+        self.assertIn("fromPluginState", project)
+        self.assertIn("toPluginState", project)
         self.assertIn("createKongProjectForInstrument", catalog)
         self.assertIn("preset.containerProjectState", MAIN)
         self.assertIn('createNewChildElement("KAM_PROJECT")', PRESET)
         capture = HOST.split("juce::MemoryBlock PluginHostEngine::captureContainerState()", 1)[1].split(
-            "bool PluginHostEngine::restoreKongState", 1)[0]
+            "bool PluginHostEngine::restoreKongProject", 1)[0]
         self.assertNotIn("detach();", capture)
         self.assertIn("suspendProcessing(true)", capture)
 

@@ -58,7 +58,6 @@ private:
     void commitCustomPreset(const juce::String& name, const juce::String& baseStyleId);
     fengyin::ToneStyleSettings customToneSettingsFromPayload(const juce::var& payload) const;
     void loadSelectedPreset(std::function<void(bool, const juce::String&)> completion = {});
-    void reactivateKongPreset(std::function<void(bool)> completion);
     void completeLoadedPreset(const fengyin::SoundPreset& preset,
                               std::function<void(bool, const juce::String&)> completion);
     void captureToneBeforePresetEdit();
@@ -156,11 +155,11 @@ private:
     juce::String editingReturnPluginBrand;
     juce::String editingReturnInstrumentKey;
     juce::String editingReturnInstrumentName;
-    juce::String editingReturnProgramName;
     bool editingReturnWasCustom = false;
     int editingReturnModelIndex = -1;
     juce::Array<fengyin::ToneParameterValue> editingReturnToneParameters;
     juce::MemoryBlock editingReturnSamplerState;
+    juce::MemoryBlock editingReturnContainerProjectState;
     fengyin::ToneStyleSettings editingReturnToneSettings;
     juce::String currentToneStyleId { "natural" };
     juce::String currentPluginBrand { "swam" };
