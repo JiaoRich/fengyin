@@ -7,6 +7,7 @@
 #include <atomic>
 #include <array>
 #include <vector>
+#include <optional>
 
 #include "MidiPerformanceSink.h"
 #include "RecordingService.h"
@@ -59,6 +60,12 @@ private:
 class PluginHostEngine final : public MidiPerformanceSink
 {
 public:
+    struct KongPresetActivation
+    {
+        juce::String parameterName;
+        float value = 0.0f;
+    };
+
     using LoadCallback = std::function<void(bool success, const juce::String& message)>;
 
     PluginHostEngine();
@@ -104,6 +111,8 @@ public:
     bool restoreKongState(const juce::MemoryBlock& state);
     [[nodiscard]] juce::MemoryBlock captureContainerState();
     bool restoreContainerState(const juce::MemoryBlock& state);
+    [[nodiscard]] std::optional<KongPresetActivation> getActiveKongPresetActivation() const;
+    bool setKongPresetActivation(const KongPresetActivation& activation, bool clearFirstStage);
     bool selectProgramByAliases(const juce::StringArray& aliases);
     [[nodiscard]] juce::StringArray getInstrumentModelNames() const;
     [[nodiscard]] int getCurrentInstrumentModelIndex() const noexcept;

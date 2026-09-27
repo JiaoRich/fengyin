@@ -2470,27 +2470,53 @@ void MainComponent::restoreToneBeforePresetEdit()
                           programName, wasCustom, modelIndex, parameters, toneSettings, samplerState]
                          (bool success, const juce::String& message)
                          {
-                             pluginLoading = false;
-                             if (! success) return;
+                             if (! success) { pluginLoading = false; return; }
                              currentPluginBrand = brand;
                              currentInstrumentKey = instrumentKey;
                              currentInstrumentChineseName = instrumentName;
+                             auto finish = [safe = juce::Component::SafePointer<MainComponent>(this),
+                                            presetId, presetName, styleId, brand, wasCustom,
+                                            modelIndex, parameters, toneSettings, samplerState]
+                             {
+                                 if (safe == nullptr) return;
+                                 if (modelIndex >= 0) safe->pluginHost.selectInstrumentModel(modelIndex);
+                                 if (brand != "kong" || samplerState.getSize() == 0)
+                                     safe->pluginHost.restoreToneParameters(parameters);
+                                 safe->masterOutput.setToneStyle(toneSettings);
+                                 safe->currentToneStyleId = styleId;
+                                 safe->currentPresetId = presetId;
+                                 safe->currentPresetDisplayName = presetName;
+                                 safe->currentPresetIsCustom = wasCustom;
+                                 safe->currentBaseToneSettings = toneSettings;
+                                 safe->currentSwamToneParameterCount = parameters.size();
+                                 safe->pluginLoading = false;
+                                 safe->pluginStatus.setText(utf8("已取消修改，恢复原音色"), juce::dontSendNotification);
+                             };
                              if (brand == "kong")
                              {
-                                 if (samplerState.getSize() > 0) pluginHost.restoreKongState(samplerState);
-                                 else if (programName.isNotEmpty()) pluginHost.selectProgramByAliases({ programName });
+                                 const auto restored = samplerState.getSize() > 0
+                                     ? pluginHost.restoreKongState(samplerState)
+                                     : programName.isNotEmpty() && pluginHost.selectProgramByAliases({ programName });
+                                 if (! restored) { pluginLoading = false; return; }
                              }
                              activatePluginOutput(message);
-                             if (modelIndex >= 0) pluginHost.selectInstrumentModel(modelIndex);
-                             if (brand != "kong" || samplerState.getSize() == 0) pluginHost.restoreToneParameters(parameters);
-                             masterOutput.setToneStyle(toneSettings);
-                             currentToneStyleId = styleId;
-                             currentPresetId = presetId;
-                             currentPresetDisplayName = presetName;
-                             currentPresetIsCustom = wasCustom;
-                             currentBaseToneSettings = toneSettings;
-                             currentSwamToneParameterCount = parameters.size();
-                             pluginStatus.setText(utf8("已取消修改，恢复原音色"), juce::dontSendNotification);
+                             if (brand == "kong")
+                             {
+                                 pluginStatus.setText(utf8("正在恢复空音奏法……"), juce::dontSendNotification);
+                                 reactivateKongPreset([safe = juce::Component::SafePointer<MainComponent>(this), finish](bool ok)
+                                 {
+                                     if (safe == nullptr) return;
+                                     if (! ok)
+                                     {
+                                         safe->pluginLoading = false;
+                                         safe->pluginStatus.setText(utf8("空音奏法恢复失败"), juce::dontSendNotification);
+                                         return;
+                                     }
+                                     finish();
+                                 });
+                                 return;
+                             }
+                             finish();
                          });
 }
 
@@ -2558,9 +2584,9 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                          status.bufferSize > 0 ? status.bufferSize : 128,
                          [this, preset, completion](bool success, const juce::String& message)
                          {
-                             pluginLoading = false;
                              if (! success)
                              {
+                                 pluginLoading = false;
                                  useTestSynth();
                                  pluginStatus.setText(utf8("方案载入失败：") + message, juce::dontSendNotification);
                                  if (completion) completion(false, utf8("方案载入失败：") + message);
@@ -2578,6 +2604,7 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                                          && pluginHost.selectProgramByAliases({ preset.pluginProgramName });
                                  if (! restored)
                                  {
+                                     pluginLoading = false;
                                      const auto error = utf8("此空音方案缺少可恢复的乐器状态，请重新定制保存");
                                      pluginStatus.setText(error, juce::dontSendNotification);
                                      if (completion) completion(false, error);
@@ -2585,8 +2612,91 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                                  }
                              }
                              activatePluginOutput(message);
+                             if (isContainer)
+                             {
+                                 pluginStatus.setText(utf8("正在激活空音奏法……"), juce::dontSendNotification);
+                                 reactivateKongPreset([safe = juce::Component::SafePointer<MainComponent>(this),
+                                                       preset, completion](bool activated)
+                                 {
+                                     if (safe == nullptr) return;
+                                     safe->pluginLoading = false;
+                                     if (! activated)
+                                     {
+                                         const auto error = utf8("空音二级奏法激活失败，请重新选择该乐器");
+                                         safe->pluginStatus.setText(error, juce::dontSendNotification);
+                                         if (completion) completion(false, error);
+                                         return;
+                                     }
+                                     safe->completeLoadedPreset(preset, completion);
+                                 });
+                                 return;
+                             }
+                             pluginLoading = false;
                              completeLoadedPreset(preset, completion);
                          });
+}
+
+void MainComponent::reactivateKongPreset(std::function<void(bool)> completion)
+{
+    // QinEngine restores the visible KAI/preset identifiers before its internal
+    // voice loader is activated.  A manual change of the secondary preset fixes
+    // the silence because it emits a real parameter transition. Reproduce that
+    // transition after the rack has had time to initialise, then reassert the
+    // selected preset once more for slower sample libraries.
+    const auto safe = juce::Component::SafePointer<MainComponent>(this);
+    const auto startActivation = [safe, completion](fengyin::PluginHostEngine::KongPresetActivation activation)
+    {
+        if (safe == nullptr) return;
+        safe->pluginHost.resetPerformance();
+        if (! safe->pluginHost.setKongPresetActivation(activation, true))
+        {
+            if (completion) completion(false);
+            return;
+        }
+        juce::Timer::callAfterDelay(180, [safe, activation, completion]
+        {
+            if (safe == nullptr) return;
+            if (! safe->pluginHost.setKongPresetActivation(activation, false))
+            {
+                if (completion) completion(false);
+                return;
+            }
+            juce::Timer::callAfterDelay(1400, [safe, activation, completion]
+            {
+                if (safe == nullptr) return;
+                if (! safe->pluginHost.setKongPresetActivation(activation, false))
+                {
+                    if (completion) completion(false);
+                    return;
+                }
+                juce::Timer::callAfterDelay(700, [safe, completion]
+                {
+                    if (safe == nullptr) return;
+                    safe->pluginHost.resetPerformance();
+                    if (completion) completion(true);
+                });
+            });
+        });
+    };
+    juce::Timer::callAfterDelay(400, [safe, startActivation, completion]
+    {
+        if (safe == nullptr) return;
+        if (const auto activation = safe->pluginHost.getActiveKongPresetActivation(); activation.has_value())
+        {
+            startActivation(*activation);
+            return;
+        }
+        // On slower machines QinEngine may publish its restored rack parameters
+        // after setStateInformation returns. Retry discovery once without
+        // blocking the UI or audio thread.
+        juce::Timer::callAfterDelay(800, [safe, startActivation, completion]
+        {
+            if (safe == nullptr) return;
+            const auto activation = safe->pluginHost.getActiveKongPresetActivation();
+            if (activation.has_value()) startActivation(*activation);
+            else if (completion) completion(false);
+        });
+    });
 }
 
 void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,

@@ -82,6 +82,24 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("swamExpressionController.load", HOST)
         self.assertIn("applyStandardSwamExpressionCurve", MAIN)
 
+    def test_qin_restore_reactivates_secondary_preset_before_reporting_success(self):
+        self.assertIn("getActiveKongPresetActivation", HOST)
+        self.assertIn('name.startsWithIgnoreCase("Preset_ID_")', HOST)
+        self.assertIn('findByName("KAI_ID_" + suffix)', HOST)
+        self.assertIn("setValueNotifyingHost(value)", HOST)
+        restore = MAIN.split("void MainComponent::reactivateKongPreset", 1)[1].split(
+            "void MainComponent::completeLoadedPreset", 1)[0]
+        self.assertIn("setKongPresetActivation(activation, true)", restore)
+        self.assertGreaterEqual(restore.count("setKongPresetActivation(activation, false)"), 2)
+        self.assertGreaterEqual(restore.count("getActiveKongPresetActivation()"), 2)
+        load = MAIN.split("void MainComponent::loadSelectedPreset", 1)[1].split(
+            "void MainComponent::reactivateKongPreset", 1)[0]
+        self.assertLess(load.index("reactivateKongPreset"), load.index("completeLoadedPreset(preset"))
+        self.assertIn("正在激活空音奏法", load)
+        cancel_restore = MAIN.split("void MainComponent::restoreToneBeforePresetEdit", 1)[1].split(
+            "void MainComponent::loadSelectedPreset", 1)[0]
+        self.assertIn("reactivateKongPreset", cancel_restore)
+
     def test_swam_main_expression_curve_preserves_controller_mapping(self):
         curve = (ROOT / "native" / "Source" / "SwamExpressionCurve.cpp").read_text(encoding="utf-8")
         header = (ROOT / "native" / "Source" / "SwamExpressionCurve.h").read_text(encoding="utf-8")
