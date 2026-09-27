@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_data_structures/juce_data_structures.h>
+#include <cstring>
 #include <optional>
 
 namespace fengyin
@@ -77,16 +78,17 @@ public:
         return output.getMemoryBlock();
     }
 
-    // QinEngine deliberately uses two closely-related ValueTree schemas:
-    //   .KAM file: KAMFileRoot { RackParam(TuningType), PresetList }
-    //   VST state: State { Zoom, RackParam(Tuning), PresetList }
+    // QinEngine deliberately uses two layers:
+    //   .KAM file: KAMFileRoot { RackParam, PresetList }
+    //   JUCE VST3 state: VST3PluginState XML wrapping the component's
+    //                    State { RackParam, PresetList } ValueTree.
     // Never persist a guessed KAM when the live plug-in can provide its exact
     // selected KAI and articulation. Convert the state captured from QinEngine
     // into the native project format instead.
     static juce::MemoryBlock fromPluginState(const juce::MemoryBlock& pluginState)
     {
         if (pluginState.getSize() == 0) return {};
-        const auto state = juce::ValueTree::readFromData(pluginState.getData(), pluginState.getSize());
+        const auto state = readPluginComponentState(pluginState);
         if (! state.isValid()) return {};
         // Some QinEngine builds return their native project payload directly
         // from getStateInformation. Preserve it rather than rejecting a valid
@@ -94,20 +96,24 @@ public:
         if (state.hasType("KAMFileRoot"))
             return hasSelectedPreset(state.getChildWithName("PresetList")) ? pluginState : juce::MemoryBlock();
         if (! state.hasType("State")) return {};
-        const auto sourceRack = state.getChildWithName("RackParam");
         const auto sourceList = state.getChildWithName("PresetList");
-        if (! sourceRack.isValid() || ! sourceList.isValid() || ! hasSelectedPreset(sourceList)) return {};
-
-        auto rack = sourceRack.createCopy();
-        if (rack.hasProperty("Tuning"))
+        if (! sourceList.isValid()) return {};
+        for (int index = 0; index < sourceList.getNumChildren(); ++index)
         {
-            rack.setProperty("TuningType", rack.getProperty("Tuning"), nullptr);
-            rack.removeProperty("Tuning", nullptr);
+            const auto slot = sourceList.getChild(index);
+            if (! slot.hasType("Preset")) continue;
+            const auto kai = slot.getProperty("KAI").toString();
+            const auto preset = slot.getProperty("Preset").toString();
+            if (kai.isEmpty() || preset.isEmpty()) continue;
+
+            // QinEngine's VST3 component state deliberately omits IsSelected
+            // and contains runtime-only fields such as NoteRanges. A native
+            // KAM contains the same exact KAI/preset identity in a compact,
+            // canonical schema. Build that schema from the values selected in
+            // the live editor; never infer them from the user's display name.
+            return create(kai, preset);
         }
-        juce::ValueTree root("KAMFileRoot");
-        root.addChild(rack, -1, nullptr);
-        root.addChild(sourceList.createCopy(), -1, nullptr);
-        return serialise(root);
+        return {};
     }
 
     // Convert a native .KAM project into the exact schema consumed by
@@ -124,22 +130,80 @@ public:
         if (! sourceRack.isValid() || ! sourceList.isValid() || ! hasSelectedPreset(sourceList)) return {};
 
         juce::ValueTree state("State");
-        juce::ValueTree zoom("Zoom");
-        zoom.setProperty("UI_Width", 1200, nullptr);
-        zoom.setProperty("UI_Height", 760, nullptr);
-        auto rack = sourceRack.createCopy();
-        if (rack.hasProperty("TuningType"))
+        juce::ValueTree rack("RackParam");
+        rack.setProperty("MainTune", 440.0, nullptr);
+        rack.setProperty("Poly", 1.0, nullptr);
+        rack.setProperty("TuningType", 0.0, nullptr);
+        rack.setProperty("IsOptimizationOn", 0.0, nullptr);
+        rack.setProperty("ImpulseType", 1.0, nullptr);
+        rack.setProperty("Gain", 0.0, nullptr);
+        rack.setProperty("Display", 1, nullptr);
+        rack.setProperty("PitchbendUp", 10.0, nullptr);
+        rack.setProperty("PitchbendDown", 2.0, nullptr);
+
+        juce::ValueTree list("PresetList");
+        for (int index = 0; index < sourceList.getNumChildren(); ++index)
         {
-            rack.setProperty("Tuning", rack.getProperty("TuningType"), nullptr);
-            rack.removeProperty("TuningType", nullptr);
+            const auto source = sourceList.getChild(index);
+            if (! source.hasType("Preset")
+                || source.getProperty("KAI").toString().isEmpty()
+                || source.getProperty("Preset").toString().isEmpty()) continue;
+            juce::ValueTree slot("Preset");
+            for (const auto* property : { "KAI", "Preset", "MIDI", "Audio", "Volume", "Tone",
+                                          "Balance", "FXAUX", "IndexSelectedKeyswitch" })
+                if (source.hasProperty(property))
+                    slot.setProperty(property, source.getProperty(property), nullptr);
+            list.addChild(slot, -1, nullptr);
         }
-        state.addChild(zoom, -1, nullptr);
+        if (list.getNumChildren() == 0) return {};
         state.addChild(rack, -1, nullptr);
-        state.addChild(sourceList.createCopy(), -1, nullptr);
-        return serialise(state);
+        state.addChild(list, -1, nullptr);
+        return wrapVst3ComponentState(serialise(state));
     }
 
 private:
+    static juce::ValueTree readPluginComponentState(const juce::MemoryBlock& data)
+    {
+        // JUCE's VST3 host wraps the plug-in's IComponent state in a
+        // VST3PluginState XML binary (magic "VC2!"). The previous code tried
+        // to parse this wrapper as a ValueTree and therefore never reached the
+        // exact KAI and articulation selected by the user.
+        if (data.getSize() <= 8 || juce::ByteOrder::littleEndianInt(data.getData()) != 0x21324356u)
+        {
+            auto direct = juce::ValueTree::readFromData(data.getData(), data.getSize());
+            return direct.hasType("State") || direct.hasType("KAMFileRoot") ? direct : juce::ValueTree();
+        }
+        const auto declaredLength = static_cast<int>(juce::ByteOrder::littleEndianInt(
+            static_cast<const char*>(data.getData()) + 4));
+        if (declaredLength <= 0 || declaredLength > static_cast<int>(data.getSize() - 8)) return {};
+        auto wrapper = juce::parseXML(juce::String::fromUTF8(
+            static_cast<const char*>(data.getData()) + 8, declaredLength));
+        if (wrapper == nullptr || ! wrapper->hasTagName("VST3PluginState")) return {};
+        const auto* component = wrapper->getChildByName("IComponent");
+        if (component == nullptr) return {};
+        juce::MemoryBlock componentState;
+        if (! componentState.fromBase64Encoding(component->getAllSubText())) return {};
+        return juce::ValueTree::readFromData(componentState.getData(), componentState.getSize());
+    }
+
+    static juce::MemoryBlock wrapVst3ComponentState(const juce::MemoryBlock& componentState)
+    {
+        if (componentState.getSize() == 0) return {};
+        juce::XmlElement wrapper("VST3PluginState");
+        wrapper.createNewChildElement("IComponent")->addTextElement(componentState.toBase64Encoding());
+        juce::MemoryBlock result;
+        {
+            juce::MemoryOutputStream output(result, false);
+            output.writeInt(static_cast<int>(0x21324356u));
+            output.writeInt(0);
+            wrapper.writeTo(output, juce::XmlElement::TextFormat().singleLine());
+            output.writeByte(0);
+        }
+        const auto textLength = juce::ByteOrder::swapIfBigEndian(static_cast<juce::uint32>(result.getSize() - 9));
+        std::memcpy(static_cast<char*>(result.getData()) + 4, &textLength, sizeof(textLength));
+        return result;
+    }
+
     static bool hasSelectedPreset(const juce::ValueTree& list)
     {
         for (int index = 0; index < list.getNumChildren(); ++index)

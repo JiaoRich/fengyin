@@ -1868,6 +1868,8 @@ void MainComponent::beginContainerInstrument(const juce::String& adapter)
         containerInstrumentDraftActive = true;
         containerInstrumentDraftAdapter = "kong-v3";
         containerInstrumentStateBeforeSelection = pluginHost.captureContainerState();
+        containerInstrumentPendingState.reset();
+        containerInstrumentPendingProject.reset();
         activatePluginOutput(pluginHost.getPluginName());
         const auto opened = pluginHost.showPluginEditor(false);
         emit(opened, opened ? "ready" : "error", opened
@@ -1912,60 +1914,61 @@ void MainComponent::commitContainerInstrument(const juce::String& name)
         emit(false, "error", utf8("添加流程已失效，请重新点击“添加空音乐器”"));
         return;
     }
-    if (name.isEmpty()) { emit(false, "error", utf8("请填写乐器名称")); return; }
+    if (containerInstrumentPendingProject.getSize() == 0)
+    {
+        const auto state = pluginHost.captureContainerState();
+        if (state.getSize() == 0)
+        {
+            emit(false, "error", utf8("没有读取到空音乐器状态，请在原厂界面重新选择乐器"));
+            return;
+        }
+        const auto unchanged = state.getSize() == containerInstrumentStateBeforeSelection.getSize()
+            && (state.getSize() == 0 || std::memcmp(state.getData(), containerInstrumentStateBeforeSelection.getData(),
+                                                    state.getSize()) == 0);
+        if (unchanged)
+        {
+            emit(false, "error", utf8("尚未检测到新乐器，请先在空音窗口点击“＋”选择乐器和奏法"));
+            return;
+        }
+        const auto project = fengyin::KongProjectFile::fromPluginState(state);
+        if (project.getSize() == 0)
+        {
+            emit(false, "error", utf8("未读取到已选的乐器和奏法，请在空音里完成选择后重试"));
+            return;
+        }
+        containerInstrumentPendingState = state;
+        containerInstrumentPendingProject = project;
+        pluginHost.closePluginEditor(false);
+        emit(true, "captured", utf8("已保存当前乐器和奏法，请给这个音色起个名字"));
+        return;
+    }
+    if (name.isEmpty()) { emit(false, "error", utf8("请填写音色名称")); return; }
     for (const auto& existing : cachedPresets)
         if (existing.containerInstrument && existing.pluginBrand == "kong"
-            && existing.instrumentChineseName.equalsIgnoreCase(name))
+            && existing.name.equalsIgnoreCase(name))
         {
-            emit(false, "error", utf8("已经添加过同名乐器，请换一个名称"));
+            emit(false, "error", utf8("已经有同名音色，请换一个名称"));
             return;
         }
 
-    const auto state = pluginHost.captureContainerState();
-    if (state.getSize() == 0)
-    {
-        emit(false, "error", utf8("没有读取到空音乐器状态，请在原厂界面重新选择乐器"));
-        return;
-    }
-    const auto unchanged = state.getSize() == containerInstrumentStateBeforeSelection.getSize()
-        && (state.getSize() == 0 || std::memcmp(state.getData(), containerInstrumentStateBeforeSelection.getData(),
-                                                state.getSize()) == 0);
-    if (unchanged)
-    {
-        emit(false, "error", utf8("尚未检测到新乐器，请先在空音窗口点击“＋”选择乐器"));
-        return;
-    }
+    const auto state = containerInstrumentPendingState;
+    const auto project = containerInstrumentPendingProject;
+    const auto description = fengyin::KongProjectFile::describe(project);
+    if (! description.has_value()) { emit(false, "error", utf8("空音 KAM 状态无效，请重新选择")); return; }
+    const auto* instrument = fengyin::KongInstrumentCatalog::matchProgram(description->kai);
 
     fengyin::SoundPreset preset;
     preset.id = juce::Uuid().toString();
-    preset.name = utf8("原厂音色");
+    preset.name = name;
     preset.pluginIdentifier = pluginHost.getPluginIdentifier();
     preset.pluginBrand = "kong";
     preset.containerInstrument = true;
     preset.containerAdapter = containerInstrumentDraftAdapter;
-    preset.instrumentKey = "container:" + containerInstrumentDraftAdapter + ":" + preset.id;
-    preset.instrumentChineseName = name;
+    preset.instrumentKey = instrument != nullptr ? juce::String(instrument->key)
+        : "container:" + containerInstrumentDraftAdapter + ":" + description->kai.toLowerCase();
+    preset.instrumentChineseName = instrument != nullptr ? utf8(instrument->chineseName) : name;
     preset.samplerState = state;
-    preset.containerProjectState = fengyin::KongProjectFile::fromPluginState(state);
-    if (preset.containerProjectState.getSize() == 0)
-    {
-        const auto diagnostic = pluginHost.createContainerStateDiagnostic(containerInstrumentStateBeforeSelection,
-                                                                           state);
-        const auto stamp = juce::Time::getCurrentTime().formatted("%Y%m%d-%H%M%S");
-        auto folder = juce::File::getSpecialLocation(juce::File::userDesktopDirectory);
-        if (! folder.isDirectory())
-            folder = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
-        const auto file = folder.getNonexistentChildFile(utf8("风吟-空音状态诊断-") + stamp,
-                                                         ".fydiagnostic", false);
-        if (diagnostic.isEmpty() || ! file.replaceWithText(diagnostic, false, false, "\n"))
-        {
-            emit(false, "error", utf8("空音状态暂时无法识别，且诊断文件导出失败"));
-            return;
-        }
-        emit(false, "diagnostic", utf8("已将空音的完整当前状态导出到：")
-            + file.getFullPathName() + utf8("。请将该文件发给开发者分析。"));
-        return;
-    }
+    preset.containerProjectState = project;
     preset.customTone = true;
     preset.baseToneStyleId = "natural";
     preset.toneStyleId = "natural";
@@ -1994,16 +1997,18 @@ void MainComponent::commitContainerInstrument(const juce::String& name)
 
     currentPluginBrand = "kong";
     currentInstrumentKey = preset.instrumentKey;
-    currentInstrumentChineseName = name;
+    currentInstrumentChineseName = preset.instrumentChineseName;
     currentPresetDisplayName = preset.name;
     currentPresetId = preset.id;
     currentPresetIsCustom = true;
     containerInstrumentDraftActive = false;
     containerInstrumentDraftAdapter.clear();
     containerInstrumentStateBeforeSelection.reset();
+    containerInstrumentPendingState.reset();
+    containerInstrumentPendingProject.reset();
     editingReturnValid = false;
     refreshPresetChoices();
-    pluginStatus.setText(utf8("已添加空音乐器：") + name, juce::dontSendNotification);
+    pluginStatus.setText(utf8("已添加空音音色：") + name, juce::dontSendNotification);
     emit(true, "saved", utf8("已添加：") + name);
 }
 
@@ -2013,6 +2018,8 @@ void MainComponent::cancelContainerInstrument()
     containerInstrumentDraftActive = false;
     containerInstrumentDraftAdapter.clear();
     containerInstrumentStateBeforeSelection.reset();
+    containerInstrumentPendingState.reset();
+    containerInstrumentPendingProject.reset();
     restoreToneBeforePresetEdit();
 }
 
@@ -2488,6 +2495,7 @@ void MainComponent::restoreToneBeforePresetEdit()
     const auto wasCustom = editingReturnWasCustom;
     const auto modelIndex = editingReturnModelIndex;
     const auto parameters = editingReturnToneParameters;
+    const auto samplerState = editingReturnSamplerState;
     const auto projectState = editingReturnContainerProjectState;
     const auto toneSettings = editingReturnToneSettings;
     pluginLoading = true;
@@ -2495,7 +2503,7 @@ void MainComponent::restoreToneBeforePresetEdit()
                          status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
                          status.bufferSize > 0 ? status.bufferSize : 128,
                          [this, presetId, presetName, styleId, brand, instrumentKey, instrumentName,
-                          wasCustom, modelIndex, parameters, toneSettings, projectState]
+                          wasCustom, modelIndex, parameters, toneSettings, samplerState, projectState]
                          (bool success, const juce::String& message)
                          {
                              if (! success) { pluginLoading = false; return; }
@@ -2522,9 +2530,9 @@ void MainComponent::restoreToneBeforePresetEdit()
                              };
                              if (brand == "kong")
                              {
-                                 const auto restored = projectState.getSize() > 0
-                                     ? pluginHost.restoreKongProject(projectState)
-                                     : false;
+                                 const auto restored = samplerState.getSize() > 0
+                                     ? pluginHost.restoreContainerState(samplerState)
+                                     : (projectState.getSize() > 0 && pluginHost.restoreKongProject(projectState));
                                  if (! restored) { pluginLoading = false; return; }
                              }
                              activatePluginOutput(message);
@@ -2607,10 +2615,12 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                              const auto isContainer = preset.containerInstrument || preset.pluginBrand == "kong";
                              if (isContainer)
                              {
-                                 // Restore from the native KAM project. The adapter converts KAMFileRoot
-                                 // into QinEngine's VST State schema before calling setStateInformation,
-                                 // so clearMulti/addKAI/addPreset run as one coherent restore operation.
-                                 const auto restored = pluginHost.restoreKongProject(preset.containerProjectState);
+                                 // Prefer the exact VST3 state captured from the audible live instance.
+                                 // The paired native KAM remains the durable identity and is also used
+                                 // when an older preset has no captured wrapper state.
+                                 const auto restored = preset.samplerState.getSize() > 0
+                                     ? pluginHost.restoreContainerState(preset.samplerState)
+                                     : pluginHost.restoreKongProject(preset.containerProjectState);
                                  if (! restored)
                                  {
                                      pluginLoading = false;

@@ -932,9 +932,12 @@ function renderPresets() {
     if (action === 'add-container-instrument') {
       $('#container-instrument-dialog').hidden=false;
       $('#container-instrument-name').value='';
+      $('#container-instrument-name').hidden=true;
       $('#container-instrument-status').textContent='请先看完上方步骤，再开始选择乐器。';
       $('#open-container-instrument').disabled=false;
+      $('#open-container-instrument').hidden=false;
       $('#confirm-container-instrument').disabled=true;
+      $('#confirm-container-instrument').textContent='我已选好';
       return;
     }
     if (action === 'create') {
@@ -1833,10 +1836,11 @@ $('#open-container-instrument')?.addEventListener('click', () => {
   nativeEvent('beginContainerInstrument',{adapter:'kong-v3'});
 });
 $('#confirm-container-instrument')?.addEventListener('click', () => {
-  const name=$('#container-instrument-name').value.trim();
-  if (!name) return toast('请填写乐器名称');
+  const naming=!$('#container-instrument-name').hidden;
+  const name=naming?$('#container-instrument-name').value.trim():'';
+  if (naming && !name) return toast('请填写音色名称');
   $('#confirm-container-instrument').disabled=true;
-  $('#container-instrument-status').textContent='正在保存原厂乐器状态……';
+  $('#container-instrument-status').textContent=naming?'正在保存音色……':'正在保存当前乐器和奏法……';
   nativeEvent('commitContainerInstrument',{name});
 });
 window.__JUCE__?.backend?.addEventListener('containerInstrumentResult', result => {
@@ -1845,6 +1849,12 @@ window.__JUCE__?.backend?.addEventListener('containerInstrumentResult', result =
   if (result?.stage === 'ready') {
     $('#confirm-container-instrument').disabled=false;
     $('#container-instrument-status').textContent='请在空音窗口选择并试听；选好后关闭原厂窗口，再返回创建乐器。';
+  } else if (result?.stage === 'captured' && result?.success) {
+    $('#container-instrument-name').hidden=false;
+    $('#container-instrument-name').focus();
+    $('#open-container-instrument').hidden=true;
+    $('#confirm-container-instrument').disabled=false;
+    $('#confirm-container-instrument').textContent='保存音色';
   } else if (result?.stage === 'saved' && result?.success) {
     $('#container-instrument-dialog').hidden=true;
     toast(result.message || '空音乐器已添加');
@@ -1991,7 +2001,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 0.16.4 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 0.16.5 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

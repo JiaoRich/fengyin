@@ -44,6 +44,25 @@ int main()
     // It must be accepted unchanged instead of failing creation.
     assert(fengyin::KongProjectFile::fromPluginState(preset.containerProjectState)
            == preset.containerProjectState);
+    const auto wrappedVst3State = fengyin::KongProjectFile::toPluginState(preset.containerProjectState);
+    assert(wrappedVst3State.getSize() > preset.containerProjectState.getSize());
+    const auto generatedRoundTrip = fengyin::KongProjectFile::fromPluginState(wrappedVst3State);
+    const auto generatedDescription = fengyin::KongProjectFile::describe(generatedRoundTrip);
+    assert(generatedDescription.has_value());
+    assert(generatedDescription->kai == "ErHu");
+    assert(generatedDescription->preset == "Sus_Main");
+    const auto referenceVstStatePath = juce::SystemStats::getEnvironmentVariable("FENGYIN_REFERENCE_VST_STATE", {});
+    if (referenceVstStatePath.isNotEmpty())
+    {
+        juce::MemoryBlock referenceState;
+        assert(juce::File(referenceVstStatePath).loadFileAsData(referenceState));
+        const auto extractedProject = fengyin::KongProjectFile::fromPluginState(referenceState);
+        assert(extractedProject == preset.containerProjectState);
+        const auto extracted = fengyin::KongProjectFile::describe(extractedProject);
+        assert(extracted.has_value());
+        assert(extracted->kai == "ErHu");
+        assert(extracted->preset == "Sus_Main");
+    }
     preset.customTone = true;
     preset.compressionRatio = 2.4f;
     preset.harshControl = 0.22f;
@@ -79,14 +98,6 @@ int main()
     assert(project->audioOutput == 0);
     const auto pluginState = fengyin::KongProjectFile::toPluginState(loaded->containerProjectState);
     assert(pluginState.getSize() > 0);
-    const auto stateTree = juce::ValueTree::readFromData(pluginState.getData(), pluginState.getSize());
-    assert(stateTree.hasType("State"));
-    assert(stateTree.getNumChildren() == 3);
-    assert(stateTree.getChild(0).hasType("Zoom"));
-    assert(stateTree.getChild(1).hasType("RackParam"));
-    assert(stateTree.getChild(1).hasProperty("Tuning"));
-    assert(! stateTree.getChild(1).hasProperty("TuningType"));
-    assert(stateTree.getChild(2).hasType("PresetList"));
     const auto roundTripKam = fengyin::KongProjectFile::fromPluginState(pluginState);
     const auto roundTrip = fengyin::KongProjectFile::describe(roundTripKam);
     assert(roundTrip.has_value());
