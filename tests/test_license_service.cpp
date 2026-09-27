@@ -1,5 +1,6 @@
 #include "LicenseService.h"
 #include <cassert>
+#include <iostream>
 int main()
 {
     juce::RSAKey publicKey, privateKey;
@@ -14,6 +15,28 @@ int main()
     assert(valid.activated && valid.licenseId == "FY-000001");
     assert(! service.validate(code, "AAAA-BBBB-CCCC-DDDD-EEEE").activated);
     assert(! service.validate(code + "1", machine).activated);
+
+    // RSA integers discard leading hexadecimal zeroes. A valid SHA256 digest
+    // may start with zero, independently of the OS/hardware that was signed.
+    bool checkedLeadingZero = false;
+    for (int index = 0; index < 4096; ++index)
+    {
+        const auto id = "ZERO-" + juce::String(index);
+        const auto payload = "FY1|" + machine.removeCharacters("-") + "|" + id + "|PERMANENT";
+        const auto digest = juce::SHA256(payload.toRawUTF8(), static_cast<size_t>(payload.getNumBytesAsUTF8())).toHexString();
+        if (! digest.startsWithChar('0')) continue;
+        const auto signedCode = fengyin::LicenseService::createActivationCode(machine, id, privateKey);
+        const auto result = service.validate(signedCode, machine);
+        if (! result.activated)
+        {
+            std::cerr << "Leading-zero digest rejected: " << digest << " / " << result.message << '\n';
+            return 1;
+        }
+        assert(! service.validate(signedCode + "1", machine).activated);
+        checkedLeadingZero = true;
+        break;
+    }
+    assert(checkedLeadingZero);
 
     const auto trialFolder = juce::File::getSpecialLocation(juce::File::tempDirectory)
         .getNonexistentChildFile("fengyin-trial-test", {}, true);
