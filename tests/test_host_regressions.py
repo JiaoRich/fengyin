@@ -91,6 +91,9 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("KongProjectFile::toPluginState", HOST)
         self.assertIn("pluginHost.restoreKongProject(preset.containerProjectState)", MAIN)
         self.assertIn("KongProjectFile::fromPluginState(state)", MAIN)
+        self.assertNotIn("pluginCatalog.createKongProjectForInstrument(name)", MAIN)
+        self.assertIn("createContainerStateDiagnostic", MAIN)
+        self.assertIn(".fydiagnostic", MAIN)
         self.assertNotIn("reactivateKongPreset", MAIN)
         self.assertNotIn("setKongPresetActivation", HOST)
 
