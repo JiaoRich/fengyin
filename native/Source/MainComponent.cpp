@@ -386,6 +386,10 @@ void MainComponent::setupWebInterface()
             juce::SystemClipboard::copyTextToClipboard(machineCode);
         })
         .withEventListener("chooseVideo", [this](juce::var) { if (isActivated) chooseVideoForWebInterface(); })
+        .withEventListener("setBendRange", [this](juce::var payload)
+        {
+            if (isActivated && ! pluginLoading) changeInstrumentBendRange(payload);
+        })
         .withEventListener("setVideoPlaybackState", [this](juce::var payload)
         {
             if (static_cast<int>(payload.getProperty("generation", -1)) != webVideoGeneration) return;
@@ -1088,6 +1092,11 @@ void MainComponent::timerCallback()
         if (systemStatus.state != "idle")
         {
             superLowLatencyRunning = false;
+            if (isActivated)
+            {
+                if (pluginHost.hasPlugin()) midi.setPerformanceSink(&pluginHost);
+                else midi.setPerformanceSink(&testSynth);
+            }
             emitSuperLowLatencyState();
         }
     }
@@ -1316,6 +1325,11 @@ void MainComponent::timerCallback()
         state->setProperty("pluginBrand", currentPluginBrand);
         state->setProperty("instrumentChineseName", currentInstrumentChineseName);
         state->setProperty("instrumentKey", currentInstrumentKey);
+        state->setProperty("bendRange", bendRange);
+        state->setProperty("bendRangeApplied", bendRangeApplied);
+        state->setProperty("bendRangeRemembered", bendRangeRemembered);
+        state->setProperty("bendRecommended", currentPluginBrand == "kong" ? 3 : 1);
+        state->setProperty("bendPreferenceKey", bendPreferenceKey());
         juce::Array<juce::var> instrumentModels;
         const auto swamModelNames = currentPluginBrand == "swam" ? pluginHost.getInstrumentModelNames()
                                                                   : juce::StringArray();
@@ -1550,12 +1564,6 @@ void MainComponent::emitSuperLowLatencyState(const juce::String& overrideMessage
 void MainComponent::startSuperLowLatencyOptimisation(bool restore)
 {
     if (superLowLatencyRunning) return;
-    if (videoPlaybackActive || recorder.isRecording() || midi.getSnapshot().breath > 0.01f
-        || midi.getSnapshot().lastNote >= 0)
-    {
-        emitSuperLowLatencyState(utf8("请先暂停伴奏、录音和吹奏，再修改系统声卡驱动。"));
-        return;
-    }
     const auto status = windowsLowLatencyOptimizer.getStatus();
     if (! status.supported)
     {
@@ -1572,6 +1580,17 @@ void MainComponent::startSuperLowLatencyOptimisation(bool restore)
         emitSuperLowLatencyState(utf8("未找到适用的 Realtek / Senary / C-Media 板载声卡，未修改系统。"));
         return;
     }
+    // The user has confirmed the system-driver operation. Quiesce our own
+    // playback instead of treating the last MIDI note as an active performer.
+    if (recorder.isRecording()) toggleRecording();
+    accompaniment.pause();
+    videoPlaybackActive = false;
+    audio.cancelAutomaticLatencyTuning();
+    pluginHost.setLatencyProbeActive(false);
+    pluginHost.resetPerformance();
+    testSynth.resetPerformance();
+    if (webInterface != nullptr)
+        webInterface->emitEventIfBrowserIsVisible("pauseForDriverChange", juce::var());
     const auto launched = restore ? windowsLowLatencyOptimizer.launchRestore()
                                   : windowsLowLatencyOptimizer.launchOptimisation();
     if (! launched)
@@ -1580,6 +1599,7 @@ void MainComponent::startSuperLowLatencyOptimisation(bool restore)
         return;
     }
     superLowLatencyRunning = true;
+    midi.setPerformanceSink(nullptr);
     superLowLatencyPollTicks = 0;
     emitSuperLowLatencyState(restore ? utf8("正在恢复原声卡驱动…")
                                      : utf8("正在备份原驱动并切换微软低延迟驱动…"));
@@ -2496,14 +2516,15 @@ void MainComponent::restoreToneBeforePresetEdit()
     const auto modelIndex = editingReturnModelIndex;
     const auto parameters = editingReturnToneParameters;
     const auto samplerState = editingReturnSamplerState;
-    const auto projectState = editingReturnContainerProjectState;
     const auto toneSettings = editingReturnToneSettings;
-    // QinEngine's generic VST3 state describes the visible rack, but omits the
-    // KAM-only IsSelected flag that activates the audible slot. Always restore
-    // container instruments from the paired native KAM representation.
     const auto initialState = brand == "kong"
-        ? fengyin::KongProjectFile::toPluginState(projectState)
+        ? samplerState
         : juce::MemoryBlock();
+    if (brand == "kong" && initialState.getSize() == 0)
+    {
+        pluginStatus.setText(utf8("无法恢复：缺少原厂音源状态"), juce::dontSendNotification);
+        return;
+    }
     pluginLoading = true;
     pluginHost.loadAsync(chosen,
                          status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
@@ -2532,6 +2553,7 @@ void MainComponent::restoreToneBeforePresetEdit()
                                  safe->currentPresetIsCustom = wasCustom;
                                  safe->currentBaseToneSettings = toneSettings;
                                  safe->currentSwamToneParameterCount = parameters.size();
+                                 safe->applyInstrumentBendRange();
                                  safe->pluginLoading = false;
                                  safe->pluginStatus.setText(utf8("已取消修改，恢复原音色"), juce::dontSendNotification);
                              };
@@ -2594,18 +2616,22 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
     }
 
     const auto status = audio.getStatus();
+    // KAM and VST state have different schemas. Use the untouched plugin state.
+    const auto initialContainerState = preset.containerInstrument || preset.pluginBrand == "kong"
+        ? preset.samplerState
+        : juce::MemoryBlock();
+    if ((preset.containerInstrument || preset.pluginBrand == "kong") && initialContainerState.getSize() == 0)
+    {
+        const auto error = utf8("此方案缺少原厂音源状态，请重新创建；未载入不完整的状态。");
+        pluginStatus.setText(error, juce::dontSendNotification);
+        if (completion) completion(false, error);
+        return;
+    }
     currentPluginBrand = preset.pluginBrand;
     currentInstrumentKey = preset.instrumentKey;
     currentInstrumentChineseName = preset.instrumentChineseName;
     pluginStatus.setText(utf8("正在恢复音色方案……"), juce::dontSendNotification);
     pluginLoading = true;
-    // Do not prefer samplerState here. QinEngine omits IsSelected from its
-    // generic VST3 state, leaving the restored rack visible but silent until
-    // the user changes articulation. The native KAM contains that activation
-    // flag and is the authoritative load source.
-    const auto initialContainerState = preset.containerInstrument || preset.pluginBrand == "kong"
-        ? fengyin::KongProjectFile::toPluginState(preset.containerProjectState)
-        : juce::MemoryBlock();
     pluginHost.loadAsync(chosen,
                          status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
                          status.bufferSize > 0 ? status.bufferSize : 128,
@@ -2656,6 +2682,7 @@ void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
     currentPresetDisplayName = preset.name;
     currentPresetId = preset.id;
     currentPresetIsCustom = preset.customTone;
+    applyInstrumentBendRange();
     pluginStatus.setText(utf8("已恢复音色：") + preset.name, juce::dontSendNotification);
     pluginHost.unloadEffect();
     effectStatus.setText(utf8("内置音色引擎已启用"), juce::dontSendNotification);
@@ -2712,6 +2739,7 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName)
     masterOutput.setToneStyle(defaultStyle.settings);
     currentSwamToneParameterCount = currentPluginBrand == "swam"
         ? pluginHost.applySwamToneProfile(defaultStyle.swam) : 0;
+    applyInstrumentBendRange();
     pluginStatus.setText(utf8("当前音源：") + pluginName, juce::dontSendNotification);
     if (! pluginHost.hasEffect())
         effectStatus.setText(utf8("效果器：未使用"), juce::dontSendNotification);
@@ -2726,6 +2754,76 @@ void MainComponent::applyCurrentSwamToneStyle()
     }
     const auto style = fengyin::ToneStyleCatalog::find(currentInstrumentKey, currentToneStyleId);
     currentSwamToneParameterCount = pluginHost.applySwamToneProfile(style.swam);
+    applyInstrumentBendRange();
+}
+
+namespace
+{
+juce::File bendPreferencesFile()
+{
+    return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+        .getChildFile("FengYin").getChildFile("bend-ranges.json");
+}
+juce::var readBendPreferences()
+{
+    auto values = juce::JSON::parse(bendPreferencesFile().loadFileAsString());
+    return values.isObject() ? values : juce::var(new juce::DynamicObject());
+}
+}
+
+juce::String MainComponent::bendPreferenceKey() const
+{
+    return pluginHost.getPluginIdentifier() + "|" + currentInstrumentKey;
+}
+
+void MainComponent::applyInstrumentBendRange()
+{
+    bendRangeApplied = false;
+    bendRangeRemembered = false;
+    bendRange = currentPluginBrand == "kong" ? 3 : 1;
+    if (! pluginHost.hasPlugin() || currentInstrumentKey.isEmpty()) return;
+    const auto values = readBendPreferences();
+    const auto saved = static_cast<int>(values.getProperty(bendPreferenceKey(), 0));
+    if (saved >= 1 && saved <= 4) { bendRange = saved; bendRangeRemembered = true; }
+    bendRangeApplied = pluginHost.setBendRange(bendRange);
+}
+
+void MainComponent::changeInstrumentBendRange(const juce::var& payload)
+{
+    auto reply = [this](bool success, const juce::String& message)
+    {
+        auto result = std::make_unique<juce::DynamicObject>();
+        result->setProperty("success", success);
+        result->setProperty("message", message);
+        if (webInterface != nullptr)
+            webInterface->emitEventIfBrowserIsVisible("bendRangeResult", juce::var(result.release()));
+    };
+    if (! pluginHost.hasPlugin() || payload.getProperty("key", {}).toString() != bendPreferenceKey())
+    { reply(false, utf8("当前乐器已切换，请重新设置。")); return; }
+    const bool reset = static_cast<bool>(payload.getProperty("reset", false));
+    const auto desired = reset ? (currentPluginBrand == "kong" ? 3 : 1)
+                              : static_cast<int>(payload.getProperty("value", 0));
+    if (desired < 1 || desired > 4) return;
+    if (! pluginHost.setBendRange(desired))
+    { reply(false, utf8("当前音源未提供可验证的弯音范围参数，未保存修改；请在原厂界面设置。")); return; }
+    auto values = readBendPreferences();
+    if (reset) values.getDynamicObject()->removeProperty(bendPreferenceKey());
+    else values.getDynamicObject()->setProperty(bendPreferenceKey(), desired);
+    const auto file = bendPreferencesFile();
+    juce::TemporaryFile temporary(file);
+    const bool saved = file.getParentDirectory().createDirectory()
+        && temporary.getFile().replaceWithText(juce::JSON::toString(values))
+        && temporary.overwriteTargetFileWithTemporary();
+    if (! saved)
+    {
+        applyInstrumentBendRange();
+        reply(false, utf8("无法保存弯音设置，已尝试恢复原设置。"));
+        return;
+    }
+    bendRange = desired;
+    bendRangeApplied = true;
+    bendRangeRemembered = ! reset;
+    reply(true, reset ? utf8("已恢复推荐弯音范围") : utf8("已保存此乐器的弯音范围"));
 }
 
 void MainComponent::configureTechniqueDefaults()

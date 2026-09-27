@@ -70,6 +70,12 @@ private:
     static juce::File getOnboardingMarkerFile();
     void activatePluginOutput(const juce::String& pluginName);
     void applyCurrentSwamToneStyle();
+    void applyInstrumentBendRange();
+    void changeInstrumentBendRange(const juce::var& payload);
+    juce::String bendPreferenceKey() const;
+    int bendRange = 0;
+    bool bendRangeApplied = false;
+    bool bendRangeRemembered = false;
     [[nodiscard]] fengyin::SwamFamily currentTechniqueFamily() const;
     void configureTechniqueDefaults();
     void showActivationDialog();

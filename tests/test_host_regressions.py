@@ -91,9 +91,9 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('"IsSelected"', project)
         self.assertIn('setProperty("TuningType"', project)
         self.assertIn("KongProjectFile::toPluginState", HOST)
-        self.assertIn("KongProjectFile::toPluginState(preset.containerProjectState)", MAIN)
+        self.assertIn("? preset.samplerState", MAIN)
         self.assertIn("initialContainerState,", MAIN)
-        self.assertNotIn("? preset.samplerState", MAIN)
+        self.assertNotIn("KongProjectFile::toPluginState(preset.containerProjectState)", MAIN)
         self.assertIn("KongProjectFile::fromPluginState(state)", MAIN)
         self.assertNotIn("pluginCatalog.createKongProjectForInstrument(name)", MAIN)
         self.assertNotIn(".fydiagnostic", MAIN)
@@ -263,7 +263,7 @@ class HostRegressionTests(unittest.TestCase):
         self.assertNotIn("beginContainerOutputVerification", MAIN)
         self.assertNotIn("containerOutputVerificationStartSignals", MAIN_HEADER)
         self.assertIn("preset.containerProjectState.getSize() == 0", MAIN)
-        self.assertIn("KongProjectFile::toPluginState(preset.containerProjectState)", MAIN)
+        self.assertIn("? preset.samplerState", MAIN)
         self.assertNotIn("pluginHost.restoreContainerState(preset.containerProjectState)", MAIN)
         self.assertIn("不要重复点击", MAIN)
         self.assertIn("currentPresetId == preset.id", MAIN)
@@ -396,9 +396,29 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("backup-manifest.json", optimiser)
         self.assertIn("/add-driver", optimiser)
         self.assertIn("Realtek|Senary|C-Media", optimiser)
-        self.assertIn("Nahimic|A-Volute|Dolby", optimiser)
+        self.assertNotIn("'enhancement-conflict'", optimiser)
+        self.assertNotIn("Remove-Item -LiteralPath $BackupDir", optimiser)
+        self.assertIn("$LASTEXITCODE -ne 3010", optimiser)
         self.assertNotIn("Invoke-WebRequest", optimiser)
         self.assertIn('L"runas"', optimiser)
+
+    def test_driver_change_quiesces_instead_of_rejecting_last_midi_note(self):
+        main = (ROOT / "native" / "Source" / "MainComponent.cpp").read_text(encoding="utf-8")
+        start = main.split("void MainComponent::startSuperLowLatencyOptimisation(bool restore)", 1)[1].split(
+            "void MainComponent::followSystemAudioOutputIfNeeded", 1)[0]
+        self.assertNotIn("lastNote", start)
+        self.assertIn("if (recorder.isRecording()) toggleRecording();", start)
+        self.assertIn("accompaniment.pause();", start)
+        self.assertIn('"pauseForDriverChange"', start)
+        self.assertIn("midi.setPerformanceSink(nullptr)", start)
+
+    def test_stale_plugin_loads_cannot_replace_current_graph(self):
+        self.assertIn("if (generation != loadGeneration) return;", HOST)
+        self.assertIn("effectGeneration != effectLoadGeneration", HOST)
+        unload = HOST.split("void PluginHostEngine::unload()", 1)[1].split("bool PluginHostEngine::hasPlugin", 1)[0]
+        self.assertIn("++loadGeneration", unload)
+        self.assertLess(unload.index("player.setProcessor(nullptr)"), unload.index("instrumentEditorWindow.reset()"))
+        self.assertIn("getCallbackLock()", HOST.split("PluginHostEngine::captureContainerState()", 1)[1].split("bool PluginHostEngine::restoreKongProject", 1)[0])
 
 
 if __name__ == "__main__":
