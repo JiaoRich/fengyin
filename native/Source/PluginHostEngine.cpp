@@ -290,10 +290,20 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                                  int bufferSize,
                                  LoadCallback callback)
 {
+    loadAsync(description, sampleRate, bufferSize, {}, std::move(callback));
+}
+
+void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
+                                 double sampleRate,
+                                 int bufferSize,
+                                 const juce::MemoryBlock& initialState,
+                                 LoadCallback callback)
+{
     unload();
     formatManager.createPluginInstanceAsync(
         description, sampleRate, bufferSize,
-        [this, description, sampleRate, bufferSize, guard = lifetime, completion = std::move(callback)]
+        [this, description, sampleRate, bufferSize, initialState,
+         guard = lifetime, completion = std::move(callback)]
         (std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error) mutable
         {
             if (! guard->load(std::memory_order_acquire))
@@ -303,6 +313,23 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                 if (completion)
                     completion(false, error.isNotEmpty() ? error : juce::String("VST3 load failed"));
                 return;
+            }
+            // Restore component/controller state before AudioProcessorPlayer
+            // prepares and starts the graph. QinEngine can update its visible
+            // rack when state is injected into a running instance without
+            // constructing the selected KAI voice; changing articulation in
+            // the editor then appears to "fix" it. Mature hosts restore project
+            // state at this pre-activation point instead.
+            if (initialState.getSize() > 0)
+            {
+                if (initialState.getSize() > 16 * 1024 * 1024)
+                {
+                    if (completion)
+                        completion(false, juce::String::fromUTF8("音源状态文件异常"));
+                    return;
+                }
+                instance->setStateInformation(initialState.getData(),
+                                              static_cast<int>(initialState.getSize()));
             }
             auto processingGraph = std::make_unique<TechniqueProcessingGraph>();
             processingGraph->applyTechniqueValues = [this] { flushTechniqueValues(); };
