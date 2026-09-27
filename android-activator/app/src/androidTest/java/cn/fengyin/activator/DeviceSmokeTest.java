@@ -72,4 +72,19 @@ public class DeviceSmokeTest {
             assertEquals(1,b.search("").size());
         }finally{a.close();b.close();c.deleteDatabase(db);c.deleteDatabase(db2);}
     }
+    @Test public void keyIsEncryptedAndCanBeRemoved()throws Exception{
+        Context c=InstrumentationRegistry.getInstrumentation().getTargetContext();
+        KeyVault vault=new KeyVault(c);vault.prepare();
+        // Authenticate the disposable emulator screen lock, never a user's device.
+        try(android.os.ParcelFileDescriptor fd=InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand("locksettings verify --old 2468")){
+            java.io.FileInputStream in=new java.io.FileInputStream(fd.getFileDescriptor());byte[] buffer=new byte[1024];while(in.read(buffer)!=-1){};
+        }
+        byte[] plain="disposable-test-private-key-not-production".getBytes("UTF-8");
+        try {
+            vault.save(plain);assertTrue(vault.exists());assertArrayEquals(plain,vault.read());
+            byte[] disk=java.nio.file.Files.readAllBytes(new java.io.File(c.getNoBackupFilesDir(),"license-key.enc").toPath());
+            assertFalse(new String(disk,"UTF-8").contains(new String(plain,"UTF-8")));
+            KeyVault reopened=new KeyVault(c);assertArrayEquals(plain,reopened.read());
+        }finally{vault.remove();assertFalse(vault.exists());}
+    }
 }
