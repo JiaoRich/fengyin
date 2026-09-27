@@ -104,6 +104,8 @@ public:
     [[nodiscard]] juce::MemoryBlock captureKongState();
     bool restoreKongProject(const juce::MemoryBlock& project);
     [[nodiscard]] juce::MemoryBlock captureContainerState();
+    [[nodiscard]] juce::String createContainerStateDiagnostic(const juce::MemoryBlock& beforeState,
+                                                               const juce::MemoryBlock& afterState) const;
     bool restoreContainerState(const juce::MemoryBlock& state);
     bool selectProgramByAliases(const juce::StringArray& aliases);
     [[nodiscard]] juce::StringArray getInstrumentModelNames() const;
