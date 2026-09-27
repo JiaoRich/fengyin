@@ -675,6 +675,74 @@ juce::MemoryBlock PluginHostEngine::captureContainerState()
     return state;
 }
 
+juce::String PluginHostEngine::createContainerStateDiagnostic(const juce::MemoryBlock& beforeState,
+                                                               const juce::MemoryBlock& afterState) const
+{
+    auto root = std::make_unique<juce::DynamicObject>();
+    root->setProperty("format", "FengYin QinEngine Windows state diagnostic");
+    root->setProperty("schemaVersion", 1);
+    root->setProperty("createdAt", juce::Time::getCurrentTime().toISO8601(true));
+    root->setProperty("pluginName", currentDescription.name);
+    root->setProperty("pluginDescriptiveName", currentDescription.descriptiveName);
+    root->setProperty("pluginManufacturer", currentDescription.manufacturerName);
+    root->setProperty("pluginVersion", currentDescription.version);
+    root->setProperty("pluginFormat", currentDescription.pluginFormatName);
+    root->setProperty("pluginIdentifier", currentDescription.fileOrIdentifier);
+    root->setProperty("beforeStateBytes", static_cast<juce::int64>(beforeState.getSize()));
+    root->setProperty("afterStateBytes", static_cast<juce::int64>(afterState.getSize()));
+    root->setProperty("beforeStateBase64", beforeState.toBase64Encoding());
+    root->setProperty("afterStateBase64", afterState.toBase64Encoding());
+
+    const auto addParsedState = [&root](const char* prefix, const juce::MemoryBlock& data)
+    {
+        const auto tree = juce::ValueTree::readFromData(data.getData(), data.getSize());
+        root->setProperty(juce::String(prefix) + "ValueTreeValid", tree.isValid());
+        if (! tree.isValid()) return;
+        root->setProperty(juce::String(prefix) + "ValueTreeType", tree.getType().toString());
+        if (auto xml = tree.createXml())
+            root->setProperty(juce::String(prefix) + "ValueTreeXml", xml->toString());
+    };
+    addParsedState("before", beforeState);
+    addParsedState("after", afterState);
+
+    juce::Array<juce::var> programs;
+    juce::Array<juce::var> parameters;
+    if (auto* processor = getPlugin())
+    {
+        root->setProperty("currentProgram", processor->getCurrentProgram());
+        root->setProperty("currentProgramName", processor->getProgramName(processor->getCurrentProgram()));
+        for (int index = 0; index < processor->getNumPrograms(); ++index)
+        {
+            auto item = std::make_unique<juce::DynamicObject>();
+            item->setProperty("index", index);
+            item->setProperty("name", processor->getProgramName(index));
+            programs.add(juce::var(item.release()));
+        }
+
+        const auto& pluginParameters = processor->getParameters();
+        for (int index = 0; index < pluginParameters.size(); ++index)
+        {
+            auto* parameter = pluginParameters[index];
+            if (parameter == nullptr) continue;
+            const auto value = parameter->getValue();
+            auto item = std::make_unique<juce::DynamicObject>();
+            item->setProperty("index", index);
+            item->setProperty("identifier", stableParameterIdentifier(*parameter, index));
+            item->setProperty("name", parameter->getName(256));
+            item->setProperty("label", parameter->getLabel());
+            item->setProperty("value", static_cast<double>(value));
+            item->setProperty("text", parameter->getText(value, 256));
+            item->setProperty("numSteps", parameter->getNumSteps());
+            item->setProperty("isDiscrete", parameter->isDiscrete());
+            item->setProperty("isAutomatable", parameter->isAutomatable());
+            parameters.add(juce::var(item.release()));
+        }
+    }
+    root->setProperty("programs", juce::var(programs));
+    root->setProperty("parameters", juce::var(parameters));
+    return juce::JSON::toString(juce::var(root.release()), true);
+}
+
 bool PluginHostEngine::restoreKongProject(const juce::MemoryBlock& project)
 {
     if (! hasPlugin()
