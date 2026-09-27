@@ -90,7 +90,8 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('wrapVst3ComponentState', project)
         self.assertIn('setProperty("TuningType"', project)
         self.assertIn("KongProjectFile::toPluginState", HOST)
-        self.assertIn("pluginHost.restoreKongProject(preset.containerProjectState)", MAIN)
+        self.assertIn("KongProjectFile::toPluginState(preset.containerProjectState)", MAIN)
+        self.assertIn("initialContainerState,", MAIN)
         self.assertIn("KongProjectFile::fromPluginState(state)", MAIN)
         self.assertNotIn("pluginCatalog.createKongProjectForInstrument(name)", MAIN)
         self.assertNotIn(".fydiagnostic", MAIN)
@@ -260,7 +261,7 @@ class HostRegressionTests(unittest.TestCase):
         self.assertNotIn("beginContainerOutputVerification", MAIN)
         self.assertNotIn("containerOutputVerificationStartSignals", MAIN_HEADER)
         self.assertIn("preset.containerProjectState.getSize() == 0", MAIN)
-        self.assertIn("pluginHost.restoreKongProject(preset.containerProjectState)", MAIN)
+        self.assertIn("KongProjectFile::toPluginState(preset.containerProjectState)", MAIN)
         self.assertNotIn("pluginHost.restoreContainerState(preset.containerProjectState)", MAIN)
         self.assertIn("不要重复点击", MAIN)
         self.assertIn("currentPresetId == preset.id", MAIN)
@@ -272,6 +273,15 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('"falcon"', adapters)
         self.assertIn('"three-body"', adapters)
         self.assertIn("inventory must not create", (ROOT / "tests" / "ui_next_version.cjs").read_text(encoding="utf-8"))
+
+    def test_container_state_is_restored_before_audio_graph_activation(self):
+        state_restore = HOST.index("instance->setStateInformation(initialState.getData()")
+        graph_activation = HOST.index("player.setProcessor(graph.get())", state_restore)
+        self.assertLess(state_restore, graph_activation)
+        load_function = MAIN[MAIN.index("void MainComponent::loadSelectedPreset"):]
+        self.assertIn("const auto initialContainerState", load_function)
+        self.assertIn("pluginHost.loadAsync(chosen,", load_function)
+        self.assertIn("initialContainerState,", load_function)
 
     def test_packaged_web_runtime_contains_kong_instrument_artwork(self):
         for filename in ("instrument_kong_erhu.png", "instrument_kong_dizi.png"):
