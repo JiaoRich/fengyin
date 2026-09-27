@@ -71,6 +71,11 @@ public:
                    double sampleRate,
                    int bufferSize,
                    LoadCallback callback);
+    void loadAsync(const juce::PluginDescription& description,
+                   double sampleRate,
+                   int bufferSize,
+                   const juce::MemoryBlock& initialState,
+                   LoadCallback callback);
     void unload();
     void loadEffectAsync(const juce::PluginDescription& description,
                          double sampleRate, int bufferSize, LoadCallback callback);

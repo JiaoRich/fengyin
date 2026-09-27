@@ -2498,12 +2498,16 @@ void MainComponent::restoreToneBeforePresetEdit()
     const auto samplerState = editingReturnSamplerState;
     const auto projectState = editingReturnContainerProjectState;
     const auto toneSettings = editingReturnToneSettings;
+    const auto initialState = brand == "kong"
+        ? (samplerState.getSize() > 0 ? samplerState : fengyin::KongProjectFile::toPluginState(projectState))
+        : juce::MemoryBlock();
     pluginLoading = true;
     pluginHost.loadAsync(chosen,
                          status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
                          status.bufferSize > 0 ? status.bufferSize : 128,
+                         initialState,
                          [this, presetId, presetName, styleId, brand, instrumentKey, instrumentName,
-                          wasCustom, modelIndex, parameters, toneSettings, samplerState, projectState]
+                          wasCustom, modelIndex, parameters, toneSettings]
                          (bool success, const juce::String& message)
                          {
                              if (! success) { pluginLoading = false; return; }
@@ -2528,13 +2532,6 @@ void MainComponent::restoreToneBeforePresetEdit()
                                  safe->pluginLoading = false;
                                  safe->pluginStatus.setText(utf8("已取消修改，恢复原音色"), juce::dontSendNotification);
                              };
-                             if (brand == "kong")
-                             {
-                                 const auto restored = samplerState.getSize() > 0
-                                     ? pluginHost.restoreContainerState(samplerState)
-                                     : (projectState.getSize() > 0 && pluginHost.restoreKongProject(projectState));
-                                 if (! restored) { pluginLoading = false; return; }
-                             }
                              activatePluginOutput(message);
                              finish();
                          });
@@ -2599,9 +2596,15 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
     currentInstrumentChineseName = preset.instrumentChineseName;
     pluginStatus.setText(utf8("正在恢复音色方案……"), juce::dontSendNotification);
     pluginLoading = true;
+    const auto initialContainerState = preset.containerInstrument || preset.pluginBrand == "kong"
+        ? (preset.samplerState.getSize() > 0
+            ? preset.samplerState
+            : fengyin::KongProjectFile::toPluginState(preset.containerProjectState))
+        : juce::MemoryBlock();
     pluginHost.loadAsync(chosen,
                          status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
                          status.bufferSize > 0 ? status.bufferSize : 128,
+                         initialContainerState,
                          [this, preset, completion](bool success, const juce::String& message)
                          {
                              if (! success)
@@ -2611,24 +2614,6 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                                  pluginStatus.setText(utf8("方案载入失败：") + message, juce::dontSendNotification);
                                  if (completion) completion(false, utf8("方案载入失败：") + message);
                                  return;
-                             }
-                             const auto isContainer = preset.containerInstrument || preset.pluginBrand == "kong";
-                             if (isContainer)
-                             {
-                                 // Prefer the exact VST3 state captured from the audible live instance.
-                                 // The paired native KAM remains the durable identity and is also used
-                                 // when an older preset has no captured wrapper state.
-                                 const auto restored = preset.samplerState.getSize() > 0
-                                     ? pluginHost.restoreContainerState(preset.samplerState)
-                                     : pluginHost.restoreKongProject(preset.containerProjectState);
-                                 if (! restored)
-                                 {
-                                     pluginLoading = false;
-                                     const auto error = utf8("此空音方案缺少完整 KAM 工程，请删除后重新添加乐器");
-                                     pluginStatus.setText(error, juce::dontSendNotification);
-                                     if (completion) completion(false, error);
-                                     return;
-                                 }
                              }
                              activatePluginOutput(message);
                              pluginLoading = false;
