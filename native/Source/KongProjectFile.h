@@ -149,7 +149,7 @@ public:
                 || source.getProperty("KAI").toString().isEmpty()
                 || source.getProperty("Preset").toString().isEmpty()) continue;
             juce::ValueTree slot("Preset");
-            for (const auto* property : { "KAI", "Preset", "MIDI", "Audio", "Volume", "Tone",
+            for (const auto* property : { "KAI", "Preset", "IsSelected", "MIDI", "Audio", "Volume", "Tone",
                                           "Balance", "FXAUX", "IndexSelectedKeyswitch" })
                 if (source.hasProperty(property))
                     slot.setProperty(property, source.getProperty(property), nullptr);

@@ -46,6 +46,16 @@ int main()
            == preset.containerProjectState);
     const auto wrappedVst3State = fengyin::KongProjectFile::toPluginState(preset.containerProjectState);
     assert(wrappedVst3State.getSize() > preset.containerProjectState.getSize());
+    const auto wrapperLength = static_cast<int>(juce::ByteOrder::littleEndianInt(
+        static_cast<const char*>(wrappedVst3State.getData()) + 4));
+    auto wrapperXml = juce::parseXML(juce::String::fromUTF8(
+        static_cast<const char*>(wrappedVst3State.getData()) + 8, wrapperLength));
+    assert(wrapperXml != nullptr);
+    juce::MemoryBlock componentState;
+    assert(componentState.fromBase64Encoding(wrapperXml->getChildByName("IComponent")->getAllSubText()));
+    const auto activeState = juce::ValueTree::readFromData(componentState.getData(), componentState.getSize());
+    const auto activeSlot = activeState.getChildWithName("PresetList").getChild(0);
+    assert(static_cast<bool>(activeSlot.getProperty("IsSelected", false)));
     const auto generatedRoundTrip = fengyin::KongProjectFile::fromPluginState(wrappedVst3State);
     const auto generatedDescription = fengyin::KongProjectFile::describe(generatedRoundTrip);
     assert(generatedDescription.has_value());
