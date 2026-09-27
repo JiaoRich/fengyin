@@ -1949,7 +1949,21 @@ void MainComponent::commitContainerInstrument(const juce::String& name)
     preset.containerProjectState = fengyin::KongProjectFile::fromPluginState(state);
     if (preset.containerProjectState.getSize() == 0)
     {
-        emit(false, "error", utf8("无法从空音当前状态生成完整 KAM，请确认已在原厂界面选中乐器和奏法"));
+        const auto diagnostic = pluginHost.createContainerStateDiagnostic(containerInstrumentStateBeforeSelection,
+                                                                           state);
+        const auto stamp = juce::Time::getCurrentTime().formatted("%Y%m%d-%H%M%S");
+        auto folder = juce::File::getSpecialLocation(juce::File::userDesktopDirectory);
+        if (! folder.isDirectory())
+            folder = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
+        const auto file = folder.getNonexistentChildFile(utf8("风吟-空音状态诊断-") + stamp,
+                                                         ".fydiagnostic", false);
+        if (diagnostic.isEmpty() || ! file.replaceWithText(diagnostic, false, false, "\n"))
+        {
+            emit(false, "error", utf8("空音状态暂时无法识别，且诊断文件导出失败"));
+            return;
+        }
+        emit(false, "diagnostic", utf8("已将空音的完整当前状态导出到：")
+            + file.getFullPathName() + utf8("。请将该文件发给开发者分析。"));
         return;
     }
     preset.customTone = true;
