@@ -373,7 +373,11 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("parameter == instrumentModelParameter", HOST)
         for key in ("soprano-sax", "alto-sax", "tenor-sax", "baritone-sax"):
             block = TONE_STYLES.split(f'key == "{key}"', 1)[1].split("if (key ==", 1)[0]
-            self.assertGreaterEqual(block.count("{ true,"), 3)
+            if key == "soprano-sax":
+                for style in range(3):
+                    self.assertIn(f"SwamToneProfile::soprano({style})", block)
+            else:
+                self.assertGreaterEqual(block.count("{ true,"), 3)
 
     def test_custom_tone_settings_preserve_builtin_styles(self):
         self.assertIn('withEventListener("previewCustomTone"', MAIN)

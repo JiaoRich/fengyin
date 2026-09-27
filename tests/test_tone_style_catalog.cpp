@@ -31,6 +31,14 @@ void checkSaxophoneSwamProfiles(const juce::String& key)
     const auto styles = fengyin::ToneStyleCatalog::forInstrument(key);
     assert(styles.size() == 3);
     for (const auto& style : styles) assert(style.swam.enabled);
+    if (key == "soprano-sax")
+    {
+        for (const auto& style : styles) assert(style.swam.displayTargets.size() == 22);
+        assert(juce::String(styles[0].swam.displayTargets[1].display) == "0.00");
+        assert(juce::String(styles[1].swam.displayTargets[1].display) == "-0.08");
+        assert(juce::String(styles[2].swam.displayTargets[1].display) == "0.10");
+        return;
+    }
     assert(std::abs(styles[0].swam.brightness - styles[1].swam.brightness) > 0.04f);
     assert(std::abs(styles[1].swam.timbre - styles[2].swam.timbre) > 0.04f);
 }

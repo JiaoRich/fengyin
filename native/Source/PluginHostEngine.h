@@ -1,4 +1,5 @@
 #pragma once
+#include "SwamToneApplication.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_utils/juce_audio_utils.h>
@@ -118,6 +119,7 @@ public:
     [[nodiscard]] juce::String getCurrentInstrumentModelName() const;
     bool selectInstrumentModel(int index);
     int applySwamToneProfile(const SwamToneProfile& profile);
+    [[nodiscard]] juce::var getSwamToneAudit() const { return swamToneAudit; }
     bool applyStandardSwamExpressionCurve();
     bool setBendRange(int semitones);
 
@@ -137,6 +139,7 @@ public:
     [[nodiscard]] int getProcessingLatencySamples() const noexcept;
 
 private:
+    juce::var swamToneAudit;
     void queue(juce::MidiMessage message, double timestampSeconds) noexcept;
     bool rebuildConnections();
     void resolveTechniqueParameters();
