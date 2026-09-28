@@ -3,6 +3,7 @@
 #include <juce_dsp/juce_dsp.h>
 #include <array>
 #include <atomic>
+#include "AirProcessor.h"
 
 namespace fengyin
 {
@@ -22,6 +23,7 @@ struct ToneStyleSettings
     float reverbWidth = 0.88f;
     float outputGain = 1.0f;
     float bass = 0.0f; // independent low-shelf gain, -1..1 = -12..+12 dB
+    float air = 0.0f; // 0..1; appended to preserve existing preset initialisers
 };
 
 class MasterOutputService
@@ -82,6 +84,8 @@ private:
     std::atomic<float> styleRoomSize { 0.42f }, styleDamping { 0.54f }, styleWidth { 0.88f };
     std::atomic<float> styleOutputGain { 1.0f };
     std::atomic<float> bassTone { 0.0f };
+    std::atomic<float> airAmount { 0.0f };
+    AirProcessor airProcessor;
     std::atomic<uint64_t> overloadSamples { 0 };
     float smoothedBassGain = 1.0f;
     float smoothedOutputGain = 1.0f;

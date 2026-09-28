@@ -1310,6 +1310,7 @@ void MainComponent::timerCallback()
         auto toneObject = std::make_unique<juce::DynamicObject>();
         toneObject->setProperty("brightness", (toneSettings.tone + 1.0f) * 50.0f);
         toneObject->setProperty("bass", (toneSettings.bass + 1.0f) * 50.0f);
+        toneObject->setProperty("air", toneSettings.air * 100.0f);
         toneObject->setProperty("saturation", toneSettings.saturation / 0.35f * 100.0f);
         toneObject->setProperty("warmth", toneSettings.warmth * 100.0f);
         toneObject->setProperty("compression", juce::jlimit(0.0f, 100.0f, (0.85f - toneSettings.compressionThreshold) / 0.55f * 100.0f));
@@ -2013,6 +2014,7 @@ void MainComponent::commitContainerInstrument(const juce::String& name)
     preset.reverbWidth = settings.reverbWidth;
     preset.outputGain = settings.outputGain;
     preset.bass = settings.bass;
+    preset.air = settings.air;
     if (! presetStore.save(preset))
     {
         emit(false, "error", utf8("保存失败，请检查磁盘空间"));
@@ -2211,6 +2213,7 @@ fengyin::ToneStyleSettings MainComponent::customToneSettingsFromPayload(const ju
     const auto bass = normal("bass", 0.5);
     result.tone = static_cast<float>(normal("brightness", (result.tone + 1.0f) * 0.5f) * 2.0 - 1.0);
     result.bass = static_cast<float>(bass * 2.0 - 1.0);
+    result.air = static_cast<float>(normal("air", result.air));
     result.warmth = static_cast<float>(normal("warmth", result.warmth));
     const auto compression = normal("compression", 0.35);
     result.compressionThreshold = static_cast<float>(0.85 - compression * 0.55);
@@ -2278,6 +2281,7 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
     preset.reverbWidth = settings.reverbWidth;
     preset.outputGain = settings.outputGain;
     preset.bass = settings.bass;
+    preset.air = settings.air;
     if (presetStore.save(preset))
     {
         currentPresetDisplayName = name;
@@ -2678,6 +2682,7 @@ void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
         style.settings.reverbWidth = preset.reverbWidth;
         style.settings.outputGain = preset.outputGain;
         style.settings.bass = preset.bass;
+        style.settings.air = preset.air;
     }
     if (preset.instrumentModelIndex >= 0)
         pluginHost.selectInstrumentModel(preset.instrumentModelIndex);
@@ -2806,6 +2811,7 @@ void MainComponent::exportCurrentToneDiagnostic()
     effect->setProperty("reverbWidth", fx.reverbWidth);
     effect->setProperty("outputGain", fx.outputGain);
     effect->setProperty("bass", fx.bass);
+    effect->setProperty("air", fx.air);
     data->setProperty("fengyinEffects", juce::var(effect.release()));
     const auto json = juce::JSON::toString(diagnostic, false);
     const auto name = juce::File::createLegalFileName(currentInstrumentChineseName + "-" + styleName

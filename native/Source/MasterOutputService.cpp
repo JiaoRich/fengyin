@@ -18,6 +18,7 @@ void MasterOutputService::setToneStyle(const ToneStyleSettings& settings) noexce
     styleWidth.store(juce::jlimit(0.0f, 1.0f, settings.reverbWidth));
     styleOutputGain.store(juce::jlimit(0.5f, 1.25f, settings.outputGain));
     bassTone.store(juce::jlimit(-1.0f, 1.0f, settings.bass));
+    airAmount.store(std::isfinite(settings.air) ? juce::jlimit(0.0f, 1.0f, settings.air) : 0.0f);
     reverbParametersDirty.store(true, std::memory_order_release);
 }
 
@@ -25,7 +26,7 @@ ToneStyleSettings MasterOutputService::getToneStyle() const noexcept
 {
     return { eqTone.load(), warmth.load(), reverbMix.load(), styleCompressionThreshold.load(),
              styleCompressionRatio.load(), styleSaturation.load(), styleHarshControl.load(),
-             styleRoomSize.load(), styleDamping.load(), styleWidth.load(), styleOutputGain.load(), bassTone.load() };
+             styleRoomSize.load(), styleDamping.load(), styleWidth.load(), styleOutputGain.load(), bassTone.load(), airAmount.load() };
 }
 
 void MasterOutputService::setSampleRate(double value) noexcept
@@ -37,6 +38,7 @@ void MasterOutputService::setSampleRate(double value) noexcept
     smoothedBassGain = juce::Decibels::decibelsToGain(bassTone.load(std::memory_order_relaxed) * 12.0f);
     smoothedOutputGain = styleOutputGain.load(std::memory_order_relaxed);
     instrumentReverb.setSampleRate(validRate);
+    airProcessor.prepare(validRate);
     instrumentReverb.reset();
     lastInstrumentReverbMix = -1.0f;
 }
@@ -152,6 +154,7 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
             data[sample] = value * compressorGain * automaticTrim * smoothedOutputGain;
         }
     }
+    airProcessor.process(outputs, channels, samples, airAmount.load(std::memory_order_relaxed));
     const auto wetMix = reverbMix.load(std::memory_order_relaxed);
     updateInstrumentReverb(wetMix, settings);
     if (channels > 1 && outputs[0] != nullptr && outputs[1] != nullptr)

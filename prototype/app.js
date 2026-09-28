@@ -640,6 +640,7 @@ $('#tone-warmth')?.addEventListener('input', event => {
 });
 const expertControls = [
   ['bass','低频 EQ · 180 Hz / ±12 dB',50],['brightness','高频色彩 · EQ',50],
+  ['air','空气感 · Air',0],
   ['warmth','温暖度 · Warmth',20],['saturation','饱和度 · Saturation',12],
   ['compression','压缩阈值 · Threshold',35],['ratio','压缩比 · Ratio',25],
   ['harsh','去刺耳 · Harsh Control',25],['reverb','混响强度 · Reverb Mix',18],
@@ -650,7 +651,7 @@ function toneStyleToExpert() {
   const style = toneStylesForInstrument(currentInstrument?.instrumentKey)[currentToneStyleIndex] || {};
   if (latestBackendState?.toneSettings && window.__JUCE__?.backend?.emitEvent)
     return Object.fromEntries(expertControls.map(([id,,fallback]) => [id,Number(latestBackendState.toneSettings[id] ?? fallback)]));
-  return {bass:50,brightness:Math.round((Number(style.eq || 0)+100)/2),warmth:Number(style.warmth ?? 20),compression:35,harsh:25,reverb:Number(style.reverb ?? 18),room:42,output:80};
+  return {bass:50,air:0,brightness:Math.round((Number(style.eq || 0)+100)/2),warmth:Number(style.warmth ?? 20),compression:35,harsh:25,reverb:Number(style.reverb ?? 18),room:42,output:80};
 }
 function renderExpertControls() {
   $('#expert-grid').innerHTML = expertControls.map(([id,label,fallback]) => `<div class="expert-control"><label for="expert-${id}"><span>${label}</span><b id="expert-${id}-value">${expertDisplay(id,expertSettings?.[id] ?? fallback)}</b></label><input id="expert-${id}" data-expert="${id}" type="range" min="0" max="100" step="0.001" value="${expertSettings?.[id] ?? fallback}" ${currentPluginLoaded ? '' : 'disabled'}></div>`).join('');
@@ -2101,7 +2102,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 0.16.11 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 0.16.12 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

@@ -40,6 +40,7 @@ struct SoundPreset
     float reverbWidth = 0.88f;
     float outputGain = 1.0f;
     float bass = 0.0f;
+    float air = 0.0f;
 };
 
 class SoundPresetStore final
