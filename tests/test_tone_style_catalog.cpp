@@ -46,6 +46,36 @@ void checkSaxophoneSwamProfiles(const juce::String& key)
 
 int main()
 {
+    // Real instrument chain receives Air, while the accompaniment/master path
+    // remains unchanged. Existing preset aggregate defaults keep Air disabled.
+    assert(fengyin::ToneStyleCatalog::forInstrument("soprano-sax")[0].settings.air == 0.0f);
+    fengyin::MasterOutputService dryChain, airChain;
+    auto fx = dryChain.getToneStyle();
+    fx.reverbMix = 0.0f;
+    dryChain.setToneStyle(fx);
+    fx.air = 0.8f;
+    airChain.setToneStyle(fx);
+    assert(airChain.getToneStyle().air == 0.8f);
+    dryChain.setSampleRate(48000.0);
+    airChain.setSampleRate(48000.0);
+    float dry[128], wet[128];
+    double difference = 0;
+    for (int block = 0; block < 100; ++block)
+    {
+        for (int i = 0; i < 128; ++i)
+            dry[i] = wet[i] = 0.03f * std::sin(static_cast<float>(block * 128 + i) * 1.2f);
+        float* d[] { dry }; float* w[] { wet };
+        dryChain.processInstrument(d, 1, 128);
+        airChain.processInstrument(w, 1, 128);
+        for (int i = 0; i < 128; ++i) difference += std::abs(dry[i] - wet[i]);
+    }
+    assert(difference > 1.0);
+    for (int i = 0; i < 128; ++i) dry[i] = wet[i] = 0.2f;
+    float* masterDry[] { dry }; float* masterWet[] { wet };
+    dryChain.processMaster(masterDry, 1, 128);
+    airChain.processMaster(masterWet, 1, 128);
+    for (int i = 0; i < 128; ++i) assert(dry[i] == wet[i]);
+
     const auto temporary = juce::File::getSpecialLocation(juce::File::tempDirectory)
         .getNonexistentChildFile("fengyin-library-test", {}, true);
     const auto bank = temporary.getChildFile(juce::String::fromUTF8("用户 自选库"));

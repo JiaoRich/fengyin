@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 0.16.11 LANGUAGES C CXX)
+project(FengYin VERSION 0.16.12 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -278,6 +278,10 @@ if(BUILD_TESTING)
     target_include_directories(FengYinToneStyleTests PRIVATE native/Source)
     target_link_libraries(FengYinToneStyleTests PRIVATE juce::juce_dsp juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
     add_test(NAME tone_style_catalog COMMAND FengYinToneStyleTests)
+
+    add_executable(FengYinAirTests tests/test_air_processor.cpp)
+    target_include_directories(FengYinAirTests PRIVATE native/Source)
+    add_test(NAME air_processor COMMAND FengYinAirTests)
 
     add_executable(FengYinSwamExpressionCurveTests
         tests/test_swam_expression_curve.cpp

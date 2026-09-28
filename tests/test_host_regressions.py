@@ -16,6 +16,22 @@ AUDIO = (ROOT / "native" / "Source" / "AudioDeviceService.cpp").read_text(encodi
 
 
 class HostRegressionTests(unittest.TestCase):
+    def test_air_wires_preview_save_reload_ui_and_diagnostic(self):
+        self.assertIn('toneObject->setProperty("air", toneSettings.air * 100.0f)', MAIN)
+        self.assertIn('normal("air", result.air)', MAIN)
+        self.assertEqual(MAIN.count('preset.air = settings.air;'), 2)
+        self.assertIn('style.settings.air = preset.air;', MAIN)
+        self.assertIn('effect->setProperty("air", fx.air);', MAIN)
+        self.assertIn('child->setAttribute("air", static_cast<double>(preset.air));', PRESET)
+        self.assertIn('getDoubleAttribute("air", 0.0)', PRESET)
+        self.assertIn("['air','空气感 · Air',0]", JS)
+        self.assertIn("nativeEvent('previewCustomTone', expertSettings)", JS)
+        instrument, master = MASTER.split('void MasterOutputService::processMaster', 1)
+        self.assertIn('airProcessor.process(outputs, channels, samples', instrument)
+        self.assertNotIn('airProcessor.process', master)
+        self.assertIn("nativeEvent('cancelCustomTone')", JS)
+        self.assertIn('exportCurrentToneDiagnostic', MAIN)
+
     def test_endpoint_switch_does_not_start_or_invalidate_tuning(self):
         follow = AUDIO.split("bool AudioDeviceService::followSystemDefaultOutput()", 1)[1].split(
             "bool AudioDeviceService::systemDefaultOutputChanged()", 1)[0]

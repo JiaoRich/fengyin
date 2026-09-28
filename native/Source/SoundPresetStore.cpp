@@ -121,6 +121,7 @@ std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<Soun
         child->setAttribute("reverbWidth", static_cast<double>(preset.reverbWidth));
         child->setAttribute("outputGain", static_cast<double>(preset.outputGain));
         child->setAttribute("bass", static_cast<double>(preset.bass));
+        child->setAttribute("air", static_cast<double>(preset.air));
         for (const auto& parameter : preset.toneParameters)
         {
             auto* stored = child->createNewChildElement("TONE_PARAMETER");
@@ -182,6 +183,7 @@ juce::Array<SoundPreset> SoundPresetStore::fromXml(const juce::XmlElement& root)
         preset.reverbWidth = static_cast<float>(child->getDoubleAttribute("reverbWidth", 0.88));
         preset.outputGain = static_cast<float>(child->getDoubleAttribute("outputGain", 1.0));
         preset.bass = static_cast<float>(child->getDoubleAttribute("bass", 0.0));
+        preset.air = static_cast<float>(child->getDoubleAttribute("air", 0.0));
         for (auto* stored : child->getChildIterator())
             if (stored->hasTagName("TONE_PARAMETER"))
             {

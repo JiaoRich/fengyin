@@ -78,6 +78,7 @@ int main()
     preset.harshControl = 0.22f;
     preset.outputGain = 0.92f;
     preset.bass = -0.35f;
+    preset.air = 0.67f;
 
     assert(store.save(preset));
     const auto loaded = store.findById("test-id");
@@ -118,6 +119,7 @@ int main()
     assert(std::abs(loaded->harshControl - 0.22f) < 0.001f);
     assert(std::abs(loaded->outputGain - 0.92f) < 0.001f);
     assert(std::abs(loaded->bass + 0.35f) < 0.001f);
+    assert(std::abs(loaded->air - 0.67f) < 0.001f);
     assert(store.setDefaultId("test-id"));
     assert(store.getDefaultId() == "test-id");
 
@@ -133,6 +135,15 @@ int main()
     preset.containerProjectState.reset();
     assert(store.save(preset));
     assert(store.findById("test-id")->samplerState.getSize() == 0);
+    assert(std::abs(store.findById("test-id")->air - 0.67f) < 0.001f);
+
+    // A pre-Air preset must load as fully bypassed, not inherit the last tone.
+    const auto presetFile = directory.getChildFile("sound-presets.xml");
+    auto legacy = juce::XmlDocument::parse(presetFile);
+    assert(legacy != nullptr);
+    legacy->getFirstChildElement()->removeAttribute("air");
+    assert(legacy->writeTo(presetFile));
+    assert(store.findById("test-id")->air == 0.0f);
 
     directory.deleteRecursively();
 }
