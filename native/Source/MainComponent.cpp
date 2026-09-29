@@ -302,6 +302,7 @@ void MainComponent::setupWebInterface()
         {
             if (studioUnlocked) exportStudioDraft(payload.getProperty("id", {}).toString());
         })
+        .withEventListener("studioImport", [this](juce::var) { importStudioPackage(); })
         .withEventListener("studioEffectAction", [this](juce::var payload)
         {
             if (! studioUnlocked || pluginLoading || effectLoading) return;
@@ -1370,6 +1371,7 @@ void MainComponent::timerCallback()
         const auto currentPluginName = pluginHost.hasPlugin() ? pluginHost.getPluginName() : juce::String();
         state->setProperty("pluginName", pluginHost.hasPlugin() ? currentPluginName : utf8("安全测试音源"));
         state->setProperty("pluginLoaded", pluginHost.hasPlugin());
+        state->setProperty("pluginIdentifier", pluginHost.getPluginIdentifier());
         state->setProperty("pluginLoading", pluginLoading);
         state->setProperty("pluginBrand", currentPluginBrand);
         state->setProperty("instrumentChineseName", currentInstrumentChineseName);
@@ -2369,6 +2371,61 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
         pluginStatus.setText(utf8("保存失败，请检查磁盘空间"), juce::dontSendNotification);
         if (webInterface) webInterface->emitEventIfBrowserIsVisible("studioSaveResult", juce::String());
     }
+}
+
+void MainComponent::importStudioPackage()
+{
+    if (! isActivated || ! studioUnlocked || studioImportChooser || pluginLoading || effectLoading) return;
+    studioImportChooser = std::make_unique<juce::FileChooser>(utf8("导入整套音色方案包"), juce::File(), "*.fytonepack");
+    auto safe = juce::Component::SafePointer<MainComponent>(this);
+    studioImportChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+        [safe](const juce::FileChooser& chooser)
+        {
+            if (! safe) return;
+            const auto file = chooser.getResult();
+            juce::MessageManager::callAsync([safe] { if (safe) safe->studioImportChooser.reset(); });
+            if (file == juce::File() || ! safe->studioUnlocked) return;
+            const auto reply = [safe](bool success, bool loaded, const juce::String& message, const fengyin::SoundPreset& preset)
+            {
+                if (! safe || ! safe->webInterface) return;
+                auto* result = new juce::DynamicObject();
+                result->setProperty("success", success);
+                result->setProperty("loaded", loaded);
+                result->setProperty("message", message);
+                result->setProperty("id", preset.id);
+                result->setProperty("name", preset.name);
+                result->setProperty("instrumentName", preset.instrumentChineseName);
+                safe->webInterface->emitEventIfBrowserIsVisible("studioImportResult", juce::var(result));
+            };
+            juce::String error;
+            auto imported = fengyin::TonePackage::read(file, error);
+            if (! imported) { reply(false, false, error, {}); return; }
+            // Always a new draft, even when the package originated on this PC.
+            const auto originalName = imported->name;
+            int suffix = 1;
+            const auto exists = [&safe, &imported]
+            {
+                for (const auto& existing : safe->cachedPresets)
+                    if (existing.studioDraft && existing.instrumentChineseName == imported->instrumentChineseName
+                        && existing.name == imported->name) return true;
+                return false;
+            };
+            while (exists()) imported->name = originalName + utf8("（导入 ") + juce::String(suffix++) + utf8("）");
+            if (! safe->presetStore.save(*imported)) { reply(false, false, utf8("无法保存导入草稿，请检查磁盘空间"), {}); return; }
+            safe->refreshPresetChoices();
+            safe->captureToneBeforePresetEdit();
+            safe->editingPresetId = imported->id;
+            for (int i = 0; i < safe->cachedPresets.size(); ++i)
+                if (safe->cachedPresets.getReference(i).id == imported->id)
+                    safe->presetSelector.setSelectedId(i + 1, juce::dontSendNotification);
+            safe->loadSelectedPreset([safe, preset = *imported, reply](bool loaded, const juce::String& message)
+            {
+                if (! safe) return;
+                if (! loaded) safe->editingPresetId.clear();
+                reply(true, loaded, loaded ? utf8("方案包已导入，可以继续调音")
+                    : utf8("方案已保存到草稿箱，但尚未完整加载：") + message, preset);
+            });
+        });
 }
 
 void MainComponent::exportStudioDraft(const juce::String& id)

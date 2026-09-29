@@ -44,6 +44,18 @@ try {
   await page.locator('[data-studio-edit]').click();await emit('presetLoadResult',{success:true});
   assert.equal(await page.locator('#instrument-select').isDisabled(),true);
   assert.equal(await page.locator('#studio-style-name').inputValue(),'秘密草稿');
+  await page.locator('#studio-import').click();assert.equal(await page.evaluate(()=>window.sent.at(-1).name),'studioImport');
+  await emit('studioImportResult',{success:false,message:'方案包校验失败'});
+  assert.match(await page.locator('#studio-import-status').textContent(),/校验失败/);
+  await emit('studioImportResult',{success:true,loaded:false,id:'imported',message:'缺少效果器'});
+  assert.equal(await page.locator('#studio-drafts').isVisible(),true);
+  await emit('studioImportResult',{success:true,loaded:true,id:'imported',name:'导入独奏',instrumentName:'高音萨克斯',message:'已导入'});
+  assert.equal(await page.locator('#studio-style-name').inputValue(),'导入独奏');
+  state.pluginIdentifier='sax';state.presetEditing=true;await emit('backendState',state);
+  assert.equal(await page.locator('#instrument-select').inputValue(),'0');
+  assert.equal(await page.locator('#instrument-select').isDisabled(),true);
+  await page.locator('#save-expert').click();
+  assert.equal(await page.evaluate(()=>window.sent.at(-1).payload.name),'导入独奏');
   assert.deepEqual(errors,[]);console.log(`${width}: login/public isolation/edit/save/export/chain interactions passed`);
   await page.close();
  }

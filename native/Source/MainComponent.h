@@ -40,6 +40,8 @@ private:
     void chooseVideoForWebInterface();
     void exportCurrentToneDiagnostic();
     void exportStudioDraft(const juce::String& id);
+    void importStudioPackage();
+    std::unique_ptr<juce::FileChooser> studioImportChooser;
     bool studioUnlocked = false;
     juce::String studioInstrumentName;
     std::unique_ptr<juce::FileChooser> studioExportChooser;
