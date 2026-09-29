@@ -40,12 +40,13 @@ static String stableId(AudioProcessorParameter& p,int i)
     if(auto* named=dynamic_cast<AudioProcessorParameterWithID*>(&p))return "id:"+named->paramID;
     return "index:"+String(i)+":"+p.getName(160).toLowerCase().removeCharacters(" ._-/()[]");
 }
-int main(int argc,char** argv)
+static int collect(const StringArray& args)
 {
     ScopedJuceInitialiser_GUI initialise;
+    const int argc=args.size();
     if(argc<4){std::cerr<<"Usage: SwamParameterCollector plugin.vst3 requests.json output.json [--test-mode]\n";return 2;}
-    const bool test=argc>4&&String(argv[4])=="--test-mode";
-    const File pluginFile(String::fromUTF8(argv[1])),requestFile(String::fromUTF8(argv[2])),outputFile(String::fromUTF8(argv[3]));
+    const bool test=argc>4&&args[4]=="--test-mode";
+    const File pluginFile(args[1]),requestFile(args[2]),outputFile(args[3]);
     const auto requests=JSON::parse(requestFile);
     if(!requests.isObject()||requests["schema"].toString()!="fengyin.swam-collection-requests.v1"){std::cerr<<"Invalid requests\n";return 3;}
     std::cout<<"Scanning "<<pluginFile.getFullPathName()<<std::endl;
@@ -105,3 +106,14 @@ int main(int argc,char** argv)
     std::cout<<"SAVED "<<outputFile.getFullPathName()<<std::endl;
     return drift.isEmpty()&&missing.isEmpty()&&ambiguous.isEmpty()?0:10;
 }
+#if JUCE_WINDOWS
+int wmain(int argc,wchar_t** argv)
+{
+    StringArray args;for(int i=0;i<argc;++i)args.add(String(argv[i]));return collect(args);
+}
+#else
+int main(int argc,char** argv)
+{
+    StringArray args;for(int i=0;i<argc;++i)args.add(String::fromUTF8(argv[i]));return collect(args);
+}
+#endif
