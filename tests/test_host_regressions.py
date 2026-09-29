@@ -64,7 +64,7 @@ class HostRegressionTests(unittest.TestCase):
     def test_custom_tone_has_independent_bass_and_direct_page(self):
         self.assertIn('toneObject->setProperty("bass", (toneSettings.bass + 1.0f)', MAIN)
         self.assertIn("result.bass =", MAIN)
-        self.assertIn("定制音色", JS)
+        self.assertIn("调音师工作台", JS)
         self.assertIn("enterCustomToneCreate", JS)
         self.assertIn("custom-tone-empty", (ROOT / "prototype" / "index.html").read_text(encoding="utf-8"))
 
@@ -74,7 +74,7 @@ class HostRegressionTests(unittest.TestCase):
         rebuild = HOST.index("if (! rebuildConnections())", output_node)
         self.assertLess(configure, output_node)
         self.assertLess(output_node, rebuild)
-        self.assertIn("return midiConnected && audioConnections > 0", HOST)
+        self.assertIn("return midiConnected && connectSerialEffects", HOST)
 
     def test_midi_hotplug_status_is_polled_and_cleared(self):
         self.assertIn("void MidiInputService::pollConnection()", MIDI)

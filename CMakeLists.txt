@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 0.16.12 LANGUAGES C CXX)
+project(FengYin VERSION 0.17.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -234,6 +234,11 @@ if(BUILD_TESTING)
         juce::juce_recommended_warning_flags
     )
     add_test(NAME sound_preset_roundtrip COMMAND FengYinPresetTests)
+    add_executable(FengYinStudioTests tests/test_tone_studio.cpp native/Source/SoundPresetStore.cpp)
+    target_include_directories(FengYinStudioTests PRIVATE native/Source)
+    target_compile_definitions(FengYinStudioTests PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+    target_link_libraries(FengYinStudioTests PRIVATE juce::juce_audio_processors juce::juce_cryptography juce::juce_recommended_config_flags)
+    add_test(NAME tone_studio_chain_package COMMAND FengYinStudioTests)
 
     add_executable(FengYinLicenseTests tests/test_license_service.cpp native/Source/LicenseService.cpp)
     target_include_directories(FengYinLicenseTests PRIVATE native/Source)
