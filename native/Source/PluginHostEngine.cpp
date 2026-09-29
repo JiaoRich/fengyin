@@ -347,6 +347,7 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
             currentDescription = description;
             resolveTechniqueParameters();
             resolveInstrumentModelParameter();
+            releaseBaseline = captureToneParameters();
             if (! rebuildConnections())
             {
                 unload();
@@ -1024,12 +1025,50 @@ bool PluginHostEngine::selectInstrumentModel(int index)
     return true;
 }
 
-int PluginHostEngine::applySwamToneProfile(const SwamToneProfile& profile)
+int PluginHostEngine::applySwamToneProfile(const SwamToneProfile& profile, bool restoreModel)
 {
     const ScopedGraphPause pause(graph.get());
     swamToneAudit = juce::var();
     auto* plugin = getPlugin();
     if (plugin == nullptr || ! profile.enabled) return 0;
+    if (! profile.releaseParameters.isEmpty())
+    {
+        auto* audit = new juce::DynamicObject();
+        swamToneAudit = juce::var(audit);
+        audit->setProperty("expectedAtApply", profile.releaseParameters.size());
+        audit->setProperty("verifiedAtApply", 0);
+        audit->setProperty("modelApplied", false);
+        if (currentDescription.version != "3.9.4") return 0;
+        // Reset sound-only values before applying a sparse preset, preventing
+        // the previous style's EQ/reverb/timbre from leaking into this one.
+        juce::Array<ToneParameterValue> baseline;
+        for (const auto& v : releaseBaseline)
+        {
+            const auto name = v.identifier.fromFirstOccurrenceOf(":", false, false)
+                .fromFirstOccurrenceOf(":", false, false);
+            const auto index = v.identifier.fromFirstOccurrenceOf(":", false, false).getIntValue();
+            if (index > 116 || isMidiRoutingParameter(name) || name.contains("pitchbend")
+                || name.contains("transpose") || name.contains("microtuning") || name.contains("breathctrl")
+                || name.startsWith("sliderdebug") || name == "expression" || name == "velocity"
+                || name == "panic" || name == "bypass" || name == "program" || name == "sustain"
+                || name == "mastertune" || name == "root" || name == "temperament"
+                || name == "cavitscaleultimate" || name == "maqam") continue;
+            baseline.add(v);
+        }
+        restoreToneParameters(baseline);
+        const auto model = instrumentModelNames.indexOf(profile.releaseModel);
+        const auto modelApplied = !restoreModel || (model >= 0 && selectInstrumentModel(model));
+        const auto restored = restoreToneParameters(profile.releaseParameters);
+        int verified = 0;
+        const auto actual = captureToneParameters();
+        for (const auto& expected : profile.releaseParameters)
+            for (const auto& value : actual)
+                if (expected.identifier == value.identifier && std::abs(expected.value - value.value) < 0.0001f)
+                { ++verified; break; }
+        audit->setProperty("verifiedAtApply", verified);
+        audit->setProperty("modelApplied", modelApplied);
+        return restored;
+    }
     if (! profile.displayTargets.empty())
     {
         SwamToneApplication application;

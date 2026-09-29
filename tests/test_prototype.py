@@ -70,7 +70,7 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertIn("if (reset || instrumentChanged) applyToneStyle", JS)
         self.assertIn("state.instrumentChineseName || state.pluginName", JS)
         self.assertIn("state.activeToneVariantId || state.toneStyleId", JS)
-        self.assertIn("key.startsWith('horn-')", JS)
+        self.assertIn("return toneStyleLibrary[key] ||", JS)
         self.assertNotIn("key.includes('horn') || key === 'euphonium'", JS)
 
     def test_audio_page_omits_internal_implementation_copy(self):

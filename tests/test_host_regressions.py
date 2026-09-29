@@ -397,9 +397,9 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("styleCompressionThreshold", MASTER)
         self.assertIn("styleHarshControl", MASTER)
         self.assertIn("std::tanh", MASTER)
-        self.assertIn('"silky"', TONE_STYLES)
-        self.assertIn('"warm-jazz"', TONE_STYLES)
-        self.assertIn('"cinematic"', TONE_STYLES)
+        self.assertIn('"kenny"', TONE_STYLES)
+        self.assertIn('"jazz"', TONE_STYLES)
+        self.assertIn('"mellow"', TONE_STYLES)
         self.assertNotIn("favoritePresetButton", MAIN)
 
     def test_swam_models_and_tone_profiles_are_real_but_never_touch_midi_mapping(self):
@@ -413,13 +413,10 @@ class HostRegressionTests(unittest.TestCase):
         for protected in ("midi", "controller", "breath", "expression", "pitchbend", "growl", "vibrato"):
             self.assertIn(f'"{protected}"', HOST)
         self.assertIn("parameter == instrumentModelParameter", HOST)
-        for key in ("soprano-sax", "alto-sax", "tenor-sax", "baritone-sax"):
-            block = TONE_STYLES.split(f'key == "{key}"', 1)[1].split("if (key ==", 1)[0]
-            if key == "soprano-sax":
-                for style in range(3):
-                    self.assertIn(f"SwamToneProfile::soprano({style})", block)
-            else:
-                self.assertGreaterEqual(block.count("{ true,"), 3)
+        self.assertEqual(TONE_STYLES.count('s.swam.releaseParameters ='), 7)
+        for name in ('肯萨','流行高音','爵士','深情','流行','醇厚','温暖'):
+            self.assertIn(name, TONE_STYLES)
+        self.assertIn('currentDescription.version != "3.9.4"', HOST)
 
     def test_custom_tone_settings_preserve_builtin_styles(self):
         self.assertIn('withEventListener("previewCustomTone"', MAIN)

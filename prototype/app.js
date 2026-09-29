@@ -110,45 +110,67 @@ let techniqueRenderSignature = '';
 let adapterRenderSignature = '';
 
 const toneStyleLibrary = {
-  'soprano-sax': [
-    {id:'natural',name:'自然原声',description:'真实、均衡、保留原始动态',eq:0,reverb:18,warmth:18},
-    {id:'silky',name:'丝滑抒情',description:'温暖、柔和、浪漫大厅',eq:-12,reverb:36,warmth:58},
-    {id:'stage',name:'明亮舞台',description:'清晰、明亮、更有穿透力',eq:28,reverb:24,warmth:30}
+  "soprano-sax": [
+    {
+      "id": "kenny",
+      "name": "肯萨",
+      "description": "",
+      "eq": 0.0,
+      "reverb": 34.4393998384476,
+      "warmth": 62.6179993152618
+    },
+    {
+      "id": "pop-high",
+      "name": "流行高音",
+      "description": "",
+      "eq": 21.814000606536872,
+      "reverb": 38.95620107650757,
+      "warmth": 62.61799931526184
+    }
   ],
-  'alto-sax': [
-    {id:'natural',name:'自然原声',description:'均衡自然，适合多数曲目',eq:0,reverb:18,warmth:20},
-    {id:'warm-jazz',name:'温暖爵士',description:'厚实、松弛、带轻微暖色',eq:-18,reverb:25,warmth:66},
-    {id:'pop',name:'流行穿透',description:'结实明快，容易融入伴奏',eq:30,reverb:20,warmth:32}
+  "alto-sax": [
+    {
+      "id": "jazz",
+      "name": "爵士",
+      "description": "",
+      "eq": 0.0,
+      "reverb": 18.0,
+      "warmth": 10.0
+    },
+    {
+      "id": "deep",
+      "name": "深情",
+      "description": "",
+      "eq": 20.0,
+      "reverb": 32.0,
+      "warmth": 10.0
+    },
+    {
+      "id": "pop",
+      "name": "流行",
+      "description": "",
+      "eq": 40.0,
+      "reverb": 32.0,
+      "warmth": 10.0
+    }
   ],
-  'tenor-sax': [
-    {id:'natural',name:'自然原声',description:'宽厚自然，动态完整',eq:0,reverb:18,warmth:25},
-    {id:'smoky',name:'烟熏爵士',description:'低沉、温暖、略带粗粝感',eq:-24,reverb:23,warmth:74},
-    {id:'lyrical',name:'深情抒情',description:'圆润、舒展、柔和大厅',eq:-10,reverb:34,warmth:60}
-  ],
-  trumpet: [
-    {id:'natural',name:'自然原声',description:'清晰真实，保持铜管动态',eq:0,reverb:17,warmth:16},
-    {id:'bright-pop',name:'明亮流行',description:'有冲击力，适合舞台与流行',eq:32,reverb:18,warmth:28},
-    {id:'soft',name:'柔和抒情',description:'收敛刺耳感，温暖耐听',eq:-20,reverb:32,warmth:52}
-  ],
-  flute: [
-    {id:'natural',name:'自然原声',description:'自然气声与真实动态',eq:0,reverb:20,warmth:12},
-    {id:'clear',name:'通透明亮',description:'清澈通透，适合轻快旋律',eq:25,reverb:22,warmth:10},
-    {id:'airy',name:'空灵抒情',description:'气息感更强，空间更宽广',eq:-8,reverb:42,warmth:36}
-  ],
-  violin: [
-    {id:'natural',name:'自然独奏',description:'真实弓感与自然空间',eq:0,reverb:22,warmth:18},
-    {id:'warm',name:'温暖抒情',description:'柔和圆润，适合慢歌旋律',eq:-16,reverb:34,warmth:56},
-    {id:'cinematic',name:'电影叙事',description:'宽广、明亮、具有画面感',eq:18,reverb:40,warmth:38}
-  ],
-  'low-brass': [
-    {id:'natural',name:'自然原声',description:'保留铜管真实动态',eq:0,reverb:18,warmth:22},
-    {id:'warm-orchestral',name:'温暖交响',description:'厚实圆润，容易融入乐团',eq:-18,reverb:27,warmth:58},
-    {id:'cinematic-brass',name:'电影史诗',description:'宽广雄浑，富有力量',eq:15,reverb:38,warmth:34}
-  ],
-  woodwind: [
-    {id:'natural',name:'自然原声',description:'保留木管的真实音头与动态',eq:0,reverb:18,warmth:20},
-    {id:'warm-lyrical',name:'温暖抒情',description:'柔和圆润，适合歌唱性旋律',eq:-16,reverb:31,warmth:52},
-    {id:'cinematic-wood',name:'电影叙事',description:'清晰宽广，富有画面感',eq:12,reverb:39,warmth:34}
+  "tenor-sax": [
+    {
+      "id": "mellow",
+      "name": "醇厚",
+      "description": "",
+      "eq": -50.0,
+      "reverb": 22.0,
+      "warmth": 32.0
+    },
+    {
+      "id": "warm",
+      "name": "温暖",
+      "description": "",
+      "eq": 5.0,
+      "reverb": 12.0,
+      "warmth": 16.0
+    }
   ]
 };
 
@@ -463,34 +485,15 @@ function escapeHtml(value) {
 }
 
 function toneStylesForInstrument(key = '') {
-  if (!key) return [{id:'none',name:'请先加载音色',description:'加载乐器后即可选择音色风格',eq:0,reverb:18,warmth:20}];
-  if (key.startsWith('kong-') || key.startsWith('container:kong-v3:')) {
-    const folkName = currentInstrument?.chineseName || '民乐';
-    const windLandscape = key.startsWith('kong-dizi') || ['kong-xiao','kong-nanxiao','kong-xun'].includes(key);
-    const festiveWind = key.startsWith('kong-suona') || key === 'kong-guanzi';
-    const profiles = windLandscape
-      ? [['natural','自然原声',`保留${folkName}真实气息与音头`,0,20,24],['silk-bamboo','清雅丝竹','清透自然，保留气息细节',12,29,28],['landscape','空灵山水','宽广悠远，适合古风抒情',-10,44,42]]
-      : festiveWind
-        ? [['natural','自然原声',`保留${folkName}真实动态`,0,18,18],['festive','喜庆明亮','高亢清晰，适合舞台与喜庆曲目',24,20,18],['epic-folk','厚重叙事','收敛刺耳感，增加厚重空间',-8,35,46]]
-        : [['natural','自然原声',`保留${folkName}真实质感`,0,20,24],['warm-folk','温暖抒情','柔和耐听，适合抒情曲目',-12,32,55],['cinematic-folk','国风叙事','清晰宽广，适合古风与影视',22,36,34]];
-    return profiles
-      .map(([id,name,description,eq,reverb,warmth]) => ({id,name,description,eq,reverb,warmth}));
-  }
-  const family = instrumentFamily(key);
-  return toneStyleLibrary[key]
-    || (family === 'saxophone' ? (key === 'baritone-sax' ? toneStyleLibrary['tenor-sax'] : toneStyleLibrary['alto-sax']) : null)
-    || (family === 'flute' ? toneStyleLibrary.flute : null)
-    || (family === 'woodwind' ? toneStyleLibrary.woodwind : null)
-    || (family === 'strings' ? toneStyleLibrary.violin : null)
-    || (family === 'brass' ? (key.includes('trombone') || key.includes('tuba') || key.startsWith('horn-') || key === 'euphonium' ? toneStyleLibrary['low-brass'] : toneStyleLibrary.trumpet) : null)
-    || [{id:'natural',name:'自然原声',description:'保留乐器原始音色与动态',eq:0,reverb:20,warmth:20}];
+ if (!key) return [{id:'none',name:'请先加载音色',eq:0,reverb:20,warmth:20}];
+ return toneStyleLibrary[key] || [{id:'natural',name:'自然原声',description:'',eq:0,reverb:20,warmth:20}];
 }
 
 function toneVariantsForCurrentInstrument() {
   if (!currentInstrument) return toneStylesForInstrument('');
   const builtins = toneStylesForInstrument(currentInstrument.instrumentKey).map(style=>({...style,custom:false}));
   const customs = savedPresets.map((preset,index)=>({preset,index}))
-    .filter(({preset})=>!preset.studioDraft && preset.instrumentKey===currentInstrument.instrumentKey)
+    .filter(({preset})=>preset.brand==='kong' && !preset.studioDraft && preset.instrumentKey===currentInstrument.instrumentKey)
     .map(({preset,index})=>({id:`custom:${preset.id}`,name:preset.name,description:'我的音色方案',custom:true,presetIndex:index,
       eq:0,reverb:Math.round(Number(latestBackendState.reverbMix||.2)*100),warmth:20}));
   return [...customs,...builtins];
@@ -898,7 +901,7 @@ function renderPresets() {
     return (leftIndex < 0 ? Number.MAX_SAFE_INTEGER : leftIndex) - (rightIndex < 0 ? Number.MAX_SAFE_INTEGER : rightIndex);
   });
   const instrumentCards = cards.map(card => {
-    const customs = savedPresets.map((preset,index)=>({preset,index})).filter(({preset})=>!preset.studioDraft && preset.instrumentKey===card.key)
+    const customs = savedPresets.map((preset,index)=>({preset,index})).filter(({preset})=>preset.brand==='kong' && !preset.studioDraft && preset.instrumentKey===card.key)
       .map(({preset,index})=>({id:`custom:${preset.id ?? index}`,name:preset.name,custom:true,presetIndex:index}));
     const builtins = card.customOnly ? [] : toneStylesForInstrument(card.key).map(style=>({...style,custom:false,presetIndex:-1}));
     const tones = [...customs,...builtins];
@@ -1887,7 +1890,7 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   if (currentPluginLoaded && (state.activeToneVariantId || state.toneStyleId)) {
     const failedStyle = state.swamToneIncomplete ? `${state.toneStyleId}|${state.instrumentModelName}` : '';
     if (failedStyle && window.lastFailedSwamStyle !== failedStyle)
-      toast('当前 SWAM 未能完整应用此风格，已保留原音色。请导出当前音色参数供检查。');
+      toast('音色参数或型号未完全匹配，请确认使用 SWAM 3.9.4，并导出当前音色参数供检查。');
     window.lastFailedSwamStyle = failedStyle;
     const styles = toneVariantsForCurrentInstrument();
     const wantedVariant = state.activeToneVariantId || state.toneStyleId;
@@ -2111,7 +2114,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 0.17.2 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.0.0 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

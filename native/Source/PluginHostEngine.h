@@ -128,7 +128,7 @@ public:
     [[nodiscard]] int getCurrentInstrumentModelIndex() const noexcept;
     [[nodiscard]] juce::String getCurrentInstrumentModelName() const;
     bool selectInstrumentModel(int index);
-    int applySwamToneProfile(const SwamToneProfile& profile);
+    int applySwamToneProfile(const SwamToneProfile& profile, bool restoreModel = true);
     [[nodiscard]] juce::var getSwamToneAudit() const { return swamToneAudit; }
     bool applyStandardSwamExpressionCurve();
     bool setBendRange(int semitones);
@@ -168,6 +168,7 @@ private:
     juce::AudioProcessorGraph::Node::Ptr audioOutputNode;
     juce::AudioProcessorGraph::Node::Ptr midiInputNode;
     juce::PluginDescription currentDescription;
+    juce::Array<ToneParameterValue> releaseBaseline;
     class PluginEditorWindow;
     std::unique_ptr<PluginEditorWindow> instrumentEditorWindow;
     std::unique_ptr<PluginEditorWindow> effectEditorWindow;

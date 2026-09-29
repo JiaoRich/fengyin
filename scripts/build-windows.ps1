@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "0.17.2",
+    [string]$Version = "1.0.0",
     [switch]$SkipInstaller
 )
 
