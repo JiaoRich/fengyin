@@ -27,7 +27,7 @@ function Find-SwamPlugins([string]$folder) {
     foreach ($item in $items) {
         if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { continue }
         if ($item.Extension -ieq '.vst3') {
-            if ($item.FullName -match '(?i)swam') { [void]$paths.Add($item.FullName) }
+            if ($item.Name -match '(?i)^SWAM' -or $item.FullName -match '(?i)[\\/]SWAM[\\/]') { [void]$paths.Add($item.FullName) }
             # Do not collect a bundle's inner binary a second time.
         } elseif ($item.PSIsContainer) { Find-SwamPlugins $item.FullName }
     }
