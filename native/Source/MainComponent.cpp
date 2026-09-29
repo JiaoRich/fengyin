@@ -2217,6 +2217,7 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
         preset.containerProjectState = fengyin::KongProjectFile::fromPluginState(preset.samplerState);
     }
     preset.instrumentModelIndex = pluginHost.getCurrentInstrumentModelIndex();
+    preset.instrumentModelName = pluginHost.getCurrentInstrumentModelName();
     preset.eqTone = masterOutput.getEqTone();
     preset.warmth = masterOutput.getWarmth();
     preset.reverbMix = masterOutput.getReverbMix();
@@ -2319,6 +2320,7 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
         }
     }
     preset.instrumentModelIndex = pluginHost.getCurrentInstrumentModelIndex();
+    preset.instrumentModelName = pluginHost.getCurrentInstrumentModelName();
     preset.pluginBrand = currentPluginBrand;
     preset.instrumentKey = currentInstrumentKey;
     preset.instrumentChineseName = studioInstrumentName;
@@ -2422,7 +2424,7 @@ void MainComponent::importStudioPackage()
             {
                 if (! safe) return;
                 if (! loaded) safe->editingPresetId.clear();
-                reply(true, loaded, loaded ? utf8("方案包已导入，可以继续调音")
+                reply(true, loaded, loaded ? utf8("方案包已导入：") + message
                     : utf8("方案已保存到草稿箱，但尚未完整加载：") + message, preset);
             });
         });
@@ -2836,6 +2838,32 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
         return;
     }
 
+    juce::PluginDescription savedInstrument;
+    const auto savedInstrumentXml = juce::parseXML(preset.instrumentDescriptionXml);
+    const bool differentVersion = savedInstrumentXml && savedInstrument.loadFromXml(*savedInstrumentXml)
+        && savedInstrument.version != chosen.version;
+    juce::String compatibilityWarning;
+    if (differentVersion && preset.pluginBrand == "swam")
+    {
+        if (preset.instrumentState.getSize() > 0)
+        {
+            const auto message = utf8("方案与本机 SWAM 版本不同，不能安全恢复完整插件状态：")
+                + savedInstrument.version + " → " + chosen.version;
+            pluginStatus.setText(message, juce::dontSendNotification);
+            if (completion) completion(false, message);
+            return;
+        }
+        if (preset.instrumentModelName.isEmpty() && preset.instrumentModelIndex >= 0)
+        {
+            preset.instrumentModelIndex = -1;
+            compatibilityWarning = utf8("原方案未记录型号名称，跨版本未套用旧型号序号，请在原厂界面确认型号。");
+        }
+    }
+    const std::function<void(bool, const juce::String&)> reportCompletion = [completion, compatibilityWarning](bool success, const juce::String& message)
+    {
+        if (completion) completion(success, compatibilityWarning.isEmpty() ? message
+            : message + " " + compatibilityWarning);
+    };
     const auto status = audio.getStatus();
     // KAM and VST state have different schemas. Use the untouched plugin state.
     const auto initialContainerState = preset.containerInstrument || preset.pluginBrand == "kong"
@@ -2858,7 +2886,7 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
                          status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
                          status.bufferSize > 0 ? status.bufferSize : 128,
                          initialContainerState,
-                         [this, preset, completion](bool success, const juce::String& message)
+                         [this, preset, completion = reportCompletion](bool success, const juce::String& message)
                          {
                              if (! success)
                              {
@@ -2877,6 +2905,7 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
 void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
                                          std::function<void(bool, const juce::String&)> completion)
 {
+    juce::Logger::writeToLog("Preset parameter restoration begin");
     auto style = fengyin::ToneStyleCatalog::find(currentInstrumentKey, preset.baseToneStyleId);
     style.settings.tone = preset.eqTone;
     style.settings.warmth = preset.warmth;
@@ -2894,10 +2923,22 @@ void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
         style.settings.bass = preset.bass;
         style.settings.air = preset.air;
     }
-    if (preset.instrumentModelIndex >= 0)
+    juce::String restoreWarning;
+    if (preset.instrumentModelName.isNotEmpty())
+    {
+        const auto index = pluginHost.getInstrumentModelNames().indexOf(preset.instrumentModelName);
+        if (index < 0 || ! pluginHost.selectInstrumentModel(index))
+            restoreWarning = utf8("乐器型号未匹配，请在原厂界面确认。");
+    }
+    else if (preset.instrumentModelIndex >= 0)
         pluginHost.selectInstrumentModel(preset.instrumentModelIndex);
     if ((! preset.containerInstrument && preset.pluginBrand != "kong") || preset.samplerState.getSize() == 0)
-        pluginHost.restoreToneParameters(preset.toneParameters);
+    {
+        const auto restored = pluginHost.restoreToneParameters(preset.toneParameters);
+        if (restored != preset.toneParameters.size())
+            restoreWarning += utf8(" 参数恢复 ") + juce::String(restored) + "/"
+                + juce::String(preset.toneParameters.size()) + utf8("，未匹配的参数未写入。");
+    }
     currentToneStyleId = "custom:" + preset.id;
     currentBaseToneSettings = style.settings;
     masterOutput.setToneStyle(style.settings);
@@ -2907,22 +2948,24 @@ void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
     currentPresetIsCustom = preset.customTone;
     applyInstrumentBendRange();
     pluginStatus.setText(utf8("已恢复音色：") + preset.name, juce::dontSendNotification);
+    juce::Logger::writeToLog("Preset parameters restored; restoring effect chain");
     pluginLoading = true;
     const auto audioStatus = audio.getStatus();
     pluginHost.restoreEffectChain(preset.effects, audioStatus.sampleRate > 0 ? audioStatus.sampleRate : 48000,
         audioStatus.bufferSize > 0 ? audioStatus.bufferSize : 128,
-        [safe = juce::Component::SafePointer<MainComponent>(this), completion](bool success, const juce::String& message)
+        [safe = juce::Component::SafePointer<MainComponent>(this), completion, restoreWarning](bool success, const juce::String& message)
         {
             if (! safe) return;
             safe->pluginLoading = false;
             safe->effectStatus.setText(message, juce::dontSendNotification);
             if (! success) safe->pluginStatus.setText(utf8("音色未完整恢复：") + message, juce::dontSendNotification);
-            if (completion) completion(success, message);
+            if (completion) completion(success, message + " " + restoreWarning);
         });
 }
 
 void MainComponent::activatePluginOutput(const juce::String& pluginName, bool applyDefaults)
 {
+    juce::Logger::writeToLog("Plugin output activation begin; defaults=" + juce::String(applyDefaults ? 1 : 0));
     audio.getDeviceManager().removeAudioCallback(&testSynth);
     const auto brand = fengyin::SupportedInstrumentClassifier::classify(pluginName, {});
     const auto family = brand == fengyin::SupportedInstrumentClassifier::Brand::swam
@@ -2945,6 +2988,7 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName, bool ap
         pluginHost.applyStandardSwamExpressionCurve();
     // Complete all plugin-state changes before the real-time callback begins.
     pluginHost.attachTo(audio.getDeviceManager());
+    juce::Logger::writeToLog("Plugin output attached");
     midi.setTechniqueContext(fengyin::SwamPluginClassifier::familyKey(family));
     midi.setPerformanceSink(&pluginHost);
     configureTechniqueDefaults();
@@ -2972,6 +3016,7 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName, bool ap
         ? pluginHost.applySwamToneProfile(defaultStyle.swam) : 0;
     applyInstrumentBendRange();
     pluginStatus.setText(utf8("当前音源：") + pluginName, juce::dontSendNotification);
+    juce::Logger::writeToLog("Plugin output activation complete");
     if (! pluginHost.hasEffect())
         effectStatus.setText(utf8("效果器：未使用"), juce::dontSendNotification);
 }

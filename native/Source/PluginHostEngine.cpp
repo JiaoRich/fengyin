@@ -359,11 +359,19 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
             setKongExpressionMode(fengyin::SupportedInstrumentClassifier::classify(
                 description.name, description.manufacturerName, description.fileOrIdentifier)
                     == fengyin::SupportedInstrumentClassifier::Brand::kong);
+            // Keep the entire caller's initialization transaction silent, not
+            // just individual parameter writes. The device may already be live.
+            graph->suspendProcessing(true);
             player.setProcessor(graph.get());
             juce::Logger::writeToLog("Plugin graph ready " + juce::String(generation));
             resetPerformance();
+            juce::Logger::writeToLog("Plugin performance reset queued " + juce::String(generation));
             if (completion)
                 completion(true, instrumentNode->getProcessor()->getName());
+            // A completion may replace/unload the graph. Never retain a raw
+            // graph pointer across that callback.
+            if (guard->load(std::memory_order_acquire) && generation == loadGeneration && graph)
+                graph->suspendProcessing(false);
         });
 }
 
@@ -457,6 +465,8 @@ juce::Array<ToneParameterValue> PluginHostEngine::captureToneParameters() const
 
 int PluginHostEngine::restoreToneParameters(const juce::Array<ToneParameterValue>& stored)
 {
+    const ScopedGraphPause pause(graph.get());
+    juce::Logger::writeToLog("Tone parameter restore begin; count=" + juce::String(stored.size()));
     auto* plugin = getPlugin();
     if (plugin == nullptr) return 0;
     int restored = 0;
@@ -477,18 +487,27 @@ int PluginHostEngine::restoreToneParameters(const juce::Array<ToneParameterValue
                 break;
             }
     }
+    juce::Logger::writeToLog("Tone parameter restore complete; count=" + juce::String(restored));
     return restored;
 }
 
 bool PluginHostEngine::applyStandardSwamExpressionCurve()
 {
+    // The player may still be attached after replacing an instrument. Never
+    // restore opaque plugin state concurrently with its audio callback.
+    const ScopedGraphPause pause(graph.get());
+    juce::Logger::writeToLog("SWAM expression state update begin");
     auto* plugin = getPlugin();
     if (plugin == nullptr) return false;
 
     juce::MemoryBlock state;
     plugin->getStateInformation(state);
     const auto result = SwamExpressionCurve::applyToState(state);
-    if (! result.found) return false;
+    if (! result.found)
+    {
+        juce::Logger::writeToLog("SWAM expression state update skipped: no supported curve");
+        return false;
+    }
 
     // Preserve and follow the controller already selected inside SWAM. The
     // smart adapter translates any supported wind controller to this one
@@ -502,6 +521,7 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve()
         resolveInstrumentModelParameter();
         resetPerformance();
     }
+    juce::Logger::writeToLog("SWAM expression state update complete");
     return true;
 }
 
@@ -991,6 +1011,8 @@ juce::String PluginHostEngine::getCurrentInstrumentModelName() const
 
 bool PluginHostEngine::selectInstrumentModel(int index)
 {
+    const ScopedGraphPause pause(graph.get());
+    juce::Logger::writeToLog("Instrument model selection begin; index=" + juce::String(index));
     if (instrumentModelParameter == nullptr || ! juce::isPositiveAndBelow(index, instrumentModelNames.size())
         || instrumentModelValues.size() != static_cast<size_t>(instrumentModelNames.size()))
         return false;
@@ -998,11 +1020,13 @@ bool PluginHostEngine::selectInstrumentModel(int index)
     instrumentModelParameter->beginChangeGesture();
     instrumentModelParameter->setValueNotifyingHost(value);
     instrumentModelParameter->endChangeGesture();
+    juce::Logger::writeToLog("Instrument model selection complete");
     return true;
 }
 
 int PluginHostEngine::applySwamToneProfile(const SwamToneProfile& profile)
 {
+    const ScopedGraphPause pause(graph.get());
     swamToneAudit = juce::var();
     auto* plugin = getPlugin();
     if (plugin == nullptr || ! profile.enabled) return 0;

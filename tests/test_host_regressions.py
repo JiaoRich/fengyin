@@ -16,6 +16,32 @@ AUDIO = (ROOT / "native" / "Source" / "AudioDeviceService.cpp").read_text(encodi
 
 
 class HostRegressionTests(unittest.TestCase):
+    def test_import_initialization_is_suspended_before_player_exposure(self):
+        start = HOST.index('graph->suspendProcessing(true);')
+        exposed = HOST.index('player.setProcessor(graph.get());', start)
+        completed = HOST.index('completion(true, instrumentNode->getProcessor()->getName());', exposed)
+        resumed = HOST.index('graph->suspendProcessing(false);', completed)
+        self.assertLess(start, exposed)
+        self.assertLess(completed, resumed)
+        self.assertIn('generation == loadGeneration && graph', HOST[completed:resumed])
+
+    def test_cross_version_import_does_not_guess_model_index_or_opaque_state(self):
+        self.assertIn('savedInstrument.version != chosen.version', MAIN)
+        self.assertIn('preset.instrumentState.getSize() > 0', MAIN)
+        self.assertIn('preset.instrumentModelIndex = -1;', MAIN)
+        self.assertIn('getInstrumentModelNames().indexOf(preset.instrumentModelName)', MAIN)
+        self.assertIn('utf8("方案包已导入：") + message', MAIN)
+
+    def test_bulk_tone_changes_pause_live_processing(self):
+        for signature in (
+            'int PluginHostEngine::restoreToneParameters(',
+            'bool PluginHostEngine::applyStandardSwamExpressionCurve()',
+            'bool PluginHostEngine::selectInstrumentModel(',
+            'int PluginHostEngine::applySwamToneProfile(',
+        ):
+            body = HOST.split(signature, 1)[1].split('\n}', 1)[0]
+            self.assertIn('const ScopedGraphPause pause(graph.get());', body)
+
     def test_air_wires_preview_save_reload_ui_and_diagnostic(self):
         self.assertIn('toneObject->setProperty("air", toneSettings.air * 100.0f)', MAIN)
         self.assertIn('normal("air", result.air)', MAIN)
