@@ -78,6 +78,7 @@ int main()
 
     const auto directory=juce::File::getSpecialLocation(juce::File::tempDirectory).getNonexistentChildFile("fengyin-studio-test",{},true);
     assert(directory.createDirectory());
+    {
     fengyin::SoundPreset preset;
     preset.id="test";preset.name="Style";preset.instrumentChineseName="Sax";preset.pluginIdentifier="instrument";
     preset.studioDraft=true;preset.instrumentState=juce::MemoryBlock("state",5);
@@ -86,6 +87,13 @@ int main()
     preset.effects.push_back({description.createXml()->toString(),juce::MemoryBlock("FX bytes",8),true});
     const auto file=directory.getChildFile("scheme.fytonepack");
     assert(fengyin::TonePackage::write(preset,file));
+    juce::String importError;
+    const auto imported = fengyin::TonePackage::read(file, importError);
+    assert(imported && importError.isEmpty() && imported->studioDraft && imported->id != preset.id);
+    assert(imported->instrumentState == preset.instrumentState);
+    assert(imported->effects[0].state == preset.effects[0].state && imported->effects[0].bypassed);
+    const auto secondImport = fengyin::TonePackage::read(file, importError);
+    assert(secondImport && secondImport->id != imported->id);
     juce::ZipFile zip(file);
     assert(zip.getNumEntries()==2);
     const auto read=[&](const char* name){std::unique_ptr<juce::InputStream> stream(zip.createStreamForEntry(zip.getIndexOfFileName(name)));assert(stream);return stream->readEntireStreamAsString();};
@@ -104,9 +112,30 @@ int main()
     preset.containerProjectState=juce::MemoryBlock("KAM bytes",9);
     const auto kongFile=directory.getChildFile("kong.fytonepack");
     assert(fengyin::TonePackage::write(preset,kongFile));
+    const auto importedKong = fengyin::TonePackage::read(kongFile, importError);
+    assert(importedKong && importedKong->containerProjectState == preset.containerProjectState
+        && importedKong->samplerState == preset.samplerState);
     juce::ZipFile kongZip(kongFile);
     assert(kongZip.getNumEntries()==3);
     std::unique_ptr<juce::InputStream> kam(kongZip.createStreamForEntry(kongZip.getIndexOfFileName("instrument.KAM")));
     assert(kam&&kam->readEntireStreamAsString()=="KAM bytes");
+    // Corrupted contents with an intact old manifest are refused.
+    const auto badFile=directory.getChildFile("bad.fytonepack");
+    const auto makeBad=[&](const juce::String& path,const juce::String& content)
+    {
+        juce::ZipFile::Builder builder;
+        const auto json=read("manifest.json");
+        builder.addEntry(std::make_unique<juce::MemoryInputStream>(json.toRawUTF8(),json.getNumBytesAsUTF8(),true),6,"manifest.json",{});
+        builder.addEntry(std::make_unique<juce::MemoryInputStream>(content.toRawUTF8(),content.getNumBytesAsUTF8(),true),6,path,{});
+        assert(badFile.deleteFile());
+        auto stream=badFile.createOutputStream();assert(stream&&builder.writeToStream(*stream,nullptr));
+    };
+    makeBad("tone.xml",xml+"damaged");
+    assert(!fengyin::TonePackage::read(badFile,importError));
+    makeBad("../tone.xml",xml);
+    assert(!fengyin::TonePackage::read(badFile,importError));
+    makeBad("manifest.json",xml);
+    assert(!fengyin::TonePackage::read(badFile,importError));
+    }
     assert(directory.deleteRecursively());
 }

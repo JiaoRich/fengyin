@@ -2111,7 +2111,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 0.17.0 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 0.17.1 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},
@@ -2460,7 +2460,7 @@ studioCss.textContent=`
 document.head.append(studioCss);
 $('#page-settings .panel').insertAdjacentHTML('beforeend',`<div class="tone-diagnostic-section"><button id="studio-entry" type="button">调音师入口</button><span id="studio-session-status" role="status"></span></div>`);
 document.body.insertAdjacentHTML('beforeend',`<div class="studio-login" id="studio-login" hidden role="dialog" aria-modal="true" aria-labelledby="studio-login-title"><div><h2 id="studio-login-title">调音师入口</h2><label>密码<input id="studio-password" type="password" autocomplete="off"></label><p id="studio-login-status" role="status"></p><footer><button id="studio-login-cancel">取消</button><button id="studio-login-confirm" class="primary-button">进入</button></footer></div></div>`);
-$('#page-chain .panel').insertAdjacentHTML('afterbegin',`<div class="studio-toolbar"><div><button id="studio-new">新建音色</button> <button id="studio-show-drafts">草稿箱</button></div><button id="studio-exit">退出调音师</button></div><div id="studio-drafts" hidden></div>`);
+$('#page-chain .panel').insertAdjacentHTML('afterbegin',`<div class="studio-toolbar"><div><button id="studio-new">新建音色</button> <button id="studio-import">导入方案包</button> <button id="studio-show-drafts">草稿箱</button></div><button id="studio-exit">退出调音师</button></div><p id="studio-import-status" role="status" hidden></p><div id="studio-drafts" hidden></div>`);
 $('#custom-tone-editor .custom-tone-step').insertAdjacentHTML('beforeend',`<div class="studio-names"><label>乐器名称<input id="studio-instrument-name" placeholder="例如：高音萨克斯、二胡"></label><label>音色风格<input id="studio-style-name" placeholder="例如：丝滑抒情"></label></div>`);
 $('#custom-effects-step').insertAdjacentHTML('afterbegin',`<div id="studio-effects"><h3>第三方效果器</h3><div class="studio-fx-add" id="studio-fx-add"></div><div id="studio-fx-chain"></div><p class="studio-final-label">最后 · 风吟内置效果</p></div>`);
 document.querySelector('#custom-effects-step > h3').after($('#studio-effects'));
@@ -2493,6 +2493,21 @@ $('#studio-new').onclick=()=>{
 $('#studio-show-drafts').onclick=()=>{
   $('#custom-tone-empty').hidden=true;$('#custom-tone-editor').hidden=true;$('#studio-drafts').hidden=false;renderStudioDrafts();
 };
+$('#studio-import').onclick=()=>{
+  if(!studioUnlocked)return;
+  if(expertDirty&&!window.confirm('导入会切换到新的调音草稿，放弃当前未保存的修改？'))return;
+  nativeEvent('studioImport');
+};
+window.__JUCE__?.backend?.addEventListener('studioImportResult',result=>{
+  const status=$('#studio-import-status');status.hidden=false;status.textContent=result?.message||'导入失败';
+  if(!result?.success)return;
+  expertDirty=false;studioSavedId=result.id;
+  if(!result.loaded){$('#studio-show-drafts').click();return;}
+  $('#studio-instrument-name').value=result.instrumentName||'';
+  $('#studio-style-name').value=result.name||'';
+  $('#studio-drafts').hidden=true;
+  enterCustomToneEdit(result.name);showPage('chain');
+});
 $('#studio-exit').onclick=()=>{
   if(latestBackendState.pluginLoading||latestBackendState.effectLoading)return toast('插件正在加载，请稍候');
   if(expertDirty&&!window.confirm('退出并放弃未保存的修改？'))return;
@@ -2528,6 +2543,12 @@ function renderStudioDrafts(){
 let studioChainSignature='',studioDraftSignature='';
 window.__JUCE__?.backend?.addEventListener('backendState',state=>{
   studioUnlocked=!!state.studioUnlocked;
+  $('#studio-import').disabled=!!state.pluginLoading||!!state.effectLoading;
+  if(customToneMode==='edit'&&state.pluginLoaded&&!state.pluginLoading){
+    const sourceIndex=availableInstruments.findIndex(item=>state.pluginIdentifier
+      ?item.pluginId===state.pluginIdentifier:item.name===state.pluginName);
+    if(sourceIndex>=0)$('#instrument-select').value=String(sourceIndex);
+  }
   const rows=state.effectChain||[],signature=JSON.stringify(rows);
   if(signature!==studioChainSignature){
     studioChainSignature=signature;
