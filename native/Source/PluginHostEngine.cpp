@@ -1,4 +1,6 @@
 #include "PluginHostEngine.h"
+#include "SerialEffectRouting.h"
+#include "ScopedGraphPause.h"
 #include "KongInstrumentCatalog.h"
 #include "KongProjectFile.h"
 #include "BendRangeParameters.h"
@@ -319,7 +321,7 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
             // translation of the manufacturer's separate project-file format.
             if (initialState.getSize() > 0)
             {
-                if (initialState.getSize() > 16 * 1024 * 1024)
+                if (initialState.getSize() > 64 * 1024 * 1024)
                 {
                     if (completion)
                         completion(false, juce::String::fromUTF8("音源状态文件异常"));
@@ -374,13 +376,12 @@ void PluginHostEngine::unload()
     // Stop audio before destroying third-party editors and their processors.
     instrumentEditorWindow.reset();
     effectEditorWindow.reset();
-    effectNode = nullptr;
+    effectNodes.clear();
     instrumentNode = nullptr;
     audioOutputNode = nullptr;
     midiInputNode = nullptr;
     graph.reset();
     currentDescription = {};
-    currentEffectDescription = {};
     for (auto& parameter : techniqueParameters) parameter.store(nullptr);
     for (auto& dirty : techniqueDirty) dirty.store(false, std::memory_order_relaxed);
     instrumentModelParameter = nullptr;
@@ -412,27 +413,29 @@ juce::AudioPluginInstance* PluginHostEngine::getPlugin() const noexcept
 
 juce::String PluginHostEngine::getEffectName() const
 {
-    return effectNode != nullptr ? effectNode->getProcessor()->getName() : juce::String();
+    return hasEffect() ? effectNodes.front().node->getProcessor()->getName() : juce::String();
 }
 
 juce::String PluginHostEngine::getEffectIdentifier() const
 {
-    return effectNode != nullptr ? currentEffectDescription.createIdentifierString() : juce::String();
+    return hasEffect() ? effectNodes.front().description.createIdentifierString() : juce::String();
 }
 
 juce::MemoryBlock PluginHostEngine::saveEffectState() const
 {
     juce::MemoryBlock state;
-    if (effectNode != nullptr)
-        effectNode->getProcessor()->getStateInformation(state);
+    if (hasEffect())
+        effectNodes.front().node->getProcessor()->getStateInformation(state);
     return state;
 }
 
 bool PluginHostEngine::restoreEffectState(const void* data, std::size_t size)
 {
-    if (effectNode == nullptr || data == nullptr || size == 0 || size > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+    if (! hasEffect() || data == nullptr || size == 0 || size > static_cast<std::size_t>(std::numeric_limits<int>::max()))
         return false;
-    effectNode->getProcessor()->setStateInformation(data, static_cast<int>(size));
+    const ScopedGraphPause pause(graph.get());
+    effectNodes.front().node->getProcessor()->setStateInformation(data, static_cast<int>(size));
+    // Resume without releasing the existing instrument.
     return true;
 }
 
@@ -505,6 +508,11 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve()
 void PluginHostEngine::loadEffectAsync(const juce::PluginDescription& description, double sampleRate,
                                        int bufferSize, LoadCallback callback)
 {
+    if (effectNodes.size() >= 16)
+    {
+        if (callback) callback(false, juce::String::fromUTF8("最多串联 16 个效果器，请先移除不需要的效果器"));
+        return;
+    }
     if (graph == nullptr || instrumentNode == nullptr)
     {
         if (callback) callback(false, juce::String::fromUTF8("请先加载音源"));
@@ -524,22 +532,24 @@ void PluginHostEngine::loadEffectAsync(const juce::PluginDescription& descriptio
                 if (completion) completion(false, error.isNotEmpty() ? error : juce::String::fromUTF8("效果器加载失败"));
                 return;
             }
-            player.setProcessor(nullptr);
-            effectEditorWindow.reset();
-            if (effectNode != nullptr) graph->removeNode(effectNode->nodeID);
-            effectNode = graph->addNode(std::move(instance));
-            currentEffectDescription = description;
+            if (instance->getTotalNumInputChannels() < 1 || instance->getTotalNumOutputChannels() < 1)
+            {
+                if (completion) completion(false, juce::String::fromUTF8("此插件没有可用的音频输入或输出"));
+                return;
+            }
+            const ScopedGraphPause pause(graph.get());
+            auto effectNode = graph->addNode(std::move(instance));
+            effectNodes.push_back({ effectNode, description });
             if (! rebuildConnections())
             {
                 graph->removeNode(effectNode->nodeID);
-                effectNode = nullptr;
-                currentEffectDescription = {};
+                effectNodes.pop_back();
                 rebuildConnections();
-                player.setProcessor(graph.get());
+                // Resume without releasing the existing instrument.
                 if (completion) completion(false, juce::String::fromUTF8("效果器音频通道不兼容，已恢复直接输出"));
                 return;
             }
-            player.setProcessor(graph.get());
+            // Resume without releasing the existing instrument.
             if (completion) completion(true, effectNode->getProcessor()->getName());
         });
 }
@@ -547,31 +557,204 @@ void PluginHostEngine::loadEffectAsync(const juce::PluginDescription& descriptio
 void PluginHostEngine::unloadEffect()
 {
     ++effectLoadGeneration;
-    if (graph == nullptr || effectNode == nullptr) return;
-    player.setProcessor(nullptr);
+    if (graph == nullptr || ! hasEffect()) return;
+    const ScopedGraphPause pause(graph.get());
     effectEditorWindow.reset();
-    graph->removeNode(effectNode->nodeID);
-    effectNode = nullptr;
-    currentEffectDescription = {};
+    for (const auto& effect : effectNodes) graph->removeNode(effect.node->nodeID);
+    effectNodes.clear();
     rebuildConnections();
-    player.setProcessor(graph.get());
+    // Resume without releasing the existing instrument.
+}
+
+EffectChainStates PluginHostEngine::captureEffectChain()
+{
+    EffectChainStates result;
+    const ScopedGraphPause pause(graph.get());
+    for (const auto& effect : effectNodes)
+    {
+        EffectChainState entry;
+        entry.descriptionXml = effect.description.createXml()->toString();
+        entry.bypassed = effect.node->isBypassed();
+        effect.node->getProcessor()->getStateInformation(entry.state);
+        result.push_back(std::move(entry));
+    }
+    // Resume without releasing the existing instrument.
+    return result;
+}
+
+juce::MemoryBlock PluginHostEngine::captureInstrumentState()
+{
+    juce::MemoryBlock state;
+    const ScopedGraphPause pause(graph.get());
+    if (auto* plugin = getPlugin()) plugin->getStateInformation(state);
+    // Resume without releasing the existing instrument.
+    return state;
+}
+
+juce::String PluginHostEngine::getInstrumentDescriptionXml() const
+{
+    return hasPlugin() ? currentDescription.createXml()->toString() : juce::String();
+}
+
+juce::var PluginHostEngine::describeEffectChain() const
+{
+    juce::Array<juce::var> result;
+    for (const auto& effect : effectNodes)
+    {
+        auto* row = new juce::DynamicObject();
+        row->setProperty("name", effect.description.name);
+        row->setProperty("version", effect.description.version);
+        row->setProperty("bypassed", effect.node->isBypassed());
+        row->setProperty("latencySamples", effect.node->getProcessor()->getLatencySamples());
+        result.add(juce::var(row));
+    }
+    return result;
+}
+
+bool PluginHostEngine::removeEffectAt(int index)
+{
+    if (index < 0 || static_cast<size_t>(index) >= effectNodes.size() || ! graph) return false;
+    ++effectLoadGeneration;
+    const ScopedGraphPause pause(graph.get());
+    effectEditorWindow.reset();
+    graph->removeNode(effectNodes[static_cast<size_t>(index)].node->nodeID);
+    effectNodes.erase(effectNodes.begin() + index);
+    const auto ok = rebuildConnections();
+    // Resume without releasing the existing instrument.
+    return ok;
+}
+
+bool PluginHostEngine::moveEffect(int index, int destination)
+{
+    if (index < 0 || destination < 0 || static_cast<size_t>(index) >= effectNodes.size()
+        || static_cast<size_t>(destination) >= effectNodes.size()) return false;
+    ++effectLoadGeneration;
+    const ScopedGraphPause pause(graph.get());
+    auto slot = effectNodes[static_cast<size_t>(index)];
+    effectNodes.erase(effectNodes.begin() + index);
+    effectNodes.insert(effectNodes.begin() + destination, slot);
+    const auto ok = rebuildConnections();
+    // Resume without releasing the existing instrument.
+    return ok;
+}
+
+bool PluginHostEngine::setEffectBypassedAt(int index, bool bypassed)
+{
+    if (index < 0 || static_cast<size_t>(index) >= effectNodes.size()) return false;
+    const ScopedGraphPause pause(graph.get());
+    effectNodes[static_cast<size_t>(index)].node->setBypassed(bypassed);
+    const auto ok = rebuildConnections();
+    // Resume without releasing the existing instrument.
+    return ok;
+}
+
+bool PluginHostEngine::showEffectEditor(int index)
+{
+    if (index < 0 || static_cast<size_t>(index) >= effectNodes.size()) return false;
+    effectEditorWindow.reset();
+    auto* processor = effectNodes[static_cast<size_t>(index)].node->getProcessor();
+    std::unique_ptr<juce::AudioProcessorEditor> editor(processor->createEditorAndMakeActive());
+    if (! editor) editor = std::make_unique<juce::GenericAudioProcessorEditor>(*processor);
+    effectEditorWindow = std::make_unique<PluginEditorWindow>(processor->getName(), std::move(editor));
+    return true;
+}
+
+void PluginHostEngine::restoreEffectChain(const EffectChainStates& states, double sampleRate,
+                                         int bufferSize, LoadCallback callback)
+{
+    if (! graph || ! instrumentNode || states.size() > 16)
+    {
+        if (callback) callback(false, juce::String::fromUTF8("效果链不可载入"));
+        return;
+    }
+    struct Pending
+    {
+        EffectChainStates states;
+        std::vector<juce::PluginDescription> descriptions;
+        std::vector<std::unique_ptr<juce::AudioPluginInstance>> instances;
+        LoadCallback completion;
+    };
+    auto pending = std::make_shared<Pending>();
+    pending->states = states;
+    pending->completion = std::move(callback);
+    for (const auto& state : states)
+    {
+        juce::PluginDescription description;
+        auto xml = juce::parseXML(state.descriptionXml);
+        if (! xml || ! description.loadFromXml(*xml) || state.state.getSize() > 64u * 1024u * 1024u)
+        {
+            if (pending->completion) pending->completion(false, juce::String::fromUTF8("效果器状态损坏"));
+            return;
+        }
+        pending->descriptions.push_back(description);
+    }
+    const auto generation = ++effectLoadGeneration;
+    auto step = std::make_shared<std::function<void()>>();
+    std::weak_ptr<std::function<void()>> weakStep = step;
+    *step = [this, guard = lifetime, pending, weakStep, generation, sampleRate, bufferSize]()
+    {
+        if (! guard->load() || generation != effectLoadGeneration || ! graph) return;
+        const auto index = pending->instances.size();
+        if (index == pending->states.size())
+        {
+            const ScopedGraphPause pause(graph.get());
+            effectEditorWindow.reset();
+            auto previous = std::move(effectNodes);
+            effectNodes.clear();
+            for (size_t i = 0; i < index; ++i)
+            {
+                auto node = graph->addNode(std::move(pending->instances[i]));
+                node->setBypassed(pending->states[i].bypassed);
+                effectNodes.push_back({ node, pending->descriptions[i] });
+            }
+            const auto ok = rebuildConnections();
+            if (ok)
+                for (const auto& old : previous) graph->removeNode(old.node->nodeID);
+            else
+            {
+                for (const auto& added : effectNodes) graph->removeNode(added.node->nodeID);
+                effectNodes = std::move(previous);
+                rebuildConnections();
+            }
+            // Resume without releasing the existing instrument.
+            if (pending->completion) pending->completion(ok, ok ? juce::String::fromUTF8("效果链已恢复")
+                : juce::String::fromUTF8("效果器通道不兼容，未替换原效果链"));
+            return;
+        }
+        auto next = weakStep.lock();
+        formatManager.createPluginInstanceAsync(pending->descriptions[index], sampleRate, bufferSize,
+            [this, guard, pending, next, generation, index](std::unique_ptr<juce::AudioPluginInstance> instance,
+                                                         const juce::String& error)
+            {
+                if (! guard->load() || generation != effectLoadGeneration) return;
+                if (! instance || instance->getTotalNumInputChannels() < 1 || instance->getTotalNumOutputChannels() < 1)
+                {
+                    if (pending->completion) pending->completion(false, pending->descriptions[index].name + ": " + error);
+                    return;
+                }
+                const auto& state = pending->states[index].state;
+                if (state.getSize() > 0) instance->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
+                pending->instances.push_back(std::move(instance));
+                if (next) (*next)();
+            });
+    };
+    (*step)();
 }
 
 bool PluginHostEngine::setEffectBypassed(bool shouldBypass)
 {
-    if (effectNode == nullptr) return false;
-    effectNode->setBypassed(shouldBypass);
-    return true;
+    return setEffectBypassedAt(0, shouldBypass);
 }
 
 bool PluginHostEngine::isEffectBypassed() const noexcept
 {
-    return effectNode != nullptr && effectNode->isBypassed();
+    return hasEffect() && effectNodes.front().node->isBypassed();
 }
 
 bool PluginHostEngine::showPluginEditor(bool effect)
 {
-    auto node = effect ? effectNode : instrumentNode;
+    if (effect) return showEffectEditor(0);
+    auto node = instrumentNode;
     if (node == nullptr) return false;
     auto& window = effect ? effectEditorWindow : instrumentEditorWindow;
     if (window != nullptr)
@@ -606,26 +789,10 @@ bool PluginHostEngine::rebuildConnections()
     const auto midiConnected = graph->addConnection(
         { { midiInputNode->nodeID, juce::AudioProcessorGraph::midiChannelIndex },
           { instrumentNode->nodeID, juce::AudioProcessorGraph::midiChannelIndex } });
-    auto source = instrumentNode;
-    if (effectNode != nullptr)
-    {
-        const auto sourceChannels = juce::jmax(1, instrumentNode->getProcessor()->getTotalNumOutputChannels());
-        const auto destinationChannels = juce::jmax(1, effectNode->getProcessor()->getTotalNumInputChannels());
-        int effectConnections = 0;
-        for (int channel = 0; channel < juce::jmin(2, destinationChannels); ++channel)
-            if (graph->addConnection({ { instrumentNode->nodeID, juce::jmin(channel, sourceChannels - 1) },
-                                        { effectNode->nodeID, channel } }))
-                ++effectConnections;
-        if (effectConnections == 0) return false;
-        source = effectNode;
-    }
-    const auto sourceChannels = juce::jmax(1, source->getProcessor()->getTotalNumOutputChannels());
-    int audioConnections = 0;
-    for (int channel = 0; channel < 2; ++channel)
-        if (graph->addConnection({ { source->nodeID, juce::jmin(channel, sourceChannels - 1) },
-                                    { audioOutputNode->nodeID, channel } }))
-            ++audioConnections;
-    return midiConnected && audioConnections > 0;
+    std::vector<juce::AudioProcessorGraph::Node::Ptr> chain;
+    for (const auto& slot : effectNodes)
+        chain.push_back(slot.node);
+    return midiConnected && connectSerialEffects(*graph, instrumentNode, chain, audioOutputNode);
 }
 
 void PluginHostEngine::noteOn(int noteNumber, float velocity, double timestampSeconds) noexcept
@@ -877,8 +1044,9 @@ bool PluginHostEngine::supportsTechnique(PerformanceTechnique technique) const n
 int PluginHostEngine::getProcessingLatencySamples() const noexcept
 {
     int samples = instrumentNode != nullptr ? instrumentNode->getProcessor()->getLatencySamples() : 0;
-    if (effectNode != nullptr && ! effectNode->isBypassed())
-        samples += effectNode->getProcessor()->getLatencySamples();
+    for (const auto& effect : effectNodes)
+        if (! effect.node->isBypassed())
+            samples += effect.node->getProcessor()->getLatencySamples();
     return juce::jmax(0, samples);
 }
 

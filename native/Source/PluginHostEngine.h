@@ -18,6 +18,7 @@
 #include "SwamToneProfile.h"
 #include "SwamExpressionCurve.h"
 #include "ToneParameterValue.h"
+#include "EffectChainState.h"
 
 namespace fengyin
 {
@@ -96,7 +97,16 @@ public:
     [[nodiscard]] juce::String getPluginName() const;
     [[nodiscard]] juce::String getPluginIdentifier() const;
     [[nodiscard]] juce::AudioPluginInstance* getPlugin() const noexcept;
-    [[nodiscard]] bool hasEffect() const noexcept { return effectNode != nullptr; }
+    [[nodiscard]] bool hasEffect() const noexcept { return ! effectNodes.empty(); }
+    [[nodiscard]] EffectChainStates captureEffectChain();
+    [[nodiscard]] juce::var describeEffectChain() const;
+    void restoreEffectChain(const EffectChainStates&, double, int, LoadCallback);
+    bool removeEffectAt(int index);
+    bool moveEffect(int index, int destination);
+    bool setEffectBypassedAt(int index, bool bypassed);
+    bool showEffectEditor(int index);
+    [[nodiscard]] juce::MemoryBlock captureInstrumentState();
+    [[nodiscard]] juce::String getInstrumentDescriptionXml() const;
     [[nodiscard]] juce::String getEffectName() const;
     [[nodiscard]] juce::String getEffectIdentifier() const;
     [[nodiscard]] juce::MemoryBlock saveEffectState() const;
@@ -149,11 +159,15 @@ private:
     RecordingAudioProcessorPlayer player;
     std::unique_ptr<juce::AudioProcessorGraph> graph;
     juce::AudioProcessorGraph::Node::Ptr instrumentNode;
-    juce::AudioProcessorGraph::Node::Ptr effectNode;
+    struct EffectSlot
+    {
+        juce::AudioProcessorGraph::Node::Ptr node;
+        juce::PluginDescription description;
+    };
+    std::vector<EffectSlot> effectNodes;
     juce::AudioProcessorGraph::Node::Ptr audioOutputNode;
     juce::AudioProcessorGraph::Node::Ptr midiInputNode;
     juce::PluginDescription currentDescription;
-    juce::PluginDescription currentEffectDescription;
     class PluginEditorWindow;
     std::unique_ptr<PluginEditorWindow> instrumentEditorWindow;
     std::unique_ptr<PluginEditorWindow> effectEditorWindow;

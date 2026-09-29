@@ -3,6 +3,7 @@
 #include <juce_core/juce_core.h>
 #include <optional>
 #include "ToneParameterValue.h"
+#include "EffectChainState.h"
 
 namespace fengyin
 {
@@ -41,6 +42,10 @@ struct SoundPreset
     float outputGain = 1.0f;
     float bass = 0.0f;
     float air = 0.0f;
+    bool studioDraft = false;
+    juce::String instrumentDescriptionXml;
+    juce::MemoryBlock instrumentState;
+    EffectChainStates effects;
 };
 
 class SoundPresetStore final
@@ -54,11 +59,11 @@ public:
     bool remove(const juce::String& id);
     bool setDefaultId(const juce::String& id);
     [[nodiscard]] juce::String getDefaultId() const;
+    static std::unique_ptr<juce::XmlElement> toXml(const juce::Array<SoundPreset>& presets);
+    static juce::Array<SoundPreset> fromXml(const juce::XmlElement& root);
 
 private:
     [[nodiscard]] juce::File getFile() const;
-    static std::unique_ptr<juce::XmlElement> toXml(const juce::Array<SoundPreset>& presets);
-    static juce::Array<SoundPreset> fromXml(const juce::XmlElement& root);
     bool writeAll(const juce::Array<SoundPreset>& presets) const;
 
     juce::File directory;

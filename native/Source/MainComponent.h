@@ -39,6 +39,10 @@ private:
     static juce::File prepareLocalWebInterface();
     void chooseVideoForWebInterface();
     void exportCurrentToneDiagnostic();
+    void exportStudioDraft(const juce::String& id);
+    bool studioUnlocked = false;
+    juce::String studioInstrumentName;
+    std::unique_ptr<juce::FileChooser> studioExportChooser;
     void loadVideoForWebInterface(const juce::File& file);
     void emitVideoAudioState(bool ready, const juce::String& message);
     juce::Rectangle<int> getContentBounds() const;
@@ -69,7 +73,7 @@ private:
     void showRecordingManager();
     void showSetupGuide(bool automatic = false);
     static juce::File getOnboardingMarkerFile();
-    void activatePluginOutput(const juce::String& pluginName);
+    void activatePluginOutput(const juce::String& pluginName, bool applyDefaults = true);
     void applyCurrentSwamToneStyle();
     void applyInstrumentBendRange();
     void changeInstrumentBendRange(const juce::var& payload);
@@ -166,6 +170,8 @@ private:
     int editingReturnModelIndex = -1;
     juce::Array<fengyin::ToneParameterValue> editingReturnToneParameters;
     juce::MemoryBlock editingReturnSamplerState;
+    juce::MemoryBlock editingReturnInstrumentState;
+    fengyin::EffectChainStates editingReturnEffects;
     juce::MemoryBlock editingReturnContainerProjectState;
     fengyin::ToneStyleSettings editingReturnToneSettings;
     juce::String currentToneStyleId { "natural" };

@@ -15,9 +15,9 @@ class PrototypeStructureTests(unittest.TestCase):
             self.assertIn(f'data-page="{page}"', HTML)
 
     def test_script_references_existing_ids(self):
-        html_ids = set(re.findall(r'id="([^"]+)"', HTML))
+        html_ids = set(re.findall(r'id="([^"]+)"', HTML + JS))
         # Ignore the second dollar sign in the $$() query-all helper.
-        script_ids = set(re.findall(r"(?<!\$)\$\('#([^']+)'\)", JS))
+        script_ids = set(re.findall(r"(?<!\$)\$\('#([\w-]+)'\)", JS))
         self.assertEqual(set(), script_ids - html_ids)
 
     def test_required_first_milestone_controls_exist(self):
@@ -188,19 +188,17 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertIn("pluginLoadResult", JS)
         self.assertIn("if (!result.success)", JS)
 
-    def test_saved_presets_can_be_deleted_without_hiding_create_action(self):
+    def test_drafts_are_managed_only_in_tuner_workspace(self):
         render_body = JS.split("function renderPresets()", 1)[1].split("renderPresets();", 1)[0]
-        self.assertIn("innerHTML = create +", render_body)
-        self.assertIn("nativeEvent('deletePreset',{index:presetIndex})", JS)
-        self.assertIn('class="preset preset-create"', JS)
-        self.assertIn('data-action="delete-custom"', JS)
-        self.assertIn("${tone.custom?'':'disabled'}", JS)
-        self.assertIn('.preset-create{', HTML)
+        self.assertIn("innerHTML = scanCard + instrumentCards", render_body)
+        self.assertIn('data-studio-delete=', JS)
+        self.assertIn("filter(({preset})=>preset.studioDraft)", JS)
+        self.assertIn("if (page === 'chain' && !studioUnlocked)", JS)
 
     def test_installed_plugins_and_custom_variants_share_instrument_cards(self):
         self.assertIn("availableInstruments.map((instrument,pluginIndex)", JS)
         self.assertIn('class="instrument-preset-card compact', JS)
-        self.assertIn("data-action=\"edit-custom\"", JS)
+        self.assertNotIn("data-action=\"edit-custom\"", JS)
         self.assertIn("const tones = [...customs,...builtins]", JS)
         self.assertIn("nativeEvent('editPreset',{index:presetIndex})", JS)
         self.assertIn("nativeEvent('saveCustomPreset'", JS)

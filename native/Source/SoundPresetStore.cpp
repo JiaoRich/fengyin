@@ -32,6 +32,9 @@ bool SoundPresetStore::save(const SoundPreset& preset)
         return false;
     if (preset.samplerState.getSize() > 16 * 1024 * 1024
         || preset.containerProjectState.getSize() > 1024 * 1024) return false;
+    if (preset.instrumentState.getSize() > 64 * 1024 * 1024 || preset.effects.size() > 16) return false;
+    for (const auto& effect : preset.effects)
+        if (effect.state.getSize() > 64 * 1024 * 1024) return false;
 
     auto presets = loadAll();
     bool replaced = false;
@@ -122,6 +125,16 @@ std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<Soun
         child->setAttribute("outputGain", static_cast<double>(preset.outputGain));
         child->setAttribute("bass", static_cast<double>(preset.bass));
         child->setAttribute("air", static_cast<double>(preset.air));
+        child->setAttribute("studioDraft", preset.studioDraft);
+        child->createNewChildElement("INSTRUMENT_DESCRIPTION")->addTextElement(preset.instrumentDescriptionXml);
+        child->createNewChildElement("INSTRUMENT_STATE")->addTextElement(preset.instrumentState.toBase64Encoding());
+        for (const auto& effect : preset.effects)
+        {
+            auto* node = child->createNewChildElement("SERIAL_EFFECT");
+            node->setAttribute("bypassed", effect.bypassed);
+            node->createNewChildElement("DESCRIPTION")->addTextElement(effect.descriptionXml);
+            node->createNewChildElement("STATE")->addTextElement(effect.state.toBase64Encoding());
+        }
         for (const auto& parameter : preset.toneParameters)
         {
             auto* stored = child->createNewChildElement("TONE_PARAMETER");
@@ -184,6 +197,32 @@ juce::Array<SoundPreset> SoundPresetStore::fromXml(const juce::XmlElement& root)
         preset.outputGain = static_cast<float>(child->getDoubleAttribute("outputGain", 1.0));
         preset.bass = static_cast<float>(child->getDoubleAttribute("bass", 0.0));
         preset.air = static_cast<float>(child->getDoubleAttribute("air", 0.0));
+        preset.studioDraft = child->getBoolAttribute("studioDraft", false);
+        bool validState = true;
+        if (const auto* description = child->getChildByName("INSTRUMENT_DESCRIPTION"))
+            preset.instrumentDescriptionXml = description->getAllSubText();
+        if (const auto* state = child->getChildByName("INSTRUMENT_STATE"))
+        {
+            const auto encoded = state->getAllSubText();
+            validState = encoded.length() <= 96 * 1024 * 1024
+                && preset.instrumentState.fromBase64Encoding(encoded)
+                && preset.instrumentState.getSize() <= 64 * 1024 * 1024;
+        }
+        for (auto* node : child->getChildIterator())
+            if (node->hasTagName("SERIAL_EFFECT"))
+            {
+                EffectChainState effect;
+                effect.bypassed = node->getBoolAttribute("bypassed");
+                if (const auto* description = node->getChildByName("DESCRIPTION")) effect.descriptionXml = description->getAllSubText();
+                if (const auto* state = node->getChildByName("STATE"))
+                {
+                    const auto encoded = state->getAllSubText();
+                    validState = validState && encoded.length() <= 96 * 1024 * 1024
+                        && effect.state.fromBase64Encoding(encoded) && effect.state.getSize() <= 64 * 1024 * 1024;
+                }
+                if (preset.effects.size() >= 16) { validState = false; break; }
+                preset.effects.push_back(std::move(effect));
+            }
         for (auto* stored : child->getChildIterator())
             if (stored->hasTagName("TONE_PARAMETER"))
             {
@@ -192,7 +231,7 @@ juce::Array<SoundPreset> SoundPresetStore::fromXml(const juce::XmlElement& root)
                 parameter.value = static_cast<float>(stored->getDoubleAttribute("value"));
                 if (parameter.identifier.isNotEmpty()) preset.toneParameters.add(std::move(parameter));
             }
-        if (preset.id.isNotEmpty() && preset.name.isNotEmpty() && preset.pluginIdentifier.isNotEmpty())
+        if (validState && preset.id.isNotEmpty() && preset.name.isNotEmpty() && preset.pluginIdentifier.isNotEmpty())
             presets.add(std::move(preset));
     }
     return presets;

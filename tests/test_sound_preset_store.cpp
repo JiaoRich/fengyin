@@ -79,10 +79,22 @@ int main()
     preset.outputGain = 0.92f;
     preset.bass = -0.35f;
     preset.air = 0.67f;
+    preset.studioDraft = true;
+    preset.instrumentDescriptionXml = "<PLUGIN name=\"test\"/>";
+    preset.instrumentState = juce::MemoryBlock(samplerBytes, sizeof(samplerBytes));
+    preset.effects.push_back({"<PLUGIN name=\"EQ\"/>", juce::MemoryBlock(samplerBytes, sizeof(samplerBytes)), false});
+    preset.effects.push_back({"<PLUGIN name=\"Compressor\"/>", juce::MemoryBlock(samplerBytes, 3), true});
 
     assert(store.save(preset));
     const auto loaded = store.findById("test-id");
     assert(loaded.has_value());
+    assert(loaded->studioDraft);
+    assert(loaded->instrumentState == preset.instrumentState);
+    assert(loaded->instrumentDescriptionXml == preset.instrumentDescriptionXml);
+    assert(loaded->effects.size() == 2);
+    assert(loaded->effects[0].descriptionXml == preset.effects[0].descriptionXml);
+    assert(loaded->effects[1].state == preset.effects[1].state);
+    assert(!loaded->effects[0].bypassed && loaded->effects[1].bypassed);
     assert(loaded->name == "Alto Sax");
     assert(loaded->instrumentModelIndex == 2);
     assert(loaded->toneParameters.size() == 2);
@@ -145,5 +157,12 @@ int main()
     assert(legacy->writeTo(presetFile));
     assert(store.findById("test-id")->air == 0.0f);
 
+    auto malformed = fengyin::SoundPresetStore::toXml({preset});
+    malformed->getFirstChildElement()->getChildByName("INSTRUMENT_STATE")->deleteAllTextElements();
+    malformed->getFirstChildElement()->getChildByName("INSTRUMENT_STATE")->addTextElement("not a state");
+    assert(fengyin::SoundPresetStore::fromXml(*malformed).isEmpty());
+    auto tooMany = preset;
+    tooMany.effects.resize(17);
+    assert(!store.save(tooMany));
     directory.deleteRecursively();
 }
