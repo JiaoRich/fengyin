@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include "ToneParameterValue.h"
 
 namespace fengyin
 {
@@ -24,6 +25,8 @@ struct SwamToneProfile
     float resonance = 0.5f;
     float breathNoise = 0.5f;
     std::vector<SwamToneTarget> displayTargets {};
+    juce::Array<ToneParameterValue> releaseParameters;
+    juce::String releaseModel;
 
     static SwamToneProfile soprano(int style)
     {

@@ -1395,9 +1395,11 @@ void MainComponent::timerCallback()
         state->setProperty("instrumentModelId", pluginHost.getCurrentInstrumentModelIndex());
         state->setProperty("instrumentModelName", pluginHost.getCurrentInstrumentModelName());
         state->setProperty("swamToneParameterCount", currentSwamToneParameterCount);
-        state->setProperty("swamToneIncomplete", ! currentPresetIsCustom && currentInstrumentKey == "soprano-sax"
+        state->setProperty("swamToneIncomplete", ! currentPresetIsCustom
             && pluginHost.hasPlugin() && pluginHost.getSwamToneAudit().isObject()
-            && static_cast<int>(pluginHost.getSwamToneAudit()["verifiedAtApply"]) != 22);
+            && (static_cast<int>(pluginHost.getSwamToneAudit()["verifiedAtApply"])
+                != static_cast<int>(pluginHost.getSwamToneAudit()["expectedAtApply"])
+                || ! static_cast<bool>(pluginHost.getSwamToneAudit()["modelApplied"])));
         state->setProperty("scanning", scanProgress.scanning);
         state->setProperty("scanProgress", scanProgress.fraction);
         state->setProperty("pluginStatus", pluginStatus.getText());
@@ -3109,7 +3111,7 @@ void MainComponent::applyCurrentSwamToneStyle()
         return;
     }
     const auto style = fengyin::ToneStyleCatalog::find(currentInstrumentKey, currentToneStyleId);
-    currentSwamToneParameterCount = pluginHost.applySwamToneProfile(style.swam);
+    currentSwamToneParameterCount = pluginHost.applySwamToneProfile(style.swam, false);
     applyInstrumentBendRange();
 }
 

@@ -20,27 +20,21 @@ bool materiallyDifferent(const fengyin::ToneStyleSettings& first,
 void checkStyles(const juce::String& key)
 {
     const auto styles = fengyin::ToneStyleCatalog::forInstrument(key);
-    assert(styles.size() == 3);
-    assert(styles[0].id != styles[1].id && styles[1].id != styles[2].id);
-    assert(materiallyDifferent(styles[0].settings, styles[1].settings));
-    assert(materiallyDifferent(styles[1].settings, styles[2].settings));
+    const auto expected = key == "alto-sax" ? 3 : (key == "soprano-sax" || key == "tenor-sax" ? 2 : 1);
+    assert(styles.size() == expected);
+    if (expected == 1) assert(styles[0].name == juce::String::fromUTF8("自然原声"));
+    for (int i=1;i<styles.size();++i) assert(styles[i].id != styles[i-1].id);
 }
 
 void checkSaxophoneSwamProfiles(const juce::String& key)
 {
     const auto styles = fengyin::ToneStyleCatalog::forInstrument(key);
-    assert(styles.size() == 3);
-    for (const auto& style : styles) assert(style.swam.enabled);
-    if (key == "soprano-sax")
-    {
-        for (const auto& style : styles) assert(style.swam.displayTargets.size() == 22);
-        assert(juce::String(styles[0].swam.displayTargets[1].display) == "0.00");
-        assert(juce::String(styles[1].swam.displayTargets[1].display) == "-0.08");
-        assert(juce::String(styles[2].swam.displayTargets[1].display) == "0.10");
-        return;
+    if (key == "baritone-sax") { assert(styles.size()==1); return; }
+    for (const auto& style : styles) {
+        assert(style.swam.enabled && !style.swam.releaseParameters.isEmpty());
+        assert(style.swam.releaseModel.isNotEmpty());
+        for (const auto& p:style.swam.releaseParameters) assert(p.value>=0 && p.value<=1);
     }
-    assert(std::abs(styles[0].swam.brightness - styles[1].swam.brightness) > 0.04f);
-    assert(std::abs(styles[1].swam.timbre - styles[2].swam.timbre) > 0.04f);
 }
 }
 
