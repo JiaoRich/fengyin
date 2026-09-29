@@ -67,6 +67,11 @@ int main()
         juce::MemoryBlock snapshot;
         instrument->getStateInformation(snapshot);
         assert(graph.isSuspended());
+        {
+            const fengyin::ScopedGraphPause nested(&graph);
+            assert(graph.isSuspended());
+        }
+        assert(graph.isSuspended());
         for(const auto& connection:graph.getConnections())graph.removeConnection(connection);
         assert(fengyin::connectSerialEffects(graph,input,{offset},output));
     }
@@ -82,6 +87,7 @@ int main()
     fengyin::SoundPreset preset;
     preset.id="test";preset.name="Style";preset.instrumentChineseName="Sax";preset.pluginIdentifier="instrument";
     preset.studioDraft=true;preset.instrumentState=juce::MemoryBlock("state",5);
+    preset.instrumentModelName="Model A";
     juce::PluginDescription description;description.name="Test FX";description.version="1.2";description.pluginFormatName="VST3";description.uniqueId=42;
     preset.instrumentDescriptionXml=description.createXml()->toString();
     preset.effects.push_back({description.createXml()->toString(),juce::MemoryBlock("FX bytes",8),true});
@@ -91,6 +97,7 @@ int main()
     const auto imported = fengyin::TonePackage::read(file, importError);
     assert(imported && importError.isEmpty() && imported->studioDraft && imported->id != preset.id);
     assert(imported->instrumentState == preset.instrumentState);
+    assert(imported->instrumentModelName == preset.instrumentModelName);
     assert(imported->effects[0].state == preset.effects[0].state && imported->effects[0].bypassed);
     const auto secondImport = fengyin::TonePackage::read(file, importError);
     assert(secondImport && secondImport->id != imported->id);

@@ -14,6 +14,7 @@ struct SoundPreset
     juce::String pluginIdentifier;
     juce::Array<ToneParameterValue> toneParameters;
     int instrumentModelIndex = -1;
+    juce::String instrumentModelName;
     float eqTone = 0.2f;
     float warmth = 0.2f;
     float reverbMix = 0.28f;

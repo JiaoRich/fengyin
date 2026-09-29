@@ -99,6 +99,7 @@ std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<Soun
         child->setAttribute("name", preset.name);
         child->setAttribute("plugin", preset.pluginIdentifier);
         child->setAttribute("instrumentModelIndex", preset.instrumentModelIndex);
+        child->setAttribute("instrumentModelName", preset.instrumentModelName);
         child->setAttribute("eqTone", static_cast<double>(preset.eqTone));
         child->setAttribute("warmth", static_cast<double>(preset.warmth));
         child->setAttribute("reverbMix", static_cast<double>(preset.reverbMix));
@@ -160,6 +161,7 @@ juce::Array<SoundPreset> SoundPresetStore::fromXml(const juce::XmlElement& root)
         preset.name = child->getStringAttribute("name");
         preset.pluginIdentifier = child->getStringAttribute("plugin");
         preset.instrumentModelIndex = child->getIntAttribute("instrumentModelIndex", -1);
+        preset.instrumentModelName = child->getStringAttribute("instrumentModelName");
         preset.eqTone = static_cast<float>(child->getDoubleAttribute("eqTone", 0.2));
         preset.warmth = static_cast<float>(child->getDoubleAttribute("warmth", 0.2));
         preset.reverbMix = static_cast<float>(child->getDoubleAttribute("reverbMix", 0.28));
