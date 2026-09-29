@@ -1803,6 +1803,8 @@ void MainComponent::loadSelectedPlugin()
 
     const auto status = audio.getStatus();
     pluginStatus.setText(utf8("正在加载：") + chosen.name, juce::dontSendNotification);
+    // A new instrument invalidates any pending effect factory callback.
+    effectLoading = false;
     pluginLoading = true;
     loadPluginButton.setEnabled(false);
     pluginHost.loadAsync(chosen,
@@ -2138,6 +2140,7 @@ void MainComponent::removeEffect()
 
 void MainComponent::useTestSynth()
 {
+    effectLoading = false;
     midi.setPerformanceSink(nullptr);
     pluginHost.detach();
     pluginHost.unload();
@@ -2590,6 +2593,7 @@ void MainComponent::captureToneBeforePresetEdit()
 void MainComponent::restoreToneBeforePresetEdit()
 {
     if (! editingReturnValid) return;
+    effectLoading = false;
     editingReturnValid = false;
     if (! editingReturnHadPlugin)
     {
@@ -2791,6 +2795,7 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
     currentInstrumentKey = preset.instrumentKey;
     currentInstrumentChineseName = preset.instrumentChineseName;
     pluginStatus.setText(utf8("正在恢复音色方案……"), juce::dontSendNotification);
+    effectLoading = false;
     pluginLoading = true;
     pluginHost.loadAsync(chosen,
                          status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
