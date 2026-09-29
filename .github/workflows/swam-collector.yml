@@ -16,6 +16,9 @@ jobs:
         run: cmake -S tools/swam-parameter-collector -B collector-build -A x64
       - name: Build collector only
         run: cmake --build collector-build --config Release --target SwamParameterCollector --parallel 2
+      - name: Windows PowerShell and executable smoke tests
+        shell: powershell
+        run: ./tools/swam-parameter-collector/Test-CollectorScript.ps1 -Collector ./collector-build/Release/SwamParameterCollector.exe
       - name: Prepare portable package
         shell: pwsh
         run: |
@@ -29,6 +32,6 @@ jobs:
           [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path collector-package/Collect.ps1), [ref]$null, [ref]$null) | Out-Null
       - uses: actions/upload-artifact@v4
         with:
-          name: SWAM-Parameter-Collector-Windows-x64
+          name: SWAM-Full-Parameter-Collector-v2-Windows-x64
           path: collector-package/
           retention-days: 14

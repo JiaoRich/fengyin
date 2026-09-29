@@ -55,15 +55,15 @@ static int collect(const StringArray& args)
     if(descriptions.size()!=1){std::cerr<<"Expected one VST3 instrument\n";return 4;}
     auto description=*descriptions[0];
     auto requested=requests[Identifier(description.name)];
-    if(!requested.isObject()||description.manufacturerName!="Audio Modeling"){std::cerr<<"Unexpected plugin identity\n";return 5;}
-    if(!test&&(description.version!="3.9.4"||!SystemStats::getOperatingSystemName().containsIgnoreCase("windows"))){std::cerr<<"Requires Windows SWAM 3.9.4, found "<<description.version<<"\n";return 6;}
+    if(!description.name.startsWithIgnoreCase("SWAM")||description.manufacturerName!="Audio Modeling"||!description.isInstrument){std::cerr<<"Not a SWAM instrument\n";return 5;}
+    if(!test&&!SystemStats::getOperatingSystemName().containsIgnoreCase("windows")){std::cerr<<"Requires Windows; use explicit test-mode for development\n";return 6;}
     String error;auto plugin=formats.createPluginInstance(description,44100,256,error);
     if(!plugin){std::cerr<<error<<std::endl;return 7;}
     MessageManager::getInstance()->runDispatchLoopUntil(2000);
     plugin->fillInPluginDescription(description);
     auto* root=new DynamicObject();var result(root);
-    root->setProperty("schema","fengyin.swam-parameter-collection.v1");
-    root->setProperty("collectorVersion","1.0.0");root->setProperty("testOnly",test);
+    root->setProperty("schema","fengyin.swam-parameter-collection.v2");
+    root->setProperty("collectorVersion","2.0.0");root->setProperty("testOnly",test);
     root->setProperty("platform",SystemStats::getOperatingSystemName());root->setProperty("pluginName",description.name);
     root->setProperty("pluginVersion",description.version);root->setProperty("manufacturer",description.manufacturerName);
     root->setProperty("pluginDescriptionXml",description.createXml()->toString());
@@ -72,20 +72,42 @@ static int collect(const StringArray& args)
     root->setProperty("scope","Read-only parameter text queries in a separate fresh plugin instance; not a sound preset or a full state export.");
     Array<var> rows,missing,ambiguous;std::vector<float> before;for(auto* p:plugin->getParameters())before.push_back(p->getValue());
     const auto* targets=requested.getDynamicObject();
-    for(const auto& entry:targets->getProperties())
+    if(targets)for(const auto& entry:targets->getProperties())
     {
-        const String name=entry.name.toString();int index=-1,count=0;
-        for(int i=0;i<plugin->getParameters().size();++i)if(plugin->getParameters()[i]->getName(1024).trim()==name){index=i;++count;}
-        if(count==0){missing.add(name);continue;}if(count!=1){ambiguous.add(name);continue;}
+        int count=0;for(auto* p:plugin->getParameters())if(p->getName(1024).trim()==entry.name.toString())++count;
+        if(count==0)missing.add(entry.name.toString());if(count>1)ambiguous.add(entry.name.toString());
+    }
+    int unresolved=0,sampleCount=0;
+    for(int index=0;index<plugin->getParameters().size();++index)
+    {
         auto& p=*plugin->getParameters()[index];auto* row=new DynamicObject();
+        const auto name=p.getName(1024).trim();
         row->setProperty("nameEnglish",p.getName(1024));row->setProperty("id",stableId(p,index));row->setProperty("index",index);
         row->setProperty("currentNormalisedValue",p.getValue());row->setProperty("currentDisplayValue",p.getCurrentValueAsText());
         row->setProperty("minimumDisplay",p.getText(0,1024));row->setProperty("maximumDisplay",p.getText(1,1024));row->setProperty("unit",p.getLabel());
+        row->setProperty("defaultNormalisedValue",p.getDefaultValue());row->setProperty("defaultDisplayValue",p.getText(p.getDefaultValue(),1024));
+        row->setProperty("isDiscrete",p.isDiscrete());row->setProperty("numSteps",p.getNumSteps());
+        const bool midiProxy=name.startsWithIgnoreCase("MIDI CC");
+        int divisions=midiProxy?2:1024;
+        if(!midiProxy&&p.isDiscrete()&&p.getNumSteps()>1&&p.getNumSteps()<=1025)divisions=p.getNumSteps()-1;
+        Array<var> samples,options;StringArray optionNames;
+        for(int k=0;k<=divisions;++k)
+        {
+            const float n=float(k)/divisions;const auto text=p.getText(n,1024);auto* point=new DynamicObject();
+            point->setProperty("normalisedValue",n);point->setProperty("displayValue",text);samples.add(var(point));++sampleCount;
+            if(!midiProxy&&!number(text)&&text.trim().isNotEmpty()&&!optionNames.contains(text.trim()))
+            {optionNames.add(text.trim());auto* option=new DynamicObject();option->setProperty("name",text.trim());option->setProperty("sampleNormalisedValue",n);options.add(var(option));}
+        }
+        row->setProperty("samples",samples);row->setProperty("samplingDivisions",divisions);
+        row->setProperty("samplingScope",midiProxy?"MIDI proxy: endpoints and midpoint only; not a tone setting":"Observed getText samples; finite sampling does not prove arbitrary-value interpolation or exhaustive enum coverage");
+        if(!options.isEmpty())row->setProperty("observedTextOptions",options);
         Array<var> values;
-        if(auto* wanted=entry.value.getArray())for(const auto& v:*wanted)
+        const var requestValues=targets?targets->getProperty(Identifier(name)):var();
+        if(auto* wanted=requestValues.getArray())for(const auto& v:*wanted)
         {
             auto* match=new DynamicObject();match->setProperty("requestedDisplay",v);auto resolved=resolve(p,v.toString());match->setProperty("resolved",bool(resolved));
             if(resolved){match->setProperty("normalisedValue",resolved->value);match->setProperty("verifiedDisplay",p.getText(resolved->value,1024));match->setProperty("method",resolved->method);}
+            else ++unresolved;
             values.add(var(match));
         }
         row->setProperty("targets",values);
@@ -95,16 +117,20 @@ static int collect(const StringArray& args)
             for(int i=0;i<=8192;++i){const float n=i/8192.f;const auto text=p.getText(n,1024).trim();if(text.isNotEmpty()&&!names.contains(text)){names.add(text);auto* model=new DynamicObject();model->setProperty("name",text);model->setProperty("sampleNormalisedValue",n);models.add(var(model));}}
             row->setProperty("observedModels",models);
         }
-        rows.add(var(row));std::cout<<"Queried "<<name<<std::endl;
+        rows.add(var(row));if(!midiProxy)std::cout<<"Queried "<<name<<std::endl;
     }
     Array<var> drift;
     for(int i=0;i<plugin->getParameters().size();++i)if(plugin->getParameters()[i]->getValue()!=before[static_cast<size_t>(i)])drift.add(stableId(*plugin->getParameters()[i],i));
     root->setProperty("parameters",rows);root->setProperty("missingParameters",missing);root->setProperty("ambiguousParameters",ambiguous);root->setProperty("changedParametersDuringQueries",drift);
     root->setProperty("parameterValuesUnchanged",drift.isEmpty());
+    root->setProperty("publicParameterCount",plugin->getParameters().size());root->setProperty("collectedParameterCount",rows.size());
+    root->setProperty("sampleCount",sampleCount);root->setProperty("unresolvedRequestedValues",unresolved);
+    root->setProperty("hiddenPluginSettingsIncluded",false);
+    root->setProperty("versionPolicy","Actual installed version, never relabelled or assumed compatible with other versions");
     const auto parent=outputFile.getParentDirectory();if(!parent.isDirectory()&&!parent.createDirectory())return 8;
     if(!outputFile.replaceWithText(JSON::toString(result)))return 9;
     std::cout<<"SAVED "<<outputFile.getFullPathName()<<std::endl;
-    return drift.isEmpty()&&missing.isEmpty()&&ambiguous.isEmpty()?0:10;
+    return drift.isEmpty()?0:10;
 }
 #if JUCE_WINDOWS
 int wmain(int argc,wchar_t** argv)
