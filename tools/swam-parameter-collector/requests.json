@@ -1,0 +1,256 @@
+{
+  "schema": "fengyin.swam-collection-requests.v1",
+  "SWAM Alto Sax 3": {
+    "Instrument": [
+      "SAX 0 FLAT",
+      "SAX 2 DRY",
+      "SAX 2 BRIGHT"
+    ],
+    "Harmonic Structure": [
+      "0.12",
+      "0.00",
+      "0.08"
+    ],
+    "Sub. Harm": [
+      "12",
+      "8",
+      "10"
+    ],
+    "Formant": [
+      "1.5",
+      "-0.8",
+      "0.5"
+    ],
+    "Modal Res. Gain": [
+      "58",
+      "50",
+      "44"
+    ],
+    "Breath Noise": [
+      "32",
+      "40",
+      "46"
+    ],
+    "Key Noise": [
+      "8",
+      "10",
+      "12"
+    ],
+    "Timbral Correction": [
+      "ON"
+    ],
+    "Harm. A": [
+      "2",
+      "3",
+      "4"
+    ],
+    "Harmonic A Gain": [
+      "5.0",
+      "0.0",
+      "4.0"
+    ],
+    "Harm. B": [
+      "5",
+      "6"
+    ],
+    "Harmonic B Gain": [
+      "4.0",
+      "-3.0",
+      "3.0"
+    ],
+    "Dynamic Harmonic": [
+      "0.40",
+      "0.45",
+      "0.70"
+    ],
+    "Random Dynamic": [
+      "3",
+      "4"
+    ],
+    "Dynamic Pitch": [
+      "12",
+      "16",
+      "20"
+    ],
+    "Breathy ppp": [
+      "OFF"
+    ],
+    "Attack Start": [
+      "0"
+    ],
+    "Attack To Sustain": [
+      "1.00"
+    ],
+    "Auto Expression": [
+      "0.50"
+    ],
+    "Release Time": [
+      "10"
+    ],
+    "Growl": [
+      "0"
+    ],
+    "Flutter": [
+      "0"
+    ],
+    "Vibrato Depth": [
+      "0"
+    ],
+    "EQ Enabled": [
+      "OFF"
+    ],
+    "Compressor": [
+      "1"
+    ],
+    "Legacy Reverb": [
+      "ON"
+    ],
+    "Reverb Mix": [
+      "OFF"
+    ],
+    "Main Volume": [
+      "-9.0"
+    ],
+    "Pitch Bend Up": [
+      "2"
+    ],
+    "Pitch Bend Down": [
+      "2"
+    ],
+    "Attack Control": [
+      "Vel. Hard"
+    ],
+    "Legato Mode": [
+      "Expr"
+    ],
+    "Portamento Control": [
+      "CC"
+    ],
+    "Portamento Time": [
+      "0.000"
+    ],
+    "Portamento Max Time": [
+      "OFF"
+    ],
+    "Transpose": [
+      "0",
+      "-12"
+    ]
+  },
+  "SWAM Tenor Sax 3": {
+    "Instrument": [
+      "SAX 3 SMOOTH",
+      "SAX 3 WARM"
+    ],
+    "Harmonic Structure": [
+      "0.00"
+    ],
+    "Sub. Harm": [
+      "8"
+    ],
+    "Formant": [
+      "0.0",
+      "-1.8"
+    ],
+    "Modal Res. Gain": [
+      "50"
+    ],
+    "Breath Noise": [
+      "18",
+      "38"
+    ],
+    "Key Noise": [
+      "4"
+    ],
+    "Timbral Correction": [
+      "ON"
+    ],
+    "Harm. A": [
+      "3"
+    ],
+    "Harmonic A Gain": [
+      "0.5",
+      "-3.0"
+    ],
+    "Harm. B": [
+      "5"
+    ],
+    "Harmonic B Gain": [
+      "-1.0",
+      "-6.0"
+    ],
+    "Dynamic Harmonic": [
+      "0.45",
+      "0.40"
+    ],
+    "Random Dynamic": [
+      "3"
+    ],
+    "Dynamic Pitch": [
+      "0"
+    ],
+    "Breathy ppp": [
+      "OFF"
+    ],
+    "Attack Start": [
+      "0"
+    ],
+    "Attack To Sustain": [
+      "1.00"
+    ],
+    "Auto Expression": [
+      "0.50"
+    ],
+    "Release Time": [
+      "10"
+    ],
+    "Growl": [
+      "0"
+    ],
+    "Flutter": [
+      "0"
+    ],
+    "Vibrato Depth": [
+      "0"
+    ],
+    "EQ Enabled": [
+      "OFF"
+    ],
+    "Compressor": [
+      "1"
+    ],
+    "Legacy Reverb": [
+      "ON"
+    ],
+    "Reverb Mix": [
+      "OFF"
+    ],
+    "Main Volume": [
+      "-12.0"
+    ],
+    "Pitch Bend Up": [
+      "2"
+    ],
+    "Pitch Bend Down": [
+      "2"
+    ],
+    "Attack Control": [
+      "Vel. Soft"
+    ],
+    "Legato Mode": [
+      "Expr"
+    ],
+    "Portamento Control": [
+      "CC"
+    ],
+    "Portamento Time": [
+      "0.000"
+    ],
+    "Portamento Max Time": [
+      "OFF"
+    ],
+    "Transpose": [
+      "0"
+    ]
+  }
+}

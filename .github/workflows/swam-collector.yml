@@ -1,0 +1,34 @@
+name: SWAM Parameter Collector
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/swam-parameter-collector]
+    paths: ['tools/swam-parameter-collector/**', '.github/workflows/swam-collector.yml']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure standalone collector
+        run: cmake -S tools/swam-parameter-collector -B collector-build -A x64
+      - name: Build collector only
+        run: cmake --build collector-build --config Release --target SwamParameterCollector --parallel 2
+      - name: Prepare portable package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path collector-package
+          Copy-Item collector-build/Release/SwamParameterCollector.exe collector-package/
+          Copy-Item tools/swam-parameter-collector/requests.json collector-package/
+          Copy-Item tools/swam-parameter-collector/Collect.ps1 collector-package/
+          Copy-Item tools/swam-parameter-collector/Start.cmd collector-package/
+          Copy-Item tools/swam-parameter-collector/使用说明.md collector-package/
+          Get-FileHash collector-package/SwamParameterCollector.exe -Algorithm SHA256 | Format-List | Out-File collector-package/SHA256.txt
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path collector-package/Collect.ps1), [ref]$null, [ref]$null) | Out-Null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SWAM-Parameter-Collector-Windows-x64
+          path: collector-package/
+          retention-days: 14
