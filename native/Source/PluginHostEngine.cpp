@@ -5,6 +5,7 @@
 #include "KongProjectFile.h"
 #include "BendRangeParameters.h"
 #include "PerformanceReset.h"
+#include "ToneRestorePlan.h"
 
 #include <algorithm>
 #include <cmath>
@@ -348,6 +349,7 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
             resolveTechniqueParameters();
             resolveInstrumentModelParameter();
             releaseBaseline = captureToneParameters();
+            previousReleaseParameters.clear();
             if (! rebuildConnections())
             {
                 unload();
@@ -481,9 +483,14 @@ int PluginHostEngine::restoreToneParameters(const juce::Array<ToneParameterValue
         for (const auto& value : stored)
             if (value.identifier == identifier)
             {
-                parameter->beginChangeGesture();
-                parameter->setValueNotifyingHost(juce::jlimit(0.0f, 1.0f, value.value));
-                parameter->endChangeGesture();
+                if (toneValueNeedsWrite(parameter->getValue(), value.value))
+                {
+                    juce::Logger::writeToLog("Tone write begin: " + identifier + "=" + juce::String(value.value, 7));
+                    parameter->beginChangeGesture();
+                    parameter->setValueNotifyingHost(value.value);
+                    parameter->endChangeGesture();
+                    juce::Logger::writeToLog("Tone write returned: " + identifier);
+                }
                 ++restored;
                 break;
             }
@@ -1018,6 +1025,11 @@ bool PluginHostEngine::selectInstrumentModel(int index)
         || instrumentModelValues.size() != static_cast<size_t>(instrumentModelNames.size()))
         return false;
     const auto value = instrumentModelValues[static_cast<size_t>(index)];
+    if (getCurrentInstrumentModelIndex() == index)
+    {
+        juce::Logger::writeToLog("Instrument model unchanged; no write");
+        return true;
+    }
     instrumentModelParameter->beginChangeGesture();
     instrumentModelParameter->setValueNotifyingHost(value);
     instrumentModelParameter->endChangeGesture();
@@ -1039,26 +1051,13 @@ int PluginHostEngine::applySwamToneProfile(const SwamToneProfile& profile, bool 
         audit->setProperty("verifiedAtApply", 0);
         audit->setProperty("modelApplied", false);
         if (currentDescription.version != "3.9.4") return 0;
-        // Reset sound-only values before applying a sparse preset, preventing
-        // the previous style's EQ/reverb/timbre from leaking into this one.
-        juce::Array<ToneParameterValue> baseline;
-        for (const auto& v : releaseBaseline)
-        {
-            const auto name = v.identifier.fromFirstOccurrenceOf(":", false, false)
-                .fromFirstOccurrenceOf(":", false, false);
-            const auto index = v.identifier.fromFirstOccurrenceOf(":", false, false).getIntValue();
-            if (index > 116 || isMidiRoutingParameter(name) || name.contains("pitchbend")
-                || name.contains("transpose") || name.contains("microtuning") || name.contains("breathctrl")
-                || name.startsWith("sliderdebug") || name == "expression" || name == "velocity"
-                || name == "panic" || name == "bypass" || name == "program" || name == "sustain"
-                || name == "mastertune" || name == "root" || name == "temperament"
-                || name == "cavitscaleultimate" || name == "maqam") continue;
-            baseline.add(v);
-        }
-        restoreToneParameters(baseline);
+        const auto retired = retiredToneParameters(previousReleaseParameters,
+            profile.releaseParameters, releaseBaseline);
         const auto model = instrumentModelNames.indexOf(profile.releaseModel);
         const auto modelApplied = !restoreModel || (model >= 0 && selectInstrumentModel(model));
+        if (!retired.isEmpty()) restoreToneParameters(retired);
         const auto restored = restoreToneParameters(profile.releaseParameters);
+        previousReleaseParameters = profile.releaseParameters;
         int verified = 0;
         const auto actual = captureToneParameters();
         for (const auto& expected : profile.releaseParameters)
