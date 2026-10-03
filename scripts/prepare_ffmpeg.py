@@ -1,6 +1,7 @@
 """Resolve a retained FFmpeg LGPL release before the expensive Windows build."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import tempfile
@@ -10,6 +11,18 @@ import zipfile
 
 API = "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/tags/latest"
 ASSET = "ffmpeg-n8.1-latest-win64-lgpl-shared-8.1.zip"
+
+
+def github_api_headers():
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "FengYin-build",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
 
 
 def select_asset(release):
@@ -38,7 +51,7 @@ def prepare(destination):
     # a mismatch, never an unchecked build: fail early and retry with fresh metadata.
     for attempt in range(3):
         try:
-            request = urllib.request.Request(API, headers={"User-Agent": "FengYin-build"})
+            request = urllib.request.Request(API, headers=github_api_headers())
             with urllib.request.urlopen(request, timeout=60) as response:
                 release = json.load(response)
             url, expected = select_asset(release)
