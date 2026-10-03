@@ -19,3 +19,16 @@
 ## 用户自行安装的插件
 
 SWAM 和其他 VST3 音源、效果器不随风吟提供。用户必须自行获得相应插件授权。
+
+## VoiceMeeter Banana（1.0.3 桥接测试功能）
+
+- 用途：把风吟的虚拟 ASIO 输出与 Windows 共享声音混合后送往同一硬件设备。
+- 风吟安装包不包含 VoiceMeeter 程序本体；用户确认后由测试功能从官方地址下载原版安装程序。
+- 官方网站与使用条款：https://vb-audio.com/Voicemeeter/banana.htm
+- VoiceMeeter 是 donationware；商业使用和正式集成发行前必须另行确认并取得适当许可。
+
+## ASIO4ALL（1.0.3 桥接测试功能）
+
+- 用途：由 VoiceMeeter 打开板载声卡的 WDM/KS 路径，测试 128 samples 低延迟输出。
+- 风吟安装包不包含 ASIO4ALL 程序本体；用户确认后由测试功能从官方地址下载原版安装程序。
+- 官方网站与使用条款：https://asio4all.org/about/

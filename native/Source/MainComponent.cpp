@@ -1137,8 +1137,8 @@ void MainComponent::timerCallback()
     if (superLowLatencyRunning && ++superLowLatencyPollTicks >= 30)
     {
         superLowLatencyPollTicks = 0;
-        const auto systemStatus = windowsLowLatencyOptimizer.getStatus();
-        if (systemStatus.state != "idle")
+        const auto systemStatus = windowsAudioBridge.getStatus();
+        if (! systemStatus.running)
         {
             superLowLatencyRunning = false;
             if (isActivated)
@@ -1606,15 +1606,15 @@ void MainComponent::timerCallback()
 void MainComponent::emitSuperLowLatencyState(const juce::String& overrideMessage)
 {
     if (webInterface == nullptr) return;
-    auto status = windowsLowLatencyOptimizer.getStatus();
+    auto status = windowsAudioBridge.getStatus();
     status.running = superLowLatencyRunning;
     auto result = std::make_unique<juce::DynamicObject>();
     result->setProperty("supported", status.supported);
-    result->setProperty("eligibleDeviceFound", status.eligibleDeviceFound);
+    result->setProperty("installed", status.installed);
+    result->setProperty("active", status.active);
     result->setProperty("running", status.running);
     result->setProperty("canRestore", status.canRestore);
     result->setProperty("restartRequired", status.restartRequired);
-    result->setProperty("deviceName", status.deviceName);
     result->setProperty("state", status.running ? "running" : status.state);
     result->setProperty("message", overrideMessage.isNotEmpty() ? overrideMessage : status.message);
     webInterface->emitEventIfBrowserIsVisible("superLowLatencyState", juce::var(result.release()));
@@ -1623,7 +1623,7 @@ void MainComponent::emitSuperLowLatencyState(const juce::String& overrideMessage
 void MainComponent::startSuperLowLatencyOptimisation(bool restore)
 {
     if (superLowLatencyRunning) return;
-    const auto status = windowsLowLatencyOptimizer.getStatus();
+    const auto status = windowsAudioBridge.getStatus();
     if (! status.supported)
     {
         emitSuperLowLatencyState(status.message);
@@ -1634,13 +1634,13 @@ void MainComponent::startSuperLowLatencyOptimisation(bool restore)
         emitSuperLowLatencyState(utf8("没有找到可恢复的原驱动备份。"));
         return;
     }
-    if (! restore && ! status.eligibleDeviceFound)
+    if (! restore && status.restartRequired)
     {
-        emitSuperLowLatencyState(utf8("未找到适用的 Realtek / Senary / C-Media 板载声卡，未修改系统。"));
+        emitSuperLowLatencyState(utf8("桥接组件已安装。请先重启电脑，再回到这里点击“启用桥接”。"));
         return;
     }
-    // The user has confirmed the system-driver operation. Quiesce our own
-    // playback instead of treating the last MIDI note as an active performer.
+    // Bridge changes require a short audio restart. Stop FengYin's own streams
+    // first; this does not replace or uninstall the OEM audio driver.
     if (recorder.isRecording()) toggleRecording();
     accompaniment.pause();
     videoPlaybackActive = false;
@@ -1648,20 +1648,47 @@ void MainComponent::startSuperLowLatencyOptimisation(bool restore)
     pluginHost.setLatencyProbeActive(false);
     pluginHost.resetPerformance();
     testSynth.resetPerformance();
+    midi.setPerformanceSink(nullptr);
     if (webInterface != nullptr)
         webInterface->emitEventIfBrowserIsVisible("pauseForDriverChange", juce::var());
-    const auto launched = restore ? windowsLowLatencyOptimizer.launchRestore()
-                                  : windowsLowLatencyOptimizer.launchOptimisation();
-    if (! launched)
+    if (! restore && ! status.installed)
     {
-        emitSuperLowLatencyState(utf8("未获得管理员权限，系统设置没有更改。"));
+        if (! windowsAudioBridge.launchInstaller())
+        {
+            emitSuperLowLatencyState(utf8("无法启动桥接组件安装程序，请确认安装包完整并允许管理员权限。"));
+            return;
+        }
+        superLowLatencyRunning = true;
+        superLowLatencyPollTicks = 0;
+        emitSuperLowLatencyState(utf8("正在下载安装官方桥接组件，请按安装向导完成；完成后需重启电脑。"));
         return;
     }
-    superLowLatencyRunning = true;
-    midi.setPerformanceSink(nullptr);
-    superLowLatencyPollTicks = 0;
-    emitSuperLowLatencyState(restore ? utf8("正在恢复原声卡驱动…")
-                                     : utf8("正在备份原驱动并切换微软低延迟驱动…"));
+
+    juce::String error;
+    if (restore)
+    {
+        error = windowsAudioBridge.restoreWindowsAudio();
+        const auto types = audio.getAvailableDeviceTypes();
+        for (const auto& type : types)
+            if (! type.equalsIgnoreCase("ASIO")) { (void) audio.selectDeviceType(type); break; }
+    }
+    else
+    {
+        error = windowsAudioBridge.configureVoiceMeeter();
+        if (error.isEmpty()) error = windowsAudioBridge.routeWindowsAudioToVoiceMeeter();
+        if (error.isEmpty()) error = audio.selectDeviceType("ASIO");
+        if (error.isNotEmpty()) (void) windowsAudioBridge.restoreWindowsAudio();
+    }
+
+    if (isActivated)
+    {
+        if (pluginHost.hasPlugin()) midi.setPerformanceSink(&pluginHost);
+        else midi.setPerformanceSink(&testSynth);
+    }
+    emitAudioSettingsState(error.isEmpty(), error.isEmpty()
+        ? (restore ? utf8("已退出桥接并恢复系统输出") : utf8("桥接已启用，请播放伴奏并吹奏验证延迟与稳定性"))
+        : error);
+    emitSuperLowLatencyState(error);
 }
 
 void MainComponent::followSystemAudioOutputIfNeeded()
@@ -3378,6 +3405,8 @@ void MainComponent::emitAudioSettingsState(bool success, const juce::String& mes
     result->setProperty("callbackOverruns", static_cast<juce::int64>(pluginHost.getCallbackOverruns()));
     result->setProperty("lowLatencyMode", status.deviceType.containsIgnoreCase("Low Latency Mode")
                                               || status.deviceType.containsIgnoreCase("RAW Test Mode")
+                                              || (status.deviceType.equalsIgnoreCase("ASIO")
+                                                  && status.deviceName.containsIgnoreCase("Voicemeeter"))
                                               || status.deviceType.containsIgnoreCase(utf8("低延迟")));
 
     juce::Array<juce::var> types;

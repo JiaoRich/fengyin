@@ -1708,12 +1708,12 @@ $('#confirm-super-latency').addEventListener('click', () => {
   if (!$('#super-latency-ack').checked) return;
   superLatencyDialog.hidden = true;
   $('#super-latency-optimize').disabled = true;
-  $('#super-latency-status').textContent = '正在请求管理员权限…';
-  if (!window.__JUCE__?.backend?.emitEvent) return toast('Windows 安装版才能修改系统驱动');
+  $('#super-latency-status').textContent = '正在准备桥接组件…';
+  if (!window.__JUCE__?.backend?.emitEvent) return toast('Windows 安装版才能启用音频桥接');
   nativeEvent('startSuperLowLatencyOptimisation');
 });
 $('#restore-audio-driver').addEventListener('click', () => {
-  if (!window.confirm('恢复原声卡驱动后需重启电脑，确定继续？')) return;
+  if (!window.confirm('退出桥接并恢复原来的系统输出设备，确定继续？')) return;
   $('#restore-audio-driver').disabled = true;
   nativeEvent('restoreOriginalAudioDriver');
 });
@@ -1721,11 +1721,12 @@ $('#restore-audio-driver').addEventListener('click', () => {
 function renderSuperLowLatencyState(state = {}) {
   const running = state.running === true || state.state === 'running';
   const button = $('#super-latency-optimize');
-  button.disabled = running || state.supported === false || (state.eligibleDeviceFound === false && !state.canRestore);
-  button.textContent = running ? '正在优化…' : state.restartRequired ? '重启后生效' : '开始优化';
+  document.querySelector('.super-latency-card').hidden = state.supported === false;
+  button.disabled = running || state.supported === false || state.active === true;
+  button.textContent = running ? '正在处理…' : state.active ? '桥接已启用' : state.restartRequired ? '请重启电脑' : state.installed ? '启用桥接' : '安装并启用';
   $('#restore-audio-driver').hidden = state.canRestore !== true;
   $('#restore-audio-driver').disabled = running;
-  const message = state.message || (state.supported === false ? '仅支持 Windows 板载声卡' : '正在检查系统声卡…');
+  const message = state.message || (state.supported === false ? '仅支持 Windows' : '正在检查桥接组件…');
   $('#super-latency-status').textContent = message;
   $('#super-latency-status').classList.toggle('audio-error', state.state === 'error');
 }
@@ -2051,6 +2052,7 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   setAudioControlsBusy(!!state?.autoTuning);
   setAudioOptions($('#audio-driver-select'), state?.types, state?.type, value => {
     const name = String(value);
+    if (/^ASIO$/i.test(name)) return 'VoiceMeeter 桥接 ASIO（测试）';
     if (/RAW Test Mode/i.test(name)) return 'RAW测试模式（共享）';
     if (/Low Latency|低延迟/i.test(name)) return `${name}（推荐·共享）`;
     return `${name}（共享）`;
@@ -2062,7 +2064,10 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   const buffers = Array.isArray(state?.bufferSizes) ? state.bufferSizes : [];
   const lowLatency = !!state?.lowLatencyMode;
   const rawTest = /RAW Test Mode/i.test(String(state?.type || ''));
-  $('#audio-driver-help').textContent = rawTest
+  const bridgeTest = /^ASIO$/i.test(String(state?.type || '')) && /Voicemeeter/i.test(String(state?.output || ''));
+  $('#audio-driver-help').textContent = bridgeTest
+    ? '风吟与 Windows 系统声音经 VoiceMeeter 混合后共同输出'
+    : rawTest
     ? '仅风吟绕过可选系统音效；不修改驱动、不独占设备，可随时切回'
     : lowLatency
     ? '已使用 Windows 共享低延迟，不影响其他软件发声'
@@ -2118,7 +2123,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.0.2 RAW测试版 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.0.3 桥接测试版 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

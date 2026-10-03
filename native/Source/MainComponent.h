@@ -17,7 +17,7 @@
 #include "ContainerPluginAdapter.h"
 #include "TechniqueAdvisor.h"
 #include "VideoAudioExtractor.h"
-#include "WindowsLowLatencyOptimizer.h"
+#include "WindowsAudioBridge.h"
 
 class MainComponent final : public juce::Component, private juce::Timer
 {
@@ -102,7 +102,7 @@ private:
 
     fengyin::MidiInputService midi;
     fengyin::AudioDeviceService audio;
-    fengyin::WindowsLowLatencyOptimizer windowsLowLatencyOptimizer;
+    fengyin::WindowsAudioBridge windowsAudioBridge;
     fengyin::AccompanimentAudioService accompaniment;
     fengyin::RecordingService recorder;
     fengyin::MasterOutputService masterOutput;

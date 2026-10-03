@@ -98,14 +98,16 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertIn("addEventListener('audioSettingsState'", JS)
         self.assertNotIn("document.querySelectorAll('#page-audio button')", JS)
 
-    def test_super_low_latency_driver_workflow_is_explicit_and_reversible(self):
+    def test_super_low_latency_bridge_workflow_is_explicit_and_reversible(self):
         for control_id in ("super-latency-optimize", "restore-audio-driver",
                            "super-latency-confirm-dialog", "super-latency-ack"):
             self.assertIn(f'id="{control_id}"', HTML)
         self.assertIn("startSuperLowLatencyOptimisation", JS)
         self.assertIn("restoreOriginalAudioDriver", JS)
-        self.assertIn("恢复原驱动", HTML)
-        self.assertIn("Dolby/Nahimic", HTML)
+        self.assertIn("退出桥接", HTML)
+        self.assertIn("不会替换 Realtek", HTML)
+        self.assertIn("VoiceMeeter Banana", HTML)
+        self.assertIn("ASIO4ALL", HTML)
 
     def test_instrument_artwork_covers_every_swam_family(self):
         for key in (

@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.0.2",
+    [string]$Version = "1.0.3",
     [switch]$SkipInstaller
 )
 
@@ -74,6 +74,9 @@ if (-not (Test-Path $BuiltExe)) { throw "未找到主程序编译结果：$Built
 Copy-Item $BuiltExe (Join-Path $PackageDir "FengYin.exe") -Force
 Copy-Item (Join-Path $ProjectRoot "README.md") $PackageDir -Force
 Copy-Item (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES.md") $PackageDir -Force
+New-Item -ItemType Directory -Force -Path (Join-Path $PackageDir "tools\audio-bridge") | Out-Null
+Copy-Item (Join-Path $ProjectRoot "scripts\install-audio-bridge.ps1") `
+    (Join-Path $PackageDir "tools\audio-bridge\install.ps1") -Force
 if (Test-Path $FfmpegPath) {
     Copy-Item $FfmpegPath (Join-Path $PackageDir "ffmpeg.exe") -Force
 } else {

@@ -20,6 +20,22 @@ bool isWindowsSharedType(const juce::String& typeName)
    #endif
 }
 
+bool isVoiceMeeterBridgeType(const juce::String& typeName)
+{
+   #if JUCE_WINDOWS
+    return typeName.equalsIgnoreCase("ASIO");
+   #else
+    juce::ignoreUnused(typeName);
+    return false;
+   #endif
+}
+
+bool isVoiceMeeterBridgeDevice(const juce::String& deviceName)
+{
+    return deviceName.containsIgnoreCase("Voicemeeter")
+        && deviceName.containsIgnoreCase("Virtual ASIO");
+}
+
 juce::Array<int> sortedLegalBuffers(juce::Array<int> sizes)
 {
     sizes.removeAllInstancesOf(0);
@@ -67,8 +83,13 @@ juce::String AudioDeviceService::initialise()
    #if JUCE_WINDOWS
     // 旧版可能保存了 ASIO/Exclusive。启动时不允许短暂打开这些独占路径，
     // 而是直接从 Windows 共享设备起步。
-    if (saved != nullptr && ! isWindowsSharedType(saved->getStringAttribute("deviceType")))
-        saved.reset();
+    if (saved != nullptr)
+    {
+        const auto type = saved->getStringAttribute("deviceType");
+        const auto output = saved->getStringAttribute("audioOutputDeviceName");
+        if (! isWindowsSharedType(type) && ! (isVoiceMeeterBridgeType(type) && isVoiceMeeterBridgeDevice(output)))
+            saved.reset();
+    }
    #endif
     lastError = manager.initialise(0, 2, saved.get(), true);
     return lastError;
@@ -97,7 +118,7 @@ juce::StringArray AudioDeviceService::getAvailableDeviceTypes()
 {
     juce::StringArray names;
     for (const auto* type : manager.getAvailableDeviceTypes())
-        if (isWindowsSharedType(type->getTypeName()))
+        if (isWindowsSharedType(type->getTypeName()) || isVoiceMeeterBridgeType(type->getTypeName()))
             names.add(type->getTypeName());
     return names;
 }
@@ -107,7 +128,11 @@ juce::StringArray AudioDeviceService::getAvailableOutputDevices(const juce::Stri
     if (auto* type = findType(typeName))
     {
         type->scanForDevices();
-        return type->getDeviceNames(false);
+        auto names = type->getDeviceNames(false);
+        if (isVoiceMeeterBridgeType(typeName))
+            for (int i = names.size() - 1; i >= 0; --i)
+                if (! isVoiceMeeterBridgeDevice(names[i])) names.remove(i);
+        return names;
     }
     return {};
 }
@@ -128,8 +153,31 @@ juce::Array<int> AudioDeviceService::getAvailableBufferSizes()
 
 juce::String AudioDeviceService::selectDeviceType(const juce::String& typeName)
 {
-    if (! isWindowsSharedType(typeName))
-        return juce::String::fromUTF8("风吟仅使用 Windows 共享输出，不会独占耳机或音响");
+    if (! isWindowsSharedType(typeName) && ! isVoiceMeeterBridgeType(typeName))
+        return juce::String::fromUTF8("风吟仅开放 Windows 共享输出和 VoiceMeeter 桥接 ASIO");
+    if (isVoiceMeeterBridgeType(typeName))
+    {
+        const auto outputs = getAvailableOutputDevices(typeName);
+        if (outputs.isEmpty())
+            return juce::String::fromUTF8("未找到 VoiceMeeter Virtual ASIO；风吟不会直接打开其他 ASIO 设备");
+        juce::XmlElement setup("DEVICESETUP");
+        setup.setAttribute("deviceType", typeName);
+        setup.setAttribute("audioOutputDeviceName", outputs[0]);
+        setup.setAttribute("audioInputDeviceName", "");
+        setup.setAttribute("audioDeviceRate", 48000.0);
+        setup.setAttribute("audioDeviceBufferSize", 128);
+        lastError = manager.initialise(0, 2, &setup, false);
+        if (lastError.isEmpty())
+        {
+            if (auto* settings = properties.getUserSettings())
+            {
+                settings->setValue("audioSetupMode", "manual");
+                settings->setValue("audioSetupRevision", currentAudioSetupRevision);
+            }
+            saveSettings();
+        }
+        return lastError;
+    }
     manager.setCurrentAudioDeviceType(typeName, true);
     lastError = manager.getCurrentAudioDeviceType() == typeName
         ? juce::String()
