@@ -3377,6 +3377,7 @@ void MainComponent::emitAudioSettingsState(bool success, const juce::String& mes
     result->setProperty("tuningProgress", audio.getTuningProgress());
     result->setProperty("callbackOverruns", static_cast<juce::int64>(pluginHost.getCallbackOverruns()));
     result->setProperty("lowLatencyMode", status.deviceType.containsIgnoreCase("Low Latency Mode")
+                                              || status.deviceType.containsIgnoreCase("RAW Test Mode")
                                               || status.deviceType.containsIgnoreCase(utf8("低延迟")));
 
     juce::Array<juce::var> types;
