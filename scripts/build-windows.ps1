@@ -12,6 +12,7 @@ $FfmpegPath = Join-Path $ProjectRoot "third_party\ffmpeg\windows\ffmpeg.exe"
 $FfmpegPackageDir = Join-Path $PackageDir "tools\ffmpeg"
 $NugetPackageDir = Join-Path $ProjectRoot "third_party\nuget-packages"
 $WebViewBootstrapperPath = Join-Path $PackageDir "MicrosoftEdgeWebview2Setup.exe"
+$PreparedFfmpeg = Join-Path $env:TEMP ("fengyin-ffmpeg-" + [guid]::NewGuid().ToString("N"))
 
 function Invoke-Checked([string]$StepName, [scriptblock]$Command) {
     & $Command
@@ -26,6 +27,15 @@ if (-not $IsWindows -and $PSVersionTable.PSEdition -eq "Core") {
 
 if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
     throw "没有找到 CMake。请先安装 Visual Studio 2022，并勾选‘使用 C++ 的桌面开发’和 CMake 工具。"
+}
+
+if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+    throw "没有找到 Python，无法准备发布依赖。"
+}
+if (-not (Test-Path $FfmpegPath)) {
+    Write-Host "预检并校验 FFmpeg 发布依赖..." -ForegroundColor Cyan
+    Invoke-Checked "FFmpeg 下载与校验" { python (Join-Path $PSScriptRoot "prepare_ffmpeg.py") $PreparedFfmpeg }
+    Invoke-Checked "FFmpeg 可执行性检查" { & (Join-Path $PreparedFfmpeg "ffmpeg.exe") -version }
 }
 
 Write-Host "[1/5] 配置 Windows x64 Release 工程..." -ForegroundColor Cyan
@@ -68,28 +78,8 @@ if (Test-Path $FfmpegPath) {
     Copy-Item $FfmpegPath (Join-Path $PackageDir "ffmpeg.exe") -Force
 } else {
     Write-Host "正在准备视频伴奏混录组件（FFmpeg LGPL）..." -ForegroundColor Cyan
-    $FfmpegRelease = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-15-13-18"
-    $FfmpegArchiveName = "ffmpeg-n8.1.2-53-g1005b294ff-win64-lgpl-shared-8.1.zip"
-    $FfmpegArchive = Join-Path $env:TEMP $FfmpegArchiveName
-    $FfmpegChecksums = Join-Path $env:TEMP "fengyin-ffmpeg-checksums.sha256"
-    $FfmpegExtract = Join-Path $env:TEMP "fengyin-ffmpeg-lgpl-8.1"
-    Invoke-WebRequest -UseBasicParsing -Uri "$FfmpegRelease/$FfmpegArchiveName" -OutFile $FfmpegArchive
-    Invoke-WebRequest -UseBasicParsing -Uri "$FfmpegRelease/checksums.sha256" -OutFile $FfmpegChecksums
-    $ExpectedLine = Select-String -Path $FfmpegChecksums -Pattern ([regex]::Escape($FfmpegArchiveName)) | Select-Object -First 1
-    if (-not $ExpectedLine) { throw "无法核对 FFmpeg 下载文件。" }
-    $ExpectedHash = ($ExpectedLine.Line -split '\s+')[0].ToUpperInvariant()
-    $ActualHash = (Get-FileHash -Algorithm SHA256 $FfmpegArchive).Hash.ToUpperInvariant()
-    if ($ActualHash -ne $ExpectedHash) { throw "FFmpeg 下载校验失败。" }
-    if (Test-Path $FfmpegExtract) { Remove-Item -Path $FfmpegExtract -Recurse -Force }
-    Expand-Archive -Path $FfmpegArchive -DestinationPath $FfmpegExtract -Force
-    $FfmpegBin = Get-ChildItem $FfmpegExtract -Directory | Select-Object -First 1 | ForEach-Object { Join-Path $_.FullName "bin" }
-    if (-not $FfmpegBin -or -not (Test-Path (Join-Path $FfmpegBin "ffmpeg.exe"))) {
-        throw "FFmpeg 压缩包结构不正确。"
-    }
     New-Item -ItemType Directory -Force -Path $FfmpegPackageDir | Out-Null
-    Copy-Item (Join-Path $FfmpegBin "*") $FfmpegPackageDir -Force
-    $FfmpegRoot = Split-Path $FfmpegBin -Parent
-    Get-ChildItem $FfmpegRoot -File | Where-Object { $_.Name -match 'LICENSE|COPYING|README' } | Copy-Item -Destination $FfmpegPackageDir -Force
+    Copy-Item (Join-Path $PreparedFfmpeg "*") $FfmpegPackageDir -Force
 }
 
 Write-Host "正在准备 Microsoft Edge WebView2 运行环境安装程序..." -ForegroundColor Cyan
