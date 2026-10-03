@@ -2051,6 +2051,7 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   setAudioControlsBusy(!!state?.autoTuning);
   setAudioOptions($('#audio-driver-select'), state?.types, state?.type, value => {
     const name = String(value);
+    if (/RAW Test Mode/i.test(name)) return 'RAW测试模式（共享）';
     if (/Low Latency|低延迟/i.test(name)) return `${name}（推荐·共享）`;
     return `${name}（共享）`;
   });
@@ -2060,7 +2061,10 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   const rates = Array.isArray(state?.sampleRates) ? state.sampleRates : [];
   const buffers = Array.isArray(state?.bufferSizes) ? state.bufferSizes : [];
   const lowLatency = !!state?.lowLatencyMode;
-  $('#audio-driver-help').textContent = lowLatency
+  const rawTest = /RAW Test Mode/i.test(String(state?.type || ''));
+  $('#audio-driver-help').textContent = rawTest
+    ? '仅风吟绕过可选系统音效；不修改驱动、不独占设备，可随时切回'
+    : lowLatency
     ? '已使用 Windows 共享低延迟，不影响其他软件发声'
     : '当前为 Windows 共享兼容模式；可点击“自动优化”降低延迟';
   $('#audio-rate-help').textContent = rates.length <= 1
@@ -2114,7 +2118,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.0.1 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.0.2 RAW测试版 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

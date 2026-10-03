@@ -13,6 +13,7 @@ bool isWindowsSharedType(const juce::String& typeName)
    #if JUCE_WINDOWS
     return typeName == "Windows Audio"
         || typeName.containsIgnoreCase("Low Latency Mode")
+        || typeName.containsIgnoreCase("RAW Test Mode")
         || typeName.containsIgnoreCase(juce::String::fromUTF8("低延迟"));
    #else
     return ! typeName.containsIgnoreCase("Exclusive") && ! typeName.containsIgnoreCase("ASIO");
