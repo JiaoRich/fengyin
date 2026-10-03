@@ -4,6 +4,7 @@
 #if JUCE_WINDOWS
  #include <windows.h>
  #include <shellapi.h>
+ #include <mmreg.h>
  #include <mmdeviceapi.h>
  #include <functiondiscoverykeys_devpkey.h>
  #include <propvarutil.h>
