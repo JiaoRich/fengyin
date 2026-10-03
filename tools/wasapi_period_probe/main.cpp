@@ -116,7 +116,10 @@ void inspectMode(IMMDevice* device, bool raw, std::wostringstream& out)
     AudioClientProperties properties{};
     properties.cbSize = sizeof(properties);
     properties.bIsOffload = FALSE;
-    properties.eCategory = AudioCategory_ProAudio;
+    // Media is available across all Windows 10/11 SDK versions. The requested
+    // IAudioClient3 engine period, rather than the category name, controls the
+    // shared-mode buffer duration measured by this probe.
+    properties.eCategory = AudioCategory_Media;
     properties.Options = raw ? AUDCLNT_STREAMOPTIONS_RAW : AUDCLNT_STREAMOPTIONS_NONE;
     hr = client->SetClientProperties(&properties);
     if (FAILED(hr))
