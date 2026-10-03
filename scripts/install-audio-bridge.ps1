@@ -6,6 +6,8 @@ $work = Join-Path $env:TEMP "FengYin-AudioBridge"
 $vmZip = Join-Path $work "VoicemeeterSetup_v2130.zip"
 $vmDir = Join-Path $work "Voicemeeter"
 $asioExe = Join-Path $work "ASIO4ALL_2_15_SCN.exe"
+$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$bundledDir = Join-Path $scriptRoot "packages"
 
 function Set-Result([string]$state, [string]$message) {
     if ($ResultFile) {
@@ -27,10 +29,24 @@ function Download-Verified([string]$uri, [string]$path, [string]$sha256) {
 try {
     New-Item -ItemType Directory -Force -Path $work | Out-Null
     Set-Result "running" "正在下载官方桥接组件…"
-    Download-Verified "https://download.vb-audio.com/Download_CABLE/VoicemeeterSetup_v2130.zip" `
-        $vmZip "ee8b1f6cd4728233c8ae52897128c9af02367c091b88f55a1996d424e04d3965"
-    Download-Verified "https://asio4all.org/downloads/ASIO4ALL_2_15_SCN.exe" `
-        $asioExe "7921f771d69ec687dce2718edcaeead4b5ea089deb25dc437065f0554da0868e"
+    $bundledVm = Join-Path $bundledDir "VoicemeeterSetup_v2130.zip"
+    $bundledAsio = Join-Path $bundledDir "ASIO4ALL_2_15_SCN.exe"
+    if (Test-Path $bundledVm) { Copy-Item $bundledVm $vmZip -Force }
+    else {
+        Download-Verified "https://download.vb-audio.com/Download_CABLE/VoicemeeterSetup_v2130.zip" `
+            $vmZip "ee8b1f6cd4728233c8ae52897128c9af02367c091b88f55a1996d424e04d3965"
+    }
+    if (Test-Path $bundledAsio) { Copy-Item $bundledAsio $asioExe -Force }
+    else {
+        Download-Verified "https://asio4all.org/downloads/ASIO4ALL_2_15_SCN.exe" `
+            $asioExe "7921f771d69ec687dce2718edcaeead4b5ea089deb25dc437065f0554da0868e"
+    }
+    if ((Get-FileHash -Algorithm SHA256 $vmZip).Hash.ToLowerInvariant() -ne "ee8b1f6cd4728233c8ae52897128c9af02367c091b88f55a1996d424e04d3965") {
+        throw "VoiceMeeter 安装文件校验失败"
+    }
+    if ((Get-FileHash -Algorithm SHA256 $asioExe).Hash.ToLowerInvariant() -ne "7921f771d69ec687dce2718edcaeead4b5ea089deb25dc437065f0554da0868e") {
+        throw "ASIO4ALL 安装文件校验失败"
+    }
 
     if (Test-Path $vmDir) { Remove-Item $vmDir -Recurse -Force }
     Expand-Archive -Path $vmZip -DestinationPath $vmDir -Force

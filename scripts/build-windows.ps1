@@ -12,6 +12,7 @@ $FfmpegPath = Join-Path $ProjectRoot "third_party\ffmpeg\windows\ffmpeg.exe"
 $FfmpegPackageDir = Join-Path $PackageDir "tools\ffmpeg"
 $NugetPackageDir = Join-Path $ProjectRoot "third_party\nuget-packages"
 $WebViewBootstrapperPath = Join-Path $PackageDir "MicrosoftEdgeWebview2Setup.exe"
+$AudioBridgePackageDir = Join-Path $PackageDir "tools\audio-bridge\packages"
 $PreparedFfmpeg = Join-Path $env:TEMP ("fengyin-ffmpeg-" + [guid]::NewGuid().ToString("N"))
 
 function Invoke-Checked([string]$StepName, [scriptblock]$Command) {
@@ -77,6 +78,24 @@ Copy-Item (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES.md") $PackageDir -Force
 New-Item -ItemType Directory -Force -Path (Join-Path $PackageDir "tools\audio-bridge") | Out-Null
 Copy-Item (Join-Path $ProjectRoot "scripts\install-audio-bridge.ps1") `
     (Join-Path $PackageDir "tools\audio-bridge\install.ps1") -Force
+New-Item -ItemType Directory -Force -Path $AudioBridgePackageDir | Out-Null
+$VoiceMeeterPackage = Join-Path $AudioBridgePackageDir "VoicemeeterSetup_v2130.zip"
+$Asio4AllPackage = Join-Path $AudioBridgePackageDir "ASIO4ALL_2_15_SCN.exe"
+Write-Host "正在准备 1.0.3 测试版音频桥接组件..." -ForegroundColor Cyan
+Invoke-WebRequest -UseBasicParsing `
+    -Uri "https://download.vb-audio.com/Download_CABLE/VoicemeeterSetup_v2130.zip" `
+    -OutFile $VoiceMeeterPackage
+Invoke-WebRequest -UseBasicParsing `
+    -Uri "https://asio4all.org/downloads/ASIO4ALL_2_15_SCN.exe" `
+    -OutFile $Asio4AllPackage
+if ((Get-FileHash -Algorithm SHA256 $VoiceMeeterPackage).Hash.ToLowerInvariant() -ne `
+    "ee8b1f6cd4728233c8ae52897128c9af02367c091b88f55a1996d424e04d3965") {
+    throw "VoiceMeeter 测试组件校验失败"
+}
+if ((Get-FileHash -Algorithm SHA256 $Asio4AllPackage).Hash.ToLowerInvariant() -ne `
+    "7921f771d69ec687dce2718edcaeead4b5ea089deb25dc437065f0554da0868e") {
+    throw "ASIO4ALL 测试组件校验失败"
+}
 if (Test-Path $FfmpegPath) {
     Copy-Item $FfmpegPath (Join-Path $PackageDir "ffmpeg.exe") -Force
 } else {
