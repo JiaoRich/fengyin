@@ -3378,7 +3378,10 @@ void MainComponent::emitAudioSettingsState(bool success, const juce::String& mes
     result->setProperty("callbackOverruns", static_cast<juce::int64>(pluginHost.getCallbackOverruns()));
     result->setProperty("lowLatencyMode", status.deviceType.containsIgnoreCase("Low Latency Mode")
                                               || status.deviceType.containsIgnoreCase("RAW Test Mode")
-                                              || status.deviceType.containsIgnoreCase(utf8("低延迟")));
+                                              || status.deviceType.containsIgnoreCase(utf8("低延迟"))
+                                              || audio.isBridgeModeActive());
+    result->setProperty("bridgeAvailable", audio.isBridgeModeAvailable());
+    result->setProperty("bridgeActive", audio.isBridgeModeActive());
 
     juce::Array<juce::var> types;
     for (const auto& item : audio.getAvailableDeviceTypes()) types.add(item);

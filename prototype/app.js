@@ -2051,6 +2051,7 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   setAudioControlsBusy(!!state?.autoTuning);
   setAudioOptions($('#audio-driver-select'), state?.types, state?.type, value => {
     const name = String(value);
+    if (/^ASIO$/i.test(name)) return '桥接低延迟测试（ASIO）';
     if (/RAW Test Mode/i.test(name)) return 'RAW测试模式（共享）';
     if (/Low Latency|低延迟/i.test(name)) return `${name}（推荐·共享）`;
     return `${name}（共享）`;
@@ -2062,7 +2063,10 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   const buffers = Array.isArray(state?.bufferSizes) ? state.bufferSizes : [];
   const lowLatency = !!state?.lowLatencyMode;
   const rawTest = /RAW Test Mode/i.test(String(state?.type || ''));
-  $('#audio-driver-help').textContent = rawTest
+  const bridgeActive = state?.bridgeActive === true;
+  $('#audio-driver-help').textContent = bridgeActive
+    ? '风吟和 Windows 应用由桥接器混音；退出桥接器前请先切回共享模式'
+    : rawTest
     ? '仅风吟绕过可选系统音效；不修改驱动、不独占设备，可随时切回'
     : lowLatency
     ? '已使用 Windows 共享低延迟，不影响其他软件发声'
@@ -2073,6 +2077,11 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   $('#audio-buffer-help').textContent = buffers.length <= 1
     ? (lowLatency ? '当前设备驱动仅上报这一个可用缓冲值' : '普通 Windows Audio 由系统固定缓冲；请点击“自动优化”')
     : '128 延迟低；出现爆音时可改为 256';
+  const bridgeStatus = $('#bridge-test-status');
+  bridgeStatus.hidden = state?.bridgeAvailable !== true && !bridgeActive;
+  $('#bridge-test-message').textContent = bridgeActive
+    ? '已连接 Synchronous Audio Router，请确保 Windows 网页声音输出到 SAR 创建的播放设备。'
+    : '已检测到 Synchronous Audio Router，可在“声音模式”中主动开启。';
   const latency = Number(state?.latency);
   const latencyText = Number.isFinite(latency) ? `${latency.toFixed(1)} ms · ${latency <= 10 ? '优秀' : latency <= 20 ? '良好' : '偏高'}` : '尚未取得';
   $('#audio-latency-value').textContent = latencyText;
@@ -2118,7 +2127,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.0.2 RAW测试版 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.0.3 ASIO桥接测试版 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

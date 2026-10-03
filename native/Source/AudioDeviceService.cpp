@@ -4,7 +4,7 @@
 
 namespace
 {
-constexpr int currentAudioSetupRevision = 7;
+constexpr int currentAudioSetupRevision = 8;
 constexpr int currentTuningRevision = 8;
 constexpr double latencyCandidateTestMs = 3500.0;
 
@@ -18,6 +18,25 @@ bool isWindowsSharedType(const juce::String& typeName)
    #else
     return ! typeName.containsIgnoreCase("Exclusive") && ! typeName.containsIgnoreCase("ASIO");
    #endif
+}
+
+bool isAsioType(const juce::String& typeName)
+{
+    return typeName.equalsIgnoreCase("ASIO");
+}
+
+bool isSupportedBridgeDevice(const juce::String& deviceName)
+{
+    return deviceName.containsIgnoreCase("Synchronous Audio Router")
+        || deviceName.equalsIgnoreCase("SAR");
+}
+
+bool savedStateIsSupportedBridge(const juce::XmlElement& state)
+{
+    if (! isAsioType(state.getStringAttribute("deviceType"))) return false;
+    const auto output = state.getStringAttribute("audioOutputDeviceName",
+                        state.getStringAttribute("audioDeviceName"));
+    return isSupportedBridgeDevice(output);
 }
 
 juce::Array<int> sortedLegalBuffers(juce::Array<int> sizes)
@@ -65,12 +84,21 @@ juce::String AudioDeviceService::initialise()
     if (auto* settings = properties.getUserSettings())
         saved = juce::parseXML(settings->getValue("audioDevice"));
    #if JUCE_WINDOWS
-    // 旧版可能保存了 ASIO/Exclusive。启动时不允许短暂打开这些独占路径，
-    // 而是直接从 Windows 共享设备起步。
-    if (saved != nullptr && ! isWindowsSharedType(saved->getStringAttribute("deviceType")))
+    // 旧版的任意 ASIO/Exclusive 设置仍然废弃；只允许用户主动保存的
+    // Synchronous Audio Router 桥接设置在下次启动恢复。
+    const auto restoringBridge = saved != nullptr && savedStateIsSupportedBridge(*saved);
+    if (saved != nullptr && ! isWindowsSharedType(saved->getStringAttribute("deviceType"))
+        && ! restoringBridge)
         saved.reset();
    #endif
     lastError = manager.initialise(0, 2, saved.get(), true);
+   #if JUCE_WINDOWS
+    if (restoringBridge && (lastError.isNotEmpty() || manager.getCurrentAudioDevice() == nullptr))
+    {
+        manager.closeAudioDevice();
+        lastError = manager.initialise(0, 2, nullptr, true);
+    }
+   #endif
     return lastError;
 }
 
@@ -86,7 +114,12 @@ AudioDeviceStatus AudioDeviceService::getStatus()
         status.sampleRate = device->getCurrentSampleRate();
         status.bufferSize = device->getCurrentBufferSizeSamples();
         if (status.sampleRate > 0.0)
-            status.estimatedBufferLatencyMs = (status.bufferSize + device->getOutputLatencyInSamples()) * 1000.0 / status.sampleRate;
+        {
+            // JUCE/WASAPI 报告的 output latency 通常已包含当前输出周期，
+            // 不能再把 bufferSize 相加，否则 512 会被错显示为约 22 ms。
+            const auto reported = device->getOutputLatencyInSamples();
+            status.estimatedBufferLatencyMs = juce::jmax(status.bufferSize, reported) * 1000.0 / status.sampleRate;
+        }
         status.cpuUsage = manager.getCpuUsage();
         status.xRunCount = manager.getXRunCount();
     }
@@ -96,9 +129,21 @@ AudioDeviceStatus AudioDeviceService::getStatus()
 juce::StringArray AudioDeviceService::getAvailableDeviceTypes()
 {
     juce::StringArray names;
-    for (const auto* type : manager.getAvailableDeviceTypes())
+    for (auto* type : manager.getAvailableDeviceTypes())
+    {
         if (isWindowsSharedType(type->getTypeName()))
             names.add(type->getTypeName());
+        else if (isAsioType(type->getTypeName()))
+        {
+            type->scanForDevices();
+            for (const auto& device : type->getDeviceNames(false))
+                if (isSupportedBridgeDevice(device))
+                {
+                    names.add(type->getTypeName());
+                    break;
+                }
+        }
+    }
     return names;
 }
 
@@ -107,9 +152,25 @@ juce::StringArray AudioDeviceService::getAvailableOutputDevices(const juce::Stri
     if (auto* type = findType(typeName))
     {
         type->scanForDevices();
-        return type->getDeviceNames(false);
+        auto devices = type->getDeviceNames(false);
+        if (isAsioType(typeName))
+            for (int index = devices.size() - 1; index >= 0; --index)
+                if (! isSupportedBridgeDevice(devices[index])) devices.remove(index);
+        return devices;
     }
     return {};
+}
+
+bool AudioDeviceService::isBridgeModeAvailable()
+{
+    return getAvailableDeviceTypes().contains("ASIO")
+        && ! getAvailableOutputDevices("ASIO").isEmpty();
+}
+
+bool AudioDeviceService::isBridgeModeActive()
+{
+    const auto status = getStatus();
+    return isAsioType(status.deviceType) && isSupportedBridgeDevice(status.deviceName);
 }
 
 juce::Array<double> AudioDeviceService::getAvailableSampleRates()
@@ -128,8 +189,8 @@ juce::Array<int> AudioDeviceService::getAvailableBufferSizes()
 
 juce::String AudioDeviceService::selectDeviceType(const juce::String& typeName)
 {
-    if (! isWindowsSharedType(typeName))
-        return juce::String::fromUTF8("风吟仅使用 Windows 共享输出，不会独占耳机或音响");
+    if (! isWindowsSharedType(typeName) && ! (isAsioType(typeName) && isBridgeModeAvailable()))
+        return juce::String::fromUTF8("仅支持 Windows 共享输出或已识别的 ASIO 桥接驱动");
     manager.setCurrentAudioDeviceType(typeName, true);
     lastError = manager.getCurrentAudioDeviceType() == typeName
         ? juce::String()
@@ -145,6 +206,8 @@ juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName
     tuningActive = false;
     tuningCandidates.clear();
     tuningResults.clear();
+    if (isAsioType(manager.getCurrentAudioDeviceType()) && ! isSupportedBridgeDevice(outputName))
+        return juce::String::fromUTF8("桥接测试模式只能选择 Synchronous Audio Router");
     auto setup = manager.getAudioDeviceSetup();
     setup.outputDeviceName = outputName;
     setup.inputDeviceName.clear();
@@ -173,7 +236,7 @@ juce::String AudioDeviceService::applyBestInitialSetup()
         && current.deviceType.equalsIgnoreCase("Windows Audio")
         && current.bufferSize >= 512;
     const auto legacyExclusiveMode = revision < currentAudioSetupRevision
-        && ! isWindowsSharedType(current.deviceType);
+        && ! isWindowsSharedType(current.deviceType) && ! isBridgeModeActive();
     if (settings != nullptr && settings->getValue("audioSetupMode") == "manual"
         && ! legacyFixedBuffer && ! legacyExclusiveMode)
     {

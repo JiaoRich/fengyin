@@ -32,6 +32,8 @@ public:
     [[nodiscard]] juce::StringArray getAvailableOutputDevices(const juce::String& typeName);
     [[nodiscard]] juce::Array<double> getAvailableSampleRates();
     [[nodiscard]] juce::Array<int> getAvailableBufferSizes();
+    [[nodiscard]] bool isBridgeModeAvailable();
+    [[nodiscard]] bool isBridgeModeActive();
     juce::String selectDeviceType(const juce::String& typeName);
     juce::String applyOutputSetup(const juce::String& outputName, double sampleRate, int bufferSize);
     // 首次运行或自动跟随到新设备时，优先使用 Windows 低延迟共享模式、48 kHz 和 128 采样。
