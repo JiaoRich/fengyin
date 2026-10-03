@@ -34,7 +34,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist/wasapi-probe | Out-Null
           Copy-Item build-wasapi-probe/Release/FengYinWasapiPeriodProbe.exe dist/wasapi-probe/
-          Copy-Item tools/wasapi_period_probe/使用说明.txt dist/wasapi-probe/
+          Copy-Item tools/wasapi_period_probe/*.txt dist/wasapi-probe/
 
       - name: 上传工具
         uses: actions/upload-artifact@v5
