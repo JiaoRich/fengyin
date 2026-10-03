@@ -169,6 +169,7 @@ private:
     juce::AudioProcessorGraph::Node::Ptr midiInputNode;
     juce::PluginDescription currentDescription;
     juce::Array<ToneParameterValue> releaseBaseline;
+    juce::Array<ToneParameterValue> previousReleaseParameters;
     class PluginEditorWindow;
     std::unique_ptr<PluginEditorWindow> instrumentEditorWindow;
     std::unique_ptr<PluginEditorWindow> effectEditorWindow;

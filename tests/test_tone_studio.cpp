@@ -1,6 +1,7 @@
 #include "TonePackage.h"
 #include "SerialEffectRouting.h"
 #include "ScopedGraphPause.h"
+#include "ToneRestorePlan.h"
 #include <cassert>
 #include <cmath>
 
@@ -34,6 +35,26 @@ private:
 
 int main()
 {
+    const juce::Array<fengyin::ToneParameterValue> baseline {
+        fengyin::ToneParameterValue{"timbre", .5f},
+        fengyin::ToneParameterValue{"room", .2f},
+        fengyin::ToneParameterValue{"unrelated-model", .8f}
+    };
+    const juce::Array<fengyin::ToneParameterValue> first {
+        fengyin::ToneParameterValue{"timbre", .7f},
+        fengyin::ToneParameterValue{"room", .4f}
+    };
+    const juce::Array<fengyin::ToneParameterValue> second {
+        fengyin::ToneParameterValue{"timbre", .3f}
+    };
+    assert(fengyin::retiredToneParameters({}, first, baseline).isEmpty());
+    assert(fengyin::retiredToneParameters(first, first, baseline).isEmpty());
+    const auto retired = fengyin::retiredToneParameters(first, second, baseline);
+    assert(retired.size() == 1 && retired[0].identifier == "room" && retired[0].value == .2f);
+    assert(fengyin::retiredToneParameters(second, first, baseline).isEmpty());
+    assert(!fengyin::toneValueNeedsWrite(.5f, .5f));
+    assert(fengyin::toneValueNeedsWrite(.5f, .6f));
+    assert(!fengyin::toneValueNeedsWrite(.5f, 2.0f));
     juce::ScopedJuceInitialiser_GUI init;
     juce::AudioProcessorGraph graph;
     graph.setPlayConfigDetails(2,2,48000,64);

@@ -16,6 +16,14 @@ AUDIO = (ROOT / "native" / "Source" / "AudioDeviceService.cpp").read_text(encodi
 
 
 class HostRegressionTests(unittest.TestCase):
+    def test_release_style_restore_does_not_reset_entire_plugin(self):
+        body = HOST.split('int PluginHostEngine::applySwamToneProfile(', 1)[1].split('void PluginHostEngine::flushTechniqueValues()', 1)[0]
+        self.assertIn('retiredToneParameters(previousReleaseParameters,', body)
+        self.assertNotIn('for (const auto& v : releaseBaseline)', body)
+        self.assertIn('toneValueNeedsWrite(parameter->getValue(), value.value)', HOST)
+        self.assertIn('if (getCurrentInstrumentModelIndex() == index)', HOST)
+        self.assertIn('previousReleaseParameters.clear();', HOST)
+
     def test_import_initialization_is_suspended_before_player_exposure(self):
         start = HOST.index('graph->suspendProcessing(true);')
         exposed = HOST.index('player.setProcessor(graph.get());', start)
