@@ -1,0 +1,45 @@
+name: 构建 WASAPI 共享周期检测工具
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/wasapi-period-probe]
+    paths:
+      - tools/wasapi_period_probe/**
+      - .github/workflows/wasapi-period-probe.yml
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x64:
+    name: Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 10
+
+    steps:
+      - name: 获取源代码
+        uses: actions/checkout@v5
+
+      - name: 配置工程
+        shell: powershell
+        run: cmake -S tools/wasapi_period_probe -B build-wasapi-probe -A x64
+
+      - name: 编译 Release
+        shell: powershell
+        run: cmake --build build-wasapi-probe --config Release --parallel
+
+      - name: 整理工具
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/wasapi-probe | Out-Null
+          Copy-Item build-wasapi-probe/Release/FengYinWasapiPeriodProbe.exe dist/wasapi-probe/
+          Copy-Item tools/wasapi_period_probe/使用说明.txt dist/wasapi-probe/
+
+      - name: 上传工具
+        uses: actions/upload-artifact@v5
+        with:
+          name: 风吟-WASAPI共享周期检测工具
+          path: dist/wasapi-probe/*
+          if-no-files-found: error
+          retention-days: 14
