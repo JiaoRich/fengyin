@@ -26,6 +26,8 @@ int main()
     SharedAudioRegion systemRegion;
     initialiseRegion(instrumentRegion);
     initialiseRegion(systemRegion);
+    instrumentRegion.producerActive.store(1);
+    systemRegion.producerActive.store(1);
     pushConstant(instrumentRegion, 0.25f, -0.25f, 128);
     pushConstant(systemRegion, 0.5f, 0.25f, 128);
 
@@ -50,12 +52,20 @@ int main()
     for (std::size_t i = 0; i < left.size(); ++i)
     {
         assert(std::abs(left[i] - 1.0f) < 0.000001f);
-        assert(std::abs(right[i] - 0.75f) < 0.000001f);
+        assert(std::abs(right[i] - 1.0f) < 0.000001f);
     }
     assert(core.getCounters().clippedFrames == 128);
 
     core.render(outputs, 2, 128);
     for (const auto value : left) assert(value == 0.0f);
+    assert(core.getCounters().instrumentUnderflows == 1);
+    assert(core.getCounters().systemUnderflows == 1);
+
+    // An idle producer is quiet, not broken. It must not poison the dropout
+    // diagnostics that drive automatic stability decisions.
+    instrumentRegion.producerActive.store(0);
+    systemRegion.producerActive.store(0);
+    core.render(outputs, 2, 128);
     assert(core.getCounters().instrumentUnderflows == 1);
     assert(core.getCounters().systemUnderflows == 1);
 
@@ -65,6 +75,8 @@ int main()
     core.reset();
     initialiseRegion(instrumentRegion);
     initialiseRegion(systemRegion);
+    instrumentRegion.producerActive.store(1);
+    systemRegion.producerActive.store(1);
     for (int block = 0; block < 12; ++block)
     {
         pushConstant(instrumentRegion, 0.0f, 0.0f, 128);

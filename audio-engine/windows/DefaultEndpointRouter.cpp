@@ -1,6 +1,7 @@
 #include "DefaultEndpointRouter.h"
 
 #if defined(_WIN32)
+#include <windows.h>
 #include <propkeydef.h>
 #include <functiondiscoverykeys_devpkey.h>
 #include <mmdeviceapi.h>

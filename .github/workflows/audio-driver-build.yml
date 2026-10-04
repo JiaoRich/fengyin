@@ -42,6 +42,20 @@ jobs:
             throw "未找到可用的 MSBuild.exe"
           }
 
+          # The GitHub image contains the kernel MSBuild toolset, while the
+          # pinned WDK package supplies host tools such as stampinf.exe. NuGet
+          # does not add that private tools folder to PATH for packages.config
+          # projects, so resolve it explicitly instead of relying on runner
+          # image-specific global WDK installation state.
+          $stampInf = Get-ChildItem "$env:RUNNER_TEMP/fengyin-driver-source/packages" `
+            -Filter stampinf.exe -Recurse -File |
+            Where-Object { $_.FullName -match '[\\/]x64[\\/]stampinf\.exe$' } |
+            Select-Object -First 1
+          if (-not $stampInf) {
+            throw "WDK NuGet 包中未找到 x64/stampinf.exe"
+          }
+          $env:PATH = "$($stampInf.Directory.FullName);$env:PATH"
+
           & $msbuild "$env:RUNNER_TEMP/fengyin-driver-source/audio/sysvad/TabletAudioSample/TabletAudioSample.vcxproj" `
             -restore `
             -p:Configuration=Release `

@@ -34,6 +34,7 @@ private:
         explicit StreamReader(SharedAudioRegion& storage) noexcept : consumer(storage) {}
         void reset() noexcept { cursor = 0; current = {}; hasBlock = false; }
         bool next(float& left, float& right) noexcept;
+        [[nodiscard]] bool producerIsActive() const noexcept { return consumer.producerIsActive(); }
     private:
         AudioBlockConsumer consumer;
         AudioBlock current;
@@ -51,6 +52,7 @@ private:
         explicit AdaptiveSystemReader(SharedAudioRegion& storage) noexcept : consumer(storage) {}
         void reset() noexcept;
         bool next(float& left, float& right) noexcept;
+        [[nodiscard]] bool producerIsActive() const noexcept { return consumer.producerIsActive(); }
     private:
         bool nextSource(float& left, float& right) noexcept;
         AudioBlockConsumer consumer;

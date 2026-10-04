@@ -1,8 +1,8 @@
 #include "DefaultEndpointRouter.h"
 
 #if defined(_WIN32)
-#include <shellapi.h>
 #include <windows.h>
+#include <shellapi.h>
 
 #include <cstdlib>
 #include <string>

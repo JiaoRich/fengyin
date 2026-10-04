@@ -10,7 +10,7 @@
 namespace fengyin::audioengine
 {
 constexpr std::uint32_t protocolMagic = 0x45415946u; // "FYAE" in little endian
-constexpr std::uint16_t protocolMajor = 2;
+constexpr std::uint16_t protocolMajor = 3;
 constexpr std::uint16_t protocolMinor = 0;
 constexpr std::uint32_t engineSampleRate = 48000;
 constexpr std::uint16_t engineChannels = 2;
@@ -64,6 +64,10 @@ struct alignas(64) SharedAudioRegion
     std::atomic<std::uint64_t> producerHeartbeat { 0 };
     std::atomic<std::uint64_t> consumerHeartbeat { 0 };
     std::atomic<std::uint64_t> droppedBlocks { 0 };
+    // Producers explicitly publish whether silence means "healthy but quiet"
+    // or "the real-time source failed to deliver a requested block". This
+    // keeps an idle instrument from being reported as an audio dropout.
+    std::atomic<std::uint32_t> producerActive { 0 };
     std::atomic<std::uint32_t> state { static_cast<std::uint32_t>(StreamState::stopped) };
     // The physical backend publishes the period it actually obtained. Some
     // drivers align a requested 128/256-frame period to a nearby legal value;
@@ -97,6 +101,7 @@ inline void initialiseRegion(SharedAudioRegion& region) noexcept
     region.producerHeartbeat.store(0, std::memory_order_relaxed);
     region.consumerHeartbeat.store(0, std::memory_order_relaxed);
     region.droppedBlocks.store(0, std::memory_order_relaxed);
+    region.producerActive.store(0, std::memory_order_relaxed);
     region.state.store(static_cast<std::uint32_t>(StreamState::stopped), std::memory_order_relaxed);
     region.activePeriodFrames.store(0, std::memory_order_relaxed);
     for (auto& block : region.blocks)
@@ -170,6 +175,11 @@ public:
         const auto read = region.readSequence.load(std::memory_order_relaxed);
         const auto write = region.writeSequence.load(std::memory_order_acquire);
         return write - read;
+    }
+
+    [[nodiscard]] bool producerIsActive() const noexcept
+    {
+        return region.producerActive.load(std::memory_order_acquire) != 0;
     }
 
 private:

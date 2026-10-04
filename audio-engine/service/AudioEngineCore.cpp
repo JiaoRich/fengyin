@@ -140,12 +140,13 @@ void AudioEngineCore::render(float* const* outputs, std::uint32_t outputChannels
 
         auto left = instrumentLeft + systemLeft;
         auto right = instrumentRight + systemRight;
-        const auto peak = std::max(std::abs(left), std::abs(right));
-        if (peak > 1.0f)
+        if (std::abs(left) > 1.0f || std::abs(right) > 1.0f)
         {
-            const auto safety = 1.0f / peak;
-            left *= safety;
-            right *= safety;
+            // Preserve the original system and instrument levels throughout
+            // their valid range. Only impossible output values are clamped;
+            // there is no hidden compressor or accompaniment ducking here.
+            left = std::clamp(left, -1.0f, 1.0f);
+            right = std::clamp(right, -1.0f, 1.0f);
             ++clipped;
         }
         if (outputs[0] != nullptr)
@@ -155,8 +156,10 @@ void AudioEngineCore::render(float* const* outputs, std::uint32_t outputChannels
         for (std::uint32_t channel = 2; channel < outputChannels; ++channel)
             if (outputs[channel] != nullptr) outputs[channel][frame] = 0.0f;
     }
-    if (instrumentMissing) instrumentUnderflows.fetch_add(1, std::memory_order_relaxed);
-    if (systemMissing) systemUnderflows.fetch_add(1, std::memory_order_relaxed);
+    if (instrumentMissing && instrument.producerIsActive())
+        instrumentUnderflows.fetch_add(1, std::memory_order_relaxed);
+    if (systemMissing && system.producerIsActive())
+        systemUnderflows.fetch_add(1, std::memory_order_relaxed);
     if (clipped != 0) clippedFrames.fetch_add(clipped, std::memory_order_relaxed);
 }
 

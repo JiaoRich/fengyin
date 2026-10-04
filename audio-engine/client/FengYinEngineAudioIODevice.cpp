@@ -60,6 +60,7 @@ juce::String FengYinEngineAudioIODevice::open(const juce::BigInteger& inputChann
         return "Cannot create FengYin engine request semaphore";
     }
     producer = std::make_unique<AudioBlockProducer>(*mapping.get());
+    mapping.get()->producerActive.store(0, std::memory_order_release);
     // The independent engine starts before the JUCE device is opened and
     // publishes the physical period it really obtained. Honour that value so
     // one callback always supplies exactly one hardware period.
@@ -81,6 +82,8 @@ juce::String FengYinEngineAudioIODevice::open(const juce::BigInteger& inputChann
 void FengYinEngineAudioIODevice::close()
 {
     stop();
+    if (mapping.get() != nullptr)
+        mapping.get()->producerActive.store(0, std::memory_order_release);
 #if defined(_WIN32)
     if (requestSemaphore != nullptr) CloseHandle(requestSemaphore);
     requestSemaphore = nullptr;
@@ -99,6 +102,8 @@ void FengYinEngineAudioIODevice::start(juce::AudioIODeviceCallback* callback)
     activeCallback = callback;
     stopRequested.store(false, std::memory_order_release);
     callback->audioDeviceAboutToStart(this);
+    if (mapping.get() != nullptr)
+        mapping.get()->producerActive.store(1, std::memory_order_release);
     playing.store(true, std::memory_order_release);
     pump = std::thread([this] { run(); });
 }
@@ -106,6 +111,8 @@ void FengYinEngineAudioIODevice::start(juce::AudioIODeviceCallback* callback)
 void FengYinEngineAudioIODevice::stop()
 {
     stopRequested.store(true, std::memory_order_release);
+    if (mapping.get() != nullptr)
+        mapping.get()->producerActive.store(0, std::memory_order_release);
 #if defined(_WIN32)
     if (requestSemaphore != nullptr) ReleaseSemaphore(requestSemaphore, 1, nullptr);
 #endif

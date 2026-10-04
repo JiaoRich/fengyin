@@ -199,6 +199,7 @@ void WasapiLoopbackInput::run(SharedAudioRegion* destination) noexcept
     mmcss = AvSetMmThreadCharacteristicsW(L"Pro Audio", &taskIndex);
     AudioBlockProducer producer(*destination);
     std::array<float, maximumFramesPerBlock> silence {};
+    destination->producerActive.store(1, std::memory_order_release);
     running.store(true, std::memory_order_release);
     SetEvent(startedEvent);
     while (! stopRequested.load(std::memory_order_acquire))
@@ -258,6 +259,7 @@ void WasapiLoopbackInput::run(SharedAudioRegion* destination) noexcept
             capture->ReleaseBuffer(packetFrames);
         }
     }
+    destination->producerActive.store(0, std::memory_order_release);
     finish();
 #else
     (void) destination;
