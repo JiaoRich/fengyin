@@ -13,12 +13,13 @@
 ## Windows 实机准备
 
 1. 安装 ASIO4ALL。
-2. 从官方项目安装 Synchronous Audio Router 0.13.1（签名版）：
-   <https://github.com/eiz/SynchronousAudioRouter/releases/tag/0.13.1>
-3. 在 SAR Configuration 中将底层 Hardware Interface 设为 ASIO4ALL，并新建一个 Playback 端点，建议命名为“风吟网页伴奏”。
-4. 在 ASIO4ALL 面板中选择实际的 Realtek 耳机/扬声器，先测试 48 kHz / 128，爆音则改为 256。
-5. 将 Windows 或浏览器的输出选为“风吟网页伴奏”。
-6. 打开风吟声音设置，手动选择“桥接低延迟测试（ASIO）”和 `Synchronous Audio Router`。
+2. 从官方项目安装 Synchronous Audio Router 0.13.1：
+   <https://github.com/eiz/SynchronousAudioRouter/releases/tag/v0.13.1>
+3. 打开风吟声音设置，手动选择“桥接低延迟测试（ASIO）”和 `Synchronous Audio Router`。
+4. 点击“配置桥接”，在 SAR 面板把 Hardware Interface 设为 ASIO4ALL。
+5. 在 ASIO4ALL 面板中只启用实际的 Realtek 耳机/扬声器，关闭麦克风输入；先测试 48 kHz / 128，爆音则改为 256。
+6. 在 SAR 的 Windows Audio Devices 点击 Add，新建名为“风吟网页伴奏”的双声道 Playback 端点并确定。风吟会重启音频流并自动接入这组立体声通道。
+7. 在 Windows“设置 → 系统 → 声音 → 音量合成器”中，把浏览器输出选为“风吟网页伴奏”；如果浏览器未列出，先播放网页声音或重启浏览器。
 
 ## 验收记录
 

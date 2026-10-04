@@ -30,6 +30,17 @@ class AsioBridgeModeTests(unittest.TestCase):
         self.assertIn("桥接低延迟测试（ASIO）", js)
         self.assertIn("state?.bridgeAvailable", js)
 
+    def test_bridge_configuration_and_input_mix_are_implemented(self):
+        audio = (ROOT / "native" / "Source" / "AudioDeviceService.cpp").read_text(encoding="utf-8")
+        main = (ROOT / "native" / "Source" / "MainComponent.cpp").read_text(encoding="utf-8")
+        html = (ROOT / "prototype" / "index.html").read_text(encoding="utf-8")
+        self.assertIn("showControlPanel()", audio)
+        self.assertIn("bridgePlaybackInputEnabled", audio)
+        self.assertIn("getActiveInputChannels", audio)
+        self.assertIn("FloatVectorOperations::copy", audio)
+        self.assertIn('configureAudioBridge', main)
+        self.assertIn('configure-audio-bridge', html)
+
     def test_latency_display_does_not_double_count_same_output_period(self):
         audio = (ROOT / "native" / "Source" / "AudioDeviceService.cpp").read_text(encoding="utf-8")
         self.assertIn("juce::jmax(status.bufferSize, reported)", audio)

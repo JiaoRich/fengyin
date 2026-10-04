@@ -531,6 +531,13 @@ void MainComponent::setupWebInterface()
         })
         .withEventListener("requestAudioSettings", [this](juce::var) { emitAudioSettingsState(); })
         .withEventListener("applyAudioSettings", [this](juce::var payload) { applyAudioSettingsFromWeb(payload); })
+        .withEventListener("configureAudioBridge", [this](juce::var)
+        {
+            const auto error = audio.configureBridgePlaybackEndpoint();
+            emitAudioSettingsState(error.isEmpty(), error.isEmpty()
+                ? utf8("SAR 网页伴奏端点已启用，请在 Windows 音量合成器中选择它")
+                : error);
+        })
         .withEventListener("requestSuperLowLatencyStatus", [this](juce::var) { emitSuperLowLatencyState(); })
         .withEventListener("startSuperLowLatencyOptimisation", [this](juce::var)
         {

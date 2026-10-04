@@ -78,6 +78,11 @@ AudioDeviceService::AudioDeviceService()
     properties.setStorageParameters(options);
 }
 
+AudioDeviceService::~AudioDeviceService()
+{
+    manager.removeAudioCallback(this);
+}
+
 juce::String AudioDeviceService::initialise()
 {
     std::unique_ptr<juce::XmlElement> saved;
@@ -99,7 +104,44 @@ juce::String AudioDeviceService::initialise()
         lastError = manager.initialise(0, 2, nullptr, true);
     }
    #endif
+    manager.addAudioCallback(this);
     return lastError;
+}
+
+void AudioDeviceService::audioDeviceIOCallbackWithContext(const float* const* inputs, int numInputs,
+                                                           float* const* outputs, int numOutputs,
+                                                           int numSamples,
+                                                           const juce::AudioIODeviceCallbackContext&)
+{
+    for (int channel = 0; channel < numOutputs; ++channel)
+        if (outputs[channel] != nullptr)
+            juce::FloatVectorOperations::clear(outputs[channel], numSamples);
+
+    if (! bridgeInputMixActive.load(std::memory_order_acquire) || numInputs <= 0)
+        return;
+
+    // AudioDeviceManager 会把这个回调与软音源回调相加。网页原声不进入
+    // 风吟效果链，也不增加额外重采样或响度处理。
+    for (int channel = 0; channel < numOutputs; ++channel)
+    {
+        const auto input = juce::jmin(channel, numInputs - 1);
+        if (outputs[channel] != nullptr && inputs[input] != nullptr)
+            juce::FloatVectorOperations::copy(outputs[channel], inputs[input], numSamples);
+    }
+}
+
+void AudioDeviceService::audioDeviceAboutToStart(juce::AudioIODevice* device)
+{
+    bridgeInputMixActive.store(device != nullptr
+        && isAsioType(device->getTypeName())
+        && isSupportedBridgeDevice(device->getName())
+        && device->getActiveInputChannels().countNumberOfSetBits() >= 2,
+        std::memory_order_release);
+}
+
+void AudioDeviceService::audioDeviceStopped()
+{
+    bridgeInputMixActive.store(false, std::memory_order_release);
 }
 
 AudioDeviceStatus AudioDeviceService::getStatus()
@@ -173,6 +215,55 @@ bool AudioDeviceService::isBridgeModeActive()
     return isAsioType(status.deviceType) && isSupportedBridgeDevice(status.deviceName);
 }
 
+bool AudioDeviceService::applySavedBridgeInputChannels(juce::AudioDeviceManager::AudioDeviceSetup& setup)
+{
+    auto* settings = properties.getUserSettings();
+    if (settings == nullptr || ! settings->getBoolValue("bridgePlaybackInputEnabled", false))
+        return false;
+    auto* device = manager.getCurrentAudioDevice();
+    if (device == nullptr) return false;
+    const auto inputs = device->getInputChannelNames();
+    if (inputs.size() < 2) return false;
+
+    // SAR 保证物理输入在前、虚拟 Playback 端点在后。风吟只打开最后创建的
+    // 一组立体声通道，避免把板载麦克风或其他物理输入混入扬声器形成反馈。
+    setup.useDefaultInputChannels = false;
+    setup.inputChannels.clear();
+    setup.inputChannels.setBit(inputs.size() - 2);
+    setup.inputChannels.setBit(inputs.size() - 1);
+    return true;
+}
+
+juce::String AudioDeviceService::configureBridgePlaybackEndpoint()
+{
+    if (! isBridgeModeActive())
+        return juce::String::fromUTF8("请先在声音模式中选择桥接低延迟测试（ASIO）");
+    auto* device = manager.getCurrentAudioDevice();
+    if (device == nullptr || ! device->hasControlPanel())
+        return juce::String::fromUTF8("当前 SAR 驱动未提供配置面板");
+    if (! device->showControlPanel())
+        return juce::String::fromUTF8("未能打开 SAR 配置面板，请尝试以管理员身份运行风吟");
+
+    // SAR 0.13.1 在配置窗口关闭后才重建端点，重启同一驱动读取新通道表。
+    manager.closeAudioDevice();
+    manager.restartLastAudioDevice();
+    device = manager.getCurrentAudioDevice();
+    if (device == nullptr || device->getInputChannelNames().size() < 2)
+        return juce::String::fromUTF8("未检测到 SAR Playback 端点，请添加一个双声道 Playback 后再确定");
+
+    if (auto* settings = properties.getUserSettings())
+        settings->setValue("bridgePlaybackInputEnabled", true);
+    auto setup = manager.getAudioDeviceSetup();
+    if (! applySavedBridgeInputChannels(setup))
+        return juce::String::fromUTF8("无法启用 SAR Playback 输入通道");
+    setup.inputDeviceName = setup.outputDeviceName;
+    lastError = manager.setAudioDeviceSetup(setup, true);
+    if (lastError.isNotEmpty())
+        return juce::String::fromUTF8("SAR 端点已创建，但无法启用输入：") + lastError;
+    saveSettings();
+    return {};
+}
+
 juce::Array<double> AudioDeviceService::getAvailableSampleRates()
 {
     if (auto* device = manager.getCurrentAudioDevice())
@@ -214,7 +305,11 @@ juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName
     setup.sampleRate = sampleRate;
     setup.bufferSize = bufferSize;
     setup.useDefaultInputChannels = false;
+    setup.inputChannels.clear();
     setup.useDefaultOutputChannels = true;
+    if (isAsioType(manager.getCurrentAudioDeviceType()) && isSupportedBridgeDevice(outputName)
+        && applySavedBridgeInputChannels(setup))
+        setup.inputDeviceName = outputName;
     lastError = manager.setAudioDeviceSetup(setup, true);
     if (lastError.isEmpty())
     {

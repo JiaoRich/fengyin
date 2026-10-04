@@ -2,6 +2,7 @@
 
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_data_structures/juce_data_structures.h>
+#include <atomic>
 #include <optional>
 #include <vector>
 
@@ -20,11 +21,11 @@ struct AudioDeviceStatus
     juce::String error;
 };
 
-class AudioDeviceService final
+class AudioDeviceService final : private juce::AudioIODeviceCallback
 {
 public:
     AudioDeviceService();
-    ~AudioDeviceService() = default;
+    ~AudioDeviceService() override;
 
     juce::String initialise();
     [[nodiscard]] AudioDeviceStatus getStatus();
@@ -34,6 +35,7 @@ public:
     [[nodiscard]] juce::Array<int> getAvailableBufferSizes();
     [[nodiscard]] bool isBridgeModeAvailable();
     [[nodiscard]] bool isBridgeModeActive();
+    juce::String configureBridgePlaybackEndpoint();
     juce::String selectDeviceType(const juce::String& typeName);
     juce::String applyOutputSetup(const juce::String& outputName, double sampleRate, int bufferSize);
     // 首次运行或自动跟随到新设备时，优先使用 Windows 低延迟共享模式、48 kHz 和 128 采样。
@@ -63,6 +65,13 @@ public:
     [[nodiscard]] juce::AudioDeviceManager& getDeviceManager() noexcept { return manager; }
 
 private:
+    void audioDeviceIOCallbackWithContext(const float* const* inputChannelData, int numInputChannels,
+                                          float* const* outputChannelData, int numOutputChannels,
+                                          int numSamples,
+                                          const juce::AudioIODeviceCallbackContext&) override;
+    void audioDeviceAboutToStart(juce::AudioIODevice*) override;
+    void audioDeviceStopped() override;
+    bool applySavedBridgeInputChannels(juce::AudioDeviceManager::AudioDeviceSetup& setup);
     juce::AudioIODeviceType* findType(const juce::String& typeName);
     juce::String preferredLiveDeviceType();
     juce::String configureAutomaticType(const juce::String& typeName);
@@ -93,6 +102,7 @@ private:
     juce::AudioDeviceManager manager;
     juce::ApplicationProperties properties;
     juce::String lastError;
+    std::atomic<bool> bridgeInputMixActive { false };
     int observedXRunCount = 0;
     int unstablePolls = 0;
     bool tuningActive = false;

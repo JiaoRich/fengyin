@@ -1693,6 +1693,10 @@ $('#audio-auto-optimize').addEventListener('click', () => {
   if (!window.__JUCE__?.backend?.emitEvent) return;
   nativeEvent('optimiseAudioSettings');
 });
+$('#configure-audio-bridge').addEventListener('click', () => {
+  if (!window.__JUCE__?.backend?.emitEvent) return toast('请在 Windows 安装版中配置桥接');
+  nativeEvent('configureAudioBridge');
+});
 
 const superLatencyDialog = $('#super-latency-confirm-dialog');
 $('#super-latency-optimize').addEventListener('click', () => {
@@ -2080,8 +2084,9 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   const bridgeStatus = $('#bridge-test-status');
   bridgeStatus.hidden = state?.bridgeAvailable !== true && !bridgeActive;
   $('#bridge-test-message').textContent = bridgeActive
-    ? '已连接 Synchronous Audio Router，请确保 Windows 网页声音输出到 SAR 创建的播放设备。'
+    ? '点击配置桥接，添加名为“风吟网页伴奏”的双声道 Playback 设备。'
     : '已检测到 Synchronous Audio Router，可在“声音模式”中主动开启。';
+  $('#configure-audio-bridge').disabled = !bridgeActive || !!state?.autoTuning;
   const latency = Number(state?.latency);
   const latencyText = Number.isFinite(latency) ? `${latency.toFixed(1)} ms · ${latency <= 10 ? '优秀' : latency <= 20 ? '良好' : '偏高'}` : '尚未取得';
   $('#audio-latency-value').textContent = latencyText;
