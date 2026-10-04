@@ -196,14 +196,13 @@ jobs:
           if (-not $signTool) { throw "未找到 x64 signtool.exe，无法签署测试 CAT。" }
           & $signTool.FullName sign /fd sha256 /sha1 $testThumbprint $builtCat
           if ($LASTEXITCODE -ne 0) { throw "FengYinAudio.cat 测试签名失败：$LASTEXITCODE" }
-          $testCertificatePath = Join-Path $releaseDir "TabletAudioSample.cer"
-          Import-Certificate -FilePath $testCertificatePath -CertStoreLocation "Cert:\CurrentUser\Root" | Out-Null
-          Import-Certificate -FilePath $testCertificatePath -CertStoreLocation "Cert:\CurrentUser\TrustedPublisher" | Out-Null
-          # Avoid SignTool's online chain retrieval for this intentionally
-          # self-signed certificate. Get-AuthenticodeSignature validates the
-          # local chain after importing the exact certificate shipped in the
-          # kit, and also checks that CAT and SYS have the same thumbprint.
-          ./scripts/test-fengyin-test-driver.ps1 -DriverDir $releaseDir -RequireTrusted
+          # Do not import this ephemeral certificate into the hosted runner:
+          # Windows may perform a long online chain lookup for a deliberately
+          # self-signed WDK certificate.  The offline validator requires CAT
+          # and SYS to carry the exact certificate exported by this build.
+          # The target-PC installer performs the stricter Valid check after
+          # importing that certificate into its local trust stores.
+          ./scripts/test-fengyin-test-driver.ps1 -DriverDir $releaseDir
 
       - name: 生成 Partner Center 待签名提交包
         shell: pwsh
