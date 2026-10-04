@@ -49,7 +49,10 @@ jobs:
           # image-specific global WDK installation state.
           $stampInf = Get-ChildItem "$env:RUNNER_TEMP/fengyin-driver-source/packages" `
             -Filter stampinf.exe -Recurse -File |
-            Where-Object { $_.FullName -match '[\\/]x64[\\/]stampinf\.exe$' } |
+            Where-Object {
+              $_.FullName -match 'Microsoft\.Windows\.WDK\.x64' -and
+              $_.FullName -match '[\\/]x64[\\/]stampinf\.exe$'
+            } |
             Select-Object -First 1
           if (-not $stampInf) {
             throw "WDK NuGet 包中未找到 x64/stampinf.exe"
@@ -58,7 +61,10 @@ jobs:
 
           $infVerif = Get-ChildItem "$env:RUNNER_TEMP/fengyin-driver-source/packages" `
             -Filter infverif.dll -Recurse -File |
-            Where-Object { $_.FullName -match '[\\/]x64[\\/]infverif\.dll$' } |
+            Where-Object {
+              $_.FullName -match 'Microsoft\.Windows\.WDK\.x64' -and
+              $_.FullName -match '[\\/]x64[\\/]infverif\.dll$'
+            } |
             Select-Object -First 1
           if (-not $infVerif) {
             throw "WDK NuGet 包中未找到 x64/infverif.dll"
@@ -73,7 +79,10 @@ jobs:
           # defect with a skip flag.
           $apiValidator = Get-ChildItem "$env:RUNNER_TEMP/fengyin-driver-source/packages" `
             -Filter apivalidator.exe -Recurse -File |
-            Where-Object { $_.FullName -match '[\\/]x64[\\/]apivalidator\.exe$' } |
+            Where-Object {
+              $_.FullName -match 'Microsoft\.Windows\.WDK\.x64' -and
+              $_.FullName -match '[\\/]x64[\\/]apivalidator\.exe$'
+            } |
             Select-Object -First 1
           if (-not $apiValidator) {
             throw "WDK NuGet 包中未找到 x64/apivalidator.exe"
@@ -84,8 +93,9 @@ jobs:
           }
           $apiValidatorX86Dir = Join-Path $apiValidator.Directory.Parent.FullName "x86"
           New-Item -ItemType Directory -Force -Path $apiValidatorX86Dir | Out-Null
-          Copy-Item $apiValidator.FullName (Join-Path $apiValidatorX86Dir "ApiValidator.exe") -Force
-          Copy-Item $apiValidatorDll (Join-Path $apiValidatorX86Dir "microsoft.kits.drivers.apivalidator.dll") -Force
+          # ApiValidator launches ApiExtractor from the same host-tools
+          # directory. Mirror the complete directory, not only the front-end.
+          Copy-Item (Join-Path $apiValidator.Directory.FullName "*") $apiValidatorX86Dir -Recurse -Force
 
           & $msbuild "$env:RUNNER_TEMP/fengyin-driver-source/audio/sysvad/EndpointsCommon/EndpointsCommon.vcxproj" `
             -restore `
@@ -114,7 +124,10 @@ jobs:
           }
           $infVerifier = Get-ChildItem "$env:RUNNER_TEMP/fengyin-driver-source/packages" `
             -Filter infverif.exe -Recurse -File |
-            Where-Object { $_.FullName -match '[\\/]x64[\\/]infverif\.exe$' } |
+            Where-Object {
+              $_.FullName -match 'Microsoft\.Windows\.WDK\.x64' -and
+              $_.FullName -match '[\\/]x64[\\/]infverif\.exe$'
+            } |
             Select-Object -First 1
           if (-not $infVerifier) {
             throw "WDK NuGet 包中未找到 x64/infverif.exe"
