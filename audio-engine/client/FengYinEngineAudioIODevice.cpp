@@ -149,7 +149,20 @@ void FengYinEngineAudioIODevice::run() noexcept
     {
         const auto wait = WaitForSingleObject(requestSemaphore, 1000);
         if (stopRequested.load(std::memory_order_acquire)) break;
-        if (wait == WAIT_TIMEOUT) continue;
+        if (wait == WAIT_TIMEOUT)
+        {
+            if (mapping.get() != nullptr)
+            {
+                const auto state = static_cast<StreamState>(
+                    mapping.get()->state.load(std::memory_order_acquire));
+                if (state == StreamState::fallback || state == StreamState::stopped)
+                {
+                    error = "FengYin engine stopped; Windows shared fallback is required";
+                    break;
+                }
+            }
+            continue;
+        }
         if (wait != WAIT_OBJECT_0) { error = "FengYin engine request wait failed"; break; }
         juce::FloatVectorOperations::clear(left.data(), bufferFrames);
         juce::FloatVectorOperations::clear(right.data(), bufferFrames);

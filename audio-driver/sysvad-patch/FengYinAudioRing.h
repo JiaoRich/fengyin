@@ -8,7 +8,7 @@
 
 void FengYinAudioRingInitialize() noexcept;
 void FengYinAudioRingResetReader() noexcept;
-void FengYinAudioRingWrite(_In_reads_bytes_(byteCount) const BYTE* source,
+void FengYinAudioRingWrite(_In_reads_bytes_(byteCount) const UCHAR* source,
                            _In_ ULONG byteCount) noexcept;
-void FengYinAudioRingRead(_Out_writes_bytes_(byteCount) BYTE* destination,
+void FengYinAudioRingRead(_Out_writes_bytes_(byteCount) UCHAR* destination,
                           _In_ ULONG byteCount) noexcept;

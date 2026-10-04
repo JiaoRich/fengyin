@@ -138,9 +138,11 @@ void AudioEngineProcessController::stop() noexcept
 
 bool AudioEngineProcessController::isRunning() const noexcept
 {
-    return statusMapping.get() != nullptr
-        && static_cast<StreamState>(statusMapping.get()->state.load(std::memory_order_acquire))
-            == StreamState::running;
+    if (statusMapping.get() == nullptr) return false;
+    const auto state = static_cast<StreamState>(
+        statusMapping.get()->state.load(std::memory_order_acquire));
+    return state == StreamState::starting || state == StreamState::running
+        || state == StreamState::recovering;
 }
 
 std::uint32_t AudioEngineProcessController::actualBufferFrames() const noexcept

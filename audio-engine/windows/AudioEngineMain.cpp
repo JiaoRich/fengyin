@@ -42,6 +42,21 @@ bool launchRecoveryWatchdog()
     CloseHandle(process.hProcess);
     return true;
 }
+
+void discardQueuedAudio(SharedAudioRegion& region) noexcept
+{
+    region.readSequence.store(region.writeSequence.load(std::memory_order_acquire),
+                              std::memory_order_release);
+}
+
+void publishState(SharedAudioRegion& instrument, SharedAudioRegion& system,
+                  StreamState state, std::uint32_t frames) noexcept
+{
+    instrument.activePeriodFrames.store(frames, std::memory_order_release);
+    system.activePeriodFrames.store(frames, std::memory_order_release);
+    instrument.state.store(static_cast<std::uint32_t>(state), std::memory_order_release);
+    system.state.store(static_cast<std::uint32_t>(state), std::memory_order_release);
+}
 }
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
@@ -101,23 +116,26 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     DefaultEndpointRouter router;
     if (routeSystemAudio)
     {
-        std::wstring previousPhysicalEndpoint;
-        if (! router.routeSystemAudioToFengYin(previousPhysicalEndpoint, error))
+        // Start recovery before changing any Windows endpoint. If this process
+        // dies in the small interval between journal creation and the route
+        // becoming active, the watchdog still observes our exit and restores
+        // the journal instead of leaving Windows pointed at a dead endpoint.
+        if (! launchRecoveryWatchdog())
         {
             CloseHandle(stopEvent);
             ReleaseMutex(singleton);
             CloseHandle(singleton);
             return 4;
         }
-        if (preferredEndpointId.empty()) preferredEndpointId = previousPhysicalEndpoint;
-        if (! launchRecoveryWatchdog())
+        std::wstring previousPhysicalEndpoint;
+        if (! router.routeSystemAudioToFengYin(previousPhysicalEndpoint, error))
         {
-            router.restore();
             CloseHandle(stopEvent);
             ReleaseMutex(singleton);
             CloseHandle(singleton);
             return 5;
         }
+        if (preferredEndpointId.empty()) preferredEndpointId = previousPhysicalEndpoint;
     }
     WasapiExclusiveOutput output;
     if (! output.start(core, requestedFrames, preferredEndpointId, error))
@@ -133,10 +151,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 
     lifecycle.markRunning();
     const auto actualFrames = output.actualBufferFrames();
-    instrumentMapping.get()->activePeriodFrames.store(actualFrames, std::memory_order_release);
-    systemMapping.get()->activePeriodFrames.store(actualFrames, std::memory_order_release);
-    instrumentMapping.get()->state.store(static_cast<std::uint32_t>(StreamState::running));
-    systemMapping.get()->state.store(static_cast<std::uint32_t>(StreamState::running));
+    publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::running, actualFrames);
     WasapiLoopbackInput loopback;
     std::wstring loopbackError;
     // The engineering fast path remains usable before the signed virtual
@@ -151,18 +166,84 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         CloseHandle(singleton);
         return 7;
     }
-    WaitForSingleObject(stopEvent, INFINITE);
+    // Device removal, sleep and driver resets invalidate an exclusive stream.
+    // Recover inside the engine process without rebuilding the VST graph. The
+    // existing fast-path client remains valid when the physical period is the
+    // same; if a replacement device requires another period we fail closed so
+    // the main app can reopen its audio device rather than drift or crackle.
+    bool unrecoverableOutputFailure = false;
+    while (WaitForSingleObject(stopEvent, 250) == WAIT_TIMEOUT)
+    {
+        if (output.isRunning())
+        {
+            if (! routeSystemAudio || loopback.isRunning()) continue;
+
+            // A Windows Audio service restart can invalidate only the virtual
+            // loopback side while the physical instrument stream remains
+            // healthy. Reopen that side independently so SWAM never reloads.
+            loopback.stop();
+            discardQueuedAudio(*systemMapping.get());
+            bool loopbackRecovered = false;
+            for (int attempt = 0; attempt < 6
+                 && WaitForSingleObject(stopEvent, 0) != WAIT_OBJECT_0; ++attempt)
+            {
+                std::wstring restartError;
+                if (loopback.start(*systemMapping.get(), restartError))
+                {
+                    loopbackRecovered = true;
+                    break;
+                }
+                if (WaitForSingleObject(stopEvent, 750) == WAIT_OBJECT_0) break;
+            }
+            if (loopbackRecovered) continue;
+            unrecoverableOutputFailure = true;
+            lifecycle.useFallback();
+            publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::fallback, 0);
+            break;
+        }
+        lifecycle.beginRecovery();
+        publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::recovering, 0);
+        output.stop();
+        discardQueuedAudio(*instrumentMapping.get());
+        discardQueuedAudio(*systemMapping.get());
+        core.reset();
+
+        bool recovered = false;
+        for (int attempt = 0; attempt < 6 && WaitForSingleObject(stopEvent, 0) != WAIT_OBJECT_0; ++attempt)
+        {
+            std::wstring restartError;
+            if (output.start(core, requestedFrames, preferredEndpointId, restartError))
+            {
+                const auto recoveredFrames = output.actualBufferFrames();
+                if (recoveredFrames == actualFrames)
+                {
+                    publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::running,
+                                 recoveredFrames);
+                    lifecycle.markRunning();
+                    recovered = true;
+                    break;
+                }
+                output.stop();
+            }
+            if (WaitForSingleObject(stopEvent, 750) == WAIT_OBJECT_0) break;
+        }
+        if (! recovered)
+        {
+            unrecoverableOutputFailure = true;
+            lifecycle.useFallback();
+            publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::fallback, 0);
+            break;
+        }
+    }
     lifecycle.stop();
     loopback.stop();
     output.stop();
-    instrumentMapping.get()->state.store(static_cast<std::uint32_t>(StreamState::stopped));
-    systemMapping.get()->state.store(static_cast<std::uint32_t>(StreamState::stopped));
-    instrumentMapping.get()->activePeriodFrames.store(0, std::memory_order_release);
-    systemMapping.get()->activePeriodFrames.store(0, std::memory_order_release);
+    if (! unrecoverableOutputFailure)
+        publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::stopped, 0);
     CloseHandle(stopEvent);
     ReleaseMutex(singleton);
     CloseHandle(singleton);
-    return 0;
+    return unrecoverableOutputFailure ? 8 : 0;
 }
 #else
 int main() { return 0; }

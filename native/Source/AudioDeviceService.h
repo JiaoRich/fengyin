@@ -22,7 +22,7 @@ struct AudioDeviceStatus
     juce::String error;
 };
 
-class AudioDeviceService final
+class AudioDeviceService final : private juce::Timer
 {
 public:
     AudioDeviceService();
@@ -91,6 +91,7 @@ private:
     bool startNextLatencyCandidate();
     juce::String finishAutomaticLatencyTuning();
     void saveSettings();
+    void timerCallback() override;
 
     juce::AudioDeviceManager manager;
     audioengine::AudioEngineProcessController engineProcess;

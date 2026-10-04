@@ -3,23 +3,23 @@
 namespace
 {
 constexpr ULONG capacity = 1u << 18; // 262,144 bytes; power-of-two wrapping.
-alignas(64) BYTE storage[capacity] {};
+alignas(64) UCHAR storage[capacity] {};
 KSPIN_LOCK lock {};
 ULONGLONG writePosition = 0;
 ULONGLONG readPosition = 0;
 
-void copyIntoRing(ULONGLONG position, const BYTE* source, ULONG bytes) noexcept
+void copyIntoRing(ULONGLONG position, const UCHAR* source, ULONG bytes) noexcept
 {
     const auto offset = static_cast<ULONG>(position & (capacity - 1));
-    const auto first = min(bytes, capacity - offset);
+    const auto first = bytes < capacity - offset ? bytes : capacity - offset;
     RtlCopyMemory(storage + offset, source, first);
     if (bytes > first) RtlCopyMemory(storage, source + first, bytes - first);
 }
 
-void copyFromRing(ULONGLONG position, BYTE* destination, ULONG bytes) noexcept
+void copyFromRing(ULONGLONG position, UCHAR* destination, ULONG bytes) noexcept
 {
     const auto offset = static_cast<ULONG>(position & (capacity - 1));
-    const auto first = min(bytes, capacity - offset);
+    const auto first = bytes < capacity - offset ? bytes : capacity - offset;
     RtlCopyMemory(destination, storage + offset, first);
     if (bytes > first) RtlCopyMemory(destination + first, storage, bytes - first);
 }
@@ -41,7 +41,7 @@ void FengYinAudioRingResetReader() noexcept
     KeReleaseSpinLock(&lock, previousIrql);
 }
 
-void FengYinAudioRingWrite(const BYTE* source, ULONG byteCount) noexcept
+void FengYinAudioRingWrite(const UCHAR* source, ULONG byteCount) noexcept
 {
     if (source == nullptr || byteCount == 0) return;
     if (byteCount > capacity)
@@ -58,7 +58,7 @@ void FengYinAudioRingWrite(const BYTE* source, ULONG byteCount) noexcept
     KeReleaseSpinLock(&lock, previousIrql);
 }
 
-void FengYinAudioRingRead(BYTE* destination, ULONG byteCount) noexcept
+void FengYinAudioRingRead(UCHAR* destination, ULONG byteCount) noexcept
 {
     if (destination == nullptr || byteCount == 0) return;
     KIRQL previousIrql;

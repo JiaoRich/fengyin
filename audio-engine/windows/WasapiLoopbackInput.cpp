@@ -146,12 +146,16 @@ void WasapiLoopbackInput::run(SharedAudioRegion* destination) noexcept
     WAVEFORMATEX* mixFormat = nullptr;
     auto fail = [&] (const wchar_t* message)
     {
+        if (destination != nullptr)
+            destination->producerActive.store(0, std::memory_order_release);
         startError = message;
         running.store(false, std::memory_order_release);
         if (startedEvent != nullptr) SetEvent(startedEvent);
     };
     auto finish = [&]
     {
+        if (destination != nullptr)
+            destination->producerActive.store(0, std::memory_order_release);
         if (client) client->Stop();
         if (mixFormat != nullptr) CoTaskMemFree(mixFormat);
         if (mmcss != nullptr) AvRevertMmThreadCharacteristics(mmcss);

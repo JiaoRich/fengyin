@@ -82,6 +82,7 @@ AudioDeviceService::AudioDeviceService()
 
 AudioDeviceService::~AudioDeviceService()
 {
+    stopTimer();
     manager.closeAudioDevice();
     engineProcess.stop();
 }
@@ -110,7 +111,14 @@ juce::String AudioDeviceService::initialise()
             engineState.setAttribute("audioDeviceOutChans", "11");
             lastError = manager.initialise(0, 2, &engineState, false);
             if (lastError.isEmpty())
+            {
+                // The timer runs on JUCE's message thread. If the isolated
+                // engine exhausts its own device-recovery attempts, return to
+                // the ordinary Windows shared output without touching VST or
+                // application data and without requiring an app restart.
+                startTimer(250);
                 return {};
+            }
             manager.closeAudioDevice();
             engineProcess.stop();
         }
@@ -137,6 +145,20 @@ juce::String AudioDeviceService::initialise()
     }
    #endif
     return lastError;
+}
+
+void AudioDeviceService::timerCallback()
+{
+   #if JUCE_WINDOWS
+    if (engineProcess.isRunning()) return;
+    stopTimer();
+    manager.closeAudioDevice();
+    engineProcess.stop();
+    const auto fallbackError = manager.initialise(0, 2, nullptr, true);
+    lastError = fallbackError.isEmpty()
+        ? juce::String::fromUTF8("低延迟声音引擎已自动恢复为 Windows 共享输出")
+        : juce::String::fromUTF8("低延迟声音引擎和 Windows 共享输出均未能恢复：") + fallbackError;
+   #endif
 }
 
 AudioDeviceStatus AudioDeviceService::getStatus()

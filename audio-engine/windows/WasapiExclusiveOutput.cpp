@@ -261,7 +261,11 @@ void WasapiExclusiveOutput::run(AudioEngineCore* engine, std::uint32_t requested
     while (! stopRequested.load(std::memory_order_acquire))
     {
         const auto wait = WaitForSingleObject(audioEvent, 1000);
-        if (wait == WAIT_TIMEOUT) continue;
+        // A healthy 128–512 frame stream signals every 3–11 ms. One full
+        // second without an event means the device, service or power state
+        // changed; leave the worker so the engine recovery state machine can
+        // reopen the endpoint instead of remaining silently "running".
+        if (wait == WAIT_TIMEOUT) break;
         if (wait != WAIT_OBJECT_0) break;
         engine->render(planes, 2, actualFrames);
         bytes = nullptr;

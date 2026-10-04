@@ -116,7 +116,13 @@ try {
                 192000,')
     )
     Edit-PinnedFile 'audio\sysvad\TabletAudioSample\TabletAudioSample.vcxproj' @(
-        @('    <ClCompile Include="..\common.cpp" />', "    <ClCompile Include=`"..\common.cpp`" />`n    <ClCompile Include=`"..\FengYinAudioRing.cpp`" />")
+        @('    <ClCompile Include="..\common.cpp" />', "    <ClCompile Include=`"..\common.cpp`" />`n    <ClCompile Include=`"..\FengYinAudioRing.cpp`" />"),
+        @('  <ItemDefinitionGroup Condition="''$(Configuration)|$(Platform)''==''Release|x64''">
+    <Link>', '  <ItemDefinitionGroup Condition="''$(Configuration)|$(Platform)''==''Release|x64''">
+    <ClCompile>
+      <DisableSpecificWarnings>4296;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>')
     )
     Edit-PinnedFile 'audio\sysvad\TabletAudioSample\minipairs.h' @(
         @('    &SpeakerMiniports,

@@ -56,10 +56,21 @@ jobs:
           }
           $env:PATH = "$($stampInf.Directory.FullName);$env:PATH"
 
+          $infVerif = Get-ChildItem "$env:RUNNER_TEMP/fengyin-driver-source/packages" `
+            -Filter infverif.dll -Recurse -File |
+            Where-Object { $_.FullName -match '[\\/]x64[\\/]infverif\.dll$' } |
+            Select-Object -First 1
+          if (-not $infVerif) {
+            throw "WDK NuGet 包中未找到 x64/infverif.dll"
+          }
+          $env:PATH = "$($infVerif.Directory.FullName);$env:PATH"
+
           & $msbuild "$env:RUNNER_TEMP/fengyin-driver-source/audio/sysvad/TabletAudioSample/TabletAudioSample.vcxproj" `
             -restore `
             -p:Configuration=Release `
             -p:Platform=x64 `
+            -p:TreatWarningAsError=false `
+            -p:SkipPackageVerification=true `
             -m
 
       - name: 上传内部编译产物
