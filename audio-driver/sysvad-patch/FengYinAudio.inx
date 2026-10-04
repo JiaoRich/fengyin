@@ -14,9 +14,9 @@ PnpLockDown = 1
 tabletaudiosample.sys = 1
 
 [Manufacturer]
-%MfgName% = FengYin,NTamd64.10.0
+%MfgName% = FengYin,NTamd64.10.0...16299
 
-[FengYin.NTamd64.10.0]
+[FengYin.NTamd64.10.0...16299]
 %FengYin.DeviceDesc% = FengYinAudio, Root\FengYinAudioEngine
 
 [DestinationDirs]

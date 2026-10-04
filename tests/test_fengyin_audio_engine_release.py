@@ -24,14 +24,15 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
     def test_driver_is_render_only_and_has_stable_hardware_id(self):
         inf = self.read("audio-driver/sysvad-patch/FengYinAudio.inx")
         self.assertIn(r"Root\FengYinAudioEngine", inf)
+        self.assertIn("NTamd64.10.0...16299", inf)
         self.assertIn('FengYin.SpeakerName = "风吟共享扬声器"', inf)
         self.assertNotIn("KSCATEGORY_CAPTURE", inf)
         self.assertNotIn("WaveMic", inf)
 
     def test_ci_keeps_driver_validation_enabled(self):
         workflow = self.read(".github/workflows/audio-driver-build.yml")
-        self.assertIn("ApiValidator.exe", workflow)
-        self.assertIn("infverif.exe", workflow)
+        self.assertIn("apivalidator.exe", workflow.lower())
+        self.assertIn("infverif.exe", workflow.lower())
         self.assertNotIn("RunApiValidator=false", workflow)
 
     def test_public_package_rejects_test_signed_driver(self):
