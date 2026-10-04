@@ -124,6 +124,17 @@ target_sources(FengYin PRIVATE
     native/Source/AudioDeviceService.h
     native/Source/WindowsLowLatencyOptimizer.cpp
     native/Source/WindowsLowLatencyOptimizer.h
+    audio-engine/client/FengYinEngineAudioIODevice.cpp
+    audio-engine/client/FengYinEngineAudioIODevice.h
+    audio-engine/windows/NamedSharedAudioRegion.cpp
+    audio-engine/windows/NamedSharedAudioRegion.h
+    audio-engine/common/FengYinAudioProtocol.h
+)
+
+target_include_directories(FengYin PRIVATE
+    audio-engine/client
+    audio-engine/common
+    audio-engine/windows
 )
 
 target_compile_definitions(FengYin PRIVATE
@@ -197,9 +208,30 @@ if(WIN32)
         NOMINMAX
         WIN32_LEAN_AND_MEAN
     )
+
+    add_executable(FengYinAudioEngine WIN32
+        audio-engine/windows/AudioEngineMain.cpp
+        audio-engine/windows/NamedSharedAudioRegion.cpp
+        audio-engine/windows/NamedSharedAudioRegion.h
+        audio-engine/windows/WasapiExclusiveOutput.cpp
+        audio-engine/windows/WasapiExclusiveOutput.h
+        audio-engine/service/AudioEngineCore.cpp
+        audio-engine/service/AudioEngineCore.h
+        audio-engine/common/FengYinAudioProtocol.h
+    )
+    target_include_directories(FengYinAudioEngine PRIVATE
+        audio-engine/common
+        audio-engine/service
+        audio-engine/windows
+    )
+    target_compile_definitions(FengYinAudioEngine PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_link_libraries(FengYinAudioEngine PRIVATE ole32 avrt)
 endif()
 
 install(TARGETS FengYin RUNTIME DESTINATION . BUNDLE DESTINATION .)
+if(WIN32)
+    install(TARGETS FengYinAudioEngine RUNTIME DESTINATION .)
+endif()
 
 # 正式发布时把审核过许可的 ffmpeg.exe 放到这个位置，安装时会自动携带。
 set(FENGYIN_FFMPEG_EXE
@@ -242,6 +274,22 @@ if(BUILD_TESTING)
     target_compile_definitions(FengYinStudioTests PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
     target_link_libraries(FengYinStudioTests PRIVATE juce::juce_audio_processors juce::juce_cryptography juce::juce_recommended_config_flags)
     add_test(NAME tone_studio_chain_package COMMAND FengYinStudioTests)
+
+    add_executable(FengYinAudioEngineProtocolTests
+        tests/test_audio_engine_protocol.cpp
+    )
+    target_include_directories(FengYinAudioEngineProtocolTests PRIVATE audio-engine/common)
+    add_test(NAME audio_engine_protocol COMMAND FengYinAudioEngineProtocolTests)
+
+    add_executable(FengYinAudioEngineCoreTests
+        tests/test_audio_engine_core.cpp
+        audio-engine/service/AudioEngineCore.cpp
+    )
+    target_include_directories(FengYinAudioEngineCoreTests PRIVATE
+        audio-engine/common
+        audio-engine/service
+    )
+    add_test(NAME audio_engine_core COMMAND FengYinAudioEngineCoreTests)
 
     add_executable(FengYinLicenseTests tests/test_license_service.cpp native/Source/LicenseService.cpp)
     target_include_directories(FengYinLicenseTests PRIVATE native/Source)
