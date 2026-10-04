@@ -10,7 +10,7 @@
 namespace fengyin::audioengine
 {
 constexpr std::uint32_t protocolMagic = 0x45415946u; // "FYAE" in little endian
-constexpr std::uint16_t protocolMajor = 1;
+constexpr std::uint16_t protocolMajor = 2;
 constexpr std::uint16_t protocolMinor = 0;
 constexpr std::uint32_t engineSampleRate = 48000;
 constexpr std::uint16_t engineChannels = 2;
@@ -65,7 +65,11 @@ struct alignas(64) SharedAudioRegion
     std::atomic<std::uint64_t> consumerHeartbeat { 0 };
     std::atomic<std::uint64_t> droppedBlocks { 0 };
     std::atomic<std::uint32_t> state { static_cast<std::uint32_t>(StreamState::stopped) };
-    std::uint32_t reserved = 0;
+    // The physical backend publishes the period it actually obtained. Some
+    // drivers align a requested 128/256-frame period to a nearby legal value;
+    // the producer must render that real size or its queue slowly accumulates
+    // latency even though neither side reports an xrun.
+    std::atomic<std::uint32_t> activePeriodFrames { 0 };
     std::array<AudioBlock, audioBlockSlots> blocks {};
 };
 
@@ -94,6 +98,7 @@ inline void initialiseRegion(SharedAudioRegion& region) noexcept
     region.consumerHeartbeat.store(0, std::memory_order_relaxed);
     region.droppedBlocks.store(0, std::memory_order_relaxed);
     region.state.store(static_cast<std::uint32_t>(StreamState::stopped), std::memory_order_relaxed);
+    region.activePeriodFrames.store(0, std::memory_order_relaxed);
     for (auto& block : region.blocks)
         block = {};
 }
@@ -133,6 +138,7 @@ public:
                     ? channels[channel][frame] : 0.0f;
 
         region.writeSequence.store(write + 1, std::memory_order_release);
+        region.producerHeartbeat.fetch_add(1, std::memory_order_relaxed);
         return true;
     }
 
@@ -155,6 +161,7 @@ public:
             return false;
         destination = region.blocks[static_cast<std::size_t>(read % audioBlockSlots)];
         region.readSequence.store(read + 1, std::memory_order_release);
+        region.consumerHeartbeat.fetch_add(1, std::memory_order_relaxed);
         return true;
     }
 
@@ -162,4 +169,3 @@ private:
     SharedAudioRegion& region;
 };
 }
-

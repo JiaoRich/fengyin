@@ -11,6 +11,7 @@ int main()
     SharedAudioRegion region;
     initialiseRegion(region);
     assert(isCompatible(region.protocol));
+    assert(region.activePeriodFrames.load() == 0);
 
     AudioBlockProducer producer(region);
     AudioBlockConsumer consumer(region);
@@ -23,9 +24,11 @@ int main()
     }
     const float* channels[] { left.data(), right.data() };
     assert(producer.tryPush(channels, 2, 128, 123456));
+    assert(region.producerHeartbeat.load() == 1);
 
     AudioBlock block;
     assert(consumer.tryPop(block));
+    assert(region.consumerHeartbeat.load() == 1);
     assert(block.sequence == 0);
     assert(block.qpcTimestamp == 123456);
     assert(block.frameCount == 128);
@@ -61,4 +64,3 @@ int main()
     assert(! consumer.tryPop(block));
     return 0;
 }
-

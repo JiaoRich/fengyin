@@ -5,6 +5,8 @@
 #include <optional>
 #include <vector>
 
+#include "AudioEngineProcessController.h"
+
 namespace fengyin
 {
 struct AudioDeviceStatus
@@ -24,6 +26,7 @@ class AudioDeviceService final
 {
 public:
     AudioDeviceService();
+    ~AudioDeviceService();
 
     juce::String initialise();
     [[nodiscard]] AudioDeviceStatus getStatus();
@@ -90,6 +93,7 @@ private:
     void saveSettings();
 
     juce::AudioDeviceManager manager;
+    audioengine::AudioEngineProcessController engineProcess;
     juce::ApplicationProperties properties;
     juce::String lastError;
     int observedXRunCount = 0;

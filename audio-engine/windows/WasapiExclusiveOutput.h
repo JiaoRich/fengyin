@@ -27,13 +27,15 @@ public:
     WasapiExclusiveOutput(const WasapiExclusiveOutput&) = delete;
     WasapiExclusiveOutput& operator=(const WasapiExclusiveOutput&) = delete;
 
-    bool start(AudioEngineCore& engine, std::uint32_t requestedFrames, std::wstring& error);
+    bool start(AudioEngineCore& engine, std::uint32_t requestedFrames,
+               const std::wstring& preferredEndpointId, std::wstring& error);
     void stop() noexcept;
     [[nodiscard]] std::uint32_t actualBufferFrames() const noexcept { return activeFrames.load(); }
     [[nodiscard]] bool isRunning() const noexcept { return running.load(); }
 
 private:
-    void run(AudioEngineCore* engine, std::uint32_t requestedFrames) noexcept;
+    void run(AudioEngineCore* engine, std::uint32_t requestedFrames,
+             std::wstring preferredEndpointId) noexcept;
     void reportStarted(bool success, const std::wstring& message, std::uint32_t frames) noexcept;
 
     std::thread worker;

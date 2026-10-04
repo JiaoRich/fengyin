@@ -126,6 +126,8 @@ target_sources(FengYin PRIVATE
     native/Source/WindowsLowLatencyOptimizer.h
     audio-engine/client/FengYinEngineAudioIODevice.cpp
     audio-engine/client/FengYinEngineAudioIODevice.h
+    audio-engine/client/AudioEngineProcessController.cpp
+    audio-engine/client/AudioEngineProcessController.h
     audio-engine/windows/NamedSharedAudioRegion.cpp
     audio-engine/windows/NamedSharedAudioRegion.h
     audio-engine/common/FengYinAudioProtocol.h
@@ -199,7 +201,7 @@ target_include_directories(FengYinLicenseGenerator PRIVATE native/Source)
 target_link_libraries(FengYinLicenseGenerator PRIVATE juce::juce_cryptography)
 
 if(WIN32)
-    target_link_libraries(FengYin PRIVATE setupapi advapi32 shell32)
+    target_link_libraries(FengYin PRIVATE setupapi advapi32 shell32 avrt)
     target_compile_definitions(FengYin PRIVATE
         # ASIO 只供用户主动选择 KoordASIO 的 WASAPI 共享模式。默认和
         # 自动优化仍只使用 Windows 共享输出，不会打开独占驱动。
@@ -215,6 +217,8 @@ if(WIN32)
         audio-engine/windows/NamedSharedAudioRegion.h
         audio-engine/windows/WasapiExclusiveOutput.cpp
         audio-engine/windows/WasapiExclusiveOutput.h
+        audio-engine/windows/PhysicalOutputSelector.cpp
+        audio-engine/windows/PhysicalOutputSelector.h
         audio-engine/service/AudioEngineCore.cpp
         audio-engine/service/AudioEngineCore.h
         audio-engine/common/FengYinAudioProtocol.h
@@ -225,7 +229,7 @@ if(WIN32)
         audio-engine/windows
     )
     target_compile_definitions(FengYinAudioEngine PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
-    target_link_libraries(FengYinAudioEngine PRIVATE ole32 avrt)
+    target_link_libraries(FengYinAudioEngine PRIVATE ole32 avrt shell32 propsys)
 endif()
 
 install(TARGETS FengYin RUNTIME DESTINATION . BUNDLE DESTINATION .)

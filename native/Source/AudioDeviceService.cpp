@@ -1,5 +1,6 @@
 #include "AudioDeviceService.h"
 #include "AudioHardwareIdentity.h"
+#include "FengYinEngineAudioIODevice.h"
 #include <algorithm>
 
 namespace
@@ -79,8 +80,43 @@ AudioDeviceService::AudioDeviceService()
     properties.setStorageParameters(options);
 }
 
+AudioDeviceService::~AudioDeviceService()
+{
+    manager.closeAudioDevice();
+    engineProcess.stop();
+}
+
 juce::String AudioDeviceService::initialise()
 {
+   #if JUCE_WINDOWS
+    // Kept behind an explicit engineering flag until the signed virtual
+    // device, rollback and full acceptance suite are complete. This lets the
+    // Windows test package exercise the real instrument fast path without
+    // exposing a half-finished mode to ordinary users.
+    if (juce::SystemStats::getEnvironmentVariable("FENGYIN_AUDIO_ENGINE_TEST", {}) == "1")
+    {
+        juce::String engineError;
+        if (engineProcess.start(256, {}, engineError))
+        {
+            manager.addAudioDeviceType(std::make_unique<audioengine::FengYinEngineAudioIODeviceType>());
+            juce::XmlElement engineState("DEVICESETUP");
+            engineState.setAttribute("deviceType", "FengYin Audio Engine");
+            engineState.setAttribute("audioOutputDeviceName", "FengYin Low Latency Output");
+            engineState.setAttribute("audioInputDeviceName", juce::String());
+            engineState.setAttribute("audioDeviceRate", static_cast<double>(audioengine::engineSampleRate));
+            engineState.setAttribute("audioDeviceBufferSize",
+                                     static_cast<int>(engineProcess.actualBufferFrames()));
+            engineState.setAttribute("audioDeviceInChans", juce::String());
+            engineState.setAttribute("audioDeviceOutChans", "11");
+            lastError = manager.initialise(0, 2, &engineState, false);
+            if (lastError.isEmpty())
+                return {};
+            manager.closeAudioDevice();
+            engineProcess.stop();
+        }
+        lastError = engineError;
+    }
+   #endif
     std::unique_ptr<juce::XmlElement> saved;
     if (auto* settings = properties.getUserSettings())
         saved = juce::parseXML(settings->getValue("audioDevice"));
@@ -274,6 +310,8 @@ juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName
 
 juce::String AudioDeviceService::applyBestInitialSetup()
 {
+    if (engineProcess.isRunning())
+        return juce::String::fromUTF8("风吟音频引擎测试通道已启动");
     auto* settings = properties.getUserSettings();
     const auto current = getStatus();
     const auto revision = settings != nullptr ? settings->getIntValue("audioSetupRevision", 0) : 0;

@@ -1,22 +1,75 @@
 #include "WasapiExclusiveOutput.h"
 #include "NamedSharedAudioRegion.h"
+#include "PhysicalOutputSelector.h"
 
 #if defined(_WIN32)
 #include <avrt.h>
 #include <functiondiscoverykeys_devpkey.h>
+#include <ksmedia.h>
 #endif
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 
 namespace fengyin::audioengine
 {
+#if defined(_WIN32)
+namespace
+{
+enum class PhysicalSampleFormat { float32, pcm16 };
+
+WAVEFORMATEXTENSIBLE makeStereoFormat(PhysicalSampleFormat format)
+{
+    WAVEFORMATEXTENSIBLE result {};
+    result.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
+    result.Format.nChannels = engineChannels;
+    result.Format.nSamplesPerSec = engineSampleRate;
+    result.Format.wBitsPerSample = format == PhysicalSampleFormat::float32 ? 32 : 16;
+    result.Format.nBlockAlign = result.Format.nChannels * result.Format.wBitsPerSample / 8;
+    result.Format.nAvgBytesPerSec = result.Format.nSamplesPerSec * result.Format.nBlockAlign;
+    result.Format.cbSize = sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX);
+    result.Samples.wValidBitsPerSample = result.Format.wBitsPerSample;
+    result.dwChannelMask = SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT;
+    result.SubFormat = format == PhysicalSampleFormat::float32
+        ? KSDATAFORMAT_SUBTYPE_IEEE_FLOAT : KSDATAFORMAT_SUBTYPE_PCM;
+    return result;
+}
+
+void interleaveOutput(BYTE* destination, PhysicalSampleFormat format,
+                      const float* left, const float* right, UINT32 frames) noexcept
+{
+    if (format == PhysicalSampleFormat::float32)
+    {
+        auto* samples = reinterpret_cast<float*>(destination);
+        for (UINT32 frame = 0; frame < frames; ++frame)
+        {
+            samples[frame * 2] = left[frame];
+            samples[frame * 2 + 1] = right[frame];
+        }
+        return;
+    }
+    auto* samples = reinterpret_cast<std::int16_t*>(destination);
+    for (UINT32 frame = 0; frame < frames; ++frame)
+    {
+        const auto convert = [] (float value)
+        {
+            return static_cast<std::int16_t>(std::lrint(std::clamp(value, -1.0f, 1.0f) * 32767.0f));
+        };
+        samples[frame * 2] = convert(left[frame]);
+        samples[frame * 2 + 1] = convert(right[frame]);
+    }
+}
+}
+#endif
+
 WasapiExclusiveOutput::~WasapiExclusiveOutput()
 {
     stop();
 }
 
 bool WasapiExclusiveOutput::start(AudioEngineCore& engine, std::uint32_t requestedFrames,
+                                  const std::wstring& preferredEndpointId,
                                   std::wstring& error)
 {
     stop();
@@ -32,7 +85,10 @@ bool WasapiExclusiveOutput::start(AudioEngineCore& engine, std::uint32_t request
         startMessage.clear();
     }
     stopRequested.store(false, std::memory_order_release);
-    worker = std::thread([this, &engine, requestedFrames] { run(&engine, requestedFrames); });
+    worker = std::thread([this, &engine, requestedFrames, preferredEndpointId]
+    {
+        run(&engine, requestedFrames, preferredEndpointId);
+    });
     std::unique_lock lock(startMutex);
     if (! startCondition.wait_for(lock, std::chrono::seconds(5), [this] { return startReported; }))
     {
@@ -76,7 +132,8 @@ void WasapiExclusiveOutput::reportStarted(bool success, const std::wstring& mess
     startCondition.notify_all();
 }
 
-void WasapiExclusiveOutput::run(AudioEngineCore* engine, std::uint32_t requestedFrames) noexcept
+void WasapiExclusiveOutput::run(AudioEngineCore* engine, std::uint32_t requestedFrames,
+                                std::wstring preferredEndpointId) noexcept
 {
 #if defined(_WIN32)
     const auto coResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
@@ -103,7 +160,10 @@ void WasapiExclusiveOutput::run(AudioEngineCore* engine, std::uint32_t requested
 
     auto hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
                                IID_PPV_ARGS(&enumerator));
-    if (SUCCEEDED(hr)) hr = enumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &device);
+    std::wstring selectedId, selectedName, selectionError;
+    if (SUCCEEDED(hr) && ! selectPhysicalOutput(*enumerator.Get(), preferredEndpointId,
+                                                device, selectedId, selectedName, selectionError))
+        hr = E_NOTFOUND;
     if (SUCCEEDED(hr)) hr = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, &client);
     if (FAILED(hr))
     {
@@ -112,21 +172,21 @@ void WasapiExclusiveOutput::run(AudioEngineCore* engine, std::uint32_t requested
         return;
     }
 
-    WAVEFORMATEX format {};
-    format.wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
-    format.nChannels = engineChannels;
-    format.nSamplesPerSec = engineSampleRate;
-    format.wBitsPerSample = 32;
-    format.nBlockAlign = format.nChannels * format.wBitsPerSample / 8;
-    format.nAvgBytesPerSec = format.nSamplesPerSec * format.nBlockAlign;
-    if (client->IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE, &format, nullptr) != S_OK)
+    auto sampleFormat = PhysicalSampleFormat::float32;
+    auto format = makeStereoFormat(sampleFormat);
+    if (client->IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE, &format.Format, nullptr) != S_OK)
     {
-        reportStarted(false, L"The physical output does not support 48 kHz stereo float in exclusive mode", 0);
-        finish();
-        return;
+        sampleFormat = PhysicalSampleFormat::pcm16;
+        format = makeStereoFormat(sampleFormat);
+        if (client->IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE, &format.Format, nullptr) != S_OK)
+        {
+            reportStarted(false, L"The physical output does not support 48 kHz stereo in exclusive mode", 0);
+            finish();
+            return;
+        }
     }
 
-    const auto requestedDuration = static_cast<REFERENCE_TIME>(
+    auto requestedDuration = static_cast<REFERENCE_TIME>(
         (10000000ull * requestedFrames + engineSampleRate - 1) / engineSampleRate);
     audioEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     instrumentRequest = CreateSemaphoreW(nullptr, 0, 4, instrumentRequestSemaphoreName);
@@ -138,7 +198,24 @@ void WasapiExclusiveOutput::run(AudioEngineCore* engine, std::uint32_t requested
     }
     hr = client->Initialize(AUDCLNT_SHAREMODE_EXCLUSIVE,
                             AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_NOPERSIST,
-                            requestedDuration, requestedDuration, &format, nullptr);
+                            requestedDuration, requestedDuration, &format.Format, nullptr);
+    if (hr == AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED)
+    {
+        UINT32 alignedFrames = 0;
+        if (SUCCEEDED(client->GetBufferSize(&alignedFrames)) && alignedFrames > 0
+            && alignedFrames <= maximumFramesPerBlock)
+        {
+            renderer.Reset();
+            client.Reset();
+            hr = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, &client);
+            requestedDuration = static_cast<REFERENCE_TIME>(
+                (10000000ull * alignedFrames + engineSampleRate - 1) / engineSampleRate);
+            if (SUCCEEDED(hr))
+                hr = client->Initialize(AUDCLNT_SHAREMODE_EXCLUSIVE,
+                                        AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_NOPERSIST,
+                                        requestedDuration, requestedDuration, &format.Format, nullptr);
+        }
+    }
     if (FAILED(hr))
     {
         reportStarted(false, L"The requested exclusive buffer is not supported", 0);
@@ -166,12 +243,7 @@ void WasapiExclusiveOutput::run(AudioEngineCore* engine, std::uint32_t requested
     hr = renderer->GetBuffer(actualFrames, &bytes);
     if (SUCCEEDED(hr))
     {
-        auto* interleaved = reinterpret_cast<float*>(bytes);
-        for (UINT32 frame = 0; frame < actualFrames; ++frame)
-        {
-            interleaved[frame * 2] = left[frame];
-            interleaved[frame * 2 + 1] = right[frame];
-        }
+        interleaveOutput(bytes, sampleFormat, left.data(), right.data(), actualFrames);
         hr = renderer->ReleaseBuffer(actualFrames, 0);
     }
     if (SUCCEEDED(hr)) hr = client->Start();
@@ -193,12 +265,7 @@ void WasapiExclusiveOutput::run(AudioEngineCore* engine, std::uint32_t requested
         engine->render(planes, 2, actualFrames);
         bytes = nullptr;
         if (FAILED(renderer->GetBuffer(actualFrames, &bytes))) break;
-        auto* interleaved = reinterpret_cast<float*>(bytes);
-        for (UINT32 frame = 0; frame < actualFrames; ++frame)
-        {
-            interleaved[frame * 2] = left[frame];
-            interleaved[frame * 2 + 1] = right[frame];
-        }
+        interleaveOutput(bytes, sampleFormat, left.data(), right.data(), actualFrames);
         if (FAILED(renderer->ReleaseBuffer(actualFrames, 0))) break;
         ReleaseSemaphore(instrumentRequest, 1, nullptr);
     }
@@ -206,6 +273,7 @@ void WasapiExclusiveOutput::run(AudioEngineCore* engine, std::uint32_t requested
 #else
     (void) engine;
     (void) requestedFrames;
+    (void) preferredEndpointId;
     reportStarted(false, L"WASAPI is only available on Windows", 0);
 #endif
 }

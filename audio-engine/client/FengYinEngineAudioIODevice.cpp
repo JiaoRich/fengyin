@@ -60,7 +60,14 @@ juce::String FengYinEngineAudioIODevice::open(const juce::BigInteger& inputChann
         return "Cannot create FengYin engine request semaphore";
     }
     producer = std::make_unique<AudioBlockProducer>(*mapping.get());
-    bufferFrames = bufferSizeSamples;
+    // The independent engine starts before the JUCE device is opened and
+    // publishes the physical period it really obtained. Honour that value so
+    // one callback always supplies exactly one hardware period.
+    const auto engineState = static_cast<StreamState>(mapping.get()->state.load(std::memory_order_acquire));
+    const auto engineFrames = mapping.get()->activePeriodFrames.load(std::memory_order_acquire);
+    bufferFrames = engineState == StreamState::running
+        && engineFrames > 0 && engineFrames <= maximumFramesPerBlock
+        ? static_cast<int>(engineFrames) : bufferSizeSamples;
     xruns.store(0, std::memory_order_relaxed);
     opened.store(true, std::memory_order_release);
     error.clear();
