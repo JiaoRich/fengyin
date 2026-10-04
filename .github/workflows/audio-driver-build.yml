@@ -125,6 +125,24 @@ jobs:
           if (-not (Test-Path $builtInf)) {
             throw "驱动已编译但未生成 FengYinAudio.inf"
           }
+          $releaseDir = Split-Path -Parent $builtInf
+          $builtCat = Join-Path $releaseDir "FengYinAudio.cat"
+          if (-not (Test-Path $builtCat)) {
+            $inf2Cat = Get-ChildItem "$env:RUNNER_TEMP/fengyin-driver-source/packages" `
+              -Filter inf2cat.exe -Recurse -File |
+              Where-Object {
+                $_.FullName -match 'Microsoft\.Windows\.WDK\.x64' -and
+                $_.FullName -match '[\\/]x64[\\/]inf2cat\.exe$'
+              } |
+              Select-Object -First 1
+            if (-not $inf2Cat) {
+              throw "WDK NuGet 包中未找到 x64/inf2cat.exe"
+            }
+            & $inf2Cat.FullName "/driver:$releaseDir" /os:10_X64 /uselocaltime
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path $builtCat)) {
+              throw "Inf2Cat 未能生成 FengYinAudio.cat：$LASTEXITCODE"
+            }
+          }
           $infVerifier = Get-ChildItem "$env:RUNNER_TEMP/fengyin-driver-source/packages" `
             -Filter infverif.exe -Recurse -File |
             Where-Object {

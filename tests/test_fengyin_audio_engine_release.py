@@ -33,6 +33,7 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         workflow = self.read(".github/workflows/audio-driver-build.yml")
         self.assertIn("apivalidator.exe", workflow.lower())
         self.assertIn("infverif.exe", workflow.lower())
+        self.assertIn("inf2cat.exe", workflow.lower())
         self.assertNotIn("RunApiValidator=false", workflow)
 
     def test_public_package_rejects_test_signed_driver(self):
