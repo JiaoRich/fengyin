@@ -1,4 +1,7 @@
 #if defined(_WIN32)
+#include "DefaultEndpointRouter.h"
+#include "NamedSharedAudioRegion.h"
+
 #include <windows.h>
 #include <newdev.h>
 #include <setupapi.h>
@@ -12,6 +15,41 @@
 namespace
 {
 constexpr wchar_t hardwareId[] = L"Root\\FengYinAudioEngine";
+void log(const std::wstring& message);
+
+bool stopAudioEngine()
+{
+    const auto singleton = OpenMutexW(SYNCHRONIZE | MUTEX_MODIFY_STATE, FALSE,
+                                      fengyin::audioengine::engineSingletonName);
+    if (singleton == nullptr) return true;
+    if (const auto stopEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE,
+                                          fengyin::audioengine::engineStopEventName))
+    {
+        SetEvent(stopEvent);
+        CloseHandle(stopEvent);
+    }
+    const auto stopped = WaitForSingleObject(singleton, 5000);
+    if (stopped == WAIT_OBJECT_0 || stopped == WAIT_ABANDONED)
+        ReleaseMutex(singleton);
+    CloseHandle(singleton);
+    return stopped == WAIT_OBJECT_0 || stopped == WAIT_ABANDONED;
+}
+
+bool prepareForDriverChange()
+{
+    if (! stopAudioEngine())
+    {
+        log(L"Audio engine did not stop before driver change");
+        return false;
+    }
+    std::wstring error;
+    if (! fengyin::audioengine::DefaultEndpointRouter::restorePendingRoute(error))
+    {
+        log(L"Default endpoint recovery failed before driver change: " + error);
+        return false;
+    }
+    return true;
+}
 
 std::filesystem::path logPath()
 {
@@ -121,6 +159,7 @@ int uninstall();
 
 int install(const std::filesystem::path& suppliedInf)
 {
+    if (! prepareForDriverChange()) return 9;
     std::error_code ignored;
     const auto infPath = std::filesystem::absolute(suppliedInf, ignored);
     if (ignored || ! std::filesystem::is_regular_file(infPath))
@@ -170,6 +209,10 @@ int install(const std::filesystem::path& suppliedInf)
 
 int uninstall()
 {
+    // Never remove the virtual endpoint while Windows may still use it as a
+    // default device. This guard also protects direct helper invocations that
+    // do not come from Inno Setup's normal close-applications sequence.
+    if (! prepareForDriverChange()) return 9;
     const auto devices = SetupDiGetClassDevsW(nullptr, nullptr, nullptr, DIGCF_ALLCLASSES);
     if (devices == INVALID_HANDLE_VALUE) return 6;
     bool failed = false;

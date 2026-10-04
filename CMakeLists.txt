@@ -246,9 +246,15 @@ if(WIN32)
 
     add_executable(FengYinDriverSetup WIN32
         audio-engine/windows/DriverSetupMain.cpp
+        audio-engine/windows/DefaultEndpointRouter.cpp
+        audio-engine/windows/DefaultEndpointRouter.h
+    )
+    target_include_directories(FengYinDriverSetup PRIVATE
+        audio-engine/common
+        audio-engine/windows
     )
     target_compile_definitions(FengYinDriverSetup PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
-    target_link_libraries(FengYinDriverSetup PRIVATE setupapi newdev shell32)
+    target_link_libraries(FengYinDriverSetup PRIVATE setupapi newdev ole32 shell32 propsys)
 endif()
 
 install(TARGETS FengYin RUNTIME DESTINATION . BUNDLE DESTINATION .)

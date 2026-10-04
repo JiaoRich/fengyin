@@ -44,6 +44,7 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         self.assertIn("Get-AuthenticodeSignature", validator)
         self.assertIn("FengYinDriverSetup.exe", installer)
         self.assertIn("--uninstall", installer)
+        self.assertIn("为保护系统声音", installer)
         self.assertNotIn("#if HasAudioDriver ==", installer)
 
     def test_production_driver_handoff_is_strict_and_repeatable(self):
@@ -64,6 +65,14 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         self.assertIn("--route-system-audio", acceptance)
         self.assertIn("--recover-only", acceptance)
         self.assertIn("--uninstall", acceptance)
+
+    def test_driver_change_stops_engine_and_restores_windows_route_first(self):
+        setup = self.read("audio-engine/windows/DriverSetupMain.cpp")
+        cmake = self.read("CMakeLists.txt")
+        self.assertIn("stopAudioEngine()", setup)
+        self.assertIn("DefaultEndpointRouter::restorePendingRoute", setup)
+        self.assertIn("if (! prepareForDriverChange()) return 9", setup)
+        self.assertIn("audio-engine/windows/DefaultEndpointRouter.cpp", cmake)
 
     def test_endpoint_route_has_crash_and_hotplug_recovery(self):
         router = self.read("audio-engine/windows/DefaultEndpointRouter.cpp")

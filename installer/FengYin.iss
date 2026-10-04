@@ -88,7 +88,14 @@ var
 begin
   #if HasAudioDriver
   if CurUninstallStep = usUninstall then
-    Exec(ExpandConstant('{app}\FengYinDriverSetup.exe'), '--uninstall', '',
-         SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  begin
+    if not Exec(ExpandConstant('{app}\FengYinDriverSetup.exe'), '--uninstall', '',
+      SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+      RaiseException('无法启动风吟音频驱动卸载程序。');
+    if (ResultCode <> 0) and (ResultCode <> 3010) then
+      RaiseException(Format('为保护系统声音，风吟没有删除虚拟音频设备（错误码 %d）。请先重启电脑，再重新卸载。', [ResultCode]));
+    if ResultCode = 3010 then
+      DriverNeedsRestart := True;
+  end;
   #endif
 end;
