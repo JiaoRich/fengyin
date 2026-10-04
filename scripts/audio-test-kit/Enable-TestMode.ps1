@@ -32,5 +32,5 @@ if ($LASTEXITCODE -ne 0) {
     throw "Windows 未能开启测试签名模式（错误码 $LASTEXITCODE）。请确认安全启动已关闭。"
 }
 
-Write-Host "测试签名模式已设置。请重启电脑，然后运行‘安装测试音频引擎.ps1’。" -ForegroundColor Green
+Write-Host "测试签名模式已设置。请重启电脑，然后双击‘2-安装测试音频引擎.cmd’。" -ForegroundColor Green
 Read-Host "按回车退出"

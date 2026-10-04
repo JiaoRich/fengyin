@@ -41,5 +41,5 @@ if (Test-Path $CertificatePath) {
 Remove-Item (Join-Path $env:ProgramData "FengYin\test-driver-cert-thumbprint.txt") -Force -ErrorAction SilentlyContinue
 
 Write-Host "测试驱动和随包测试证书已删除，Windows 默认声音已恢复。" -ForegroundColor Green
-Write-Host "如不再测试，请继续运行‘关闭Windows测试模式.ps1’并重启。" -ForegroundColor Yellow
+Write-Host "如不再测试，请继续双击‘4-关闭测试模式.cmd’并重启。" -ForegroundColor Yellow
 Read-Host "按回车退出"

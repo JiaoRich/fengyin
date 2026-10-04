@@ -1,2 +1,3 @@
 @echo off
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0关闭Windows测试模式.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Disable-TestMode.ps1"
+pause

@@ -25,7 +25,7 @@ $StartOptions = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control" -Name
 $BcdState = (& bcdedit.exe /enum "{current}" 2>$null) -join "`n"
 $TestSigningEnabled = $StartOptions -match "TESTSIGNING" -or $BcdState -match "(?im)^testsigning\s+(Yes|是|On)\s*$"
 if (-not $TestSigningEnabled) {
-    throw "Windows 尚未运行在测试签名模式。请先运行‘开启Windows测试模式.ps1’，重启后再安装。"
+    throw "Windows 尚未运行在测试签名模式。请先双击‘1-开启测试模式.cmd’，重启后再安装。"
 }
 
 $Certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($CertificatePath)

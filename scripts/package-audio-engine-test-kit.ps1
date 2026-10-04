@@ -26,10 +26,10 @@ foreach ($Name in @("FengYinAudio.inf", "FengYinAudio.cat", "TabletAudioSample.s
     Copy-Item (Join-Path $DriverDir $Name) (Join-Path $PackagedDriver $Name) -Force
 }
 
-Copy-Item (Join-Path $ProjectRoot "scripts\audio-test-kit\安装测试音频引擎.ps1") $OutputDir -Force
-Copy-Item (Join-Path $ProjectRoot "scripts\audio-test-kit\卸载并恢复系统声音.ps1") $OutputDir -Force
-Copy-Item (Join-Path $ProjectRoot "scripts\audio-test-kit\开启Windows测试模式.ps1") $OutputDir -Force
-Copy-Item (Join-Path $ProjectRoot "scripts\audio-test-kit\关闭Windows测试模式.ps1") $OutputDir -Force
+Copy-Item (Join-Path $ProjectRoot "scripts\audio-test-kit\Enable-TestMode.ps1") $OutputDir -Force
+Copy-Item (Join-Path $ProjectRoot "scripts\audio-test-kit\Install-TestAudioEngine.ps1") $OutputDir -Force
+Copy-Item (Join-Path $ProjectRoot "scripts\audio-test-kit\Uninstall-TestAudioEngine.ps1") $OutputDir -Force
+Copy-Item (Join-Path $ProjectRoot "scripts\audio-test-kit\Disable-TestMode.ps1") $OutputDir -Force
 Copy-Item (Join-Path $ProjectRoot "scripts\audio-test-kit\*.cmd") $OutputDir -Force
 Copy-Item (Join-Path $ProjectRoot "docs\风吟音频引擎免费实机测试说明.md") (Join-Path $OutputDir "测试说明-请先阅读.md") -Force
 

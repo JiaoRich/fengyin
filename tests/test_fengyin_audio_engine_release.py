@@ -49,13 +49,25 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         self.assertNotIn("package-audio-engine-test-kit.ps1", self.read("scripts/build-windows.ps1"))
 
     def test_free_engine_trial_has_complete_rollback(self):
-        install = self.read("scripts/audio-test-kit/安装测试音频引擎.ps1")
-        uninstall = self.read("scripts/audio-test-kit/卸载并恢复系统声音.ps1")
-        disable = self.read("scripts/audio-test-kit/关闭Windows测试模式.ps1")
+        install = self.read("scripts/audio-test-kit/Install-TestAudioEngine.ps1")
+        uninstall = self.read("scripts/audio-test-kit/Uninstall-TestAudioEngine.ps1")
+        disable = self.read("scripts/audio-test-kit/Disable-TestMode.ps1")
         self.assertIn("TrustedPublisher", install)
         self.assertIn("--recover-only", uninstall)
         self.assertIn("--uninstall", uninstall)
         self.assertIn("testsigning off", disable)
+
+    def test_trial_launchers_use_ascii_script_paths_and_keep_errors_visible(self):
+        expected = {
+            "scripts/audio-test-kit/1-开启测试模式.cmd": "Enable-TestMode.ps1",
+            "scripts/audio-test-kit/2-安装测试音频引擎.cmd": "Install-TestAudioEngine.ps1",
+            "scripts/audio-test-kit/3-卸载并恢复系统声音.cmd": "Uninstall-TestAudioEngine.ps1",
+            "scripts/audio-test-kit/4-关闭测试模式.cmd": "Disable-TestMode.ps1",
+        }
+        for launcher, script_name in expected.items():
+            contents = self.read(launcher)
+            self.assertIn(script_name, contents)
+            self.assertIn("pause", contents.lower())
 
     def test_public_package_rejects_test_signed_driver(self):
         release = self.read("scripts/check-release.ps1")
