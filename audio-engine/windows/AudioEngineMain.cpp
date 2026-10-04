@@ -1,4 +1,5 @@
 #include "AudioEngineCore.h"
+#include "DefaultEndpointRouter.h"
 #include "NamedSharedAudioRegion.h"
 #include "WasapiExclusiveOutput.h"
 #include "WasapiLoopbackInput.h"
@@ -19,18 +20,26 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 {
     std::wstring preferredEndpointId;
     std::uint32_t requestedFrames = 256;
+    bool routeSystemAudio = false;
     int argumentCount = 0;
     if (auto** arguments = CommandLineToArgvW(GetCommandLineW(), &argumentCount))
     {
-        for (int index = 1; index + 1 < argumentCount; ++index)
+        for (int index = 1; index < argumentCount; ++index)
             if (std::wstring(arguments[index]) == L"--physical-endpoint")
-                preferredEndpointId = arguments[++index];
+            {
+                if (index + 1 < argumentCount) preferredEndpointId = arguments[++index];
+            }
             else if (std::wstring(arguments[index]) == L"--buffer")
             {
-                const auto parsed = std::wcstoul(arguments[++index], nullptr, 10);
-                if (parsed == 128 || parsed == 256 || parsed == 512)
-                    requestedFrames = static_cast<std::uint32_t>(parsed);
+                if (index + 1 < argumentCount)
+                {
+                    const auto parsed = std::wcstoul(arguments[++index], nullptr, 10);
+                    if (parsed == 128 || parsed == 256 || parsed == 512)
+                        requestedFrames = static_cast<std::uint32_t>(parsed);
+                }
             }
+            else if (std::wstring(arguments[index]) == L"--route-system-audio")
+                routeSystemAudio = true;
         LocalFree(arguments);
     }
     HANDLE singleton = CreateMutexW(nullptr, TRUE, engineSingletonName);
@@ -61,6 +70,19 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     EngineLifecycle lifecycle;
     lifecycle.beginStart();
     AudioEngineCore core(*instrumentMapping.get(), *systemMapping.get());
+    DefaultEndpointRouter router;
+    if (routeSystemAudio)
+    {
+        std::wstring previousPhysicalEndpoint;
+        if (! router.routeSystemAudioToFengYin(previousPhysicalEndpoint, error))
+        {
+            CloseHandle(stopEvent);
+            ReleaseMutex(singleton);
+            CloseHandle(singleton);
+            return 4;
+        }
+        if (preferredEndpointId.empty()) preferredEndpointId = previousPhysicalEndpoint;
+    }
     WasapiExclusiveOutput output;
     if (! output.start(core, requestedFrames, preferredEndpointId, error))
     {
@@ -70,7 +92,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         CloseHandle(stopEvent);
         ReleaseMutex(singleton);
         CloseHandle(singleton);
-        return 4;
+        return 5;
     }
 
     lifecycle.markRunning();
@@ -83,7 +105,16 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     std::wstring loopbackError;
     // The engineering fast path remains usable before the signed virtual
     // speaker is installed. Once present, its Windows mix joins automatically.
-    (void) loopback.start(*systemMapping.get(), loopbackError);
+    const auto loopbackStarted = loopback.start(*systemMapping.get(), loopbackError);
+    if (routeSystemAudio && ! loopbackStarted)
+    {
+        output.stop();
+        router.restore();
+        CloseHandle(stopEvent);
+        ReleaseMutex(singleton);
+        CloseHandle(singleton);
+        return 6;
+    }
     WaitForSingleObject(stopEvent, INFINITE);
     lifecycle.stop();
     loopback.stop();

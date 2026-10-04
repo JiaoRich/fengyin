@@ -1,0 +1,48 @@
+name: 风吟虚拟音频驱动编译验证
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/fengyin-audio-engine-1.1.0
+    paths:
+      - "audio-driver/**"
+      - "scripts/prepare-fengyin-audio-driver.ps1"
+      - ".github/workflows/audio-driver-build.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-driver:
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 45
+    steps:
+      - name: 获取风吟源码
+        uses: actions/checkout@v4
+
+      - name: 准备固定版本 SysVAD
+        shell: pwsh
+        run: ./scripts/prepare-fengyin-audio-driver.ps1 -OutputDirectory "$env:RUNNER_TEMP/fengyin-driver-source"
+
+      - name: 恢复微软 WDK NuGet 工具链
+        shell: pwsh
+        run: nuget restore "$env:RUNNER_TEMP/fengyin-driver-source/packages.config" -PackagesDirectory "$env:RUNNER_TEMP/fengyin-driver-source/packages"
+
+      - name: 编译 x64 Release 驱动
+        shell: pwsh
+        run: |
+          msbuild "$env:RUNNER_TEMP/fengyin-driver-source/audio/sysvad/TabletAudioSample/TabletAudioSample.vcxproj" `
+            -restore `
+            -p:Configuration=Release `
+            -p:Platform=x64 `
+            -m
+
+      - name: 上传内部编译产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: fengyin-audio-driver-unsigned-internal
+          path: |
+            ${{ runner.temp }}/fengyin-driver-source/audio/sysvad/**/x64/Release/**
+            ${{ runner.temp }}/fengyin-driver-source/audio/sysvad/**/Release/**
+          if-no-files-found: error

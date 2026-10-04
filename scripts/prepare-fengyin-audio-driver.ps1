@@ -24,6 +24,22 @@ try {
 
     Copy-Item (Join-Path $patchRoot 'FengYinAudioRing.h') 'audio\sysvad\FengYinAudioRing.h'
     Copy-Item (Join-Path $patchRoot 'FengYinAudioRing.cpp') 'audio\sysvad\FengYinAudioRing.cpp'
+    # SysVAD tracks these files with CRLF. Normalising only the patched files
+    # makes git-apply deterministic on both Windows and CI without changing
+    # the rest of Microsoft's source tree.
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    $patchTargets = @(
+        'audio\sysvad\common.cpp',
+        'audio\sysvad\EndpointsCommon\minwavertstream.cpp',
+        'audio\sysvad\EndpointsCommon\speakerwavtable.h',
+        'audio\sysvad\TabletAudioSample\TabletAudioSample.vcxproj',
+        'audio\sysvad\TabletAudioSample\minipairs.h'
+    )
+    foreach ($target in $patchTargets) {
+        $text = [System.IO.File]::ReadAllText($target).Replace("`r`n", "`n")
+        $text = [System.Text.RegularExpressions.Regex]::Replace($text, '[ \t]+(?=\n)', '')
+        [System.IO.File]::WriteAllText($target, $text, $utf8NoBom)
+    }
     git apply --check (Join-Path $patchRoot 'apply-fengyin.patch')
     if ($LASTEXITCODE -ne 0) { throw '风吟 SysVAD 补丁与固定上游版本不匹配' }
     git apply (Join-Path $patchRoot 'apply-fengyin.patch')

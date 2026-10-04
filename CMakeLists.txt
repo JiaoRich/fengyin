@@ -213,6 +213,8 @@ if(WIN32)
 
     add_executable(FengYinAudioEngine WIN32
         audio-engine/windows/AudioEngineMain.cpp
+        audio-engine/windows/DefaultEndpointRouter.cpp
+        audio-engine/windows/DefaultEndpointRouter.h
         audio-engine/windows/NamedSharedAudioRegion.cpp
         audio-engine/windows/NamedSharedAudioRegion.h
         audio-engine/windows/WasapiExclusiveOutput.cpp

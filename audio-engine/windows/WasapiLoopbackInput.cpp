@@ -40,17 +40,30 @@ bool isFengYinSpeaker(IMMDevice& device)
         || name.find(L"风吟共享扬声器") != std::wstring::npos;
 }
 
-bool isFloatStereo48k(const WAVEFORMATEX& format)
+enum class SampleEncoding
 {
-    if (format.nSamplesPerSec != engineSampleRate || format.nChannels != engineChannels
-        || format.wBitsPerSample != 32)
-        return false;
-    if (format.wFormatTag == WAVE_FORMAT_IEEE_FLOAT) return true;
+    unsupported,
+    float32,
+    pcm16
+};
+
+SampleEncoding getSampleEncoding(const WAVEFORMATEX& format)
+{
+    if (format.nSamplesPerSec != engineSampleRate || format.nChannels != engineChannels)
+        return SampleEncoding::unsupported;
+    if (format.wFormatTag == WAVE_FORMAT_IEEE_FLOAT && format.wBitsPerSample == 32)
+        return SampleEncoding::float32;
+    if (format.wFormatTag == WAVE_FORMAT_PCM && format.wBitsPerSample == 16)
+        return SampleEncoding::pcm16;
     if (format.wFormatTag != WAVE_FORMAT_EXTENSIBLE
         || format.cbSize < sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX))
-        return false;
+        return SampleEncoding::unsupported;
     const auto& extensible = reinterpret_cast<const WAVEFORMATEXTENSIBLE&>(format);
-    return extensible.SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
+    if (extensible.SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT && format.wBitsPerSample == 32)
+        return SampleEncoding::float32;
+    if (extensible.SubFormat == KSDATAFORMAT_SUBTYPE_PCM && format.wBitsPerSample == 16)
+        return SampleEncoding::pcm16;
+    return SampleEncoding::unsupported;
 }
 
 Microsoft::WRL::ComPtr<IMMDevice> findFengYinSpeaker(IMMDeviceEnumerator& enumerator)
@@ -152,9 +165,11 @@ void WasapiLoopbackInput::run(SharedAudioRegion* destination) noexcept
     if (! device) hr = HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
     if (SUCCEEDED(hr)) hr = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, &client);
     if (SUCCEEDED(hr)) hr = client->GetMixFormat(&mixFormat);
-    if (FAILED(hr) || mixFormat == nullptr || ! isFloatStereo48k(*mixFormat))
+    const auto encoding = mixFormat != nullptr ? getSampleEncoding(*mixFormat)
+                                               : SampleEncoding::unsupported;
+    if (FAILED(hr) || encoding == SampleEncoding::unsupported)
     {
-        fail(L"FengYin virtual speaker format must be 48 kHz stereo float");
+        fail(L"FengYin virtual speaker format must be 48 kHz stereo PCM");
         finish();
         return;
     }
@@ -202,7 +217,6 @@ void WasapiLoopbackInput::run(SharedAudioRegion* destination) noexcept
             while (remaining > 0)
             {
                 const auto frames = std::min<std::uint32_t>(remaining, maximumFramesPerBlock);
-                const auto* interleaved = reinterpret_cast<const float*>(bytes);
                 const float* channels[2] {};
                 std::array<float, maximumFramesPerBlock> left {}, right {};
                 if ((flags & AUDCLNT_BUFFERFLAGS_SILENT) != 0 || bytes == nullptr)
@@ -212,10 +226,24 @@ void WasapiLoopbackInput::run(SharedAudioRegion* destination) noexcept
                 }
                 else
                 {
-                    for (std::uint32_t frame = 0; frame < frames; ++frame)
+                    if (encoding == SampleEncoding::float32)
                     {
-                        left[frame] = interleaved[(offset + frame) * 2];
-                        right[frame] = interleaved[(offset + frame) * 2 + 1];
+                        const auto* interleaved = reinterpret_cast<const float*>(bytes);
+                        for (std::uint32_t frame = 0; frame < frames; ++frame)
+                        {
+                            left[frame] = interleaved[(offset + frame) * 2];
+                            right[frame] = interleaved[(offset + frame) * 2 + 1];
+                        }
+                    }
+                    else
+                    {
+                        const auto* interleaved = reinterpret_cast<const std::int16_t*>(bytes);
+                        constexpr auto scale = 1.0f / 32768.0f;
+                        for (std::uint32_t frame = 0; frame < frames; ++frame)
+                        {
+                            left[frame] = static_cast<float>(interleaved[(offset + frame) * 2]) * scale;
+                            right[frame] = static_cast<float>(interleaved[(offset + frame) * 2 + 1]) * scale;
+                        }
                     }
                     channels[0] = left.data();
                     channels[1] = right.data();
