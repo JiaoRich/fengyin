@@ -32,7 +32,17 @@ jobs:
       - name: 编译 x64 Release 驱动
         shell: pwsh
         run: |
-          msbuild "$env:RUNNER_TEMP/fengyin-driver-source/audio/sysvad/TabletAudioSample/TabletAudioSample.vcxproj" `
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          if (-not (Test-Path $vswhere)) {
+            throw "未找到 Visual Studio Installer 的 vswhere.exe"
+          }
+
+          $msbuild = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -find MSBuild/**/Bin/MSBuild.exe | Select-Object -First 1
+          if (-not $msbuild -or -not (Test-Path $msbuild)) {
+            throw "未找到可用的 MSBuild.exe"
+          }
+
+          & $msbuild "$env:RUNNER_TEMP/fengyin-driver-source/audio/sysvad/TabletAudioSample/TabletAudioSample.vcxproj" `
             -restore `
             -p:Configuration=Release `
             -p:Platform=x64 `

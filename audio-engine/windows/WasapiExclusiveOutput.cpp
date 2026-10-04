@@ -4,6 +4,7 @@
 
 #if defined(_WIN32)
 #include <avrt.h>
+#include <propkeydef.h>
 #include <functiondiscoverykeys_devpkey.h>
 #include <ksmedia.h>
 #endif
