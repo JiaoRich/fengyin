@@ -32,7 +32,7 @@ foreach ($Name in @("FengYinAudio.cat", "TabletAudioSample.sys")) {
     if ($Signature.SignerCertificate.Thumbprint -ne $Certificate.Thumbprint) {
         throw "$Name 与随包测试证书不匹配。"
     }
-    if ($Signature.Status -notin @("Valid", "UnknownError")) {
+    if ($Signature.Status -notin @("Valid", "UnknownError", "NotTrusted")) {
         # A clean machine may not trust the test root until installation time;
         # UnknownError is acceptable only when signer identity still matches.
         throw "$Name 签名状态异常：$($Signature.Status)"

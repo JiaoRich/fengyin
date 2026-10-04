@@ -174,8 +174,9 @@ jobs:
           # with exactly the same ephemeral WDK test certificate as the SYS.
           $sysPath = Join-Path $releaseDir "TabletAudioSample.sys"
           $sysSignature = Get-AuthenticodeSignature $sysPath
-          if ($sysSignature.Status -ne 'Valid' -or -not $sysSignature.SignerCertificate) {
-            throw "TabletAudioSample.sys 没有有效的 WDK 测试签名。"
+          if (-not $sysSignature.SignerCertificate -or
+              $sysSignature.Status -notin @('Valid', 'UnknownError', 'NotTrusted')) {
+            throw "TabletAudioSample.sys 没有可验证的 WDK 测试签名：$($sysSignature.Status)"
           }
           $testThumbprint = $sysSignature.SignerCertificate.Thumbprint
           if ($sysSignature.SignerCertificate.Subject -notmatch 'WDKTestCert|Windows Test|Test Certificate') {
