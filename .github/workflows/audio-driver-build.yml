@@ -11,6 +11,10 @@ on:
       - "scripts/prepare-driver-submission.ps1"
       - "scripts/import-signed-driver.ps1"
       - "scripts/test-fengyin-production-driver.ps1"
+      - "scripts/test-fengyin-test-driver.ps1"
+      - "scripts/package-audio-engine-test-kit.ps1"
+      - "scripts/audio-test-kit/**"
+      - "docs/风吟音频引擎免费实机测试说明.md"
       - ".github/workflows/audio-driver-build.yml"
 
 permissions:
@@ -164,6 +168,38 @@ jobs:
             throw "FengYinAudio.inf 验证失败：$LASTEXITCODE"
           }
 
+          # MSBuild test-signs the SYS before this workflow regenerates the
+          # catalog.  A newly generated CAT is unsigned and Windows will still
+          # reject the package even when TESTSIGNING is enabled.  Sign the CAT
+          # with exactly the same ephemeral WDK test certificate as the SYS.
+          $sysPath = Join-Path $releaseDir "TabletAudioSample.sys"
+          $sysSignature = Get-AuthenticodeSignature $sysPath
+          if ($sysSignature.Status -ne 'Valid' -or -not $sysSignature.SignerCertificate) {
+            throw "TabletAudioSample.sys 没有有效的 WDK 测试签名。"
+          }
+          $testThumbprint = $sysSignature.SignerCertificate.Thumbprint
+          if ($sysSignature.SignerCertificate.Subject -notmatch 'WDKTestCert|Windows Test|Test Certificate') {
+            throw "内部测试驱动的 SYS 不是预期的 WDK 测试证书：$($sysSignature.SignerCertificate.Subject)"
+          }
+          $signTool = Get-ChildItem "$env:RUNNER_TEMP/fengyin-driver-source/packages" `
+            -Filter signtool.exe -Recurse -File |
+            Where-Object { $_.FullName -match '[\\/]x64[\\/]signtool\.exe$' } |
+            Select-Object -First 1
+          if (-not $signTool) {
+            $signTool = Get-ChildItem "${env:ProgramFiles(x86)}/Windows Kits/10/bin" `
+              -Filter signtool.exe -Recurse -File -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -match '[\\/]x64[\\/]signtool\.exe$' } |
+              Sort-Object FullName -Descending |
+              Select-Object -First 1
+          }
+          if (-not $signTool) { throw "未找到 x64 signtool.exe，无法签署测试 CAT。" }
+          & $signTool.FullName sign /fd sha256 /sha1 $testThumbprint $builtCat
+          if ($LASTEXITCODE -ne 0) { throw "FengYinAudio.cat 测试签名失败：$LASTEXITCODE" }
+          & $signTool.FullName verify /pa /v $builtCat | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "FengYinAudio.cat 测试签名验证失败：$LASTEXITCODE" }
+
+          ./scripts/test-fengyin-test-driver.ps1 -DriverDir $releaseDir
+
       - name: 生成 Partner Center 待签名提交包
         shell: pwsh
         run: |
@@ -174,7 +210,7 @@ jobs:
       - name: 上传内部编译产物
         uses: actions/upload-artifact@v4
         with:
-          name: fengyin-audio-driver-unsigned-internal
+          name: fengyin-audio-driver-test-signed-internal
           path: |
             ${{ runner.temp }}/fengyin-driver-source/audio/sysvad/TabletAudioSample/x64/Release/FengYinAudio.inf
             ${{ runner.temp }}/fengyin-driver-source/audio/sysvad/TabletAudioSample/x64/Release/FengYinAudio.cat
@@ -189,3 +225,42 @@ jobs:
           name: fengyin-audio-driver-partner-center-submission-unsigned
           path: ${{ runner.temp }}/fengyin-driver-submission/Disk1/FengYinAudio-attestation.cab
           if-no-files-found: error
+
+  build-engineering-test-kit:
+    name: 免费音频引擎实机测试包
+    needs: build-driver
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - name: 获取风吟源码
+        uses: actions/checkout@v5
+
+      - name: 下载 WDK 测试签名驱动
+        uses: actions/download-artifact@v5
+        with:
+          name: fengyin-audio-driver-test-signed-internal
+          path: ${{ runner.temp }}/fengyin-test-driver
+
+      - name: 安装中文安装包工具
+        shell: powershell
+        run: choco install innosetup --yes --no-progress
+
+      - name: 编译、测试并整理免安装程序
+        shell: powershell
+        run: ./scripts/build-windows.ps1 -Version "1.1.0-test" -SkipInstaller
+
+      - name: 生成与正式版隔离的测试包
+        shell: pwsh
+        run: |
+          ./scripts/package-audio-engine-test-kit.ps1 `
+            -AppPackageDir "dist/FengYin" `
+            -DriverDir "$env:RUNNER_TEMP/fengyin-test-driver" `
+            -OutputDir "dist/FengYin-Audio-Engine-Test-Kit"
+
+      - name: 上传免费实机测试包
+        uses: actions/upload-artifact@v5
+        with:
+          name: 风吟-音频引擎-测试签名专用包
+          path: dist/FengYin-Audio-Engine-Test-Kit
+          if-no-files-found: error
+          retention-days: 7

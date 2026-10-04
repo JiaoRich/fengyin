@@ -36,6 +36,27 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         self.assertIn("inf2cat.exe", workflow.lower())
         self.assertNotIn("RunApiValidator=false", workflow)
 
+    def test_free_engine_trial_is_isolated_from_public_release(self):
+        workflow = self.read(".github/workflows/audio-driver-build.yml")
+        test_validator = self.read("scripts/test-fengyin-test-driver.ps1")
+        production_validator = self.read("scripts/test-fengyin-production-driver.ps1")
+        packager = self.read("scripts/package-audio-engine-test-kit.ps1")
+        self.assertIn("signtool", workflow.lower())
+        self.assertIn("FengYinAudio.cat", workflow)
+        self.assertIn("WDKTestCert", test_validator)
+        self.assertIn("WDKTestCert", production_validator)
+        self.assertIn("test-driver", packager)
+        self.assertNotIn("package-audio-engine-test-kit.ps1", self.read("scripts/build-windows.ps1"))
+
+    def test_free_engine_trial_has_complete_rollback(self):
+        install = self.read("scripts/audio-test-kit/安装测试音频引擎.ps1")
+        uninstall = self.read("scripts/audio-test-kit/卸载并恢复系统声音.ps1")
+        disable = self.read("scripts/audio-test-kit/关闭Windows测试模式.ps1")
+        self.assertIn("TrustedPublisher", install)
+        self.assertIn("--recover-only", uninstall)
+        self.assertIn("--uninstall", uninstall)
+        self.assertIn("testsigning off", disable)
+
     def test_public_package_rejects_test_signed_driver(self):
         release = self.read("scripts/check-release.ps1")
         validator = self.read("scripts/test-fengyin-production-driver.ps1")
