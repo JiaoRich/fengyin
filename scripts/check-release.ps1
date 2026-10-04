@@ -8,6 +8,7 @@ $RequiredFiles = @(
     "FengYin.exe",
     "FengYinAudioEngine.exe",
     "FengYinAudioWatchdog.exe",
+    "FengYinDriverSetup.exe",
     "README.md",
     "THIRD_PARTY_NOTICES.md",
     "MicrosoftEdgeWebview2Setup.exe"

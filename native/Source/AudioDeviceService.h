@@ -26,7 +26,7 @@ class AudioDeviceService final : private juce::Timer
 {
 public:
     AudioDeviceService();
-    ~AudioDeviceService();
+    ~AudioDeviceService() override;
 
     juce::String initialise();
     [[nodiscard]] AudioDeviceStatus getStatus();

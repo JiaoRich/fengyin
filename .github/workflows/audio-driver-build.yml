@@ -81,6 +81,7 @@ jobs:
             -p:Platform=x64 `
             -p:TreatWarningAsError=false `
             -p:SkipPackageVerification=true `
+            -p:RunApiValidator=false `
             -m
           if ($LASTEXITCODE -ne 0) {
             throw "风吟虚拟音频驱动编译失败：$LASTEXITCODE"

@@ -243,11 +243,17 @@ if(WIN32)
     target_include_directories(FengYinAudioWatchdog PRIVATE audio-engine/windows)
     target_compile_definitions(FengYinAudioWatchdog PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
     target_link_libraries(FengYinAudioWatchdog PRIVATE ole32 shell32 propsys)
+
+    add_executable(FengYinDriverSetup WIN32
+        audio-engine/windows/DriverSetupMain.cpp
+    )
+    target_compile_definitions(FengYinDriverSetup PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_link_libraries(FengYinDriverSetup PRIVATE setupapi newdev shell32)
 endif()
 
 install(TARGETS FengYin RUNTIME DESTINATION . BUNDLE DESTINATION .)
 if(WIN32)
-    install(TARGETS FengYinAudioEngine FengYinAudioWatchdog RUNTIME DESTINATION .)
+    install(TARGETS FengYinAudioEngine FengYinAudioWatchdog FengYinDriverSetup RUNTIME DESTINATION .)
 endif()
 
 # 正式发布时把审核过许可的 ffmpeg.exe 放到这个位置，安装时会自动携带。
