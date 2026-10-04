@@ -59,6 +59,30 @@ int main()
     assert(core.getCounters().instrumentUnderflows == 1);
     assert(core.getCounters().systemUnderflows == 1);
 
+    // The system stream may be clocked by the virtual endpoint rather than the
+    // physical device. A healthy backlog must be consumed without underflow
+    // while the adaptive reader applies its bounded drift correction.
+    core.reset();
+    initialiseRegion(instrumentRegion);
+    initialiseRegion(systemRegion);
+    for (int block = 0; block < 12; ++block)
+    {
+        pushConstant(instrumentRegion, 0.0f, 0.0f, 128);
+        pushConstant(systemRegion, 0.2f, -0.2f, 128);
+    }
+    for (int block = 0; block < 8; ++block)
+    {
+        core.render(outputs, 2, 128);
+        for (std::size_t i = 0; i < left.size(); ++i)
+        {
+            assert(std::isfinite(left[i]));
+            assert(std::isfinite(right[i]));
+            assert(std::abs(left[i] - 0.2f) < 0.0001f);
+            assert(std::abs(right[i] + 0.2f) < 0.0001f);
+        }
+    }
+    assert(core.getCounters().systemUnderflows == 0);
+
     EngineLifecycle lifecycle;
     assert(lifecycle.get() == StreamState::stopped);
     assert(lifecycle.beginStart());
@@ -71,4 +95,3 @@ int main()
     assert(lifecycle.get() == StreamState::stopped);
     return 0;
 }
-

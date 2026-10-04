@@ -219,6 +219,8 @@ if(WIN32)
         audio-engine/windows/WasapiExclusiveOutput.h
         audio-engine/windows/PhysicalOutputSelector.cpp
         audio-engine/windows/PhysicalOutputSelector.h
+        audio-engine/windows/WasapiLoopbackInput.cpp
+        audio-engine/windows/WasapiLoopbackInput.h
         audio-engine/service/AudioEngineCore.cpp
         audio-engine/service/AudioEngineCore.h
         audio-engine/common/FengYinAudioProtocol.h

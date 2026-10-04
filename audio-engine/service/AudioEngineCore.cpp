@@ -48,6 +48,79 @@ bool AudioEngineCore::StreamReader::next(float& left, float& right) noexcept
     return true;
 }
 
+void AudioEngineCore::AdaptiveSystemReader::reset() noexcept
+{
+    cursor = 0;
+    current = {};
+    hasBlock = false;
+    primed = false;
+    previousLeft = previousRight = followingLeft = followingRight = 0.0f;
+    phase = 0.0;
+}
+
+bool AudioEngineCore::AdaptiveSystemReader::nextSource(float& left, float& right) noexcept
+{
+    if (! hasBlock || cursor >= current.frameCount)
+    {
+        if (! consumer.tryPop(current))
+        {
+            hasBlock = false;
+            left = right = 0.0f;
+            return false;
+        }
+        cursor = 0;
+        hasBlock = current.frameCount != 0;
+    }
+    if (! hasBlock)
+    {
+        left = right = 0.0f;
+        return false;
+    }
+    const auto offset = static_cast<std::size_t>(cursor) * engineChannels;
+    left = current.samples[offset];
+    right = current.samples[offset + 1];
+    ++cursor;
+    return true;
+}
+
+bool AudioEngineCore::AdaptiveSystemReader::next(float& left, float& right) noexcept
+{
+    if (! primed)
+    {
+        if (! nextSource(previousLeft, previousRight)
+            || ! nextSource(followingLeft, followingRight))
+        {
+            left = right = 0.0f;
+            return false;
+        }
+        primed = true;
+        phase = 0.0;
+    }
+
+    left = previousLeft + static_cast<float>((followingLeft - previousLeft) * phase);
+    right = previousRight + static_cast<float>((followingRight - previousRight) * phase);
+    const auto queued = consumer.queuedBlocks();
+    // ±500 ppm comfortably covers independent consumer audio clocks while
+    // remaining inaudible for accompaniment and browser playback.
+    const auto ratio = queued > 8 ? 1.0005 : queued < 2 ? 0.9995 : 1.0;
+    phase += ratio;
+    while (phase >= 1.0)
+    {
+        previousLeft = followingLeft;
+        previousRight = followingRight;
+        if (! nextSource(followingLeft, followingRight))
+        {
+            followingLeft = previousLeft;
+            followingRight = previousRight;
+            primed = false;
+            phase = 0.0;
+            break;
+        }
+        phase -= 1.0;
+    }
+    return true;
+}
+
 void AudioEngineCore::render(float* const* outputs, std::uint32_t outputChannels,
                              std::uint32_t frames) noexcept
 {
@@ -95,4 +168,3 @@ EngineCounters AudioEngineCore::getCounters() const noexcept
              clippedFrames.load(std::memory_order_relaxed) };
 }
 }
-

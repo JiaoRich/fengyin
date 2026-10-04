@@ -165,6 +165,13 @@ public:
         return true;
     }
 
+    [[nodiscard]] std::uint64_t queuedBlocks() const noexcept
+    {
+        const auto read = region.readSequence.load(std::memory_order_relaxed);
+        const auto write = region.writeSequence.load(std::memory_order_acquire);
+        return write - read;
+    }
+
 private:
     SharedAudioRegion& region;
 };

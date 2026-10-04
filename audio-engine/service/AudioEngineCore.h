@@ -41,8 +41,30 @@ private:
         bool hasBlock = false;
     };
 
+    // Windows' virtual render clock and the physical device clock are not
+    // crystal-locked. This tiny asynchronous linear resampler prevents the
+    // browser stream from slowly filling or draining its ring over a long
+    // performance. It never touches the instrument fast path.
+    class AdaptiveSystemReader
+    {
+    public:
+        explicit AdaptiveSystemReader(SharedAudioRegion& storage) noexcept : consumer(storage) {}
+        void reset() noexcept;
+        bool next(float& left, float& right) noexcept;
+    private:
+        bool nextSource(float& left, float& right) noexcept;
+        AudioBlockConsumer consumer;
+        AudioBlock current;
+        std::uint32_t cursor = 0;
+        bool hasBlock = false;
+        bool primed = false;
+        float previousLeft = 0.0f, previousRight = 0.0f;
+        float followingLeft = 0.0f, followingRight = 0.0f;
+        double phase = 0.0;
+    };
+
     StreamReader instrument;
-    StreamReader system;
+    AdaptiveSystemReader system;
     std::atomic<std::uint64_t> renderCallbacks { 0 };
     std::atomic<std::uint64_t> instrumentUnderflows { 0 };
     std::atomic<std::uint64_t> systemUnderflows { 0 };
@@ -87,4 +109,3 @@ private:
     std::atomic<std::uint32_t> state { static_cast<std::uint32_t>(StreamState::stopped) };
 };
 }
-

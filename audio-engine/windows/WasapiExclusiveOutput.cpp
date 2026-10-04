@@ -163,7 +163,7 @@ void WasapiExclusiveOutput::run(AudioEngineCore* engine, std::uint32_t requested
     std::wstring selectedId, selectedName, selectionError;
     if (SUCCEEDED(hr) && ! selectPhysicalOutput(*enumerator.Get(), preferredEndpointId,
                                                 device, selectedId, selectedName, selectionError))
-        hr = E_NOTFOUND;
+        hr = HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
     if (SUCCEEDED(hr)) hr = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, &client);
     if (FAILED(hr))
     {

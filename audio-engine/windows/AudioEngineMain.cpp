@@ -1,6 +1,7 @@
 #include "AudioEngineCore.h"
 #include "NamedSharedAudioRegion.h"
 #include "WasapiExclusiveOutput.h"
+#include "WasapiLoopbackInput.h"
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -78,8 +79,14 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     systemMapping.get()->activePeriodFrames.store(actualFrames, std::memory_order_release);
     instrumentMapping.get()->state.store(static_cast<std::uint32_t>(StreamState::running));
     systemMapping.get()->state.store(static_cast<std::uint32_t>(StreamState::running));
+    WasapiLoopbackInput loopback;
+    std::wstring loopbackError;
+    // The engineering fast path remains usable before the signed virtual
+    // speaker is installed. Once present, its Windows mix joins automatically.
+    (void) loopback.start(*systemMapping.get(), loopbackError);
     WaitForSingleObject(stopEvent, INFINITE);
     lifecycle.stop();
+    loopback.stop();
     output.stop();
     instrumentMapping.get()->state.store(static_cast<std::uint32_t>(StreamState::stopped));
     systemMapping.get()->state.store(static_cast<std::uint32_t>(StreamState::stopped));
