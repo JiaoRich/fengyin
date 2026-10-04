@@ -35,6 +35,7 @@ class AsioBridgeModeTests(unittest.TestCase):
         main = (ROOT / "native" / "Source" / "MainComponent.cpp").read_text(encoding="utf-8")
         html = (ROOT / "prototype" / "index.html").read_text(encoding="utf-8")
         self.assertIn("showControlPanel()", audio)
+        self.assertIn("createDevice(sarName, sarName)", audio)
         self.assertIn("bridgePlaybackInputEnabled", audio)
         self.assertIn("getActiveInputChannels", audio)
         self.assertIn("FloatVectorOperations::copy", audio)

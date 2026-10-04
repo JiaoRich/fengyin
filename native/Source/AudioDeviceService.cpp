@@ -236,13 +236,35 @@ bool AudioDeviceService::applySavedBridgeInputChannels(juce::AudioDeviceManager:
 
 juce::String AudioDeviceService::configureBridgePlaybackEndpoint()
 {
-    if (! isBridgeModeActive())
-        return juce::String::fromUTF8("请先在声音模式中选择桥接低延迟测试（ASIO）");
+    std::unique_ptr<juce::AudioIODevice> unopenedDevice;
     auto* device = manager.getCurrentAudioDevice();
+    if (! isBridgeModeActive())
+    {
+        auto* type = findType("ASIO");
+        if (type == nullptr)
+            return juce::String::fromUTF8("未检测到 Synchronous Audio Router");
+        type->scanForDevices();
+        const auto devices = type->getDeviceNames(false);
+        juce::String sarName;
+        for (const auto& name : devices)
+            if (isSupportedBridgeDevice(name)) { sarName = name; break; }
+        if (sarName.isEmpty())
+            return juce::String::fromUTF8("未检测到 Synchronous Audio Router");
+        unopenedDevice.reset(type->createDevice(sarName, sarName));
+        device = unopenedDevice.get();
+    }
     if (device == nullptr || ! device->hasControlPanel())
         return juce::String::fromUTF8("当前 SAR 驱动未提供配置面板");
     if (! device->showControlPanel())
         return juce::String::fromUTF8("未能打开 SAR 配置面板，请尝试以管理员身份运行风吟");
+
+    if (! isBridgeModeActive())
+    {
+        unopenedDevice.reset();
+        const auto error = selectDeviceType("ASIO");
+        if (error.isNotEmpty())
+            return juce::String::fromUTF8("SAR 已配置，但无法启动：") + error;
+    }
 
     // SAR 0.13.1 在配置窗口关闭后才重建端点，重启同一驱动读取新通道表。
     manager.closeAudioDevice();

@@ -2086,7 +2086,7 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   $('#bridge-test-message').textContent = bridgeActive
     ? '点击配置桥接，添加名为“风吟网页伴奏”的双声道 Playback 设备。'
     : '已检测到 Synchronous Audio Router，可在“声音模式”中主动开启。';
-  $('#configure-audio-bridge').disabled = !bridgeActive || !!state?.autoTuning;
+  $('#configure-audio-bridge').disabled = state?.bridgeAvailable !== true || !!state?.autoTuning;
   const latency = Number(state?.latency);
   const latencyText = Number.isFinite(latency) ? `${latency.toFixed(1)} ms · ${latency <= 10 ? '优秀' : latency <= 20 ? '良好' : '偏高'}` : '尚未取得';
   $('#audio-latency-value').textContent = latencyText;
