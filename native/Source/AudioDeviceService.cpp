@@ -321,7 +321,10 @@ juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName
     tuningResults.clear();
     if (isAsioType(manager.getCurrentAudioDeviceType()) && ! isSupportedBridgeDevice(outputName))
         return juce::String::fromUTF8("桥接测试模式只能选择 Synchronous Audio Router");
-    auto setup = manager.getAudioDeviceSetup();
+    const auto previousSetup = manager.getAudioDeviceSetup();
+    const auto bridgeRequest = isAsioType(manager.getCurrentAudioDeviceType())
+        && isSupportedBridgeDevice(outputName);
+    auto setup = previousSetup;
     setup.outputDeviceName = outputName;
     setup.inputDeviceName.clear();
     setup.sampleRate = sampleRate;
@@ -329,10 +332,30 @@ juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName
     setup.useDefaultInputChannels = false;
     setup.inputChannels.clear();
     setup.useDefaultOutputChannels = true;
-    if (isAsioType(manager.getCurrentAudioDeviceType()) && isSupportedBridgeDevice(outputName)
-        && applySavedBridgeInputChannels(setup))
+    if (bridgeRequest && applySavedBridgeInputChannels(setup))
         setup.inputDeviceName = outputName;
+
+    // SAR/ASIO 在运行中热切换 buffer 容易留下半打开的驱动状态。
+    // 先完整停流再用新参数打开；失败时只恢复同一 ASIO 设备的
+    // 原设置，绝不跳回 Windows 共享驱动。
+    if (bridgeRequest)
+        manager.closeAudioDevice();
     lastError = manager.setAudioDeviceSetup(setup, true);
+    if (lastError.isNotEmpty() && bridgeRequest)
+    {
+        const auto requestedError = lastError;
+        manager.closeAudioDevice();
+        const auto restoreError = manager.setAudioDeviceSetup(previousSetup, true);
+        if (restoreError.isEmpty())
+        {
+            lastError.clear();
+            return juce::String::fromUTF8("新缓冲区 ") + juce::String(bufferSize)
+                + juce::String::fromUTF8(" 无法启动，已保留桥接模式并恢复原缓冲区。驱动返回：")
+                + requestedError;
+        }
+        lastError = requestedError + juce::String::fromUTF8("；恢复原桥接设置也失败：") + restoreError;
+        return lastError;
+    }
     if (lastError.isEmpty())
     {
         if (auto* settings = properties.getUserSettings())

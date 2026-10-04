@@ -47,6 +47,16 @@ class AsioBridgeModeTests(unittest.TestCase):
         self.assertIn("juce::jmax(status.bufferSize, reported)", audio)
         self.assertNotIn("status.bufferSize + device->getOutputLatencyInSamples()", audio)
 
+    def test_failed_bridge_buffer_change_restores_exact_asio_setup(self):
+        audio = (ROOT / "native" / "Source" / "AudioDeviceService.cpp").read_text(encoding="utf-8")
+        main = (ROOT / "native" / "Source" / "MainComponent.cpp").read_text(encoding="utf-8")
+        self.assertIn("const auto previousSetup = manager.getAudioDeviceSetup()", audio)
+        self.assertIn("manager.closeAudioDevice()", audio)
+        self.assertIn("manager.setAudioDeviceSetup(previousSetup, true)", audio)
+        self.assertIn("已保留桥接模式并恢复原缓冲区", audio)
+        self.assertIn("const auto previousWasBridge", main)
+        self.assertIn("error.isNotEmpty() && ! previousWasBridge", main)
+
 
 if __name__ == "__main__":
     unittest.main()
