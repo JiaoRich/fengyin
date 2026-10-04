@@ -32,6 +32,7 @@ try {
         $targetPath = Join-Path $output $target
         $text = [System.IO.File]::ReadAllText($targetPath).Replace("`r`n", "`n")
         $text = [System.Text.RegularExpressions.Regex]::Replace($text, '[ \t]+(?=\n)', '')
+        if ($edits.Count -eq 2 -and $edits[0] -is [string]) { $edits = ,$edits }
         $editNumber = 0
         foreach ($edit in $edits) {
             $editNumber++
