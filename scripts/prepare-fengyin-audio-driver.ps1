@@ -36,8 +36,8 @@ try {
         foreach ($edit in $edits) {
             $editNumber++
             if ($edit.Count -ne 2) { throw "驱动修改参数不完整：$target" }
-            $old = [string]$edit[0]
-            $new = [string]$edit[1]
+            $old = ([string]$edit[0]).Replace("`r`n", "`n")
+            $new = ([string]$edit[1]).Replace("`r`n", "`n")
             $first = $text.IndexOf($old, [System.StringComparison]::Ordinal)
             $last = $text.LastIndexOf($old, [System.StringComparison]::Ordinal)
             if ($first -lt 0 -or $first -ne $last) {
