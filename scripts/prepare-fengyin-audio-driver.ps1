@@ -31,9 +31,10 @@ try {
     function Edit-PinnedFile([string]$target, [array]$edits) {
         $targetPath = Join-Path $output $target
         $text = [System.IO.File]::ReadAllText($targetPath).Replace("`r`n", "`n")
-        foreach ($edit in $edits) {
-            $old = [string]$edit[0]
-            $new = [string]$edit[1]
+        if (($edits.Count % 2) -ne 0) { throw "驱动修改参数不完整：$target" }
+        for ($index = 0; $index -lt $edits.Count; $index += 2) {
+            $old = [string]$edits[$index]
+            $new = [string]$edits[$index + 1]
             $first = $text.IndexOf($old, [System.StringComparison]::Ordinal)
             $last = $text.LastIndexOf($old, [System.StringComparison]::Ordinal)
             if ($first -lt 0 -or $first -ne $last) {
