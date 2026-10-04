@@ -2,6 +2,10 @@
 #include "AudioHardwareIdentity.h"
 #include <algorithm>
 
+#if JUCE_WINDOWS
+ #include <windows.h>
+#endif
+
 namespace
 {
 constexpr int currentAudioSetupRevision = 8;
@@ -29,6 +33,23 @@ bool isSupportedBridgeDevice(const juce::String& deviceName)
 {
     return deviceName.containsIgnoreCase("Synchronous Audio Router")
         || deviceName.equalsIgnoreCase("SAR");
+}
+
+bool processCanHostSarEndpoints()
+{
+   #if JUCE_WINDOWS
+    HANDLE token = nullptr;
+    if (! OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
+        return false;
+    TOKEN_ELEVATION elevation {};
+    DWORD returned = 0;
+    const auto ok = GetTokenInformation(token, TokenElevation, &elevation,
+                                        sizeof(elevation), &returned) != FALSE;
+    CloseHandle(token);
+    return ok && elevation.TokenIsElevated != 0;
+   #else
+    return true;
+   #endif
 }
 
 bool savedStateIsSupportedBridge(const juce::XmlElement& state)
@@ -236,6 +257,9 @@ bool AudioDeviceService::applySavedBridgeInputChannels(juce::AudioDeviceManager:
 
 juce::String AudioDeviceService::configureBridgePlaybackEndpoint()
 {
+    if (! processCanHostSarEndpoints())
+        return juce::String::fromUTF8("SAR 要求宿主以管理员权限创建网页播放端点。请关闭风吟，右键选择“以管理员身份运行”后再配置桥接。");
+
     std::unique_ptr<juce::AudioIODevice> unopenedDevice;
     auto* device = manager.getCurrentAudioDevice();
     if (! isBridgeModeActive())
@@ -304,6 +328,8 @@ juce::String AudioDeviceService::selectDeviceType(const juce::String& typeName)
 {
     if (! isWindowsSharedType(typeName) && ! (isAsioType(typeName) && isBridgeModeAvailable()))
         return juce::String::fromUTF8("仅支持 Windows 共享输出或已识别的 ASIO 桥接驱动");
+    if (isAsioType(typeName) && ! processCanHostSarEndpoints())
+        return juce::String::fromUTF8("SAR 桥接需要管理员权限。已取消切换，不会改动当前声音设置。请关闭风吟后右键“以管理员身份运行”。");
     manager.setCurrentAudioDeviceType(typeName, true);
     lastError = manager.getCurrentAudioDeviceType() == typeName
         ? juce::String()
@@ -335,11 +361,9 @@ juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName
     if (bridgeRequest && applySavedBridgeInputChannels(setup))
         setup.inputDeviceName = outputName;
 
-    // SAR/ASIO 在运行中热切换 buffer 容易留下半打开的驱动状态。
-    // 先完整停流再用新参数打开；失败时只恢复同一 ASIO 设备的
-    // 原设置，绝不跳回 Windows 共享驱动。
-    if (bridgeRequest)
-        manager.closeAudioDevice();
+    // AudioDeviceManager 会先停止回调再重开同一 ASIO 设备。这里不再
+    // 额外 closeAudioDevice，否则 SAR 的动态端点会先被销毁，导致驱动
+    // 进入半初始化状态。
     lastError = manager.setAudioDeviceSetup(setup, true);
     if (lastError.isNotEmpty() && bridgeRequest)
     {

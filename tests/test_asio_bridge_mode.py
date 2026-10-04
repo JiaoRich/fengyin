@@ -51,11 +51,21 @@ class AsioBridgeModeTests(unittest.TestCase):
         audio = (ROOT / "native" / "Source" / "AudioDeviceService.cpp").read_text(encoding="utf-8")
         main = (ROOT / "native" / "Source" / "MainComponent.cpp").read_text(encoding="utf-8")
         self.assertIn("const auto previousSetup = manager.getAudioDeviceSetup()", audio)
-        self.assertIn("manager.closeAudioDevice()", audio)
         self.assertIn("manager.setAudioDeviceSetup(previousSetup, true)", audio)
         self.assertIn("已保留桥接模式并恢复原缓冲区", audio)
         self.assertIn("const auto previousWasBridge", main)
         self.assertIn("error.isNotEmpty() && ! previousWasBridge", main)
+
+    def test_sar_is_never_opened_without_required_elevation(self):
+        audio = (ROOT / "native" / "Source" / "AudioDeviceService.cpp").read_text(encoding="utf-8")
+        self.assertIn("processCanHostSarEndpoints()", audio)
+        self.assertIn("TokenElevation", audio)
+        configure = audio[audio.index("AudioDeviceService::configureBridgePlaybackEndpoint"):
+                          audio.index("AudioDeviceService::getAvailableSampleRates")]
+        select = audio[audio.index("AudioDeviceService::selectDeviceType"):
+                       audio.index("AudioDeviceService::applyOutputSetup")]
+        self.assertIn("if (! processCanHostSarEndpoints())", configure)
+        self.assertIn("if (isAsioType(typeName) && ! processCanHostSarEndpoints())", select)
 
 
 if __name__ == "__main__":
