@@ -2,13 +2,9 @@
 #include "AudioHardwareIdentity.h"
 #include <algorithm>
 
-#if JUCE_WINDOWS
- #include <windows.h>
-#endif
-
 namespace
 {
-constexpr int currentAudioSetupRevision = 8;
+constexpr int currentAudioSetupRevision = 9;
 constexpr int currentTuningRevision = 8;
 constexpr double latencyCandidateTestMs = 3500.0;
 
@@ -29,36 +25,20 @@ bool isAsioType(const juce::String& typeName)
     return typeName.equalsIgnoreCase("ASIO");
 }
 
-bool isSupportedBridgeDevice(const juce::String& deviceName)
+bool isSupportedSharedAsioDevice(const juce::String& deviceName)
 {
-    return deviceName.containsIgnoreCase("Synchronous Audio Router")
-        || deviceName.equalsIgnoreCase("SAR");
+    return deviceName.containsIgnoreCase("KoordASIO");
 }
 
-bool processCanHostSarEndpoints()
-{
-   #if JUCE_WINDOWS
-    HANDLE token = nullptr;
-    if (! OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
-        return false;
-    TOKEN_ELEVATION elevation {};
-    DWORD returned = 0;
-    const auto ok = GetTokenInformation(token, TokenElevation, &elevation,
-                                        sizeof(elevation), &returned) != FALSE;
-    CloseHandle(token);
-    return ok && elevation.TokenIsElevated != 0;
-   #else
-    return true;
-   #endif
-}
-
-bool savedStateIsSupportedBridge(const juce::XmlElement& state)
+#if JUCE_WINDOWS
+bool savedStateIsSupportedSharedAsio(const juce::XmlElement& state)
 {
     if (! isAsioType(state.getStringAttribute("deviceType"))) return false;
     const auto output = state.getStringAttribute("audioOutputDeviceName",
                         state.getStringAttribute("audioDeviceName"));
-    return isSupportedBridgeDevice(output);
+    return isSupportedSharedAsioDevice(output);
 }
+#endif
 
 juce::Array<int> sortedLegalBuffers(juce::Array<int> sizes)
 {
@@ -99,70 +79,28 @@ AudioDeviceService::AudioDeviceService()
     properties.setStorageParameters(options);
 }
 
-AudioDeviceService::~AudioDeviceService()
-{
-    manager.removeAudioCallback(this);
-}
-
 juce::String AudioDeviceService::initialise()
 {
     std::unique_ptr<juce::XmlElement> saved;
     if (auto* settings = properties.getUserSettings())
         saved = juce::parseXML(settings->getValue("audioDevice"));
    #if JUCE_WINDOWS
-    // 旧版的任意 ASIO/Exclusive 设置仍然废弃；只允许用户主动保存的
-    // Synchronous Audio Router 桥接设置在下次启动恢复。
-    const auto restoringBridge = saved != nullptr && savedStateIsSupportedBridge(*saved);
+    // 旧版 SAR/ASIO4ALL/Exclusive 设置全部废弃；只允许用户主动保存的
+    // KoordASIO 共享输出在下次启动恢复。
+    const auto restoringSharedAsio = saved != nullptr && savedStateIsSupportedSharedAsio(*saved);
     if (saved != nullptr && ! isWindowsSharedType(saved->getStringAttribute("deviceType"))
-        && ! restoringBridge)
+        && ! restoringSharedAsio)
         saved.reset();
    #endif
     lastError = manager.initialise(0, 2, saved.get(), true);
    #if JUCE_WINDOWS
-    if (restoringBridge && (lastError.isNotEmpty() || manager.getCurrentAudioDevice() == nullptr))
+    if (restoringSharedAsio && (lastError.isNotEmpty() || manager.getCurrentAudioDevice() == nullptr))
     {
         manager.closeAudioDevice();
         lastError = manager.initialise(0, 2, nullptr, true);
     }
    #endif
-    manager.addAudioCallback(this);
     return lastError;
-}
-
-void AudioDeviceService::audioDeviceIOCallbackWithContext(const float* const* inputs, int numInputs,
-                                                           float* const* outputs, int numOutputs,
-                                                           int numSamples,
-                                                           const juce::AudioIODeviceCallbackContext&)
-{
-    for (int channel = 0; channel < numOutputs; ++channel)
-        if (outputs[channel] != nullptr)
-            juce::FloatVectorOperations::clear(outputs[channel], numSamples);
-
-    if (! bridgeInputMixActive.load(std::memory_order_acquire) || numInputs <= 0)
-        return;
-
-    // AudioDeviceManager 会把这个回调与软音源回调相加。网页原声不进入
-    // 风吟效果链，也不增加额外重采样或响度处理。
-    for (int channel = 0; channel < numOutputs; ++channel)
-    {
-        const auto input = juce::jmin(channel, numInputs - 1);
-        if (outputs[channel] != nullptr && inputs[input] != nullptr)
-            juce::FloatVectorOperations::copy(outputs[channel], inputs[input], numSamples);
-    }
-}
-
-void AudioDeviceService::audioDeviceAboutToStart(juce::AudioIODevice* device)
-{
-    bridgeInputMixActive.store(device != nullptr
-        && isAsioType(device->getTypeName())
-        && isSupportedBridgeDevice(device->getName())
-        && device->getActiveInputChannels().countNumberOfSetBits() >= 2,
-        std::memory_order_release);
-}
-
-void AudioDeviceService::audioDeviceStopped()
-{
-    bridgeInputMixActive.store(false, std::memory_order_release);
 }
 
 AudioDeviceStatus AudioDeviceService::getStatus()
@@ -200,7 +138,7 @@ juce::StringArray AudioDeviceService::getAvailableDeviceTypes()
         {
             type->scanForDevices();
             for (const auto& device : type->getDeviceNames(false))
-                if (isSupportedBridgeDevice(device))
+                if (isSupportedSharedAsioDevice(device))
                 {
                     names.add(type->getTypeName());
                     break;
@@ -218,96 +156,22 @@ juce::StringArray AudioDeviceService::getAvailableOutputDevices(const juce::Stri
         auto devices = type->getDeviceNames(false);
         if (isAsioType(typeName))
             for (int index = devices.size() - 1; index >= 0; --index)
-                if (! isSupportedBridgeDevice(devices[index])) devices.remove(index);
+                if (! isSupportedSharedAsioDevice(devices[index])) devices.remove(index);
         return devices;
     }
     return {};
 }
 
-bool AudioDeviceService::isBridgeModeAvailable()
+bool AudioDeviceService::isSharedAsioModeAvailable()
 {
     return getAvailableDeviceTypes().contains("ASIO")
         && ! getAvailableOutputDevices("ASIO").isEmpty();
 }
 
-bool AudioDeviceService::isBridgeModeActive()
+bool AudioDeviceService::isSharedAsioModeActive()
 {
     const auto status = getStatus();
-    return isAsioType(status.deviceType) && isSupportedBridgeDevice(status.deviceName);
-}
-
-bool AudioDeviceService::applySavedBridgeInputChannels(juce::AudioDeviceManager::AudioDeviceSetup& setup)
-{
-    auto* settings = properties.getUserSettings();
-    if (settings == nullptr || ! settings->getBoolValue("bridgePlaybackInputEnabled", false))
-        return false;
-    auto* device = manager.getCurrentAudioDevice();
-    if (device == nullptr) return false;
-    const auto inputs = device->getInputChannelNames();
-    if (inputs.size() < 2) return false;
-
-    // SAR 保证物理输入在前、虚拟 Playback 端点在后。风吟只打开最后创建的
-    // 一组立体声通道，避免把板载麦克风或其他物理输入混入扬声器形成反馈。
-    setup.useDefaultInputChannels = false;
-    setup.inputChannels.clear();
-    setup.inputChannels.setBit(inputs.size() - 2);
-    setup.inputChannels.setBit(inputs.size() - 1);
-    return true;
-}
-
-juce::String AudioDeviceService::configureBridgePlaybackEndpoint()
-{
-    if (! processCanHostSarEndpoints())
-        return juce::String::fromUTF8("SAR 要求宿主以管理员权限创建网页播放端点。请关闭风吟，右键选择“以管理员身份运行”后再配置桥接。");
-
-    std::unique_ptr<juce::AudioIODevice> unopenedDevice;
-    auto* device = manager.getCurrentAudioDevice();
-    if (! isBridgeModeActive())
-    {
-        auto* type = findType("ASIO");
-        if (type == nullptr)
-            return juce::String::fromUTF8("未检测到 Synchronous Audio Router");
-        type->scanForDevices();
-        const auto devices = type->getDeviceNames(false);
-        juce::String sarName;
-        for (const auto& name : devices)
-            if (isSupportedBridgeDevice(name)) { sarName = name; break; }
-        if (sarName.isEmpty())
-            return juce::String::fromUTF8("未检测到 Synchronous Audio Router");
-        unopenedDevice.reset(type->createDevice(sarName, sarName));
-        device = unopenedDevice.get();
-    }
-    if (device == nullptr || ! device->hasControlPanel())
-        return juce::String::fromUTF8("当前 SAR 驱动未提供配置面板");
-    if (! device->showControlPanel())
-        return juce::String::fromUTF8("未能打开 SAR 配置面板，请尝试以管理员身份运行风吟");
-
-    if (! isBridgeModeActive())
-    {
-        unopenedDevice.reset();
-        const auto error = selectDeviceType("ASIO");
-        if (error.isNotEmpty())
-            return juce::String::fromUTF8("SAR 已配置，但无法启动：") + error;
-    }
-
-    // SAR 0.13.1 在配置窗口关闭后才重建端点，重启同一驱动读取新通道表。
-    manager.closeAudioDevice();
-    manager.restartLastAudioDevice();
-    device = manager.getCurrentAudioDevice();
-    if (device == nullptr || device->getInputChannelNames().size() < 2)
-        return juce::String::fromUTF8("未检测到 SAR Playback 端点，请添加一个双声道 Playback 后再确定");
-
-    if (auto* settings = properties.getUserSettings())
-        settings->setValue("bridgePlaybackInputEnabled", true);
-    auto setup = manager.getAudioDeviceSetup();
-    if (! applySavedBridgeInputChannels(setup))
-        return juce::String::fromUTF8("无法启用 SAR Playback 输入通道");
-    setup.inputDeviceName = setup.outputDeviceName;
-    lastError = manager.setAudioDeviceSetup(setup, true);
-    if (lastError.isNotEmpty())
-        return juce::String::fromUTF8("SAR 端点已创建，但无法启用输入：") + lastError;
-    saveSettings();
-    return {};
+    return isAsioType(status.deviceType) && isSupportedSharedAsioDevice(status.deviceName);
 }
 
 juce::Array<double> AudioDeviceService::getAvailableSampleRates()
@@ -326,10 +190,35 @@ juce::Array<int> AudioDeviceService::getAvailableBufferSizes()
 
 juce::String AudioDeviceService::selectDeviceType(const juce::String& typeName)
 {
-    if (! isWindowsSharedType(typeName) && ! (isAsioType(typeName) && isBridgeModeAvailable()))
-        return juce::String::fromUTF8("仅支持 Windows 共享输出或已识别的 ASIO 桥接驱动");
-    if (isAsioType(typeName) && ! processCanHostSarEndpoints())
-        return juce::String::fromUTF8("SAR 桥接需要管理员权限。已取消切换，不会改动当前声音设置。请关闭风吟后右键“以管理员身份运行”。");
+    if (! isWindowsSharedType(typeName) && ! (isAsioType(typeName) && isSharedAsioModeAvailable()))
+        return juce::String::fromUTF8("仅支持 Windows 共享输出或 KoordASIO 共享低延迟驱动");
+
+    if (isAsioType(typeName))
+    {
+        const auto devices = getAvailableOutputDevices(typeName);
+        if (devices.isEmpty())
+            return juce::String::fromUTF8("未检测到 KoordASIO，请先安装后重新打开风吟");
+
+        // AudioDeviceManager::setCurrentAudioDeviceType("ASIO") 会先打开注册表中的
+        // 默认 ASIO 驱动；当机器还装有 ASIO4ALL 或残留 SAR 时可能误开并卡住。
+        // 用精确 XML 直接指定 KoordASIO，保证其他 ASIO 驱动永远不会被实例化。
+        auto previousState = manager.createStateXml();
+        juce::XmlElement koordState("DEVICESETUP");
+        koordState.setAttribute("deviceType", "ASIO");
+        koordState.setAttribute("audioOutputDeviceName", devices[0]);
+        koordState.setAttribute("audioInputDeviceName", juce::String());
+        koordState.setAttribute("audioDeviceRate", 48000.0);
+        koordState.setAttribute("audioDeviceBufferSize", 128);
+        koordState.setAttribute("audioDeviceInChans", juce::String());
+        koordState.setAttribute("audioDeviceOutChans", "11");
+        manager.closeAudioDevice();
+        lastError = manager.initialise(0, 2, &koordState, false);
+        if (lastError.isNotEmpty() && previousState != nullptr)
+            (void) manager.initialise(0, 2, previousState.get(), true);
+        if (lastError.isEmpty()) saveSettings();
+        return lastError;
+    }
+
     manager.setCurrentAudioDeviceType(typeName, true);
     lastError = manager.getCurrentAudioDeviceType() == typeName
         ? juce::String()
@@ -345,11 +234,11 @@ juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName
     tuningActive = false;
     tuningCandidates.clear();
     tuningResults.clear();
-    if (isAsioType(manager.getCurrentAudioDeviceType()) && ! isSupportedBridgeDevice(outputName))
-        return juce::String::fromUTF8("桥接测试模式只能选择 Synchronous Audio Router");
+    if (isAsioType(manager.getCurrentAudioDeviceType()) && ! isSupportedSharedAsioDevice(outputName))
+        return juce::String::fromUTF8("共享低延迟模式只能选择 KoordASIO");
     const auto previousSetup = manager.getAudioDeviceSetup();
-    const auto bridgeRequest = isAsioType(manager.getCurrentAudioDeviceType())
-        && isSupportedBridgeDevice(outputName);
+    const auto sharedAsioRequest = isAsioType(manager.getCurrentAudioDeviceType())
+        && isSupportedSharedAsioDevice(outputName);
     auto setup = previousSetup;
     setup.outputDeviceName = outputName;
     setup.inputDeviceName.clear();
@@ -358,14 +247,8 @@ juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName
     setup.useDefaultInputChannels = false;
     setup.inputChannels.clear();
     setup.useDefaultOutputChannels = true;
-    if (bridgeRequest && applySavedBridgeInputChannels(setup))
-        setup.inputDeviceName = outputName;
-
-    // AudioDeviceManager 会先停止回调再重开同一 ASIO 设备。这里不再
-    // 额外 closeAudioDevice，否则 SAR 的动态端点会先被销毁，导致驱动
-    // 进入半初始化状态。
     lastError = manager.setAudioDeviceSetup(setup, true);
-    if (lastError.isNotEmpty() && bridgeRequest)
+    if (lastError.isNotEmpty() && sharedAsioRequest)
     {
         const auto requestedError = lastError;
         manager.closeAudioDevice();
@@ -374,10 +257,10 @@ juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName
         {
             lastError.clear();
             return juce::String::fromUTF8("新缓冲区 ") + juce::String(bufferSize)
-                + juce::String::fromUTF8(" 无法启动，已保留桥接模式并恢复原缓冲区。驱动返回：")
+                + juce::String::fromUTF8(" 无法启动，已保留 KoordASIO 并恢复原缓冲区。驱动返回：")
                 + requestedError;
         }
-        lastError = requestedError + juce::String::fromUTF8("；恢复原桥接设置也失败：") + restoreError;
+        lastError = requestedError + juce::String::fromUTF8("；恢复原 KoordASIO 设置也失败：") + restoreError;
         return lastError;
     }
     if (lastError.isEmpty())
@@ -400,7 +283,7 @@ juce::String AudioDeviceService::applyBestInitialSetup()
         && current.deviceType.equalsIgnoreCase("Windows Audio")
         && current.bufferSize >= 512;
     const auto legacyExclusiveMode = revision < currentAudioSetupRevision
-        && ! isWindowsSharedType(current.deviceType) && ! isBridgeModeActive();
+        && ! isWindowsSharedType(current.deviceType) && ! isSharedAsioModeActive();
     if (settings != nullptr && settings->getValue("audioSetupMode") == "manual"
         && ! legacyFixedBuffer && ! legacyExclusiveMode)
     {

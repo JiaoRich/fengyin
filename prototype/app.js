@@ -1693,10 +1693,6 @@ $('#audio-auto-optimize').addEventListener('click', () => {
   if (!window.__JUCE__?.backend?.emitEvent) return;
   nativeEvent('optimiseAudioSettings');
 });
-$('#configure-audio-bridge').addEventListener('click', () => {
-  if (!window.__JUCE__?.backend?.emitEvent) return toast('请在 Windows 安装版中配置桥接');
-  nativeEvent('configureAudioBridge');
-});
 
 const superLatencyDialog = $('#super-latency-confirm-dialog');
 $('#super-latency-optimize').addEventListener('click', () => {
@@ -2055,7 +2051,7 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   setAudioControlsBusy(!!state?.autoTuning);
   setAudioOptions($('#audio-driver-select'), state?.types, state?.type, value => {
     const name = String(value);
-    if (/^ASIO$/i.test(name)) return '桥接低延迟测试（ASIO）';
+    if (/^ASIO$/i.test(name)) return '共享低延迟测试（KoordASIO）';
     if (/RAW Test Mode/i.test(name)) return 'RAW测试模式（共享）';
     if (/Low Latency|低延迟/i.test(name)) return `${name}（推荐·共享）`;
     return `${name}（共享）`;
@@ -2067,9 +2063,9 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   const buffers = Array.isArray(state?.bufferSizes) ? state.bufferSizes : [];
   const lowLatency = !!state?.lowLatencyMode;
   const rawTest = /RAW Test Mode/i.test(String(state?.type || ''));
-  const bridgeActive = state?.bridgeActive === true;
-  $('#audio-driver-help').textContent = bridgeActive
-    ? '风吟和 Windows 应用由桥接器混音；退出桥接器前请先切回共享模式'
+  const sharedAsioActive = state?.sharedAsioActive === true;
+  $('#audio-driver-help').textContent = sharedAsioActive
+    ? '风吟通过 KoordASIO 共享输出；网页、微信等仍使用 Windows 默认扬声器'
     : rawTest
     ? '仅风吟绕过可选系统音效；不修改驱动、不独占设备，可随时切回'
     : lowLatency
@@ -2081,12 +2077,11 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   $('#audio-buffer-help').textContent = buffers.length <= 1
     ? (lowLatency ? '当前设备驱动仅上报这一个可用缓冲值' : '普通 Windows Audio 由系统固定缓冲；请点击“自动优化”')
     : '128 延迟低；出现爆音时可改为 256';
-  const bridgeStatus = $('#bridge-test-status');
-  bridgeStatus.hidden = state?.bridgeAvailable !== true && !bridgeActive;
-  $('#bridge-test-message').textContent = bridgeActive
-    ? '点击配置桥接，添加名为“风吟网页伴奏”的双声道 Playback 设备。'
-    : '已检测到 Synchronous Audio Router，可在“声音模式”中主动开启。';
-  $('#configure-audio-bridge').disabled = state?.bridgeAvailable !== true || !!state?.autoTuning;
+  const sharedAsioStatus = $('#shared-asio-status');
+  sharedAsioStatus.hidden = state?.sharedAsioAvailable !== true && !sharedAsioActive;
+  $('#shared-asio-message').textContent = sharedAsioActive
+    ? '共享低延迟已启用。无需修改浏览器输出设备，也不需要管理员权限。'
+    : '已检测到 KoordASIO，可在“声音模式”中选择共享低延迟测试。';
   const latency = Number(state?.latency);
   const latencyText = Number.isFinite(latency) ? `${latency.toFixed(1)} ms · ${latency <= 10 ? '优秀' : latency <= 20 ? '良好' : '偏高'}` : '尚未取得';
   $('#audio-latency-value').textContent = latencyText;
@@ -2132,7 +2127,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.0.3 ASIO桥接测试版 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.0.4 KoordASIO共享低延迟测试版 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

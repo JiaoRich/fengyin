@@ -531,13 +531,6 @@ void MainComponent::setupWebInterface()
         })
         .withEventListener("requestAudioSettings", [this](juce::var) { emitAudioSettingsState(); })
         .withEventListener("applyAudioSettings", [this](juce::var payload) { applyAudioSettingsFromWeb(payload); })
-        .withEventListener("configureAudioBridge", [this](juce::var)
-        {
-            const auto error = audio.configureBridgePlaybackEndpoint();
-            emitAudioSettingsState(error.isEmpty(), error.isEmpty()
-                ? utf8("SAR 网页伴奏端点已启用，请在 Windows 音量合成器中选择它")
-                : error);
-        })
         .withEventListener("requestSuperLowLatencyStatus", [this](juce::var) { emitSuperLowLatencyState(); })
         .withEventListener("startSuperLowLatencyOptimisation", [this](juce::var)
         {
@@ -3386,9 +3379,9 @@ void MainComponent::emitAudioSettingsState(bool success, const juce::String& mes
     result->setProperty("lowLatencyMode", status.deviceType.containsIgnoreCase("Low Latency Mode")
                                               || status.deviceType.containsIgnoreCase("RAW Test Mode")
                                               || status.deviceType.containsIgnoreCase(utf8("低延迟"))
-                                              || audio.isBridgeModeActive());
-    result->setProperty("bridgeAvailable", audio.isBridgeModeAvailable());
-    result->setProperty("bridgeActive", audio.isBridgeModeActive());
+                                              || audio.isSharedAsioModeActive());
+    result->setProperty("sharedAsioAvailable", audio.isSharedAsioModeAvailable());
+    result->setProperty("sharedAsioActive", audio.isSharedAsioModeActive());
 
     juce::Array<juce::var> types;
     for (const auto& item : audio.getAvailableDeviceTypes()) types.add(item);
@@ -3412,9 +3405,8 @@ void MainComponent::applyAudioSettingsFromWeb(const juce::var& payload)
 {
     pluginHost.setLatencyProbeActive(false);
     const auto previous = audio.getStatus();
-    const auto previousWasBridge = previous.deviceType.equalsIgnoreCase("ASIO")
-        && (previous.deviceName.containsIgnoreCase("Synchronous Audio Router")
-            || previous.deviceName.equalsIgnoreCase("SAR"));
+    const auto previousWasSharedAsio = previous.deviceType.equalsIgnoreCase("ASIO")
+        && previous.deviceName.containsIgnoreCase("KoordASIO");
     if (recorder.isRecording()) toggleRecording();
 
     const auto requestedType = payload.getProperty("type", previous.deviceType).toString();
@@ -3450,10 +3442,9 @@ void MainComponent::applyAudioSettingsFromWeb(const juce::var& payload)
                                  : audio.applyOutputSetup(output, sampleRate, bufferSize);
     }
 
-    // 桥接模式的 buffer 切换由 AudioDeviceService 在同一 ASIO 驱动内
-    // 原子恢复。这里不能再调用 selectDeviceType，否则会把 SAR 状态
-    // 破坏并退回 Windows 共享模式。
-    if (error.isNotEmpty() && ! previousWasBridge && previous.ready && previous.deviceType.isNotEmpty())
+    // KoordASIO 的 buffer 切换由 AudioDeviceService 在同一驱动内恢复。
+    // 这里不重复切换设备类型，避免一次失败触发第二次驱动重启。
+    if (error.isNotEmpty() && ! previousWasSharedAsio && previous.ready && previous.deviceType.isNotEmpty())
     {
         (void) audio.selectDeviceType(previous.deviceType);
         (void) audio.applyOutputSetup(previous.deviceName, previous.sampleRate, previous.bufferSize);
@@ -3461,7 +3452,7 @@ void MainComponent::applyAudioSettingsFromWeb(const juce::var& payload)
 
     emitAudioSettingsState(error.isEmpty(), error.isEmpty()
         ? utf8("设置已保存并立即生效")
-        : (previousWasBridge ? error : utf8("无法应用，已恢复上一个可用设置：") + error));
+        : (previousWasSharedAsio ? error : utf8("无法应用，已恢复上一个可用设置：") + error));
 }
 
 void MainComponent::showDeviceSettings()
