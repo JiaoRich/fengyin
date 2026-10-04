@@ -31,6 +31,7 @@ try {
     function Edit-PinnedFile([string]$target, [array]$edits) {
         $targetPath = Join-Path $output $target
         $text = [System.IO.File]::ReadAllText($targetPath).Replace("`r`n", "`n")
+        $text = [System.Text.RegularExpressions.Regex]::Replace($text, '[ \t]+(?=\n)', '')
         $editNumber = 0
         foreach ($edit in $edits) {
             $editNumber++
