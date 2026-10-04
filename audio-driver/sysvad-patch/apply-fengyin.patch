@@ -8,7 +8,7 @@ index 49673cf..a828edf 100644
  #include "AudioModuleHelper.h"
 +#include "../FengYinAudioRing.h"
  #define MINWAVERTSTREAM_POOLTAG 'SRWM'
-
+ 
  #pragma warning (disable : 4127)
 @@ -413,6 +414,10 @@ Return Value:
          {
@@ -24,7 +24,7 @@ index 49673cf..a828edf 100644
 @@ -1469,11 +1474,8 @@ VOID CMiniportWaveRTStream::UpdatePosition
                                          0);
          }
-
+ 
 -        if (!g_DoNotCreateDataFiles)
 -        {
 -            // Read from buffer and write to a file.
@@ -33,7 +33,7 @@ index 49673cf..a828edf 100644
 +        // Forward every consumed render byte to the fixed loopback cable.
 +        ReadBytes(ByteDisplacement);
      }
-
+ 
      // Increment the DMA position by the number of bytes displaced since the last
 @@ -1516,6 +1518,9 @@ ByteDisplacement - # of bytes to process.
      while (ByteDisplacement > 0)
@@ -99,7 +99,7 @@ index 8edd3ac..d972f7c 100644
 -    &HdmiMiniports,
 -    &SpdifMiniports,
  };
-
+ 
  #define g_cRenderEndpoints  (SIZEOF_ARRAY(g_RenderEndpoints))
 @@ -522,15 +519,12 @@ PENDPOINT_MINIPAIR  g_RenderEndpoints[] =
  // Capture miniport pairs.
@@ -114,10 +114,10 @@ index 8edd3ac..d972f7c 100644
 -    &MicArray3Miniports,
 +    nullptr,
  };
-
+ 
 -#define g_cCaptureEndpoints (SIZEOF_ARRAY(g_CaptureEndpoints))
 +#define g_cCaptureEndpoints 0
-
+ 
  //=============================================================================
  //
 diff --git a/audio/sysvad/common.cpp b/audio/sysvad/common.cpp
@@ -129,14 +129,14 @@ index 88e2759..0ae1472 100644
  #include "IHVPrivatePropertySet.h"
  #include "simple.h"
 +#include "FengYinAudioRing.h"
-
+ 
  #ifdef SYSVAD_BTH_BYPASS
  #include <limits.h>
 @@ -764,6 +765,7 @@ Return Value:
      DPF_ENTER(("[CAdapterCommon::Init]"));
-
+ 
      ASSERT(DeviceObject);
 +    FengYinAudioRingInitialize();
-
+ 
      NTSTATUS        ntStatus    = STATUS_SUCCESS;
-
+ 
