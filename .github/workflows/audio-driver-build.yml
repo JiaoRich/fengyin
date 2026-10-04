@@ -65,6 +65,16 @@ jobs:
           }
           $env:PATH = "$($infVerif.Directory.FullName);$env:PATH"
 
+          & $msbuild "$env:RUNNER_TEMP/fengyin-driver-source/audio/sysvad/EndpointsCommon/EndpointsCommon.vcxproj" `
+            -restore `
+            -p:Configuration=Release `
+            -p:Platform=x64 `
+            -p:TreatWarningAsError=false `
+            -m
+          if ($LASTEXITCODE -ne 0) {
+            throw "EndpointsCommon 编译失败：$LASTEXITCODE"
+          }
+
           & $msbuild "$env:RUNNER_TEMP/fengyin-driver-source/audio/sysvad/TabletAudioSample/TabletAudioSample.vcxproj" `
             -restore `
             -p:Configuration=Release `
@@ -72,6 +82,9 @@ jobs:
             -p:TreatWarningAsError=false `
             -p:SkipPackageVerification=true `
             -m
+          if ($LASTEXITCODE -ne 0) {
+            throw "风吟虚拟音频驱动编译失败：$LASTEXITCODE"
+          }
 
       - name: 上传内部编译产物
         uses: actions/upload-artifact@v4

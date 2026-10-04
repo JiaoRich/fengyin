@@ -13,6 +13,7 @@ AudioEngineProcessController::~AudioEngineProcessController()
 
 bool AudioEngineProcessController::start(std::uint32_t bufferFrames,
                                          const juce::String& physicalEndpointId,
+                                         bool routeSystemAudio,
                                          juce::String& error)
 {
     stop();
@@ -53,6 +54,8 @@ bool AudioEngineProcessController::start(std::uint32_t bufferFrames,
                  + L"\" --buffer " + std::to_wstring(bufferFrames);
     if (physicalEndpointId.isNotEmpty())
         command += L" --physical-endpoint \"" + std::wstring(physicalEndpointId.toWideCharPointer()) + L"\"";
+    if (routeSystemAudio)
+        command += L" --route-system-audio";
     std::vector<wchar_t> mutableCommand(command.begin(), command.end());
     mutableCommand.push_back(L'\0');
     STARTUPINFOW startup {};
@@ -79,6 +82,7 @@ bool AudioEngineProcessController::start(std::uint32_t bufferFrames,
 #else
     (void) bufferFrames;
     (void) physicalEndpointId;
+    (void) routeSystemAudio;
     error = "FengYin audio engine is only available on Windows";
     return false;
 #endif

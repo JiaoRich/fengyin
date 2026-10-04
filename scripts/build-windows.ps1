@@ -72,6 +72,12 @@ New-Item -ItemType Directory -Force -Path $PackageDir | Out-Null
 $BuiltExe = Join-Path $BuildDir "FengYin_artefacts\Release\FengYin.exe"
 if (-not (Test-Path $BuiltExe)) { throw "未找到主程序编译结果：$BuiltExe" }
 Copy-Item $BuiltExe (Join-Path $PackageDir "FengYin.exe") -Force
+$AudioEngineExe = Join-Path $BuildDir "Release\FengYinAudioEngine.exe"
+$AudioWatchdogExe = Join-Path $BuildDir "Release\FengYinAudioWatchdog.exe"
+if (-not (Test-Path $AudioEngineExe)) { throw "未找到独立音频引擎：$AudioEngineExe" }
+if (-not (Test-Path $AudioWatchdogExe)) { throw "未找到音频恢复守护程序：$AudioWatchdogExe" }
+Copy-Item $AudioEngineExe (Join-Path $PackageDir "FengYinAudioEngine.exe") -Force
+Copy-Item $AudioWatchdogExe (Join-Path $PackageDir "FengYinAudioWatchdog.exe") -Force
 Copy-Item (Join-Path $ProjectRoot "README.md") $PackageDir -Force
 Copy-Item (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES.md") $PackageDir -Force
 if (Test-Path $FfmpegPath) {

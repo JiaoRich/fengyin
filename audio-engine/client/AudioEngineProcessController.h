@@ -17,7 +17,7 @@ public:
     AudioEngineProcessController& operator=(const AudioEngineProcessController&) = delete;
 
     bool start(std::uint32_t bufferFrames, const juce::String& physicalEndpointId,
-               juce::String& error);
+               bool routeSystemAudio, juce::String& error);
     void stop() noexcept;
     [[nodiscard]] bool isRunning() const noexcept;
     [[nodiscard]] std::uint32_t actualBufferFrames() const noexcept;

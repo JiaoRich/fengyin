@@ -4,7 +4,14 @@
 )
 
 $ErrorActionPreference = "Stop"
-$RequiredFiles = @("FengYin.exe", "README.md", "THIRD_PARTY_NOTICES.md", "MicrosoftEdgeWebview2Setup.exe")
+$RequiredFiles = @(
+    "FengYin.exe",
+    "FengYinAudioEngine.exe",
+    "FengYinAudioWatchdog.exe",
+    "README.md",
+    "THIRD_PARTY_NOTICES.md",
+    "MicrosoftEdgeWebview2Setup.exe"
+)
 foreach ($Name in $RequiredFiles) {
     $Path = Join-Path $PackageDir $Name
     if (-not (Test-Path $Path)) { throw "发布检查失败，缺少：$Name" }
@@ -20,4 +27,4 @@ if ($Forbidden) {
 $Size = (Get-ChildItem $PackageDir -Recurse -File | Measure-Object Length -Sum).Sum
 if ($Size -lt 1MB) { throw "发布检查失败：客户程序目录体积异常。" }
 
-Write-Host "发布检查通过：主程序、说明文件齐全，客户目录未发现私钥。" -ForegroundColor Green
+Write-Host "发布检查通过：主程序、独立音频引擎、恢复守护程序和说明文件齐全，客户目录未发现私钥。" -ForegroundColor Green

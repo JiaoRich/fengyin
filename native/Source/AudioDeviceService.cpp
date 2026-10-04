@@ -97,7 +97,7 @@ juce::String AudioDeviceService::initialise()
     if (juce::SystemStats::getEnvironmentVariable("FENGYIN_AUDIO_ENGINE_TEST", {}) == "1")
     {
         juce::String engineError;
-        if (engineProcess.start(256, {}, engineError))
+        if (engineProcess.start(256, {}, true, engineError))
         {
             manager.addAudioDeviceType(std::make_unique<audioengine::FengYinEngineAudioIODeviceType>());
             juce::XmlElement engineState("DEVICESETUP");
@@ -122,7 +122,10 @@ juce::String AudioDeviceService::initialise()
             manager.closeAudioDevice();
             engineProcess.stop();
         }
-        lastError = engineError;
+        // Keep JUCE's concrete device-open failure when the process itself
+        // started successfully. Overwriting it with an empty process error
+        // hid the real diagnosis and made a failed fast-path look healthy.
+        if (engineError.isNotEmpty()) lastError = engineError;
     }
    #endif
     std::unique_ptr<juce::XmlElement> saved;
