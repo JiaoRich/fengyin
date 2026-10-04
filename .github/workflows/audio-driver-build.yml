@@ -128,13 +128,19 @@ jobs:
           $releaseDir = Split-Path -Parent $builtInf
           $builtCat = Join-Path $releaseDir "FengYinAudio.cat"
           if (-not (Test-Path $builtCat)) {
+            # Inf2Cat is a host tool. Depending on the WDK release it may be
+            # shipped only as x86 even when producing an x64 driver, so do not
+            # confuse host architecture with the target package architecture.
             $inf2Cat = Get-ChildItem "$env:RUNNER_TEMP/fengyin-driver-source/packages" `
               -Filter inf2cat.exe -Recurse -File |
-              Where-Object {
-                $_.FullName -match 'Microsoft\.Windows\.WDK\.x64' -and
-                $_.FullName -match '[\\/]x64[\\/]inf2cat\.exe$'
-              } |
+              Where-Object { $_.FullName -match 'Microsoft\.Windows\.WDK' } |
               Select-Object -First 1
+            if (-not $inf2Cat) {
+              $inf2Cat = Get-ChildItem "${env:ProgramFiles(x86)}/Windows Kits/10/bin" `
+                -Filter inf2cat.exe -Recurse -File -ErrorAction SilentlyContinue |
+                Sort-Object FullName -Descending |
+                Select-Object -First 1
+            }
             if (-not $inf2Cat) {
               throw "WDK NuGet 包中未找到 x64/inf2cat.exe"
             }
