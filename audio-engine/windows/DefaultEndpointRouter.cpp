@@ -5,6 +5,7 @@
 #include <propsys.h>
 #include <propkeydef.h>
 #include <functiondiscoverykeys_devpkey.h>
+#include <mmreg.h>
 #include <mmdeviceapi.h>
 #include <propidl.h>
 #include <propvarutil.h>
