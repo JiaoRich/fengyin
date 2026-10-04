@@ -141,6 +141,10 @@ try {
         @('#include "simple.h"', "#include `"simple.h`"`n#include `"FengYinAudioRing.h`""),
         @('    ASSERT(DeviceObject);', "    ASSERT(DeviceObject);`n    FengYinAudioRingInitialize();")
     )
+    Edit-PinnedFile 'audio\sysvad\adapter.cpp' @(
+        @('    for(ULONG i = 0; i < g_cCaptureEndpoints; ++i, ++ppAeMiniports)',
+          '    for(ULONG i = 0; i != g_cCaptureEndpoints; ++i, ++ppAeMiniports)')
+    )
 }
 finally {
     Pop-Location
