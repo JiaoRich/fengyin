@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string]$DriverDir
+    [string]$DriverDir,
+    [switch]$RequireTrusted
 )
 
 $ErrorActionPreference = "Stop"
@@ -31,6 +32,9 @@ foreach ($Name in @("FengYinAudio.cat", "TabletAudioSample.sys")) {
     }
     if ($Signature.SignerCertificate.Thumbprint -ne $Certificate.Thumbprint) {
         throw "$Name 与随包测试证书不匹配。"
+    }
+    if ($RequireTrusted -and $Signature.Status -ne "Valid") {
+        throw "$Name 在导入随包证书后仍未通过信任验证：$($Signature.Status)"
     }
     if ($Signature.Status -notin @("Valid", "UnknownError", "NotTrusted")) {
         # A clean machine may not trust the test root until installation time;

@@ -199,10 +199,11 @@ jobs:
           $testCertificatePath = Join-Path $releaseDir "TabletAudioSample.cer"
           Import-Certificate -FilePath $testCertificatePath -CertStoreLocation "Cert:\CurrentUser\Root" | Out-Null
           Import-Certificate -FilePath $testCertificatePath -CertStoreLocation "Cert:\CurrentUser\TrustedPublisher" | Out-Null
-          & $signTool.FullName verify /pa /v $builtCat | Out-Null
-          if ($LASTEXITCODE -ne 0) { throw "FengYinAudio.cat 测试签名验证失败：$LASTEXITCODE" }
-
-          ./scripts/test-fengyin-test-driver.ps1 -DriverDir $releaseDir
+          # Avoid SignTool's online chain retrieval for this intentionally
+          # self-signed certificate. Get-AuthenticodeSignature validates the
+          # local chain after importing the exact certificate shipped in the
+          # kit, and also checks that CAT and SYS have the same thumbprint.
+          ./scripts/test-fengyin-test-driver.ps1 -DriverDir $releaseDir -RequireTrusted
 
       - name: 生成 Partner Center 待签名提交包
         shell: pwsh
