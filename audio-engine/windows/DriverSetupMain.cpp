@@ -25,6 +25,27 @@ std::filesystem::path logPath()
     return folder / L"driver-setup.log";
 }
 
+std::filesystem::path installedInfRecordPath()
+{
+    auto path = logPath();
+    path.replace_filename(L"audio-driver-inf.txt");
+    return path;
+}
+
+void rememberInstalledInf(const std::filesystem::path& path)
+{
+    std::wofstream stream(installedInfRecordPath(), std::ios::trunc);
+    stream << path.filename().wstring();
+}
+
+std::wstring readInstalledInf()
+{
+    std::wifstream stream(installedInfRecordPath());
+    std::wstring name;
+    std::getline(stream, name);
+    return std::filesystem::path(name).filename().wstring();
+}
+
 void log(const std::wstring& message)
 {
     std::wofstream stream(logPath(), std::ios::app);
@@ -72,8 +93,9 @@ bool deviceExists()
 bool createRootDevice(const std::filesystem::path& infPath)
 {
     GUID classGuid {};
-    wchar_t className[MAX_CLASS_NAME_LEN] {};
-    if (! SetupDiGetINFClassW(infPath.c_str(), &classGuid, className, MAX_CLASS_NAME_LEN, nullptr))
+    constexpr DWORD classNameCapacity = 256;
+    wchar_t className[classNameCapacity] {};
+    if (! SetupDiGetINFClassW(infPath.c_str(), &classGuid, className, classNameCapacity, nullptr))
     {
         log(L"SetupDiGetINFClass failed: " + std::to_wstring(GetLastError()));
         return false;
@@ -95,6 +117,8 @@ bool createRootDevice(const std::filesystem::path& infPath)
     return ok;
 }
 
+int uninstall();
+
 int install(const std::filesystem::path& suppliedInf)
 {
     std::error_code ignored;
@@ -104,7 +128,9 @@ int install(const std::filesystem::path& suppliedInf)
         log(L"INF not found: " + suppliedInf.wstring());
         return 2;
     }
+    const auto existedBeforeInstall = deviceExists();
     wchar_t copiedInf[MAX_PATH] {};
+    bool copiedByTransaction = false;
     if (! SetupCopyOEMInfW(infPath.c_str(), nullptr, SPOST_PATH, 0, copiedInf, MAX_PATH,
                            nullptr, nullptr))
     {
@@ -115,14 +141,29 @@ int install(const std::filesystem::path& suppliedInf)
             return 3;
         }
     }
-    if (! deviceExists() && ! createRootDevice(infPath)) return 4;
+    else
+    {
+        copiedByTransaction = ! existedBeforeInstall;
+    }
+    if (! existedBeforeInstall && ! createRootDevice(infPath))
+    {
+        if (copiedByTransaction && copiedInf[0] != L'\0')
+            (void) SetupUninstallOEMInfW(std::filesystem::path(copiedInf).filename().c_str(), 0, nullptr);
+        return 4;
+    }
     BOOL reboot = FALSE;
     if (! UpdateDriverForPlugAndPlayDevicesW(nullptr, hardwareId, infPath.c_str(),
                                               INSTALLFLAG_FORCE, &reboot))
     {
         log(L"UpdateDriverForPlugAndPlayDevices failed: " + std::to_wstring(GetLastError()));
+        // Roll back only the root device created by this transaction. Never
+        // remove a previously working installation during an upgrade failure.
+        if (! existedBeforeInstall) (void) uninstall();
+        if (copiedByTransaction && copiedInf[0] != L'\0')
+            (void) SetupUninstallOEMInfW(std::filesystem::path(copiedInf).filename().c_str(), 0, nullptr);
         return 5;
     }
+    if (copiedInf[0] != L'\0') rememberInstalledInf(copiedInf);
     log(reboot ? L"Driver installed; reboot required" : L"Driver installed");
     return reboot ? 3010 : 0;
 }
@@ -147,6 +188,20 @@ int uninstall()
             failed = true;
     }
     SetupDiDestroyDeviceInfoList(devices);
+    const auto publishedInf = readInstalledInf();
+    if (! publishedInf.empty())
+    {
+        if (SetupUninstallOEMInfW(publishedInf.c_str(), 0, nullptr))
+        {
+            std::error_code ignored;
+            std::filesystem::remove(installedInfRecordPath(), ignored);
+        }
+        else
+        {
+            log(L"Driver package removal failed: " + std::to_wstring(GetLastError()));
+            failed = true;
+        }
+    }
     log(failed ? L"Driver device removal failed" : L"Driver device removed");
     return failed ? 7 : 0;
 }

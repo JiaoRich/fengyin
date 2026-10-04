@@ -25,6 +25,24 @@ if ($Forbidden) {
     throw "发布检查失败：客户目录中发现疑似私钥文件：$($Forbidden.FullName -join ', ')"
 }
 
+$DriverDir = Join-Path $PackageDir "driver"
+if (Test-Path $DriverDir) {
+    foreach ($Name in @("FengYinAudio.inf", "FengYinAudio.cat", "TabletAudioSample.sys")) {
+        if (-not (Test-Path (Join-Path $DriverDir $Name))) {
+            throw "发布检查失败，驱动包缺少：$Name"
+        }
+    }
+    foreach ($Name in @("FengYinAudio.cat", "TabletAudioSample.sys")) {
+        $Signature = Get-AuthenticodeSignature (Join-Path $DriverDir $Name)
+        if ($Signature.Status -ne "Valid" -or -not $Signature.SignerCertificate) {
+            throw "发布检查失败，驱动签名无效：$Name（$($Signature.Status)）"
+        }
+        if ($Signature.SignerCertificate.Subject -match "WDKTestCert") {
+            throw "发布检查失败：禁止把 WDK 测试签名驱动发布给用户。"
+        }
+    }
+}
+
 $Size = (Get-ChildItem $PackageDir -Recurse -File | Measure-Object Length -Sum).Sum
 if ($Size -lt 1MB) { throw "发布检查失败：客户程序目录体积异常。" }
 

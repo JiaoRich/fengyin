@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.0.4",
+    [string]$Version = "1.1.0",
     [switch]$SkipInstaller
 )
 
@@ -12,6 +12,8 @@ $FfmpegPath = Join-Path $ProjectRoot "third_party\ffmpeg\windows\ffmpeg.exe"
 $FfmpegPackageDir = Join-Path $PackageDir "tools\ffmpeg"
 $NugetPackageDir = Join-Path $ProjectRoot "third_party\nuget-packages"
 $WebViewBootstrapperPath = Join-Path $PackageDir "MicrosoftEdgeWebview2Setup.exe"
+$SignedDriverDir = Join-Path $ProjectRoot "third_party\fengyin-audio-driver\windows-x64"
+$PackagedDriverDir = Join-Path $PackageDir "driver"
 $PreparedFfmpeg = Join-Path $env:TEMP ("fengyin-ffmpeg-" + [guid]::NewGuid().ToString("N"))
 
 function Invoke-Checked([string]$StepName, [scriptblock]$Command) {
@@ -81,6 +83,23 @@ if (-not (Test-Path $DriverSetupExe)) { throw "未找到虚拟音频驱动安装
 Copy-Item $AudioEngineExe (Join-Path $PackageDir "FengYinAudioEngine.exe") -Force
 Copy-Item $AudioWatchdogExe (Join-Path $PackageDir "FengYinAudioWatchdog.exe") -Force
 Copy-Item $DriverSetupExe (Join-Path $PackageDir "FengYinDriverSetup.exe") -Force
+if (Test-Path (Join-Path $SignedDriverDir "FengYinAudio.inf")) {
+    $DriverFiles = @("FengYinAudio.inf", "FengYinAudio.cat", "TabletAudioSample.sys")
+    foreach ($DriverFile in $DriverFiles) {
+        $DriverPath = Join-Path $SignedDriverDir $DriverFile
+        if (-not (Test-Path $DriverPath)) {
+            throw "已签名驱动包不完整，缺少：$DriverFile"
+        }
+    }
+    New-Item -ItemType Directory -Force -Path $PackagedDriverDir | Out-Null
+    Copy-Item (Join-Path $SignedDriverDir "*") $PackagedDriverDir -Force
+    $HasAudioDriver = 1
+} else {
+    # Public builds must never install a CI test certificate or enable Windows
+    # test-signing. The signed package is supplied only after Partner Center
+    # attestation; until then the existing shared-audio path remains intact.
+    $HasAudioDriver = 0
+}
 Copy-Item (Join-Path $ProjectRoot "README.md") $PackageDir -Force
 Copy-Item (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES.md") $PackageDir -Force
 if (Test-Path $FfmpegPath) {
@@ -149,7 +168,8 @@ if ((Get-Item $ChineseMessages).Length -lt 10000) {
 }
 Invoke-Checked "中文安装包生成" {
     & $Iscc "/DSourceDir=$PackageDir" "/DOutputDir=$InstallerDir" "/DAppVersion=$Version" `
-        "/DChineseMessages=$ChineseMessages" (Join-Path $ProjectRoot "installer\FengYin.iss")
+        "/DChineseMessages=$ChineseMessages" "/DHasAudioDriver=$HasAudioDriver" `
+        (Join-Path $ProjectRoot "installer\FengYin.iss")
 }
 
 Write-Host "完成：$InstallerDir\风吟-$Version-Windows-x64.exe" -ForegroundColor Green

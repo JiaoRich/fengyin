@@ -1,6 +1,8 @@
 #include "PhysicalOutputSelector.h"
 
 #if defined(_WIN32)
+#include <windows.h>
+#include <propsys.h>
 #include <propkeydef.h>
 #include <functiondiscoverykeys_devpkey.h>
 #include <propvarutil.h>

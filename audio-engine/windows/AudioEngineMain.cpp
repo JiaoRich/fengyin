@@ -138,7 +138,34 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         if (preferredEndpointId.empty()) preferredEndpointId = previousPhysicalEndpoint;
     }
     WasapiExclusiveOutput output;
-    if (! output.start(core, requestedFrames, preferredEndpointId, error))
+    // Try the user's/automatic low-latency request first, then only the larger
+    // safe periods. This happens before the JUCE graph opens, so the graph is
+    // created once at the physical period that actually succeeded.
+    std::vector<std::uint32_t> periodCandidates { requestedFrames };
+    for (const auto candidate : { 128u, 256u, 512u })
+        if (candidate > requestedFrames) periodCandidates.push_back(candidate);
+    bool outputStarted = false;
+    for (const auto candidate : periodCandidates)
+    {
+        // Existing shared clients need a short moment to migrate after the
+        // Windows default was moved to the virtual endpoint. Retry the same
+        // low period before increasing latency; this is startup work, never
+        // executed on the real-time audio callback.
+        for (int attempt = 0; attempt < 3 && ! outputStarted; ++attempt)
+        {
+            if (output.start(core, candidate, preferredEndpointId, error))
+            {
+                requestedFrames = candidate;
+                outputStarted = true;
+            }
+            else if (attempt < 2)
+            {
+                Sleep(200);
+            }
+        }
+        if (outputStarted) break;
+    }
+    if (! outputStarted)
     {
         lifecycle.useFallback();
         instrumentMapping.get()->state.store(static_cast<std::uint32_t>(StreamState::fallback));
@@ -174,6 +201,35 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     bool unrecoverableOutputFailure = false;
     while (WaitForSingleObject(stopEvent, 250) == WAIT_TIMEOUT)
     {
+        if (routeSystemAudio)
+        {
+            std::wstring newPhysicalEndpoint, routeError;
+            if (router.pollPhysicalDefaultChange(newPhysicalEndpoint, routeError)
+                && ! newPhysicalEndpoint.empty() && newPhysicalEndpoint != preferredEndpointId)
+            {
+                lifecycle.beginRecovery();
+                publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::recovering, 0);
+                output.stop();
+                discardQueuedAudio(*instrumentMapping.get());
+                discardQueuedAudio(*systemMapping.get());
+                core.reset();
+                preferredEndpointId = newPhysicalEndpoint;
+                std::wstring restartError;
+                if (output.start(core, requestedFrames, preferredEndpointId, restartError)
+                    && output.actualBufferFrames() == actualFrames)
+                {
+                    publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::running,
+                                 actualFrames);
+                    lifecycle.markRunning();
+                    continue;
+                }
+                output.stop();
+                unrecoverableOutputFailure = true;
+                lifecycle.useFallback();
+                publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::fallback, 0);
+                break;
+            }
+        }
         if (output.isRunning())
         {
             if (! routeSystemAudio || loopback.isRunning()) continue;

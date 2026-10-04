@@ -4,11 +4,82 @@
 #include <thread>
 #include <vector>
 
+#if defined(_WIN32)
+#include <windows.h>
+#include <propsys.h>
+#include <functiondiscoverykeys_devpkey.h>
+#include <mmdeviceapi.h>
+#include <propvarutil.h>
+#include <wrl/client.h>
+#include <algorithm>
+#include <cwctype>
+#endif
+
 namespace fengyin::audioengine
 {
+#if defined(_WIN32)
+namespace
+{
+bool isFengYinEndpoint(IMMDevice& device)
+{
+    LPWSTR rawId = nullptr;
+    std::wstring identity;
+    if (SUCCEEDED(device.GetId(&rawId)) && rawId != nullptr)
+    {
+        identity = rawId;
+        CoTaskMemFree(rawId);
+    }
+    Microsoft::WRL::ComPtr<IPropertyStore> properties;
+    if (SUCCEEDED(device.OpenPropertyStore(STGM_READ, &properties)))
+    {
+        PROPVARIANT value;
+        PropVariantInit(&value);
+        if (SUCCEEDED(properties->GetValue(PKEY_Device_FriendlyName, &value))
+            && value.vt == VT_LPWSTR && value.pwszVal != nullptr)
+            identity += L" " + std::wstring(value.pwszVal);
+        PropVariantClear(&value);
+    }
+    std::transform(identity.begin(), identity.end(), identity.begin(), [] (wchar_t character)
+    {
+        return static_cast<wchar_t>(std::towlower(character));
+    });
+    return identity.find(L"fengyin") != std::wstring::npos
+        || identity.find(L"风吟共享扬声器") != std::wstring::npos;
+}
+}
+#endif
+
 AudioEngineProcessController::~AudioEngineProcessController()
 {
     stop();
+}
+
+bool AudioEngineProcessController::isAvailable() noexcept
+{
+#if defined(_WIN32)
+    const auto com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    if (FAILED(com) && com != RPC_E_CHANGED_MODE) return false;
+    Microsoft::WRL::ComPtr<IMMDeviceEnumerator> enumerator;
+    Microsoft::WRL::ComPtr<IMMDeviceCollection> endpoints;
+    auto available = SUCCEEDED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
+                                                IID_PPV_ARGS(&enumerator)))
+        && enumerator
+        && SUCCEEDED(enumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &endpoints))
+        && endpoints;
+    UINT count = 0;
+    if (available) available = SUCCEEDED(endpoints->GetCount(&count));
+    bool found = false;
+    for (UINT index = 0; available && index < count && ! found; ++index)
+    {
+        Microsoft::WRL::ComPtr<IMMDevice> endpoint;
+        found = SUCCEEDED(endpoints->Item(index, &endpoint)) && endpoint
+            && isFengYinEndpoint(*endpoint.Get());
+    }
+    if (SUCCEEDED(com)) CoUninitialize();
+    return found;
+#else
+    return false;
+#endif
 }
 
 bool AudioEngineProcessController::start(std::uint32_t bufferFrames,
@@ -33,8 +104,24 @@ bool AudioEngineProcessController::start(std::uint32_t bufferFrames,
 
     if (auto existing = OpenMutexW(SYNCHRONIZE, FALSE, engineSingletonName))
     {
+        // Never attach anonymously to an engine left by an earlier app
+        // instance: the new controller would not own its process handle and
+        // could leave Windows routed to the virtual speaker after exit.
+        if (auto stopEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE, engineStopEventName))
+        {
+            SetEvent(stopEvent);
+            CloseHandle(stopEvent);
+        }
+        const auto stopped = WaitForSingleObject(existing, 3000);
+        if (stopped == WAIT_OBJECT_0 || stopped == WAIT_ABANDONED)
+            ReleaseMutex(existing);
         CloseHandle(existing);
-        return waitUntilRunning(3000, error);
+        if (stopped == WAIT_TIMEOUT)
+        {
+            error = juce::String::fromUTF8("上一次风吟音频引擎未能安全退出");
+            statusMapping.close();
+            return false;
+        }
     }
 
     // There is no live engine. Discard state left by an unclean termination

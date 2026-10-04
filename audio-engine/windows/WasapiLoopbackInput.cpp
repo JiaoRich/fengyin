@@ -1,8 +1,10 @@
 #include "WasapiLoopbackInput.h"
 
 #if defined(_WIN32)
+#include <windows.h>
 #include <audioclient.h>
 #include <avrt.h>
+#include <propsys.h>
 #include <propkeydef.h>
 #include <functiondiscoverykeys_devpkey.h>
 #include <ksmedia.h>

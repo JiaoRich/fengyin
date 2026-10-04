@@ -65,6 +65,28 @@ jobs:
           }
           $env:PATH = "$($infVerif.Directory.FullName);$env:PATH"
 
+          # Microsoft.Windows.WDK.x64 10.0.28000 ships ApiValidator only in
+          # c/bin/.../x64, while its own WindowsDriver.common.targets still
+          # resolves the host tool from c/bin/.../x86. Mirror the x64 host
+          # executable into that expected private directory. This keeps the
+          # Universal API validation enabled instead of hiding the packaging
+          # defect with a skip flag.
+          $apiValidator = Get-ChildItem "$env:RUNNER_TEMP/fengyin-driver-source/packages" `
+            -Filter apivalidator.exe -Recurse -File |
+            Where-Object { $_.FullName -match '[\\/]x64[\\/]apivalidator\.exe$' } |
+            Select-Object -First 1
+          if (-not $apiValidator) {
+            throw "WDK NuGet 包中未找到 x64/apivalidator.exe"
+          }
+          $apiValidatorDll = Join-Path $apiValidator.Directory.FullName "microsoft.kits.drivers.apivalidator.dll"
+          if (-not (Test-Path $apiValidatorDll)) {
+            throw "WDK NuGet 包中未找到 ApiValidator 运行库"
+          }
+          $apiValidatorX86Dir = Join-Path $apiValidator.Directory.Parent.FullName "x86"
+          New-Item -ItemType Directory -Force -Path $apiValidatorX86Dir | Out-Null
+          Copy-Item $apiValidator.FullName (Join-Path $apiValidatorX86Dir "ApiValidator.exe") -Force
+          Copy-Item $apiValidatorDll (Join-Path $apiValidatorX86Dir "microsoft.kits.drivers.apivalidator.dll") -Force
+
           & $msbuild "$env:RUNNER_TEMP/fengyin-driver-source/audio/sysvad/EndpointsCommon/EndpointsCommon.vcxproj" `
             -restore `
             -p:Configuration=Release `
@@ -81,10 +103,25 @@ jobs:
             -p:Platform=x64 `
             -p:TreatWarningAsError=false `
             -p:SkipPackageVerification=true `
-            -p:RunApiValidator=false `
             -m
           if ($LASTEXITCODE -ne 0) {
             throw "风吟虚拟音频驱动编译失败：$LASTEXITCODE"
+          }
+
+          $builtInf = "$env:RUNNER_TEMP/fengyin-driver-source/audio/sysvad/TabletAudioSample/x64/Release/FengYinAudio.inf"
+          if (-not (Test-Path $builtInf)) {
+            throw "驱动已编译但未生成 FengYinAudio.inf"
+          }
+          $infVerifier = Get-ChildItem "$env:RUNNER_TEMP/fengyin-driver-source/packages" `
+            -Filter infverif.exe -Recurse -File |
+            Where-Object { $_.FullName -match '[\\/]x64[\\/]infverif\.exe$' } |
+            Select-Object -First 1
+          if (-not $infVerifier) {
+            throw "WDK NuGet 包中未找到 x64/infverif.exe"
+          }
+          & $infVerifier.FullName /w $builtInf
+          if ($LASTEXITCODE -ne 0) {
+            throw "FengYinAudio.inf 验证失败：$LASTEXITCODE"
           }
 
       - name: 上传内部编译产物
@@ -92,6 +129,8 @@ jobs:
         with:
           name: fengyin-audio-driver-unsigned-internal
           path: |
-            ${{ runner.temp }}/fengyin-driver-source/audio/sysvad/**/x64/Release/**
-            ${{ runner.temp }}/fengyin-driver-source/audio/sysvad/**/Release/**
+            ${{ runner.temp }}/fengyin-driver-source/audio/sysvad/TabletAudioSample/x64/Release/FengYinAudio.inf
+            ${{ runner.temp }}/fengyin-driver-source/audio/sysvad/TabletAudioSample/x64/Release/FengYinAudio.cat
+            ${{ runner.temp }}/fengyin-driver-source/audio/sysvad/TabletAudioSample/x64/Release/TabletAudioSample.sys
+            ${{ runner.temp }}/fengyin-driver-source/audio/sysvad/TabletAudioSample/x64/Release/TabletAudioSample.cer
           if-no-files-found: error

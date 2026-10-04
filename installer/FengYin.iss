@@ -5,10 +5,13 @@
   #define OutputDir "."
 #endif
 #ifndef AppVersion
-  #define AppVersion "0.5.1"
+  #define AppVersion "1.1.0"
 #endif
 #ifndef ChineseMessages
   #define ChineseMessages "compiler:Languages\ChineseSimplified.isl"
+#endif
+#ifndef HasAudioDriver
+  #define HasAudioDriver 0
 #endif
 
 [Setup]
@@ -50,3 +53,42 @@ Name: "{autodesktop}\风吟"; Filename: "{app}\FengYin.exe"; Tasks: desktopicon
 [Run]
 Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "正在检查视频与精美界面运行组件…"; Flags: waituntilterminated
 Filename: "{app}\FengYin.exe"; Description: "启动风吟"; Flags: nowait postinstall skipifsilent
+
+[Code]
+var
+  DriverNeedsRestart: Boolean;
+
+function NeedRestart(): Boolean;
+begin
+  Result := DriverNeedsRestart;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
+begin
+  #if HasAudioDriver == 1
+  if CurStep = ssPostInstall then
+  begin
+    if not Exec(ExpandConstant('{app}\FengYinDriverSetup.exe'),
+      '--install "' + ExpandConstant('{app}\driver\FengYinAudio.inf') + '"',
+      '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+      RaiseException('无法启动风吟音频驱动安装程序。');
+    if (ResultCode <> 0) and (ResultCode <> 3010) then
+      RaiseException(Format('风吟音频驱动安装失败（错误码 %d），本次安装已停止。', [ResultCode]));
+    if ResultCode = 3010 then
+      DriverNeedsRestart := True;
+  end;
+  #endif
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  ResultCode: Integer;
+begin
+  #if HasAudioDriver == 1
+  if CurUninstallStep = usUninstall then
+    Exec(ExpandConstant('{app}\FengYinDriverSetup.exe'), '--uninstall', '',
+         SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  #endif
+end;

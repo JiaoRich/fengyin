@@ -8,6 +8,7 @@ namespace
 constexpr int currentAudioSetupRevision = 9;
 constexpr int currentTuningRevision = 8;
 constexpr double latencyCandidateTestMs = 3500.0;
+const auto engineModeName = juce::String::fromUTF8("风吟低延迟（推荐）");
 
 bool isWindowsSharedType(const juce::String& typeName)
 {
@@ -90,42 +91,20 @@ AudioDeviceService::~AudioDeviceService()
 juce::String AudioDeviceService::initialise()
 {
    #if JUCE_WINDOWS
-    // Kept behind an explicit engineering flag until the signed virtual
-    // device, rollback and full acceptance suite are complete. This lets the
-    // Windows test package exercise the real instrument fast path without
-    // exposing a half-finished mode to ordinary users.
-    if (juce::SystemStats::getEnvironmentVariable("FENGYIN_AUDIO_ENGINE_TEST", {}) == "1")
+    // A public build enters the isolated engine only when its signed virtual
+    // speaker is actually active. Developer packages can opt in explicitly;
+    // machines without the complete driver fall through immediately to the
+    // established Windows shared path, with no startup delay or system change.
+    auto* audioSettings = properties.getUserSettings();
+    const auto engineEnabled = audioSettings == nullptr
+        || audioSettings->getBoolValue("audioEngineEnabled", true);
+    if (engineEnabled && (audioengine::AudioEngineProcessController::isAvailable()
+        || juce::SystemStats::getEnvironmentVariable("FENGYIN_AUDIO_ENGINE_TEST", {}) == "1"))
     {
-        juce::String engineError;
-        if (engineProcess.start(256, {}, true, engineError))
-        {
-            manager.addAudioDeviceType(std::make_unique<audioengine::FengYinEngineAudioIODeviceType>());
-            juce::XmlElement engineState("DEVICESETUP");
-            engineState.setAttribute("deviceType", "FengYin Audio Engine");
-            engineState.setAttribute("audioOutputDeviceName", "FengYin Low Latency Output");
-            engineState.setAttribute("audioInputDeviceName", juce::String());
-            engineState.setAttribute("audioDeviceRate", static_cast<double>(audioengine::engineSampleRate));
-            engineState.setAttribute("audioDeviceBufferSize",
-                                     static_cast<int>(engineProcess.actualBufferFrames()));
-            engineState.setAttribute("audioDeviceInChans", juce::String());
-            engineState.setAttribute("audioDeviceOutChans", "11");
-            lastError = manager.initialise(0, 2, &engineState, false);
-            if (lastError.isEmpty())
-            {
-                // The timer runs on JUCE's message thread. If the isolated
-                // engine exhausts its own device-recovery attempts, return to
-                // the ordinary Windows shared output without touching VST or
-                // application data and without requiring an app restart.
-                startTimer(250);
-                return {};
-            }
-            manager.closeAudioDevice();
-            engineProcess.stop();
-        }
-        // Keep JUCE's concrete device-open failure when the process itself
-        // started successfully. Overwriting it with an empty process error
-        // hid the real diagnosis and made a failed fast-path look healthy.
-        if (engineError.isNotEmpty()) lastError = engineError;
+        const auto requestedFrames = audioSettings != nullptr
+            ? audioSettings->getIntValue("audioEngineBuffer", 128) : 128;
+        lastError = startIsolatedAudioEngine(requestedFrames);
+        if (lastError.isEmpty()) return {};
     }
    #endif
     std::unique_ptr<juce::XmlElement> saved;
@@ -148,6 +127,43 @@ juce::String AudioDeviceService::initialise()
     }
    #endif
     return lastError;
+}
+
+juce::String AudioDeviceService::startIsolatedAudioEngine(int requestedFrames)
+{
+#if JUCE_WINDOWS
+    if (engineProcess.isRunning()) return {};
+    if (requestedFrames != 128 && requestedFrames != 256 && requestedFrames != 512)
+        requestedFrames = 128;
+    juce::String engineError;
+    if (! engineProcess.start(static_cast<std::uint32_t>(requestedFrames), {}, true, engineError))
+        return engineError;
+    if (! engineDeviceTypeAdded)
+    {
+        manager.addAudioDeviceType(std::make_unique<audioengine::FengYinEngineAudioIODeviceType>());
+        engineDeviceTypeAdded = true;
+    }
+    juce::XmlElement engineState("DEVICESETUP");
+    engineState.setAttribute("deviceType", "FengYin Audio Engine");
+    engineState.setAttribute("audioOutputDeviceName", "FengYin Low Latency Output");
+    engineState.setAttribute("audioInputDeviceName", juce::String());
+    engineState.setAttribute("audioDeviceRate", static_cast<double>(audioengine::engineSampleRate));
+    engineState.setAttribute("audioDeviceBufferSize",
+                             static_cast<int>(engineProcess.actualBufferFrames()));
+    engineState.setAttribute("audioDeviceInChans", juce::String());
+    engineState.setAttribute("audioDeviceOutChans", "11");
+    auto result = manager.initialise(0, 2, &engineState, false);
+    if (result.isNotEmpty())
+    {
+        manager.closeAudioDevice();
+        engineProcess.stop();
+        return result;
+    }
+    startTimer(250);
+    return {};
+#else
+    return juce::String::fromUTF8("风吟低延迟音频引擎仅支持 Windows");
+#endif
 }
 
 void AudioDeviceService::timerCallback()
@@ -173,6 +189,11 @@ AudioDeviceStatus AudioDeviceService::getStatus()
         status.ready = device->isOpen();
         status.deviceType = device->getTypeName();
         status.deviceName = device->getName();
+        if (engineProcess.isRunning())
+        {
+            status.deviceType = engineModeName;
+            status.deviceName = juce::String::fromUTF8("自动跟随耳机或音响");
+        }
         status.sampleRate = device->getCurrentSampleRate();
         status.bufferSize = device->getCurrentBufferSizeSamples();
         if (status.sampleRate > 0.0)
@@ -191,6 +212,9 @@ AudioDeviceStatus AudioDeviceService::getStatus()
 juce::StringArray AudioDeviceService::getAvailableDeviceTypes()
 {
     juce::StringArray names;
+   #if JUCE_WINDOWS
+    if (audioengine::AudioEngineProcessController::isAvailable()) names.add(engineModeName);
+   #endif
     for (auto* type : manager.getAvailableDeviceTypes())
     {
         if (isWindowsSharedType(type->getTypeName()))
@@ -211,6 +235,8 @@ juce::StringArray AudioDeviceService::getAvailableDeviceTypes()
 
 juce::StringArray AudioDeviceService::getAvailableOutputDevices(const juce::String& typeName)
 {
+    if (typeName == engineModeName)
+        return { juce::String::fromUTF8("自动跟随耳机或音响") };
     if (auto* type = findType(typeName))
     {
         type->scanForDevices();
@@ -251,8 +277,43 @@ juce::Array<int> AudioDeviceService::getAvailableBufferSizes()
 
 juce::String AudioDeviceService::selectDeviceType(const juce::String& typeName)
 {
+   #if JUCE_WINDOWS
+    if (typeName == engineModeName)
+    {
+        if (! audioengine::AudioEngineProcessController::isAvailable())
+            return juce::String::fromUTF8("风吟共享扬声器尚未安装或未启用");
+        manager.closeAudioDevice();
+        auto* settings = properties.getUserSettings();
+        const auto requestedFrames = settings != nullptr
+            ? settings->getIntValue("audioEngineBuffer", 128) : 128;
+        lastError = startIsolatedAudioEngine(requestedFrames);
+        if (lastError.isEmpty())
+        {
+            if (auto* settings = properties.getUserSettings())
+                settings->setValue("audioEngineEnabled", true);
+            saveSettings();
+        }
+        else
+        {
+            (void) manager.initialise(0, 2, nullptr, true);
+        }
+        return lastError;
+    }
+   #endif
     if (! isWindowsSharedType(typeName) && ! (isAsioType(typeName) && isSharedAsioModeAvailable()))
         return juce::String::fromUTF8("仅支持 Windows 共享输出或 KoordASIO 共享低延迟驱动");
+
+   #if JUCE_WINDOWS
+    // This is the explicit advanced-user escape hatch. Stop the isolated
+    // engine first so it restores the physical Windows endpoint and releases
+    // exclusive ownership before JUCE opens the manually selected backend.
+    if (engineProcess.isRunning())
+    {
+        manager.closeAudioDevice();
+        engineProcess.stop();
+        stopTimer();
+    }
+   #endif
 
     if (isAsioType(typeName))
     {
@@ -276,7 +337,12 @@ juce::String AudioDeviceService::selectDeviceType(const juce::String& typeName)
         lastError = manager.initialise(0, 2, &koordState, false);
         if (lastError.isNotEmpty() && previousState != nullptr)
             (void) manager.initialise(0, 2, previousState.get(), true);
-        if (lastError.isEmpty()) saveSettings();
+        if (lastError.isEmpty())
+        {
+            if (auto* settings = properties.getUserSettings())
+                settings->setValue("audioEngineEnabled", false);
+            saveSettings();
+        }
         return lastError;
     }
 
@@ -284,7 +350,12 @@ juce::String AudioDeviceService::selectDeviceType(const juce::String& typeName)
     lastError = manager.getCurrentAudioDeviceType() == typeName
         ? juce::String()
         : juce::String::fromUTF8("无法启用所选声音驱动");
-    if (lastError.isEmpty()) saveSettings();
+    if (lastError.isEmpty())
+    {
+        if (auto* settings = properties.getUserSettings())
+            settings->setValue("audioEngineEnabled", false);
+        saveSettings();
+    }
     return lastError;
 }
 
@@ -295,6 +366,33 @@ juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName
     tuningActive = false;
     tuningCandidates.clear();
     tuningResults.clear();
+   #if JUCE_WINDOWS
+    if (engineProcess.isRunning())
+    {
+        if (bufferSize != 128 && bufferSize != 256 && bufferSize != 512)
+            return juce::String::fromUTF8("风吟低延迟模式仅支持 128、256 或 512 采样");
+        if (std::abs(sampleRate - static_cast<double>(audioengine::engineSampleRate)) > 0.5)
+            return juce::String::fromUTF8("风吟低延迟模式固定使用 48000 Hz");
+        manager.closeAudioDevice();
+        engineProcess.stop();
+        lastError = startIsolatedAudioEngine(bufferSize);
+        if (lastError.isEmpty())
+        {
+            if (auto* settings = properties.getUserSettings())
+            {
+                settings->setValue("audioEngineEnabled", true);
+                settings->setValue("audioEngineBuffer", bufferSize);
+                settings->setValue("audioSetupMode", "manual");
+            }
+            saveSettings();
+        }
+        else
+        {
+            (void) manager.initialise(0, 2, nullptr, true);
+        }
+        return lastError;
+    }
+   #endif
     if (isAsioType(manager.getCurrentAudioDeviceType()) && ! isSupportedSharedAsioDevice(outputName))
         return juce::String::fromUTF8("共享低延迟模式只能选择 KoordASIO");
     const auto previousSetup = manager.getAudioDeviceSetup();
@@ -336,7 +434,7 @@ juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName
 juce::String AudioDeviceService::applyBestInitialSetup()
 {
     if (engineProcess.isRunning())
-        return juce::String::fromUTF8("风吟音频引擎测试通道已启动");
+        return juce::String::fromUTF8("风吟低延迟音频引擎已启动");
     auto* settings = properties.getUserSettings();
     const auto current = getStatus();
     const auto revision = settings != nullptr ? settings->getIntValue("audioSetupRevision", 0) : 0;
@@ -595,6 +693,7 @@ bool AudioDeviceService::hasSustainedRuntimeInstability()
 
 bool AudioDeviceService::needsAutomaticLatencyTuning()
 {
+    if (engineProcess.isRunning()) return false;
     auto* settings = properties.getUserSettings();
     if (settings == nullptr || settings->getValue("audioSetupMode") == "manual")
         return false;
@@ -717,6 +816,7 @@ bool AudioDeviceService::startNextLatencyCandidate()
 
 bool AudioDeviceService::beginAutomaticLatencyTuning(bool force)
 {
+    if (engineProcess.isRunning()) return false;
     if (tuningActive) return false;
     auto* settings = properties.getUserSettings();
     if (! force && ! needsAutomaticLatencyTuning()) return false;

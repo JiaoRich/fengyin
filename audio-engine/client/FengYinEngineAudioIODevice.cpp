@@ -37,7 +37,7 @@ std::optional<juce::BigInteger> FengYinEngineAudioIODevice::getDefaultInputChann
 }
 juce::Array<double> FengYinEngineAudioIODevice::getAvailableSampleRates() { return { 48000.0 }; }
 juce::Array<int> FengYinEngineAudioIODevice::getAvailableBufferSizes() { return { 128, 256, 512 }; }
-int FengYinEngineAudioIODevice::getDefaultBufferSize() { return 256; }
+int FengYinEngineAudioIODevice::getDefaultBufferSize() { return 128; }
 
 juce::String FengYinEngineAudioIODevice::open(const juce::BigInteger& inputChannels,
                                                const juce::BigInteger& outputChannels,
@@ -47,7 +47,11 @@ juce::String FengYinEngineAudioIODevice::open(const juce::BigInteger& inputChann
     if (! inputChannels.isZero()) return "FengYin engine does not accept audio input";
     if (outputChannels.countNumberOfSetBits() == 0) return "No output channels selected";
     if (std::abs(sampleRate - engineSampleRate) > 0.5) return "FengYin engine requires 48000 Hz";
-    if (bufferSizeSamples != 128 && bufferSizeSamples != 256 && bufferSizeSamples != 512)
+    // Some OEM drivers align a requested 128/256-frame exclusive period to a
+    // nearby hardware period (for example 144 or 240 frames). The engine
+    // publishes that real period; accepting every bounded positive value here
+    // keeps the VST callback exactly phase-locked to the hardware stream.
+    if (bufferSizeSamples <= 0 || bufferSizeSamples > maximumFramesPerBlock)
         return "Unsupported FengYin engine buffer size";
 #if defined(_WIN32)
     std::wstring mappingError;

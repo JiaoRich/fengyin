@@ -2,6 +2,7 @@
 
 #if defined(_WIN32)
 #include <windows.h>
+#include <propsys.h>
 #include <propkeydef.h>
 #include <functiondiscoverykeys_devpkey.h>
 #include <mmdeviceapi.h>
@@ -289,6 +290,65 @@ bool DefaultEndpointRouter::routeSystemAudioToFengYin(std::wstring& physicalEndp
 #else
     (void) physicalEndpointId;
     error = L"Endpoint routing is only available on Windows";
+    return false;
+#endif
+}
+
+bool DefaultEndpointRouter::pollPhysicalDefaultChange(std::wstring& physicalEndpointId,
+                                                       std::wstring& error) noexcept
+{
+    physicalEndpointId.clear();
+#if defined(_WIN32)
+    if (! active) return false;
+    Microsoft::WRL::ComPtr<IMMDeviceEnumerator> enumerator;
+    if (FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
+                                IID_PPV_ARGS(&enumerator))) || ! enumerator)
+    {
+        error = L"Cannot monitor Windows audio endpoints";
+        return false;
+    }
+    const auto virtualId = findVirtual(*enumerator.Get());
+    if (virtualId.empty())
+    {
+        error = L"FengYin Shared Speaker disappeared";
+        return false;
+    }
+
+    std::array<std::wstring, 3> current;
+    bool hasPhysicalDefault = false;
+    for (std::size_t index = 0; index < roles.size(); ++index)
+    {
+        current[index] = getId(*enumerator.Get(), roles[index]);
+        if (! current[index].empty() && current[index] != virtualId)
+        {
+            hasPhysicalDefault = true;
+            if (physicalEndpointId.empty() || roles[index] == eMultimedia)
+                physicalEndpointId = current[index];
+        }
+    }
+    if (! hasPhysicalDefault) return false;
+
+    // Preserve every new physical role for normal Windows use after FengYin
+    // exits. Roles that remain virtual inherit the chosen multimedia device.
+    for (std::size_t index = 0; index < current.size(); ++index)
+        previousEndpointIds[index] = ! current[index].empty() && current[index] != virtualId
+            ? current[index] : physicalEndpointId;
+    if (! writeJournal(previousEndpointIds))
+    {
+        error = L"Cannot update the audio endpoint recovery journal";
+        physicalEndpointId.clear();
+        return false;
+    }
+    std::array<std::wstring, 3> virtualEndpoints { virtualId, virtualId, virtualId };
+    if (! setEndpoints(virtualEndpoints))
+    {
+        error = L"Cannot restore Windows audio to FengYin Shared Speaker";
+        physicalEndpointId.clear();
+        return false;
+    }
+    return true;
+#else
+    (void) error;
     return false;
 #endif
 }

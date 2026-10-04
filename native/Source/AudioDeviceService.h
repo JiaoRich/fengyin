@@ -65,6 +65,7 @@ public:
     [[nodiscard]] juce::AudioDeviceManager& getDeviceManager() noexcept { return manager; }
 
 private:
+    juce::String startIsolatedAudioEngine(int requestedFrames = 128);
     juce::AudioIODeviceType* findType(const juce::String& typeName);
     juce::String preferredLiveDeviceType();
     juce::String configureAutomaticType(const juce::String& typeName);
@@ -95,6 +96,7 @@ private:
 
     juce::AudioDeviceManager manager;
     audioengine::AudioEngineProcessController engineProcess;
+    bool engineDeviceTypeAdded = false;
     juce::ApplicationProperties properties;
     juce::String lastError;
     int observedXRunCount = 0;

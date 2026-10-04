@@ -29,9 +29,10 @@ try {
     $minimalInf = [System.IO.File]::ReadAllText((Join-Path $patchRoot 'FengYinAudio.inx'),
                                                 [System.Text.Encoding]::UTF8)
     [System.IO.File]::WriteAllText(
-        (Join-Path $output 'audio\sysvad\TabletAudioSample\ComponentizedAudioSample.inx'),
+        (Join-Path $output 'audio\sysvad\TabletAudioSample\FengYinAudio.inx'),
         $minimalInf,
         [System.Text.Encoding]::Unicode)
+    Remove-Item (Join-Path $output 'audio\sysvad\TabletAudioSample\ComponentizedAudioSample.inx') -Force
     Remove-Item (Join-Path $output 'audio\sysvad\TabletAudioSample\ComponentizedAudioSampleExtension.inx') -Force
     Remove-Item (Join-Path $output 'audio\sysvad\TabletAudioSample\ComponentizedApoSample.inx') -Force
     # The upstream revision is pinned. Apply checked textual edits instead of

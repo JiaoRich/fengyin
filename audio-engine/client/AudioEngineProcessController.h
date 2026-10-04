@@ -18,6 +18,7 @@ public:
 
     bool start(std::uint32_t bufferFrames, const juce::String& physicalEndpointId,
                bool routeSystemAudio, juce::String& error);
+    [[nodiscard]] static bool isAvailable() noexcept;
     void stop() noexcept;
     [[nodiscard]] bool isRunning() const noexcept;
     [[nodiscard]] std::uint32_t actualBufferFrames() const noexcept;
