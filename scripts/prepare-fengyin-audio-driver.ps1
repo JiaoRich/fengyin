@@ -36,9 +36,10 @@ try {
         'audio\sysvad\TabletAudioSample\minipairs.h'
     )
     foreach ($target in $patchTargets) {
-        $text = [System.IO.File]::ReadAllText($target).Replace("`r`n", "`n")
+        $targetPath = Join-Path $output $target
+        $text = [System.IO.File]::ReadAllText($targetPath).Replace("`r`n", "`n")
         $text = [System.Text.RegularExpressions.Regex]::Replace($text, '[ \t]+(?=\n)', '')
-        [System.IO.File]::WriteAllText($target, $text, $utf8NoBom)
+        [System.IO.File]::WriteAllText($targetPath, $text, $utf8NoBom)
     }
     git apply --check (Join-Path $patchRoot 'apply-fengyin.patch')
     if ($LASTEXITCODE -ne 0) { throw '风吟 SysVAD 补丁与固定上游版本不匹配' }

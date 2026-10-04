@@ -12,10 +12,38 @@
 #include <cstdint>
 #include <cstdlib>
 #include <string>
+#include <vector>
 
 using namespace fengyin::audioengine;
 
 #if defined(_WIN32)
+namespace
+{
+bool launchRecoveryWatchdog()
+{
+    std::wstring executable(32768, L'\0');
+    const auto length = GetModuleFileNameW(nullptr, executable.data(),
+                                           static_cast<DWORD>(executable.size()));
+    if (length == 0 || length >= executable.size()) return false;
+    executable.resize(length);
+    const auto slash = executable.find_last_of(L"\\/");
+    const auto watchdog = executable.substr(0, slash + 1) + L"FengYinAudioWatchdog.exe";
+    auto command = L"\"" + watchdog + L"\" --watch-pid " + std::to_wstring(GetCurrentProcessId());
+    std::vector<wchar_t> mutableCommand(command.begin(), command.end());
+    mutableCommand.push_back(L'\0');
+    STARTUPINFOW startup {};
+    startup.cb = sizeof(startup);
+    PROCESS_INFORMATION process {};
+    if (! CreateProcessW(nullptr, mutableCommand.data(), nullptr, nullptr, FALSE,
+                         CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT,
+                         nullptr, nullptr, &startup, &process))
+        return false;
+    CloseHandle(process.hThread);
+    CloseHandle(process.hProcess);
+    return true;
+}
+}
+
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 {
     std::wstring preferredEndpointId;
@@ -82,6 +110,14 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
             return 4;
         }
         if (preferredEndpointId.empty()) preferredEndpointId = previousPhysicalEndpoint;
+        if (! launchRecoveryWatchdog())
+        {
+            router.restore();
+            CloseHandle(stopEvent);
+            ReleaseMutex(singleton);
+            CloseHandle(singleton);
+            return 5;
+        }
     }
     WasapiExclusiveOutput output;
     if (! output.start(core, requestedFrames, preferredEndpointId, error))
@@ -92,7 +128,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         CloseHandle(stopEvent);
         ReleaseMutex(singleton);
         CloseHandle(singleton);
-        return 5;
+        return 6;
     }
 
     lifecycle.markRunning();
@@ -113,7 +149,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         CloseHandle(stopEvent);
         ReleaseMutex(singleton);
         CloseHandle(singleton);
-        return 6;
+        return 7;
     }
     WaitForSingleObject(stopEvent, INFINITE);
     lifecycle.stop();
