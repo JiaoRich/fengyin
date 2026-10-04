@@ -67,7 +67,7 @@ procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
 begin
-  #if HasAudioDriver == 1
+  #if HasAudioDriver
   if CurStep = ssPostInstall then
   begin
     if not Exec(ExpandConstant('{app}\FengYinDriverSetup.exe'),
@@ -86,7 +86,7 @@ procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   ResultCode: Integer;
 begin
-  #if HasAudioDriver == 1
+  #if HasAudioDriver
   if CurUninstallStep = usUninstall then
     Exec(ExpandConstant('{app}\FengYinDriverSetup.exe'), '--uninstall', '',
          SW_HIDE, ewWaitUntilTerminated, ResultCode);

@@ -42,6 +42,7 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         self.assertIn("Get-AuthenticodeSignature", release)
         self.assertIn("FengYinDriverSetup.exe", installer)
         self.assertIn("--uninstall", installer)
+        self.assertNotIn("#if HasAudioDriver ==", installer)
 
     def test_endpoint_route_has_crash_and_hotplug_recovery(self):
         router = self.read("audio-engine/windows/DefaultEndpointRouter.cpp")
