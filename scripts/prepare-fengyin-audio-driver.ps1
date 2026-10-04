@@ -118,11 +118,13 @@ try {
     Edit-PinnedFile 'audio\sysvad\TabletAudioSample\TabletAudioSample.vcxproj' @(
         @('    <ClCompile Include="..\common.cpp" />', "    <ClCompile Include=`"..\common.cpp`" />`n    <ClCompile Include=`"..\FengYinAudioRing.cpp`" />"),
         @('  <ItemDefinitionGroup Condition="''$(Configuration)|$(Platform)''==''Release|x64''">
-    <Link>', '  <ItemDefinitionGroup Condition="''$(Configuration)|$(Platform)''==''Release|x64''">
+    <Link>
+      <AdditionalDependencies>%(AdditionalDependencies);$(DDK_LIB_PATH)\portcls.lib;$(DDK_LIB_PATH)\stdunk.lib;$(DDK_LIB_PATH)\libcntpr.lib</AdditionalDependencies>', '  <ItemDefinitionGroup Condition="''$(Configuration)|$(Platform)''==''Release|x64''">
     <ClCompile>
       <DisableSpecificWarnings>4296;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
-    <Link>')
+    <Link>
+      <AdditionalDependencies>%(AdditionalDependencies);$(DDK_LIB_PATH)\portcls.lib;$(DDK_LIB_PATH)\stdunk.lib;$(DDK_LIB_PATH)\libcntpr.lib</AdditionalDependencies>')
     )
     Edit-PinnedFile 'audio\sysvad\TabletAudioSample\minipairs.h' @(
         @('    &SpeakerMiniports,
