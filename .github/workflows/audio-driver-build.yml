@@ -196,6 +196,9 @@ jobs:
           if (-not $signTool) { throw "未找到 x64 signtool.exe，无法签署测试 CAT。" }
           & $signTool.FullName sign /fd sha256 /sha1 $testThumbprint $builtCat
           if ($LASTEXITCODE -ne 0) { throw "FengYinAudio.cat 测试签名失败：$LASTEXITCODE" }
+          $testCertificatePath = Join-Path $releaseDir "TabletAudioSample.cer"
+          Import-Certificate -FilePath $testCertificatePath -CertStoreLocation "Cert:\CurrentUser\Root" | Out-Null
+          Import-Certificate -FilePath $testCertificatePath -CertStoreLocation "Cert:\CurrentUser\TrustedPublisher" | Out-Null
           & $signTool.FullName verify /pa /v $builtCat | Out-Null
           if ($LASTEXITCODE -ne 0) { throw "FengYinAudio.cat 测试签名验证失败：$LASTEXITCODE" }
 
