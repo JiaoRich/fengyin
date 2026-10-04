@@ -31,14 +31,16 @@ try {
     function Edit-PinnedFile([string]$target, [array]$edits) {
         $targetPath = Join-Path $output $target
         $text = [System.IO.File]::ReadAllText($targetPath).Replace("`r`n", "`n")
+        $editNumber = 0
         foreach ($edit in $edits) {
+            $editNumber++
             if ($edit.Count -ne 2) { throw "驱动修改参数不完整：$target" }
             $old = [string]$edit[0]
             $new = [string]$edit[1]
             $first = $text.IndexOf($old, [System.StringComparison]::Ordinal)
             $last = $text.LastIndexOf($old, [System.StringComparison]::Ordinal)
             if ($first -lt 0 -or $first -ne $last) {
-                throw "固定 SysVAD 源码不符合预期，无法安全修改：$target"
+                throw "固定 SysVAD 源码不符合预期，无法安全修改：$target，第 $editNumber 项，匹配 $(([regex]::Matches($text, [regex]::Escape($old))).Count) 次"
             }
             $text = $text.Replace($old, $new)
         }
