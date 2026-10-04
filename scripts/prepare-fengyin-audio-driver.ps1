@@ -24,6 +24,16 @@ try {
 
     Copy-Item (Join-Path $patchRoot 'FengYinAudioRing.h') 'audio\sysvad\FengYinAudioRing.h'
     Copy-Item (Join-Path $patchRoot 'FengYinAudioRing.cpp') 'audio\sysvad\FengYinAudioRing.cpp'
+    # Replace the broad Microsoft sample package with one x64 render endpoint.
+    # INF files containing Chinese text must be UTF-16LE for Windows SetupAPI.
+    $minimalInf = [System.IO.File]::ReadAllText((Join-Path $patchRoot 'FengYinAudio.inx'),
+                                                [System.Text.Encoding]::UTF8)
+    [System.IO.File]::WriteAllText(
+        (Join-Path $output 'audio\sysvad\TabletAudioSample\ComponentizedAudioSample.inx'),
+        $minimalInf,
+        [System.Text.Encoding]::Unicode)
+    Remove-Item (Join-Path $output 'audio\sysvad\TabletAudioSample\ComponentizedAudioSampleExtension.inx') -Force
+    Remove-Item (Join-Path $output 'audio\sysvad\TabletAudioSample\ComponentizedApoSample.inx') -Force
     # The upstream revision is pinned. Apply checked textual edits instead of
     # relying on git-apply across Windows checkout/line-ending policies. Every
     # edit must match exactly once, otherwise preparation stops before build.
