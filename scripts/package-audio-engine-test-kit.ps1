@@ -14,7 +14,7 @@ $DriverDir = [System.IO.Path]::GetFullPath($DriverDir)
 $OutputDir = [System.IO.Path]::GetFullPath($OutputDir)
 
 & (Join-Path $PSScriptRoot "test-fengyin-test-driver.ps1") -DriverDir $DriverDir
-if ($LASTEXITCODE -ne 0) { throw "测试驱动验证失败：$LASTEXITCODE" }
+if (-not $?) { throw "测试驱动验证失败" }
 
 if (Test-Path $OutputDir) { Remove-Item $OutputDir -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
