@@ -25,3 +25,21 @@
 - 开发包只能在隔离 Windows 测试机使用测试签名；不允许安装到用户日常电脑。
 - 正式包必须通过 Microsoft Partner Center 签名。安装器发现签名无效时立即终止，不能自动开启 Windows 测试模式。
 - 卸载或升级前先恢复原默认端点；驱动删除失败时保留恢复数据并提示重启，不能强删设备。
+
+## 正式签名与发布交接
+
+1. 驱动工作流会同时生成内部编译件和 `fengyin-audio-driver-partner-center-submission-unsigned`。后者包含 Partner Center 要求的独立子目录、INF、SYS、CAT 和 PDB。
+2. 在保管 EV/Authenticode 证书的 Windows 电脑上对 CAB 做 SHA-256 时间戳签名，再上传 Microsoft Hardware Dev Center。证书私钥不进入源码仓库或 GitHub Actions。
+3. 下载微软返回的 ZIP 后运行：
+
+   ```powershell
+   ./scripts/import-signed-driver.ps1 -SignedPackage "C:\下载\微软返回包.zip"
+   ```
+
+4. 导入脚本只接受固定硬件 ID `Root\FengYinAudioEngine`，并验证 CAT 和 SYS 均由 Microsoft Windows Hardware Compatibility Publisher 签名、目录哈希匹配且不含 WDK 测试证书。
+5. 再运行 `scripts/build-windows.ps1`。只有上述验证全部通过，安装包才会携带驱动；否则继续生成安全的共享模式版本。
+
+微软官方流程要求 CAB 内每个驱动包位于独立子目录，并建议附 PDB；Hardware Dev Center 会重新生成 CAT。参见：
+
+- https://learn.microsoft.com/windows-hardware/drivers/dashboard/code-signing-attestation
+- https://learn.microsoft.com/windows-hardware/drivers/dashboard/code-signing-reqs

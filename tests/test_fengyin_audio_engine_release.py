@@ -37,12 +37,32 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
 
     def test_public_package_rejects_test_signed_driver(self):
         release = self.read("scripts/check-release.ps1")
+        validator = self.read("scripts/test-fengyin-production-driver.ps1")
         installer = self.read("installer/FengYin.iss")
-        self.assertIn("WDKTestCert", release)
-        self.assertIn("Get-AuthenticodeSignature", release)
+        self.assertIn("test-fengyin-production-driver.ps1", release)
+        self.assertIn("Get-AuthenticodeSignature", validator)
         self.assertIn("FengYinDriverSetup.exe", installer)
         self.assertIn("--uninstall", installer)
         self.assertNotIn("#if HasAudioDriver ==", installer)
+
+    def test_production_driver_handoff_is_strict_and_repeatable(self):
+        prepare = self.read("scripts/prepare-driver-submission.ps1")
+        importer = self.read("scripts/import-signed-driver.ps1")
+        validator = self.read("scripts/test-fengyin-production-driver.ps1")
+        workflow = self.read(".github/workflows/audio-driver-build.yml")
+        self.assertIn("TabletAudioSample.pdb", prepare)
+        self.assertIn("DestinationDir=$PackageName", prepare)
+        self.assertIn("FengYinAudio-attestation.cab", workflow)
+        self.assertIn("Root\\FengYinAudioEngine", validator)
+        self.assertIn("Microsoft Windows Hardware Compatibility", validator)
+        self.assertIn("WDKTestCert", validator)
+        self.assertIn("test-fengyin-production-driver.ps1", importer)
+
+    def test_windows_install_acceptance_covers_crash_restore_and_cleanup(self):
+        acceptance = self.read("scripts/test-audio-engine-install.ps1")
+        self.assertIn("--route-system-audio", acceptance)
+        self.assertIn("--recover-only", acceptance)
+        self.assertIn("--uninstall", acceptance)
 
     def test_endpoint_route_has_crash_and_hotplug_recovery(self):
         router = self.read("audio-engine/windows/DefaultEndpointRouter.cpp")

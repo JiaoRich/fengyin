@@ -84,6 +84,9 @@ Copy-Item $AudioEngineExe (Join-Path $PackageDir "FengYinAudioEngine.exe") -Forc
 Copy-Item $AudioWatchdogExe (Join-Path $PackageDir "FengYinAudioWatchdog.exe") -Force
 Copy-Item $DriverSetupExe (Join-Path $PackageDir "FengYinDriverSetup.exe") -Force
 if (Test-Path (Join-Path $SignedDriverDir "FengYinAudio.inf")) {
+    Write-Host "正在验证 Microsoft Hardware Dev Center 正式签名驱动..." -ForegroundColor Cyan
+    & (Join-Path $PSScriptRoot "test-fengyin-production-driver.ps1") -DriverDir $SignedDriverDir
+    if ($LASTEXITCODE -ne 0) { throw "正式驱动验证失败：$LASTEXITCODE" }
     $DriverFiles = @("FengYinAudio.inf", "FengYinAudio.cat", "TabletAudioSample.sys")
     foreach ($DriverFile in $DriverFiles) {
         $DriverPath = Join-Path $SignedDriverDir $DriverFile

@@ -8,6 +8,9 @@ on:
     paths:
       - "audio-driver/**"
       - "scripts/prepare-fengyin-audio-driver.ps1"
+      - "scripts/prepare-driver-submission.ps1"
+      - "scripts/import-signed-driver.ps1"
+      - "scripts/test-fengyin-production-driver.ps1"
       - ".github/workflows/audio-driver-build.yml"
 
 permissions:
@@ -137,6 +140,13 @@ jobs:
             throw "FengYinAudio.inf 验证失败：$LASTEXITCODE"
           }
 
+      - name: 生成 Partner Center 待签名提交包
+        shell: pwsh
+        run: |
+          ./scripts/prepare-driver-submission.ps1 `
+            -BuildOutputDir "$env:RUNNER_TEMP/fengyin-driver-source/audio/sysvad/TabletAudioSample/x64/Release" `
+            -OutputDirectory "$env:RUNNER_TEMP/fengyin-driver-submission"
+
       - name: 上传内部编译产物
         uses: actions/upload-artifact@v4
         with:
@@ -146,4 +156,12 @@ jobs:
             ${{ runner.temp }}/fengyin-driver-source/audio/sysvad/TabletAudioSample/x64/Release/FengYinAudio.cat
             ${{ runner.temp }}/fengyin-driver-source/audio/sysvad/TabletAudioSample/x64/Release/TabletAudioSample.sys
             ${{ runner.temp }}/fengyin-driver-source/audio/sysvad/TabletAudioSample/x64/Release/TabletAudioSample.cer
+            ${{ runner.temp }}/fengyin-driver-source/audio/sysvad/TabletAudioSample/x64/Release/TabletAudioSample.pdb
+          if-no-files-found: error
+
+      - name: 上传 Partner Center 待签名 CAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: fengyin-audio-driver-partner-center-submission-unsigned
+          path: ${{ runner.temp }}/fengyin-driver-submission/Disk1/FengYinAudio-attestation.cab
           if-no-files-found: error

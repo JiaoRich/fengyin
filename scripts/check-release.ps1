@@ -32,15 +32,8 @@ if (Test-Path $DriverDir) {
             throw "发布检查失败，驱动包缺少：$Name"
         }
     }
-    foreach ($Name in @("FengYinAudio.cat", "TabletAudioSample.sys")) {
-        $Signature = Get-AuthenticodeSignature (Join-Path $DriverDir $Name)
-        if ($Signature.Status -ne "Valid" -or -not $Signature.SignerCertificate) {
-            throw "发布检查失败，驱动签名无效：$Name（$($Signature.Status)）"
-        }
-        if ($Signature.SignerCertificate.Subject -match "WDKTestCert") {
-            throw "发布检查失败：禁止把 WDK 测试签名驱动发布给用户。"
-        }
-    }
+    & (Join-Path $PSScriptRoot "test-fengyin-production-driver.ps1") -DriverDir $DriverDir -Quiet
+    if ($LASTEXITCODE -ne 0) { throw "发布检查失败：正式驱动验证脚本返回 $LASTEXITCODE" }
 }
 
 $Size = (Get-ChildItem $PackageDir -Recurse -File | Measure-Object Length -Sum).Sum
