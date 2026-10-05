@@ -26,6 +26,10 @@ public:
     void render(float* const* outputs, std::uint32_t outputChannels,
                 std::uint32_t frames) noexcept;
     [[nodiscard]] EngineCounters getCounters() const noexcept;
+    void requestTestTone() noexcept { toneRequested.store(true); }
+    float takeInstrumentPeak() noexcept { return instrumentPeak.exchange(0); }
+    float takeSystemPeak() noexcept { return systemPeak.exchange(0); }
+    float takeOutputPeak() noexcept { return outputPeak.exchange(0); }
 
 private:
     class StreamReader
@@ -71,6 +75,9 @@ private:
     std::atomic<std::uint64_t> instrumentUnderflows { 0 };
     std::atomic<std::uint64_t> systemUnderflows { 0 };
     std::atomic<std::uint64_t> clippedFrames { 0 };
+    std::atomic<float> instrumentPeak { 0 }, systemPeak { 0 }, outputPeak { 0 };
+    std::atomic<bool> toneRequested { false };
+    std::uint32_t toneRemaining = 0;
 };
 
 class EngineLifecycle

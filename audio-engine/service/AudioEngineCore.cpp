@@ -19,6 +19,8 @@ void AudioEngineCore::reset() noexcept
     instrumentUnderflows.store(0, std::memory_order_relaxed);
     systemUnderflows.store(0, std::memory_order_relaxed);
     clippedFrames.store(0, std::memory_order_relaxed);
+    instrumentPeak.store(0); systemPeak.store(0); outputPeak.store(0);
+    toneRequested.store(false); toneRemaining = 0;
 }
 
 bool AudioEngineCore::StreamReader::next(float& left, float& right) noexcept
@@ -131,6 +133,8 @@ void AudioEngineCore::render(float* const* outputs, std::uint32_t outputChannels
     bool instrumentMissing = false;
     bool systemMissing = false;
     std::uint64_t clipped = 0;
+    if (toneRequested.exchange(false)) toneRemaining = engineSampleRate * 2;
+    float instrumentMaximum = 0, systemMaximum = 0, outputMaximum = 0;
     for (std::uint32_t frame = 0; frame < frames; ++frame)
     {
         float instrumentLeft = 0.0f, instrumentRight = 0.0f;
@@ -140,6 +144,17 @@ void AudioEngineCore::render(float* const* outputs, std::uint32_t outputChannels
 
         auto left = instrumentLeft + systemLeft;
         auto right = instrumentRight + systemRight;
+        instrumentMaximum = std::max({ instrumentMaximum, std::abs(instrumentLeft), std::abs(instrumentRight) });
+        systemMaximum = std::max({ systemMaximum, std::abs(systemLeft), std::abs(systemRight) });
+        if (toneRemaining > 0)
+        {
+            const auto elapsed = engineSampleRate * 2 - toneRemaining;
+            const auto envelope = std::min({1.0f, elapsed / 480.0f, toneRemaining / 480.0f});
+            // Explicit two-second diagnostic replaces the mix, not an added
+            // tone that could be masked or made louder by other streams.
+            left = right = 0.0316228f * envelope * std::sin(6.28318530718 * 440.0 * elapsed / engineSampleRate);
+            --toneRemaining;
+        }
         if (std::abs(left) > 1.0f || std::abs(right) > 1.0f)
         {
             // Preserve the original system and instrument levels throughout
@@ -155,7 +170,16 @@ void AudioEngineCore::render(float* const* outputs, std::uint32_t outputChannels
             outputs[1][frame] = right;
         for (std::uint32_t channel = 2; channel < outputChannels; ++channel)
             if (outputs[channel] != nullptr) outputs[channel][frame] = 0.0f;
+        outputMaximum = std::max({ outputMaximum, std::abs(left), std::abs(right) });
     }
+    const auto publishPeak = [](std::atomic<float>& target, float value)
+    {
+        auto previous = target.load(std::memory_order_relaxed);
+        while (previous < value && ! target.compare_exchange_weak(previous, value, std::memory_order_relaxed)) {}
+    };
+    publishPeak(instrumentPeak, instrumentMaximum);
+    publishPeak(systemPeak, systemMaximum);
+    publishPeak(outputPeak, outputMaximum);
     if (instrumentMissing && instrument.producerIsActive())
         instrumentUnderflows.fetch_add(1, std::memory_order_relaxed);
     if (systemMissing && system.producerIsActive())

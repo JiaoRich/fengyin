@@ -34,6 +34,7 @@ public:
     void setKongResetMode(bool enabled) noexcept { kongResetMode.store(enabled, std::memory_order_release); }
     [[nodiscard]] uint64_t getDroppedMidiEventCount() const noexcept { return midiQueue.droppedCount() + controlQueue.droppedCount(); }
     std::atomic<uint64_t> callbackCount { 0 }, callbackOverruns { 0 }, signalBlocks { 0 };
+    std::atomic<float> diagnosticSourcePeak { 0 };
     void audioDeviceIOCallbackWithContext(const float* const* inputs, int numInputs, float* const* outputs,
                                           int numOutputs, int numSamples,
                                           const juce::AudioIODeviceCallbackContext& context) override;
@@ -92,6 +93,7 @@ public:
     [[nodiscard]] uint64_t getCallbackCount() const noexcept { return player.callbackCount.load(); }
     [[nodiscard]] uint64_t getCallbackOverruns() const noexcept { return player.callbackOverruns.load(); }
     [[nodiscard]] uint64_t getSignalBlocks() const noexcept { return player.signalBlocks.load(); }
+    float takeDiagnosticSourcePeak() noexcept { return player.diagnosticSourcePeak.exchange(0); }
 
     [[nodiscard]] bool hasPlugin() const noexcept;
     [[nodiscard]] juce::String getPluginName() const;

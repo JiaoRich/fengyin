@@ -190,6 +190,12 @@ void FengYinEngineAudioIODevice::run() noexcept
         if (activeCallback != nullptr)
             activeCallback->audioDeviceIOCallbackWithContext(nullptr, 0, outputs, 2, bufferFrames, context);
         const float* sources[] { left.data(), right.data() };
+        float peak = 0.0f;
+        for (int i = 0; i < bufferFrames; ++i)
+            peak = juce::jmax(peak, std::abs(left[i]), std::abs(right[i]));
+        const auto micro = static_cast<std::uint32_t>(juce::jlimit(0.0f, 100.0f, peak) * 1000000.0f);
+        auto previous = mapping.get()->producerPeakMicro.load(std::memory_order_relaxed);
+        while (previous < micro && ! mapping.get()->producerPeakMicro.compare_exchange_weak(previous, micro)) {}
         const auto qpc = static_cast<std::uint64_t>(juce::Time::getHighResolutionTicks());
         if (producer == nullptr || ! producer->tryPush(sources, 2, static_cast<std::uint32_t>(bufferFrames), qpc))
             xruns.fetch_add(1, std::memory_order_relaxed);

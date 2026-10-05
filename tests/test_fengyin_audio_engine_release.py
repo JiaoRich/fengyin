@@ -6,6 +6,23 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class FengYinAudioEngineReleaseTests(unittest.TestCase):
+    def test_asio_engine_does_not_probe_microphone_during_initialisation(self):
+        patch = self.read("scripts/patch-juce-wasapi-raw.cmake")
+        cmake = self.read("CMakeLists.txt")
+        self.assertIn("FENGYIN_ASIO_RENDER_ONLY", patch)
+        self.assertIn("FENGYIN_ASIO_RENDER_ONLY=1 JUCE_ASIO_DEBUGGING=1", cmake)
+
+    def test_engine_rejects_disconnected_outputs_and_reattaches_client(self):
+        backend = self.read("audio-engine/windows/Asio4AllOutput.cpp")
+        self.assertIn('containsIgnoreCase("Not Connected")', backend)
+        self.assertLess(backend.index('containsIgnoreCase("Not Connected")'),
+                        backend.index("device->start(this)"))
+        service = self.read("native/Source/AudioDeviceService.cpp")
+        start = service.split("juce::String AudioDeviceService::startIsolatedAudioEngine", 1)[1]
+        start = start.split("void AudioDeviceService::timerCallback", 1)[0]
+        self.assertNotIn("if (engineProcess.isRunning()) return {};", start)
+        self.assertIn("manager.initialise(0, 2, &engineState, false)", start)
+
     def read(self, relative):
         return (ROOT / relative).read_text(encoding="utf-8-sig")
 

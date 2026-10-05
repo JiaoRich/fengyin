@@ -233,7 +233,8 @@ if(WIN32)
         audio-engine/windows
     )
     target_compile_definitions(FengYinAudioEngine PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN
-        JUCE_ASIO=1 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_MODAL_LOOPS_PERMITTED=1)
+        JUCE_ASIO=1 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_MODAL_LOOPS_PERMITTED=1
+        FENGYIN_ASIO_RENDER_ONLY=1 JUCE_ASIO_DEBUGGING=1)
     target_link_libraries(FengYinAudioEngine PRIVATE ole32 avrt shell32 propsys juce::juce_audio_devices)
 
     add_executable(FengYinAudioWatchdog WIN32

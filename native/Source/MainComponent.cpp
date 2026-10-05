@@ -657,6 +657,27 @@ void MainComponent::setupWebInterface()
             const auto message = audio.configureAsio4All();
             if (webInterface) webInterface->emitEventIfBrowserIsVisible("editorResult", message);
         })
+        .withEventListener("testEngineOutput", [this](juce::var)
+        {
+            const auto message = audio.requestEngineTestTone();
+            if (webInterface) webInterface->emitEventIfBrowserIsVisible("editorResult", message);
+        })
+        .withEventListener("exportAudioPathDiagnostic", [this](juce::var)
+        {
+            const auto folder = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("FengYin");
+            const auto destination = juce::File::getSpecialLocation(juce::File::userDesktopDirectory)
+                .getNonexistentChildFile(utf8("风吟音频链路诊断-") + juce::Time::getCurrentTime().formatted("%Y%m%d-%H%M%S"), ".txt");
+            const auto contents = juce::String("FengYin audio-path diagnostic v1\nExported: ")
+                + juce::Time::getCurrentTime().toISO8601(true)
+                + "\n=== App source (pre built-in effects) ===\n"
+                + folder.getChildFile("audio-source-diagnostic.log").loadFileAsString()
+                + "\n=== Engine and Windows endpoint sessions ===\n"
+                + folder.getChildFile("audio-engine.log").loadFileAsString();
+            const auto ok = destination.replaceWithText(contents);
+            if (ok) destination.revealToUser();
+            if (webInterface) webInterface->emitEventIfBrowserIsVisible("editorResult",
+                ok ? utf8("诊断已保存到桌面，请将文本文件发给我。") : utf8("诊断导出失败，请检查桌面写入权限。"));
+        })
         .withEventListener("toggleRecording", [this](juce::var) { if (isActivated || recorder.isRecording()) toggleRecording(); })
         .withEventListener("showRecordings", [](juce::var)
         {
@@ -1335,6 +1356,20 @@ void MainComponent::timerCallback()
         state->setProperty("latency", currentAudio.estimatedBufferLatencyMs + pluginLatencyMs);
         state->setProperty("pluginLatency", pluginLatencyMs);
         state->setProperty("audioCpu", currentAudio.cpuUsage);
+        static double nextSourceDiagnostic = 0;
+        if (juce::Time::getMillisecondCounterHiRes() >= nextSourceDiagnostic)
+        {
+            nextSourceDiagnostic = juce::Time::getMillisecondCounterHiRes() + 5000;
+            const auto folder = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("FengYin");
+            folder.createDirectory();
+            const auto log = folder.getChildFile("audio-source-diagnostic.log");
+            if (log.getSize() > 256 * 1024) log.replaceWithText("");
+            log.appendText(juce::Time::getCurrentTime().toISO8601(true)
+                + " sourcePeak=" + juce::String(pluginHost.takeDiagnosticSourcePeak(), 6)
+                + " callbacks=" + juce::String(pluginHost.getCallbackCount())
+                + " signalBlocks=" + juce::String(pluginHost.getSignalBlocks())
+                + " device=" + currentAudio.deviceName + "\n");
+        }
         state->setProperty("audioXruns", currentAudio.xRunCount);
         state->setProperty("callbackOverruns", static_cast<juce::int64>(pluginHost.getCallbackOverruns()));
         state->setProperty("overloadSamples", static_cast<juce::int64>(masterOutput.getOverloadSamples()));

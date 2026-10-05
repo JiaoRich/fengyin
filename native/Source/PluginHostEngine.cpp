@@ -216,6 +216,13 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
             for (int i = 0; i < numSamples && ! signal; ++i)
                 signal = std::abs(outputs[channel][i]) > 0.00001f;
     if (signal) signalBlocks.fetch_add(1, std::memory_order_relaxed);
+    float peak = 0;
+    for (int channel = 0; channel < numOutputs; ++channel)
+        if (outputs[channel] != nullptr)
+            for (int i = 0; i < numSamples; ++i)
+                peak = std::max(peak, std::abs(outputs[channel][i]));
+    auto previousPeak = diagnosticSourcePeak.load(std::memory_order_relaxed);
+    while (previousPeak < peak && ! diagnosticSourcePeak.compare_exchange_weak(previousPeak, peak)) {}
     if (masterOutput != nullptr)
         masterOutput->processInstrument(outputs, numOutputs, numSamples);
     if (accompaniment != nullptr)

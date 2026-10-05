@@ -1687,6 +1687,10 @@ function applyInlineAudioSettings(driverChanged = false) {
 
 $('#audio-driver-select').addEventListener('change', () => applyInlineAudioSettings(true));
 $('#configure-asio4all').addEventListener('click', () => nativeEvent('configureAsio4All'));
+$('#test-engine-output').addEventListener('click', () => {
+  if (window.confirm('请先调低耳机或音箱音量。将播放2秒测试音，期间暂时替代演奏和网页声音。是否继续？')) nativeEvent('testEngineOutput');
+});
+$('#export-audio-path').addEventListener('click', () => nativeEvent('exportAudioPathDiagnostic'));
 ['#audio-output-select','#audio-rate-select','#audio-buffer-select'].forEach(id => $(id).addEventListener('change', () => applyInlineAudioSettings(false)));
 $('#audio-auto-optimize').addEventListener('click', () => {
   setAudioControlsBusy(true);
@@ -1781,11 +1785,11 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
     adapterMatchPhase = 'idle';
     showPage('wind');
   }
-  if (Number.isFinite(Number(state.latency))) $('#latency').textContent = `${Number(state.latency).toFixed(1)} ms`;
+  if (Number.isFinite(Number(state.latency))) $('#latency').textContent = Number(state.latency) > 0 ? `${Number(state.latency).toFixed(1)} ms` : '—';
   if (!audioSettingsApplying && Number.isFinite(Number(state.latency))) {
     const value = Number(state.latency);
-    $('#audio-latency-value').textContent = `${value.toFixed(1)} ms · ${value <= 10 ? '优秀' : value <= 20 ? '良好' : '偏高'}`;
-    $('#audio-latency-value').classList.toggle('green', value <= 20);
+    $('#audio-latency-value').textContent = value > 0 ? `${value.toFixed(1)} ms · ${value <= 10 ? '优秀' : value <= 20 ? '良好' : '偏高'}` : '音频未运行 · 暂无延迟数据';
+    $('#audio-latency-value').classList.toggle('green', value > 0 && value <= 20);
   }
   if (Number.isFinite(Number(state.audioCpu))) $('#cpu').textContent = `${Math.round(Number(state.audioCpu)*100)}%`;
   hardwareBreath = connected ? Math.max(0,Math.min(100,Number(state.breath || 0)*100)) : null;
@@ -2090,9 +2094,9 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
     ? '共享低延迟已启用。无需修改浏览器输出设备，也不需要管理员权限。'
     : '已检测到 KoordASIO，可在“声音模式”中选择共享低延迟测试。';
   const latency = Number(state?.latency);
-  const latencyText = Number.isFinite(latency) ? `${latency.toFixed(1)} ms · ${latency <= 10 ? '优秀' : latency <= 20 ? '良好' : '偏高'}` : '尚未取得';
+  const latencyText = Number.isFinite(latency) && latency > 0 ? `${latency.toFixed(1)} ms · ${latency <= 10 ? '优秀' : latency <= 20 ? '良好' : '偏高'}` : '音频未运行 · 暂无延迟数据';
   $('#audio-latency-value').textContent = latencyText;
-  $('#audio-latency-value').classList.toggle('green', !Number.isFinite(latency) || latency <= 20);
+  $('#audio-latency-value').classList.toggle('green', Number.isFinite(latency) && latency > 0 && latency <= 20);
   const status = $('#audio-apply-status');
   status.textContent = state?.message || (state?.automatic ? '已由风吟自动优化；也可使用上方高级选项手动调整。' : '已使用高级手动设置，软件不会自动覆盖。');
   status.classList.toggle('audio-error', state?.success === false);

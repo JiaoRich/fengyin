@@ -132,11 +132,13 @@ juce::String AudioDeviceService::initialise()
 juce::String AudioDeviceService::startIsolatedAudioEngine(int requestedFrames)
 {
 #if JUCE_WINDOWS
-    if (engineProcess.isRunning()) return {};
+    // selectDeviceType closes the client device before entering here. A live
+    // engine does not imply that the instrument producer is still attached.
     if (requestedFrames != 128 && requestedFrames != 256 && requestedFrames != 512)
         requestedFrames = 128;
     juce::String engineError;
-    if (! engineProcess.start(static_cast<std::uint32_t>(requestedFrames), {}, true, engineError))
+    if (! engineProcess.isRunning()
+        && ! engineProcess.start(static_cast<std::uint32_t>(requestedFrames), {}, true, engineError))
         return engineError;
     if (! engineDeviceTypeAdded)
     {

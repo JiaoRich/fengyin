@@ -1,6 +1,7 @@
 #include "AudioEngineCore.h"
 
 #include <array>
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 
@@ -94,6 +95,33 @@ int main()
         }
     }
     assert(core.getCounters().systemUnderflows == 0);
+
+    initialiseRegion(instrumentRegion);
+    initialiseRegion(systemRegion);
+    core.reset();
+    core.requestTestTone();
+    float tonePeak = 0;
+    for (int block = 0; block < 750; ++block)
+    {
+        core.render(outputs, 2, 128);
+        for (int i = 0; i < 128; ++i)
+        {
+            assert(std::isfinite(left[i]));
+            assert(left[i] == right[i]);
+            tonePeak = std::max(tonePeak, std::abs(left[i]));
+        }
+    }
+    assert(tonePeak > 0.03f && tonePeak < 0.032f);
+    assert(core.takeInstrumentPeak() == 0);
+    assert(core.takeSystemPeak() == 0);
+    assert(core.takeOutputPeak() > 0.03f);
+    assert(core.takeOutputPeak() == 0);
+    core.render(outputs, 2, 128);
+    for (const auto sample : left) assert(sample == 0);
+    pushConstant(instrumentRegion, 0.25f, -0.25f, 128);
+    core.render(outputs, 2, 128);
+    assert(core.takeInstrumentPeak() == 0.25f);
+    assert(core.takeOutputPeak() == 0.25f);
 
     EngineLifecycle lifecycle;
     assert(lifecycle.get() == StreamState::stopped);

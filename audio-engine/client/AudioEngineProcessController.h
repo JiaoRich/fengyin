@@ -22,6 +22,12 @@ public:
     void stop() noexcept;
     [[nodiscard]] bool isRunning() const noexcept;
     [[nodiscard]] std::uint32_t actualBufferFrames() const noexcept;
+    bool requestTestTone() noexcept
+    {
+        if (! isRunning() || statusMapping.get() == nullptr) return false;
+        statusMapping.get()->testToneRequest.store(1);
+        return true;
+    }
 
 private:
     bool waitUntilRunning(int timeoutMilliseconds, juce::String& error) noexcept;

@@ -7,6 +7,7 @@
 #if defined(_WIN32)
 #include <windows.h>
 #include <shellapi.h>
+#include "AudioSessionDiagnostic.h"
 #endif
 
 #include <cstdint>
@@ -196,6 +197,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     const auto outputStarted = output.start(core, requestedFrames, preferredEndpointId, error);
     if (! outputStarted)
     {
+        logAudioSessions();
         juce::Logger::writeToLog("ASIO4ALL start failed: " + juce::String(error.c_str()));
         lifecycle.useFallback();
         instrumentMapping.get()->state.store(static_cast<std::uint32_t>(StreamState::fallback));
@@ -236,14 +238,26 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     {
         // JUCE's ASIO reset notifications use the message-thread timer.
         juce::MessageManager::getInstance()->runDispatchLoopUntil(20);
+        if (instrumentMapping.get()->testToneRequest.exchange(0) != 0)
+        {
+            core.requestTestTone();
+            juce::Logger::writeToLog("Diagnostic tone requested: 440Hz -30dBFS 2s; replaces mix during test");
+        }
         if (juce::Time::getMillisecondCounterHiRes() >= nextDiagnostic)
         {
             const auto counters = core.getCounters();
-            juce::Logger::writeToLog("Audio health: callbacks=" + juce::String(counters.renderCallbacks)
+            juce::Logger::writeToLog(juce::Time::getCurrentTime().toISO8601(true) + " Audio health: callbacks=" + juce::String(counters.renderCallbacks)
                 + " instrumentUnderflows=" + juce::String(counters.instrumentUnderflows)
                 + " systemUnderflows=" + juce::String(counters.systemUnderflows)
-                + " clippedFrames=" + juce::String(counters.clippedFrames));
+                + " clippedFrames=" + juce::String(counters.clippedFrames)
+                + " producerPeak=" + juce::String(instrumentMapping.get()->producerPeakMicro.exchange(0) / 1000000.0, 6)
+                + " instrumentReceivedPeak=" + juce::String(core.takeInstrumentPeak(), 6)
+                + " systemReceivedPeak=" + juce::String(core.takeSystemPeak(), 6)
+                + " asioPreOutputPeak=" + juce::String(core.takeOutputPeak(), 6)
+                + " producerActive=" + juce::String(instrumentMapping.get()->producerActive.load())
+                + " droppedBlocks=" + juce::String(instrumentMapping.get()->droppedBlocks.load()));
             nextDiagnostic += 5000.0;
+            logAudioSessions();
         }
         if (routeSystemAudio)
         {

@@ -38,6 +38,9 @@ public:
     [[nodiscard]] bool isSharedAsioModeActive();
     juce::String selectDeviceType(const juce::String& typeName);
     juce::String configureAsio4All();
+    juce::String requestEngineTestTone() { return engineProcess.requestTestTone()
+        ? juce::String::fromUTF8("正在播放2秒低音量测试音，请记录是否听到。")
+        : juce::String::fromUTF8("独立引擎未运行，无法播放测试音。请直接导出诊断，不必反复切换。"); }
     juce::String applyOutputSetup(const juce::String& outputName, double sampleRate, int bufferSize);
     // 首次运行或自动跟随到新设备时，优先使用 Windows 低延迟共享模式、48 kHz 和 128 采样。
     // 用户在设置面板手动应用过配置后，不再自动覆盖。

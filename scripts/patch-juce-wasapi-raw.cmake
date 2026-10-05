@@ -12,6 +12,13 @@ function(replace_exact file before after)
     file(WRITE "${file}" "${content}")
 endfunction()
 
+# The isolated render-only engine must not probe microphone pins during the
+# ASIO constructor's dummy-buffer cycle. Leave other JUCE hosts unchanged.
+set(asio "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/native/juce_ASIO_windows.cpp")
+replace_exact("${asio}"
+    "        for (int i = 0; i < jmin (2, (int) totalNumInputChans); ++i)"
+    "        for (int i = 0; i <\n           #if FENGYIN_ASIO_RENDER_ONLY\n             0;\n           #else\n             jmin (2, (int) totalNumInputChans);\n           #endif\n             ++i)")
+
 set(header "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/juce_audio_devices.h")
 set(manager "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/audio_io/juce_AudioDeviceManager.cpp")
 set(wasapi "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp")
