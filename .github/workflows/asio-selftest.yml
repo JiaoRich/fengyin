@@ -1,6 +1,9 @@
 name: 独立ASIO声音自检工具
 on:
   workflow_dispatch:
+  push:
+    branches: [codex/fengyin-audio-engine-1.1.0]
+    paths: [tools/asio-selftest/**, .github/workflows/asio-selftest.yml]
 permissions:
   contents: read
 jobs:
