@@ -36,7 +36,13 @@ std::optional<juce::BigInteger> FengYinEngineAudioIODevice::getDefaultInputChann
     return juce::BigInteger();
 }
 juce::Array<double> FengYinEngineAudioIODevice::getAvailableSampleRates() { return { 48000.0 }; }
-juce::Array<int> FengYinEngineAudioIODevice::getAvailableBufferSizes() { return { 128, 256, 512 }; }
+juce::Array<int> FengYinEngineAudioIODevice::getAvailableBufferSizes()
+{
+    juce::Array<int> sizes { 128, 256, 512 };
+    if (isOpen() && bufferFrames > 0) sizes.addIfNotAlreadyThere(bufferFrames);
+    sizes.sort();
+    return sizes;
+}
 int FengYinEngineAudioIODevice::getDefaultBufferSize() { return 128; }
 
 juce::String FengYinEngineAudioIODevice::open(const juce::BigInteger& inputChannels,

@@ -233,27 +233,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
             if (router.pollPhysicalDefaultChange(newPhysicalEndpoint, routeError)
                 && ! newPhysicalEndpoint.empty() && newPhysicalEndpoint != preferredEndpointId)
             {
-                lifecycle.beginRecovery();
-                publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::recovering, 0);
-                output.stop();
-                discardQueuedAudio(*instrumentMapping.get());
-                discardQueuedAudio(*systemMapping.get());
-                core.reset();
+                // WDM default endpoint IDs cannot select ASIO channels.
+                // Keep routing browser audio, but leave the working ASIO
+                // stream untouched; hardware selection belongs to ASIO4ALL.
                 preferredEndpointId = newPhysicalEndpoint;
-                std::wstring restartError;
-                if (output.start(core, requestedFrames, preferredEndpointId, restartError)
-                    && output.actualBufferFrames() == actualFrames)
-                {
-                    publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::running,
-                                 actualFrames);
-                    lifecycle.markRunning();
-                    continue;
-                }
-                output.stop();
-                unrecoverableOutputFailure = true;
-                lifecycle.useFallback();
-                publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::fallback, 0);
-                break;
+                juce::Logger::writeToLog("Windows default changed; ASIO4ALL channel selection preserved");
             }
         }
         if (output.isRunning())

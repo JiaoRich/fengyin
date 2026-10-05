@@ -2052,6 +2052,7 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   setAudioControlsBusy(!!state?.autoTuning);
   setAudioOptions($('#audio-driver-select'), state?.types, state?.type, value => {
     const name = String(value);
+    if (name.includes('ASIO4ALL')) return name;
     if (/^ASIO$/i.test(name)) return '共享低延迟测试（KoordASIO）';
     if (/RAW Test Mode/i.test(name)) return 'RAW测试模式（共享）';
     if (/Low Latency|低延迟/i.test(name)) return `${name}（推荐·共享）`;
@@ -2065,7 +2066,10 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   const lowLatency = !!state?.lowLatencyMode;
   const rawTest = /RAW Test Mode/i.test(String(state?.type || ''));
   const sharedAsioActive = state?.sharedAsioActive === true;
-  $('#audio-driver-help').textContent = sharedAsioActive
+  const asioBridge = String(state?.type || '').includes('ASIO4ALL');
+  $('#audio-driver-help').textContent = asioBridge
+    ? '实际输出使用 ASIO4ALL；浏览器等系统声音经风吟虚拟扬声器一起混音输出'
+    : sharedAsioActive
     ? '风吟通过 KoordASIO 共享输出；网页、微信等仍使用 Windows 默认扬声器'
     : rawTest
     ? '仅风吟绕过可选系统音效；不修改驱动、不独占设备，可随时切回'
@@ -2075,7 +2079,9 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   $('#audio-rate-help').textContent = rates.length <= 1
     ? '当前设备仅上报这一个可用采样率'
     : '伴奏视频和软音源推荐使用 48000 Hz';
-  $('#audio-buffer-help').textContent = buffers.length <= 1
+  $('#audio-buffer-help').textContent = asioBridge
+    ? '显示驱动实际缓冲区；切换失败会报错，不会悄悄提高到 512。配置驱动时请先暂停音频。'
+    : buffers.length <= 1
     ? (lowLatency ? '当前设备驱动仅上报这一个可用缓冲值' : '普通 Windows Audio 由系统固定缓冲；请点击“自动优化”')
     : '128 延迟低；出现爆音时可改为 256';
   const sharedAsioStatus = $('#shared-asio-status');
