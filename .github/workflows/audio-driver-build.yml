@@ -22,7 +22,9 @@ permissions:
 
 jobs:
   build-driver:
-    runs-on: windows-2025-vs2026
+    # WDK 26100 的 NuGet 构建任务面向 MSBuild 17（VS 2022）。使用
+    # VS 2026 会错误查找并不存在的 Microsoft.DriverKit.Build.Tasks.18.0.dll。
+    runs-on: windows-2022
     timeout-minutes: 45
     steps:
       - name: 获取风吟源码

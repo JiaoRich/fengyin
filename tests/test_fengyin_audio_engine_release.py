@@ -40,6 +40,7 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         self.assertIn("<KMDF_VERSION_MINOR>15</KMDF_VERSION_MINOR>", prepare)
         self.assertGreaterEqual(prepare.count("NTDDI_VERSION=NTDDI_WIN10_VB"), 2)
         workflow = self.read(".github/workflows/audio-driver-build.yml")
+        self.assertGreaterEqual(workflow.count("runs-on: windows-2022"), 2)
         self.assertIn("ExAllocateFromNPagedLookasideList", workflow)
         self.assertIn("ExFreeToNPagedLookasideList", workflow)
         self.assertIn("CM_Get_DevNode_Status", setup)
