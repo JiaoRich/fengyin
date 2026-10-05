@@ -121,6 +121,24 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
                     if (device && device->hasControlPanel())
                     {
                         device->showControlPanel();
+                        // ASIO controlPanel() may return while a modeless
+                        // panel is still open. Keep the driver instance and
+                        // message pump alive until its windows close.
+                        juce::MessageManager::getInstance()->runDispatchLoopUntil(250);
+                        for (;;)
+                        {
+                            bool visible = false;
+                            EnumWindows([](HWND window, LPARAM context) -> BOOL
+                            {
+                                DWORD pid = 0;
+                                GetWindowThreadProcessId(window, &pid);
+                                if (pid == GetCurrentProcessId() && IsWindowVisible(window))
+                                    *reinterpret_cast<bool*>(context) = true;
+                                return TRUE;
+                            }, reinterpret_cast<LPARAM>(&visible));
+                            if (! visible || WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0) break;
+                            juce::MessageManager::getInstance()->runDispatchLoopUntil(20);
+                        }
                         shown = true;
                     }
                     break;
