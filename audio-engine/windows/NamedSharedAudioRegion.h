@@ -31,8 +31,8 @@ private:
     bool created = false;
 };
 
-inline constexpr wchar_t instrumentRegionName[] = L"Local\\FengYin.Audio.Instrument.v2";
-inline constexpr wchar_t systemRegionName[] = L"Local\\FengYin.Audio.System.v2";
+inline constexpr wchar_t instrumentRegionName[] = L"Local\\FengYin.Audio.Instrument.v4";
+inline constexpr wchar_t systemRegionName[] = L"Local\\FengYin.Audio.System.v4";
 inline constexpr wchar_t engineStopEventName[] = L"Local\\FengYin.AudioEngine.Stop.v2";
 inline constexpr wchar_t engineSingletonName[] = L"Local\\FengYin.AudioEngine.Singleton.v2";
 inline constexpr wchar_t instrumentRequestSemaphoreName[] = L"Local\\FengYin.Audio.Instrument.Request.v2";

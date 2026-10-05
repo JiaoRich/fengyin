@@ -1,7 +1,7 @@
 #include "AudioEngineCore.h"
 #include "DefaultEndpointRouter.h"
 #include "NamedSharedAudioRegion.h"
-#include "WasapiExclusiveOutput.h"
+#include "Asio4AllOutput.h"
 #include "WasapiLoopbackInput.h"
 
 #if defined(_WIN32)
@@ -61,9 +61,17 @@ void publishState(SharedAudioRegion& instrument, SharedAudioRegion& system,
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 {
+    juce::ScopedJuceInitialiser_GUI juceInitialiser;
+    const auto logFile = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+        .getChildFile("FengYin").getChildFile("audio-engine.log");
+    logFile.getParentDirectory().createDirectory();
+    juce::FileLogger logger(logFile, "ASIO4ALL bridge starting", 256 * 1024);
+    juce::Logger::setCurrentLogger(&logger);
+    struct ResetLogger { ~ResetLogger() { juce::Logger::setCurrentLogger(nullptr); } } resetLogger;
     std::wstring preferredEndpointId;
     std::uint32_t requestedFrames = 256;
     bool routeSystemAudio = false;
+    bool configureAsio = false;
     int argumentCount = 0;
     if (auto** arguments = CommandLineToArgvW(GetCommandLineW(), &argumentCount))
     {
@@ -83,6 +91,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
             }
             else if (std::wstring(arguments[index]) == L"--route-system-audio")
                 routeSystemAudio = true;
+            else if (std::wstring(arguments[index]) == L"--configure-asio")
+                configureAsio = true;
         LocalFree(arguments);
     }
     HANDLE singleton = CreateMutexW(nullptr, TRUE, engineSingletonName);
@@ -96,6 +106,31 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     {
         CloseHandle(singleton);
         return 2;
+    }
+    if (configureAsio)
+    {
+        std::unique_ptr<juce::AudioIODeviceType> asio(juce::AudioIODeviceType::createAudioIODeviceType_ASIO());
+        bool shown = false;
+        if (asio)
+        {
+            asio->scanForDevices();
+            for (const auto& name : asio->getDeviceNames(false))
+                if (name.containsIgnoreCase("ASIO4ALL"))
+                {
+                    std::unique_ptr<juce::AudioIODevice> device(asio->createDevice(name, {}));
+                    if (device && device->hasControlPanel())
+                    {
+                        device->showControlPanel();
+                        shown = true;
+                    }
+                    break;
+                }
+        }
+        if (! shown) MessageBoxW(nullptr, L"未找到可用的 64 位 ASIO4ALL 驱动控制面板。", L"风吟 ASIO4ALL", MB_OK | MB_ICONERROR);
+        CloseHandle(stopEvent);
+        ReleaseMutex(singleton);
+        CloseHandle(singleton);
+        return shown ? 0 : 9;
     }
 
     NamedSharedAudioRegion instrumentMapping;
@@ -130,6 +165,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         std::wstring previousPhysicalEndpoint;
         if (! router.routeSystemAudioToFengYin(previousPhysicalEndpoint, error))
         {
+            juce::Logger::writeToLog("Route failed: " + juce::String(error.c_str()));
             CloseHandle(stopEvent);
             ReleaseMutex(singleton);
             CloseHandle(singleton);
@@ -137,36 +173,12 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         }
         if (preferredEndpointId.empty()) preferredEndpointId = previousPhysicalEndpoint;
     }
-    WasapiExclusiveOutput output;
-    // Try the user's/automatic low-latency request first, then only the larger
-    // safe periods. This happens before the JUCE graph opens, so the graph is
-    // created once at the physical period that actually succeeded.
-    std::vector<std::uint32_t> periodCandidates { requestedFrames };
-    for (const auto candidate : { 128u, 256u, 512u })
-        if (candidate > requestedFrames) periodCandidates.push_back(candidate);
-    bool outputStarted = false;
-    for (const auto candidate : periodCandidates)
-    {
-        // Existing shared clients need a short moment to migrate after the
-        // Windows default was moved to the virtual endpoint. Retry the same
-        // low period before increasing latency; this is startup work, never
-        // executed on the real-time audio callback.
-        for (int attempt = 0; attempt < 3 && ! outputStarted; ++attempt)
-        {
-            if (output.start(core, candidate, preferredEndpointId, error))
-            {
-                requestedFrames = candidate;
-                outputStarted = true;
-            }
-            else if (attempt < 2)
-            {
-                Sleep(200);
-            }
-        }
-        if (outputStarted) break;
-    }
+    Asio4AllOutput output;
+    // No WASAPI substitution or silent escalation to a larger period.
+    const auto outputStarted = output.start(core, requestedFrames, preferredEndpointId, error);
     if (! outputStarted)
     {
+        juce::Logger::writeToLog("ASIO4ALL start failed: " + juce::String(error.c_str()));
         lifecycle.useFallback();
         instrumentMapping.get()->state.store(static_cast<std::uint32_t>(StreamState::fallback));
         systemMapping.get()->state.store(static_cast<std::uint32_t>(StreamState::fallback));
@@ -178,6 +190,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 
     lifecycle.markRunning();
     const auto actualFrames = output.actualBufferFrames();
+    requestedFrames = actualFrames;
+    instrumentMapping.get()->physicalOutputLatencyFrames.store(output.outputLatencyFrames());
     publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::running, actualFrames);
     WasapiLoopbackInput loopback;
     std::wstring loopbackError;
@@ -199,8 +213,20 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     // same; if a replacement device requires another period we fail closed so
     // the main app can reopen its audio device rather than drift or crackle.
     bool unrecoverableOutputFailure = false;
-    while (WaitForSingleObject(stopEvent, 250) == WAIT_TIMEOUT)
+    auto nextDiagnostic = juce::Time::getMillisecondCounterHiRes() + 5000.0;
+    while (WaitForSingleObject(stopEvent, 0) == WAIT_TIMEOUT)
     {
+        // JUCE's ASIO reset notifications use the message-thread timer.
+        juce::MessageManager::getInstance()->runDispatchLoopUntil(20);
+        if (juce::Time::getMillisecondCounterHiRes() >= nextDiagnostic)
+        {
+            const auto counters = core.getCounters();
+            juce::Logger::writeToLog("Audio health: callbacks=" + juce::String(counters.renderCallbacks)
+                + " instrumentUnderflows=" + juce::String(counters.instrumentUnderflows)
+                + " systemUnderflows=" + juce::String(counters.systemUnderflows)
+                + " clippedFrames=" + juce::String(counters.clippedFrames));
+            nextDiagnostic += 5000.0;
+        }
         if (routeSystemAudio)
         {
             std::wstring newPhysicalEndpoint, routeError;

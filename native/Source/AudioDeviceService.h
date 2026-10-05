@@ -37,6 +37,7 @@ public:
     [[nodiscard]] bool isSharedAsioModeAvailable();
     [[nodiscard]] bool isSharedAsioModeActive();
     juce::String selectDeviceType(const juce::String& typeName);
+    juce::String configureAsio4All();
     juce::String applyOutputSetup(const juce::String& outputName, double sampleRate, int bufferSize);
     // 首次运行或自动跟随到新设备时，优先使用 Windows 低延迟共享模式、48 kHz 和 128 采样。
     // 用户在设置面板手动应用过配置后，不再自动覆盖。

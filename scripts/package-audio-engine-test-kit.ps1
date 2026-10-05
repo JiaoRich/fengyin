@@ -50,6 +50,7 @@ foreach ($ScriptName in @(
 }
 Copy-Item (Join-Path $ProjectRoot "scripts\audio-test-kit\*.cmd") $OutputDir -Force
 Copy-Item (Join-Path $ProjectRoot "docs\风吟音频引擎免费实机测试说明.md") (Join-Path $OutputDir "测试说明-请先阅读.md") -Force
+Copy-Item (Join-Path $ProjectRoot "docs\ASIO4ALL桥接测试验收.md") (Join-Path $OutputDir "ASIO4ALL测试步骤.md") -Force
 
 foreach ($ScriptName in @(
     "Enable-TestMode.ps1",

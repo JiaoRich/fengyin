@@ -8,7 +8,7 @@ namespace
 constexpr int currentAudioSetupRevision = 9;
 constexpr int currentTuningRevision = 8;
 constexpr double latencyCandidateTestMs = 3500.0;
-const auto engineModeName = juce::String::fromUTF8("风吟低延迟（推荐）");
+const auto engineModeName = juce::String::fromUTF8("风吟低延迟（ASIO4ALL）");
 
 bool isWindowsSharedType(const juce::String& typeName)
 {
@@ -192,7 +192,7 @@ AudioDeviceStatus AudioDeviceService::getStatus()
         if (engineProcess.isRunning())
         {
             status.deviceType = engineModeName;
-            status.deviceName = juce::String::fromUTF8("自动跟随耳机或音响");
+            status.deviceName = juce::String::fromUTF8("ASIO4ALL（输出由驱动控制面板选择）");
         }
         status.sampleRate = device->getCurrentSampleRate();
         status.bufferSize = device->getCurrentBufferSizeSamples();
@@ -236,7 +236,7 @@ juce::StringArray AudioDeviceService::getAvailableDeviceTypes()
 juce::StringArray AudioDeviceService::getAvailableOutputDevices(const juce::String& typeName)
 {
     if (typeName == engineModeName)
-        return { juce::String::fromUTF8("自动跟随耳机或音响") };
+        return { juce::String::fromUTF8("ASIO4ALL（输出由驱动控制面板选择）") };
     if (auto* type = findType(typeName))
     {
         type->scanForDevices();
@@ -273,6 +273,24 @@ juce::Array<int> AudioDeviceService::getAvailableBufferSizes()
     if (auto* device = manager.getCurrentAudioDevice())
         return device->getAvailableBufferSizes();
     return {};
+}
+
+juce::String AudioDeviceService::configureAsio4All()
+{
+   #if JUCE_WINDOWS
+    tuningActive = false;
+    manager.closeAudioDevice();
+    engineProcess.stop();
+    if (auto* settings = properties.getUserSettings())
+        settings->setValue("audioEngineEnabled", false);
+    const auto executable = juce::File::getSpecialLocation(juce::File::currentExecutableFile)
+        .getSiblingFile("FengYinAudioEngine.exe");
+    if (! executable.startAsProcess("--configure-asio"))
+        return juce::String::fromUTF8("无法打开 ASIO4ALL 配置程序");
+    return juce::String::fromUTF8("已暂停风吟音频。请在 ASIO4ALL 中仅启用实际扬声器/耳机输出，关闭输入和风吟虚拟扬声器。关闭面板后重新选择风吟低延迟模式。");
+   #else
+    return juce::String::fromUTF8("ASIO4ALL 仅用于 Windows");
+   #endif
 }
 
 juce::String AudioDeviceService::selectDeviceType(const juce::String& typeName)

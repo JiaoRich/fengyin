@@ -15,10 +15,19 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         self.assertIn('getBoolValue("audioEngineEnabled", true)', service)
         self.assertIn("startIsolatedAudioEngine(requestedFrames)", service)
 
-    def test_engine_tries_safe_periods_and_supports_oem_alignment(self):
+    def test_engine_uses_asio4all_without_silent_backend_or_period_fallback(self):
         engine = self.read("audio-engine/windows/AudioEngineMain.cpp")
         device = self.read("audio-engine/client/FengYinEngineAudioIODevice.cpp")
-        self.assertIn("{ 128u, 256u, 512u }", engine)
+        self.assertIn("Asio4AllOutput output", engine)
+        self.assertNotIn("WasapiExclusiveOutput", engine)
+        self.assertNotIn("periodCandidates", engine)
+        backend = self.read("audio-engine/windows/Asio4AllOutput.cpp")
+        self.assertIn("createAudioIODeviceType_ASIO", backend)
+        self.assertIn('containsIgnoreCase("ASIO4ALL")', backend)
+        self.assertIn("lastCallback.load() == 0", backend)
+        self.assertIn("runDispatchLoopUntil", engine)
+        self.assertIn("WaitForSingleObject(requestSemaphore, 0)", device)
+        self.assertIn("physicalOutputLatencyFrames", device)
         self.assertIn("bufferSizeSamples > maximumFramesPerBlock", device)
 
     def test_driver_is_render_only_and_has_stable_hardware_id(self):

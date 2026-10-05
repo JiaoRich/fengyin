@@ -268,6 +268,14 @@ bool DefaultEndpointRouter::routeSystemAudioToFengYin(std::wstring& physicalEndp
                                                         : previousEndpointIds[1];
     if (physicalEndpointId.empty() || physicalEndpointId == virtualId)
     {
+        physicalEndpointId = findFirstPhysical(*enumerator.Get());
+        // A user may have manually selected the virtual endpoint before
+        // launching. Recovery must restore a usable physical output.
+        for (auto& id : previousEndpointIds)
+            if (id.empty() || id == virtualId) id = physicalEndpointId;
+    }
+    if (physicalEndpointId.empty() || physicalEndpointId == virtualId)
+    {
         error = L"Cannot determine the previous physical audio output";
         restore();
         return false;

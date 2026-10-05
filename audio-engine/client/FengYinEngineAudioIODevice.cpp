@@ -106,6 +106,11 @@ void FengYinEngineAudioIODevice::start(juce::AudioIODeviceCallback* callback)
     activeCallback = callback;
     stopRequested.store(false, std::memory_order_release);
     callback->audioDeviceAboutToStart(this);
+#if defined(_WIN32)
+    // The backend starts before the plugin graph. Drop old wake-ups rather
+    // than rendering up to four stale requests and adding hidden latency.
+    while (WaitForSingleObject(requestSemaphore, 0) == WAIT_OBJECT_0) {}
+#endif
     if (mapping.get() != nullptr)
         mapping.get()->producerActive.store(1, std::memory_order_release);
     playing.store(true, std::memory_order_release);
@@ -136,7 +141,13 @@ juce::BigInteger FengYinEngineAudioIODevice::getActiveOutputChannels() const
     juce::BigInteger result; if (opened.load()) result.setRange(0, 2, true); return result;
 }
 juce::BigInteger FengYinEngineAudioIODevice::getActiveInputChannels() const { return {}; }
-int FengYinEngineAudioIODevice::getOutputLatencyInSamples() { return bufferFrames * 2; }
+int FengYinEngineAudioIODevice::getOutputLatencyInSamples()
+{
+    // One producer period plus the driver's own reported output latency.
+    // This is an estimate, not a MIDI-to-acoustic measurement.
+    return bufferFrames + (mapping.get() != nullptr
+        ? static_cast<int>(mapping.get()->physicalOutputLatencyFrames.load()) : 0);
+}
 int FengYinEngineAudioIODevice::getInputLatencyInSamples() { return 0; }
 int FengYinEngineAudioIODevice::getXRunCount() const noexcept { return xruns.load(); }
 

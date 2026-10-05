@@ -12,6 +12,7 @@ int main()
     initialiseRegion(region);
     assert(isCompatible(region.protocol));
     assert(region.activePeriodFrames.load() == 0);
+    assert(region.physicalOutputLatencyFrames.load() == 0);
     assert(region.producerActive.load() == 0);
 
     AudioBlockProducer producer(region);

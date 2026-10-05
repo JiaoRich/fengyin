@@ -10,7 +10,7 @@
 namespace fengyin::audioengine
 {
 constexpr std::uint32_t protocolMagic = 0x45415946u; // "FYAE" in little endian
-constexpr std::uint16_t protocolMajor = 3;
+constexpr std::uint16_t protocolMajor = 4;
 constexpr std::uint16_t protocolMinor = 0;
 constexpr std::uint32_t engineSampleRate = 48000;
 constexpr std::uint16_t engineChannels = 2;
@@ -74,6 +74,7 @@ struct alignas(64) SharedAudioRegion
     // the producer must render that real size or its queue slowly accumulates
     // latency even though neither side reports an xrun.
     std::atomic<std::uint32_t> activePeriodFrames { 0 };
+    std::atomic<std::uint32_t> physicalOutputLatencyFrames { 0 };
     std::array<AudioBlock, audioBlockSlots> blocks {};
 };
 
@@ -104,6 +105,7 @@ inline void initialiseRegion(SharedAudioRegion& region) noexcept
     region.producerActive.store(0, std::memory_order_relaxed);
     region.state.store(static_cast<std::uint32_t>(StreamState::stopped), std::memory_order_relaxed);
     region.activePeriodFrames.store(0, std::memory_order_relaxed);
+    region.physicalOutputLatencyFrames.store(0, std::memory_order_relaxed);
     for (auto& block : region.blocks)
         block = {};
 }

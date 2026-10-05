@@ -1686,6 +1686,7 @@ function applyInlineAudioSettings(driverChanged = false) {
 }
 
 $('#audio-driver-select').addEventListener('change', () => applyInlineAudioSettings(true));
+$('#configure-asio4all').addEventListener('click', () => nativeEvent('configureAsio4All'));
 ['#audio-output-select','#audio-rate-select','#audio-buffer-select'].forEach(id => $(id).addEventListener('change', () => applyInlineAudioSettings(false)));
 $('#audio-auto-optimize').addEventListener('click', () => {
   setAudioControlsBusy(true);

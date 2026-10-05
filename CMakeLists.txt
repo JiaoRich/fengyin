@@ -217,8 +217,8 @@ if(WIN32)
         audio-engine/windows/DefaultEndpointRouter.h
         audio-engine/windows/NamedSharedAudioRegion.cpp
         audio-engine/windows/NamedSharedAudioRegion.h
-        audio-engine/windows/WasapiExclusiveOutput.cpp
-        audio-engine/windows/WasapiExclusiveOutput.h
+        audio-engine/windows/Asio4AllOutput.cpp
+        audio-engine/windows/Asio4AllOutput.h
         audio-engine/windows/PhysicalOutputSelector.cpp
         audio-engine/windows/PhysicalOutputSelector.h
         audio-engine/windows/WasapiLoopbackInput.cpp
@@ -232,8 +232,9 @@ if(WIN32)
         audio-engine/service
         audio-engine/windows
     )
-    target_compile_definitions(FengYinAudioEngine PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
-    target_link_libraries(FengYinAudioEngine PRIVATE ole32 avrt shell32 propsys)
+    target_compile_definitions(FengYinAudioEngine PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN
+        JUCE_ASIO=1 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_MODAL_LOOPS_PERMITTED=1)
+    target_link_libraries(FengYinAudioEngine PRIVATE ole32 avrt shell32 propsys juce::juce_audio_devices)
 
     add_executable(FengYinAudioWatchdog WIN32
         audio-engine/windows/AudioWatchdogMain.cpp

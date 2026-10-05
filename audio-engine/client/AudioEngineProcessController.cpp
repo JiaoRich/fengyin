@@ -194,6 +194,15 @@ bool AudioEngineProcessController::waitUntilRunning(int timeoutMilliseconds,
             GetExitCodeProcess(process.hProcess, &exitCode);
             error = juce::String::fromUTF8("风吟音频引擎启动失败，错误代码：")
                   + juce::String(static_cast<int>(exitCode));
+            const auto log = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+                .getChildFile("FengYin").getChildFile("audio-engine.log");
+            const auto lines = juce::StringArray::fromLines(log.loadFileAsString());
+            for (int index = lines.size() - 1; index >= 0; --index)
+                if (lines[index].contains("failed:"))
+                {
+                    error += "\n" + lines[index];
+                    break;
+                }
             return false;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));

@@ -652,6 +652,11 @@ void MainComponent::setupWebInterface()
         .withEventListener("showMidiSetup", [this](juce::var) { showMidiSetup(); })
         .withEventListener("showExpressionSettings", [this](juce::var) { showExpressionSettings(); })
         .withEventListener("showAudioSettings", [this](juce::var) { showDeviceSettings(); })
+        .withEventListener("configureAsio4All", [this](juce::var)
+        {
+            const auto message = audio.configureAsio4All();
+            if (webInterface) webInterface->emitEventIfBrowserIsVisible("editorResult", message);
+        })
         .withEventListener("toggleRecording", [this](juce::var) { if (isActivated || recorder.isRecording()) toggleRecording(); })
         .withEventListener("showRecordings", [](juce::var)
         {
@@ -3460,7 +3465,7 @@ void MainComponent::showDeviceSettings()
     const auto current = audio.getStatus();
     const auto types = audio.getAvailableDeviceTypes();
     deviceDialog = std::make_unique<juce::AlertWindow>(utf8("声音设备设置"),
-        utf8("推荐使用自动优化。所有可选模式均为 Windows 共享输出，不影响其他软件发声。"),
+        utf8("Windows 模式使用共享输出；风吟低延迟模式使用 ASIO4ALL，并通过虚拟扬声器接收系统声音。"),
         juce::MessageBoxIconType::QuestionIcon);
     deviceDialog->addComboBox("type", types, utf8("声音驱动"));
     auto* typeBox = deviceDialog->getComboBoxComponent("type");
