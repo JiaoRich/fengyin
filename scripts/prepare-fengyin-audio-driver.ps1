@@ -34,6 +34,14 @@ try {
     $directoryPropsPath = Join-Path $output 'Directory.Build.props'
     $directoryProps = [System.IO.File]::ReadAllText($directoryPropsPath)
     $directoryProps = $directoryProps.Replace('10.0.28000.2526', '10.0.26100.1')
+    # Set the WDK's official target-version property before its props are
+    # imported.  Adding NTDDI_VERSION only to ClCompile is insufficient: the
+    # WDK appends its own latest-version define afterwards and wins.  VB
+    # (Windows 10 2004) keeps the generated driver compatible with Windows 11
+    # 21H2 while still satisfying the Universal driver/KMDF requirements.
+    $directoryProps = $directoryProps.Replace(
+        '</Project>',
+        "  <PropertyGroup>`n    <_NT_TARGET_VERSION>0xA000008</_NT_TARGET_VERSION>`n  </PropertyGroup>`n</Project>")
     [System.IO.File]::WriteAllText($directoryPropsPath, $directoryProps, [System.Text.UTF8Encoding]::new($true))
 
     Copy-Item (Join-Path $patchRoot 'FengYinAudioRing.h') 'audio\sysvad\FengYinAudioRing.h'
@@ -158,7 +166,7 @@ try {
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(DDK_INC_PATH);..;.</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>NTDDI_VERSION=NTDDI_WIN10_VB;%(PreprocessorDefinitions);_USE_WAVERT_;SYSVAD_BTH_BYPASS;SYSVAD_USB_SIDEBAND;_NEW_DELETE_OPERATORS_</PreprocessorDefinitions>')
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);_USE_WAVERT_;SYSVAD_BTH_BYPASS;SYSVAD_USB_SIDEBAND;_NEW_DELETE_OPERATORS_</PreprocessorDefinitions>')
     )
     Edit-PinnedFile 'audio\sysvad\TabletAudioSample\TabletAudioSample.vcxproj' @(
         @('    <KMDF_VERSION_MAJOR>1</KMDF_VERSION_MAJOR>', "    <KMDF_VERSION_MAJOR>1</KMDF_VERSION_MAJOR>`n    <KMDF_VERSION_MINOR>15</KMDF_VERSION_MINOR>"),
@@ -167,7 +175,7 @@ try {
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies);$(DDK_LIB_PATH)\portcls.lib;$(DDK_LIB_PATH)\stdunk.lib;$(DDK_LIB_PATH)\libcntpr.lib</AdditionalDependencies>', '  <ItemDefinitionGroup Condition="''$(Configuration)|$(Platform)''==''Release|x64''">
     <ClCompile>
-      <PreprocessorDefinitions>NTDDI_VERSION=NTDDI_WIN10_VB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4296;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
     <Link>
