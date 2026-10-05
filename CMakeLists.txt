@@ -254,7 +254,7 @@ if(WIN32)
         audio-engine/windows
     )
     target_compile_definitions(FengYinDriverSetup PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
-    target_link_libraries(FengYinDriverSetup PRIVATE setupapi newdev ole32 shell32 propsys)
+    target_link_libraries(FengYinDriverSetup PRIVATE setupapi newdev cfgmgr32 ole32 shell32 propsys)
 endif()
 
 install(TARGETS FengYin RUNTIME DESTINATION . BUNDLE DESTINATION .)

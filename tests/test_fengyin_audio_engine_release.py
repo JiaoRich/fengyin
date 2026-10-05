@@ -28,6 +28,24 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         self.assertIn('FengYin.SpeakerName = "风吟共享扬声器"', inf)
         self.assertNotIn("KSCATEGORY_CAPTURE", inf)
         self.assertNotIn("WaveMic", inf)
+        self.assertIn("D:P(A;;GA;;;SY)", inf)
+
+    def test_driver_targets_downlevel_windows_and_verifies_real_endpoint(self):
+        prepare = self.read("scripts/prepare-fengyin-audio-driver.ps1")
+        setup = self.read("audio-engine/windows/DriverSetupMain.cpp")
+        install = self.read("scripts/audio-test-kit/Install-TestAudioEngine.ps1")
+        uninstall = self.read("scripts/audio-test-kit/Uninstall-TestAudioEngine.ps1")
+        self.assertIn("10.0.26100.1", prepare)
+        self.assertIn("<KMDF_VERSION_MINOR>15</KMDF_VERSION_MINOR>", prepare)
+        self.assertGreaterEqual(prepare.count("NTDDI_VERSION=NTDDI_WIN10_VB"), 2)
+        workflow = self.read(".github/workflows/audio-driver-build.yml")
+        self.assertIn("ExAllocateFromNPagedLookasideList", workflow)
+        self.assertIn("ExFreeToNPagedLookasideList", workflow)
+        self.assertIn("CM_Get_DevNode_Status", setup)
+        self.assertIn("EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE", setup)
+        self.assertIn("waitForOperationalInstallation", setup)
+        self.assertIn("$InstallResult -eq 10", install)
+        self.assertIn("--check-device", uninstall)
 
     def test_ci_keeps_driver_validation_enabled(self):
         workflow = self.read(".github/workflows/audio-driver-build.yml")

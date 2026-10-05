@@ -78,6 +78,7 @@ AddReg = FengYinAudio.Hardware
 
 [FengYinAudio.Hardware]
 HKR,,DeviceType,0x10001,0x0000001D
+HKR,,Security,,"D:P(A;;GA;;;SY)(A;;GRGWGX;;;BA)(A;;GRGWGX;;;WD)(A;;GRGWGX;;;RC)"
 
 [FengYinAudio.NT.Wdf]
 KmdfService = FengYinAudio,FengYinAudio.Wdf

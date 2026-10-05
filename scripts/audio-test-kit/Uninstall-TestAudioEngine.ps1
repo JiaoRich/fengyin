@@ -29,7 +29,7 @@ if (Test-Path $Watchdog) {
 if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 3010) {
     throw "风吟测试音频驱动卸载失败（错误码 $LASTEXITCODE）。"
 }
-& $Setup --check | Out-Null
+& $Setup --check-device | Out-Null
 if ($LASTEXITCODE -eq 0) { throw "虚拟音频设备仍然存在，测试证书暂不删除。请重启后重试。" }
 
 if (Test-Path $CertificatePath) {

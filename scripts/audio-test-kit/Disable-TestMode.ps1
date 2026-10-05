@@ -11,7 +11,7 @@ if (-not $Principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
     exit
 }
 if (Test-Path $Setup) {
-    & $Setup --check | Out-Null
+    & $Setup --check-device | Out-Null
     if ($LASTEXITCODE -eq 0) {
         throw "请先双击‘3-卸载并恢复系统声音.cmd’，确认测试驱动已删除后再关闭测试模式。"
     }

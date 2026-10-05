@@ -22,6 +22,16 @@ try {
     git checkout $sourceCommit
     if ($LASTEXITCODE -ne 0) { throw '检出固定 SysVAD 版本失败' }
 
+    # The pinned sample tracks Microsoft's newest WDK.  The first trial was
+    # consequently linked with WDK 28000 and failed to load on Windows 11
+    # 21H2 (build 22000) with Code 39 / entry point not found.  Compile the
+    # same source with the stable 26100 kit and explicitly keep the KMDF ABI
+    # at the broadly supported 1.15 baseline.
+    $packagesPath = Join-Path $output 'packages.config'
+    $packages = [System.IO.File]::ReadAllText($packagesPath)
+    $packages = $packages.Replace('10.0.28000.2526', '10.0.26100.1')
+    [System.IO.File]::WriteAllText($packagesPath, $packages, [System.Text.UTF8Encoding]::new($true))
+
     Copy-Item (Join-Path $patchRoot 'FengYinAudioRing.h') 'audio\sysvad\FengYinAudioRing.h'
     Copy-Item (Join-Path $patchRoot 'FengYinAudioRing.cpp') 'audio\sysvad\FengYinAudioRing.cpp'
     # Replace the broad Microsoft sample package with one x64 render endpoint.
@@ -126,12 +136,34 @@ try {
                 48000,
                 192000,')
     )
+    Edit-PinnedFile 'audio\sysvad\EndpointsCommon\EndpointsCommon.vcxproj' @(
+        @('  <ItemDefinitionGroup Condition="''$(Configuration)|$(Platform)''==''Release|x64''">
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(DDK_INC_PATH);..</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);_USE_WAVERT_;SYSVAD_BTH_BYPASS;SYSVAD_USB_SIDEBAND</PreprocessorDefinitions>
+    </ResourceCompile>
+    <ClCompile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(DDK_INC_PATH);..;.</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);_USE_WAVERT_;SYSVAD_BTH_BYPASS;SYSVAD_USB_SIDEBAND;_NEW_DELETE_OPERATORS_</PreprocessorDefinitions>',
+          '  <ItemDefinitionGroup Condition="''$(Configuration)|$(Platform)''==''Release|x64''">
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(DDK_INC_PATH);..</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);_USE_WAVERT_;SYSVAD_BTH_BYPASS;SYSVAD_USB_SIDEBAND</PreprocessorDefinitions>
+    </ResourceCompile>
+    <ClCompile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(DDK_INC_PATH);..;.</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NTDDI_VERSION=NTDDI_WIN10_VB;%(PreprocessorDefinitions);_USE_WAVERT_;SYSVAD_BTH_BYPASS;SYSVAD_USB_SIDEBAND;_NEW_DELETE_OPERATORS_</PreprocessorDefinitions>')
+    )
     Edit-PinnedFile 'audio\sysvad\TabletAudioSample\TabletAudioSample.vcxproj' @(
+        @('    <KMDF_VERSION_MAJOR>1</KMDF_VERSION_MAJOR>', "    <KMDF_VERSION_MAJOR>1</KMDF_VERSION_MAJOR>`n    <KMDF_VERSION_MINOR>15</KMDF_VERSION_MINOR>"),
         @('    <ClCompile Include="..\common.cpp" />', "    <ClCompile Include=`"..\common.cpp`" />`n    <ClCompile Include=`"..\FengYinAudioRing.cpp`" />"),
         @('  <ItemDefinitionGroup Condition="''$(Configuration)|$(Platform)''==''Release|x64''">
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies);$(DDK_LIB_PATH)\portcls.lib;$(DDK_LIB_PATH)\stdunk.lib;$(DDK_LIB_PATH)\libcntpr.lib</AdditionalDependencies>', '  <ItemDefinitionGroup Condition="''$(Configuration)|$(Platform)''==''Release|x64''">
     <ClCompile>
+      <PreprocessorDefinitions>NTDDI_VERSION=NTDDI_WIN10_VB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4296;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
     <Link>

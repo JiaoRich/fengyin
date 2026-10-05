@@ -78,7 +78,7 @@ jobs:
           }
           $env:PATH = "$($infVerif.Directory.FullName);$env:PATH"
 
-          # Microsoft.Windows.WDK.x64 10.0.28000 ships ApiValidator only in
+          # The NuGet WDK ships ApiValidator only in
           # c/bin/.../x64, while its own WindowsDriver.common.targets still
           # resolves the host tool from c/bin/.../x86. Mirror the x64 host
           # executable into that expected private directory. This keeps the
@@ -130,6 +130,21 @@ jobs:
             throw "驱动已编译但未生成 FengYinAudio.inf"
           }
           $releaseDir = Split-Path -Parent $builtInf
+          $builtSys = Join-Path $releaseDir "TabletAudioSample.sys"
+          $dumpbin = & $vswhere -latest -products * -find VC/Tools/MSVC/**/bin/Hostx64/x64/dumpbin.exe |
+            Select-Object -First 1
+          if (-not $dumpbin -or -not (Test-Path $dumpbin)) {
+            throw "未找到 dumpbin.exe，无法验证旧版 Windows 入口兼容性"
+          }
+          $imports = (& $dumpbin /nologo /imports $builtSys) -join "`n"
+          foreach ($forbiddenImport in @(
+            "ExAllocateFromNPagedLookasideList",
+            "ExFreeToNPagedLookasideList"
+          )) {
+            if ($imports -match [regex]::Escape($forbiddenImport)) {
+              throw "驱动仍导入 Build 22000 不提供的内核入口：$forbiddenImport"
+            }
+          }
           $builtCat = Join-Path $releaseDir "FengYinAudio.cat"
           if (-not (Test-Path $builtCat)) {
             # Inf2Cat is a host tool. Depending on the WDK release it may be

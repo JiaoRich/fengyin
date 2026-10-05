@@ -6,10 +6,17 @@
 #include <newdev.h>
 #include <setupapi.h>
 #include <shellapi.h>
+#include <cfgmgr32.h>
+#include <mmdeviceapi.h>
+#include <functiondiscoverykeys_devpkey.h>
+#include <propvarutil.h>
 
+#include <chrono>
+#include <cwctype>
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace
@@ -128,6 +135,106 @@ bool deviceExists()
     return found;
 }
 
+struct DriverDeviceState
+{
+    bool exists = false;
+    bool started = false;
+    ULONG status = 0;
+    ULONG problem = 0;
+};
+
+DriverDeviceState queryDriverDeviceState()
+{
+    DriverDeviceState result;
+    const auto devices = SetupDiGetClassDevsW(nullptr, nullptr, nullptr,
+                                               DIGCF_ALLCLASSES | DIGCF_PRESENT);
+    if (devices == INVALID_HANDLE_VALUE) return result;
+    SP_DEVINFO_DATA device { sizeof(device) };
+    for (DWORD index = 0; SetupDiEnumDeviceInfo(devices, index, &device); ++index)
+    {
+        if (! deviceHasHardwareId(devices, device)) continue;
+        result.exists = true;
+        if (CM_Get_DevNode_Status(&result.status, &result.problem, device.DevInst, 0) == CR_SUCCESS)
+            result.started = (result.status & DN_STARTED) != 0 && result.problem == CM_PROB_NONE;
+        break;
+    }
+    SetupDiDestroyDeviceInfoList(devices);
+    return result;
+}
+
+bool containsIgnoreCase(std::wstring value, std::wstring needle)
+{
+    for (auto& character : value) character = static_cast<wchar_t>(towlower(character));
+    for (auto& character : needle) character = static_cast<wchar_t>(towlower(character));
+    return value.find(needle) != std::wstring::npos;
+}
+
+bool activeRenderEndpointExists()
+{
+    IMMDeviceEnumerator* enumerator = nullptr;
+    IMMDeviceCollection* endpoints = nullptr;
+    auto found = false;
+    if (FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
+                                __uuidof(IMMDeviceEnumerator), reinterpret_cast<void**>(&enumerator))))
+        return false;
+    if (SUCCEEDED(enumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &endpoints)))
+    {
+        UINT count = 0;
+        endpoints->GetCount(&count);
+        for (UINT index = 0; index < count && ! found; ++index)
+        {
+            IMMDevice* endpoint = nullptr;
+            IPropertyStore* properties = nullptr;
+            LPWSTR id = nullptr;
+            PROPVARIANT name;
+            PropVariantInit(&name);
+            if (SUCCEEDED(endpoints->Item(index, &endpoint)) && endpoint != nullptr)
+            {
+                endpoint->GetId(&id);
+                if (SUCCEEDED(endpoint->OpenPropertyStore(STGM_READ, &properties)) && properties != nullptr)
+                    properties->GetValue(PKEY_Device_FriendlyName, &name);
+                const std::wstring endpointId = id != nullptr ? id : L"";
+                const std::wstring friendlyName = name.vt == VT_LPWSTR && name.pwszVal != nullptr
+                    ? name.pwszVal : L"";
+                found = containsIgnoreCase(endpointId, L"fengyin")
+                     || containsIgnoreCase(friendlyName, L"fengyin")
+                     || containsIgnoreCase(friendlyName, L"风吟共享扬声器");
+            }
+            PropVariantClear(&name);
+            if (id != nullptr) CoTaskMemFree(id);
+            if (properties != nullptr) properties->Release();
+            if (endpoint != nullptr) endpoint->Release();
+        }
+    }
+    if (endpoints != nullptr) endpoints->Release();
+    enumerator->Release();
+    return found;
+}
+
+bool installationIsOperational(bool writeDiagnostic)
+{
+    const auto state = queryDriverDeviceState();
+    const auto endpointReady = state.started && activeRenderEndpointExists();
+    if (writeDiagnostic)
+        log(L"Driver verification: exists=" + std::to_wstring(state.exists)
+            + L", started=" + std::to_wstring(state.started)
+            + L", status=" + std::to_wstring(state.status)
+            + L", problem=" + std::to_wstring(state.problem)
+            + L", endpoint=" + std::to_wstring(endpointReady));
+    return state.exists && state.started && endpointReady;
+}
+
+bool waitForOperationalInstallation()
+{
+    for (int attempt = 0; attempt < 40; ++attempt)
+    {
+        if (installationIsOperational(false)) return true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+    (void) installationIsOperational(true);
+    return false;
+}
+
 bool createRootDevice(const std::filesystem::path& infPath)
 {
     GUID classGuid {};
@@ -203,6 +310,11 @@ int install(const std::filesystem::path& suppliedInf)
         return 5;
     }
     if (copiedInf[0] != L'\0') rememberInstalledInf(copiedInf);
+    if (! reboot && ! waitForOperationalInstallation())
+    {
+        log(L"Driver package installed but the device did not start or publish an active render endpoint");
+        return 10;
+    }
     log(reboot ? L"Driver installed; reboot required" : L"Driver installed");
     return reboot ? 3010 : 0;
 }
@@ -252,6 +364,7 @@ int uninstall()
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 {
+    const auto comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     int count = 0;
     auto** arguments = CommandLineToArgvW(GetCommandLineW(), &count);
     if (arguments == nullptr || count < 2)
@@ -263,8 +376,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     int result = 1;
     if (action == L"--install" && count >= 3) result = install(arguments[2]);
     else if (action == L"--uninstall") result = uninstall();
-    else if (action == L"--check") result = deviceExists() ? 0 : 8;
+    else if (action == L"--check") result = installationIsOperational(true) ? 0 : 8;
+    else if (action == L"--check-device") result = deviceExists() ? 0 : 8;
     LocalFree(arguments);
+    if (SUCCEEDED(comResult)) CoUninitialize();
     return result;
 }
 #else

@@ -53,17 +53,28 @@ try {
 
     & $Setup --install $InfPath
     $InstallResult = $LASTEXITCODE
+    if ($InstallResult -eq 10) {
+        & $Setup --uninstall | Out-Null
+        throw "驱动文件已复制，但 Windows 未能启动设备或创建播放端点。已尝试自动回滚；请不要继续测试，并将 C:\ProgramData\FengYin\driver-setup.log 发给开发者。"
+    }
     if ($InstallResult -ne 0 -and $InstallResult -ne 3010) {
         throw "风吟测试音频驱动安装失败（错误码 $InstallResult）。"
     }
-    & $Setup --check
-    if ($LASTEXITCODE -ne 0) { throw "安装结束后没有检测到风吟虚拟音频设备。" }
+    if ($InstallResult -eq 0) {
+        & $Setup --check
+        if ($LASTEXITCODE -ne 0) {
+            throw "驱动设备未正常启动，或 Windows 没有生成‘风吟共享扬声器’播放端点。安装不能算成功。"
+        }
+    }
 
     $StateDir = Join-Path $env:ProgramData "FengYin"
     New-Item -ItemType Directory -Force -Path $StateDir | Out-Null
     Set-Content (Join-Path $StateDir "test-driver-cert-thumbprint.txt") $Thumbprint -Encoding Ascii
-    Write-Host "测试音频引擎安装成功。现在直接运行本目录中的 FengYin.exe 开始实机测试。" -ForegroundColor Green
-    if ($InstallResult -eq 3010) { Write-Host "Windows 要求重启后驱动才会生效。" -ForegroundColor Yellow }
+    if ($InstallResult -eq 3010) {
+        Write-Host "驱动已安装，Windows 要求重启。重启后再次运行本脚本完成端点验证；当前尚不能算测试成功。" -ForegroundColor Yellow
+    } else {
+        Write-Host "测试音频引擎安装并验证成功。现在直接运行本目录中的 FengYin.exe 开始实机测试。" -ForegroundColor Green
+    }
 } catch {
     if (-not $PublisherAlreadyPresent) { Remove-Item "Cert:\LocalMachine\TrustedPublisher\$Thumbprint" -Force -ErrorAction SilentlyContinue }
     if (-not $RootAlreadyPresent) { Remove-Item "Cert:\LocalMachine\Root\$Thumbprint" -Force -ErrorAction SilentlyContinue }
