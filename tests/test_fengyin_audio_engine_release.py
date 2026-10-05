@@ -46,6 +46,8 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         self.assertIn("WDKTestCert", test_validator)
         self.assertIn("WDKTestCert", production_validator)
         self.assertIn("test-driver", packager)
+        self.assertIn("UTF8Encoding]::new($true)", packager)
+        self.assertIn("powershell.exe -NoProfile -NonInteractive", packager)
         self.assertNotIn("package-audio-engine-test-kit.ps1", self.read("scripts/build-windows.ps1"))
 
     def test_free_engine_trial_has_complete_rollback(self):
