@@ -155,7 +155,7 @@ DriverDeviceState queryDriverDeviceState()
         if (! deviceHasHardwareId(devices, device)) continue;
         result.exists = true;
         if (CM_Get_DevNode_Status(&result.status, &result.problem, device.DevInst, 0) == CR_SUCCESS)
-            result.started = (result.status & DN_STARTED) != 0 && result.problem == CM_PROB_NONE;
+            result.started = (result.status & DN_STARTED) != 0 && result.problem == 0;
         break;
     }
     SetupDiDestroyDeviceInfoList(devices);
