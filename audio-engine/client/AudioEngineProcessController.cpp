@@ -238,6 +238,14 @@ void AudioEngineProcessController::stop() noexcept
 
 bool AudioEngineProcessController::isRunning() const noexcept
 {
+#if defined(_WIN32)
+    // A crashed driver process cannot update shared memory to "stopped".
+    // Check the owned process as well, otherwise the host stays silently
+    // attached to a dead engine even after the watchdog restores Windows.
+    if (ownsProcess && process.hProcess != nullptr
+        && WaitForSingleObject(process.hProcess, 0) == WAIT_OBJECT_0)
+        return false;
+#endif
     if (statusMapping.get() == nullptr) return false;
     const auto state = static_cast<StreamState>(
         statusMapping.get()->state.load(std::memory_order_acquire));

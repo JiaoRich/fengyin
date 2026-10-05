@@ -278,6 +278,7 @@ juce::Array<int> AudioDeviceService::getAvailableBufferSizes()
 juce::String AudioDeviceService::configureAsio4All()
 {
    #if JUCE_WINDOWS
+    stopTimer();
     tuningActive = false;
     manager.closeAudioDevice();
     engineProcess.stop();
