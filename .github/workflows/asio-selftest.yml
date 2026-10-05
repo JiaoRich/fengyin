@@ -1,0 +1,39 @@
+name: 独立ASIO声音自检工具
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: 获取固定版本ASIO接口头文件（不编译JUCE）
+        uses: actions/checkout@v4
+        with:
+          repository: juce-framework/JUCE
+          ref: 9.0.2
+          path: sdk-headers
+          sparse-checkout: modules/juce_audio_devices/native/asio
+      - name: 编译独立工具
+        shell: pwsh
+        run: |
+          cmake -S tools/asio-selftest -B selftest-build -A x64 -DASIO_INCLUDE_DIR="$pwd/sdk-headers/modules/juce_audio_devices/native/asio"
+          if ($LASTEXITCODE -ne 0) { throw 'Configure failed' }
+          cmake --build selftest-build --config Release --parallel
+          if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
+          ctest --test-dir selftest-build -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw 'Test failed' }
+          $probe = Start-Process selftest-build/Release/FengYinAsioSelfTest.exe -ArgumentList '--probe', '128', 'smoke-report.txt' -PassThru
+          if (-not $probe.WaitForExit(15000)) { $probe.Kill(); throw 'Probe startup timed out' }
+          if ($probe.ExitCode -ne 2) { throw "Expected missing-driver result, got $($probe.ExitCode)" }
+          Get-Content smoke-report.txt
+          New-Item -ItemType Directory -Path selftest-package
+          Copy-Item selftest-build/Release/FengYinAsioSelfTest.exe selftest-package/
+          Copy-Item tools/asio-selftest/README.txt selftest-package/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FengYin-ASIO-SelfTest-Windows-x64
+          path: selftest-package/
+          if-no-files-found: error
