@@ -31,6 +31,10 @@ try {
     $packages = [System.IO.File]::ReadAllText($packagesPath)
     $packages = $packages.Replace('10.0.28000.2526', '10.0.26100.1')
     [System.IO.File]::WriteAllText($packagesPath, $packages, [System.Text.UTF8Encoding]::new($true))
+    $directoryPropsPath = Join-Path $output 'Directory.Build.props'
+    $directoryProps = [System.IO.File]::ReadAllText($directoryPropsPath)
+    $directoryProps = $directoryProps.Replace('10.0.28000.2526', '10.0.26100.1')
+    [System.IO.File]::WriteAllText($directoryPropsPath, $directoryProps, [System.Text.UTF8Encoding]::new($true))
 
     Copy-Item (Join-Path $patchRoot 'FengYinAudioRing.h') 'audio\sysvad\FengYinAudioRing.h'
     Copy-Item (Join-Path $patchRoot 'FengYinAudioRing.cpp') 'audio\sysvad\FengYinAudioRing.cpp'

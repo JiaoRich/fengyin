@@ -36,6 +36,7 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         install = self.read("scripts/audio-test-kit/Install-TestAudioEngine.ps1")
         uninstall = self.read("scripts/audio-test-kit/Uninstall-TestAudioEngine.ps1")
         self.assertIn("10.0.26100.1", prepare)
+        self.assertIn("Directory.Build.props", prepare)
         self.assertIn("<KMDF_VERSION_MINOR>15</KMDF_VERSION_MINOR>", prepare)
         self.assertGreaterEqual(prepare.count("NTDDI_VERSION=NTDDI_WIN10_VB"), 2)
         workflow = self.read(".github/workflows/audio-driver-build.yml")
