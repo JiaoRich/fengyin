@@ -132,6 +132,15 @@ int probe(int frames)
     const auto initialised = driver->init(window); log("ASIO init", initialised);
     auto errorText = [&] { char error[124] {}; driver->getErrorMessage(error); error[123] = 0; log("Driver message", error); };
     if (! initialised) { errorText(); return 4; }
+    if (frames == 0)
+    {
+        MessageBoxW(nullptr,L"下一步打开本工具的 ASIO4ALL 面板。\n\n点击右下角齿轮进入高级设置，展开 Realtek：\n只启用实际使用的扬声器/耳机输出；关闭麦克风输入和风吟共享扬声器。\n\n完成后关闭面板，再在确认窗口点击确定。",L"先选择实体输出",MB_OK|MB_ICONINFORMATION);
+        const auto panel = driver->controlPanel(); log("controlPanel", panel);
+        if (panel != ASE_OK) { errorText(); return 11; }
+        const auto confirmed = MessageBoxW(nullptr,L"请确认已在 ASIO4ALL 中启用 Realtek 实际输出，并关闭配置面板。\n\n点击确定后，将释放驱动，再由新进程重新连接并测试。\n尚未配置好可点击取消。",L"配置完成后继续",MB_OKCANCEL|MB_ICONINFORMATION);
+        driver.Reset(); DestroyWindow(window); CoUninitialize();
+        return confirmed == IDOK ? 0 : 12;
+    }
     char name[32] {}; driver->getDriverName(name); name[31] = 0; log("Driver name", name); log("Driver version", driver->getDriverVersion());
     auto result = driver->canSampleRate(48000); log("canSampleRate 48000", result); if (result != ASE_OK) { errorText(); return 5; }
     result = driver->setSampleRate(48000); log("setSampleRate 48000", result); if (result != ASE_OK) { errorText(); return 5; }
@@ -202,7 +211,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     {
         report.open(std::filesystem::path(argv[3]), std::ios::app | std::ios::binary);
         const int frames = _wtoi(argv[2]); LocalFree(argv);
-        if (!report || (frames != 128 && frames != 256)) return 1;
+        if (!report || (frames != 0 && frames != 128 && frames != 256)) return 1;
         return probe(frames);
     }
     LocalFree(argv);
@@ -213,19 +222,24 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     SYSTEMTIME time; GetLocalTime(&time); wchar_t filename[128];
     swprintf_s(filename,L"风吟独立ASIO自检-%04u%02u%02u-%02u%02u%02u-%lu.txt",time.wYear,time.wMonth,time.wDay,time.wHour,time.wMinute,time.wSecond,GetCurrentProcessId());
     auto path = std::filesystem::path(desktop)/filename; CoTaskMemFree(desktop);
-    { std::ofstream output(path,std::ios::binary); output << "\xEF\xBB\xBF" << "FengYin direct ASIO self-test v1; no JUCE, no dummy buffers, no inputs\nASIO4ALL settings can differ between host executables.\n"; if(!output) { MessageBoxW(nullptr,L"无法写入桌面报告。",L"无法开始",MB_OK); return 1; } }
+    { std::ofstream output(path,std::ios::binary); output << "\xEF\xBB\xBF" << "FengYin direct ASIO self-test v2; configure then fresh-process probes; no JUCE, no inputs\nASIO4ALL settings can differ between host executables.\n"; if(!output) { MessageBoxW(nullptr,L"无法写入桌面报告。",L"无法开始",MB_OK); return 1; } }
     wchar_t executable[32768]; GetModuleFileNameW(nullptr,executable,32768);
-    for (int frames : {128,256})
+    for (int frames : {0,128,256})
     {
         auto command = L"\""+std::wstring(executable)+L"\" --probe "+std::to_wstring(frames)+L" \""+path.wstring()+L"\"";
         STARTUPINFOW startup {}; startup.cb=sizeof(startup); PROCESS_INFORMATION process {};
         if (!CreateProcessW(nullptr,command.data(),nullptr,nullptr,FALSE,0,nullptr,nullptr,&startup,&process)) { std::ofstream(path,std::ios::app)<<"CreateProcess failed "<<GetLastError()<<std::endl; break; }
         CloseHandle(process.hThread);
-        const auto until = GetTickCount64()+15000;
+        const auto until = GetTickCount64()+(frames == 0 ? 600000 : 15000);
         while (WaitForSingleObject(process.hProcess,0)==WAIT_TIMEOUT && GetTickCount64()<until) { pump(); Sleep(20); }
         if (WaitForSingleObject(process.hProcess,0)==WAIT_TIMEOUT) { TerminateProcess(process.hProcess,124); WaitForSingleObject(process.hProcess,2000); }
         DWORD code=0; GetExitCodeProcess(process.hProcess,&code); CloseHandle(process.hProcess);
         std::ofstream(path,std::ios::app)<<"Probe exit code="<<code<<std::endl;
+        if (frames == 0)
+        {
+            if (code != 0) { MessageBoxW(nullptr,L"配置未完成，已停止声音测试。请把生成的报告发回。",L"配置未完成",MB_OK); break; }
+            continue;
+        }
         const auto prompt=std::to_wstring(frames)+L"帧测试结束。\n\n你听到刚才的短音了吗？\n“是”=听到，“否”=没听到，“取消”=停止后续测试。";
         const auto heard=MessageBoxW(nullptr,prompt.c_str(),L"记录测试结果",MB_YESNOCANCEL|MB_ICONQUESTION);
         std::ofstream(path,std::ios::app)<<"Listener frames="<<frames<<" answer="<<(heard==IDYES?"heard":heard==IDNO?"not heard":"cancelled")<<std::endl;
