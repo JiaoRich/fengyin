@@ -36,12 +36,11 @@ try {
     $directoryProps = $directoryProps.Replace('10.0.28000.2526', '10.0.26100.1')
     # Set the WDK's official target-version property before its props are
     # imported.  Adding NTDDI_VERSION only to ClCompile is insufficient: the
-    # WDK appends its own latest-version define afterwards and wins.  VB
-    # (Windows 10 2004) keeps the generated driver compatible with Windows 11
-    # 21H2 while still satisfying the Universal driver/KMDF requirements.
+    # WDK appends its own latest-version define afterwards and wins. CO is
+    # Windows 11 21H2, the target machine's build 22000 API baseline.
     $directoryProps = $directoryProps.Replace(
         '</Project>',
-        "  <PropertyGroup>`n    <_NT_TARGET_VERSION>0xA000008</_NT_TARGET_VERSION>`n  </PropertyGroup>`n</Project>")
+        "  <PropertyGroup>`n    <_NT_TARGET_VERSION>0xA00000B</_NT_TARGET_VERSION>`n  </PropertyGroup>`n</Project>")
     [System.IO.File]::WriteAllText($directoryPropsPath, $directoryProps, [System.Text.UTF8Encoding]::new($true))
 
     Copy-Item (Join-Path $patchRoot 'FengYinAudioRing.h') 'audio\sysvad\FengYinAudioRing.h'
@@ -148,6 +147,23 @@ try {
                 48000,
                 192000,')
     )
+    # Jack description v3 was added in 22H2. Keep the existing v1/v2
+    # handlers on 21H2 and compile v3 only when the target SDK exposes it.
+    $jackV3Sections = @(
+        @('mintopo.h', '(?ms)^    NTSTATUS PropertyHandlerJackDescription3\s*\(.*?^    \);'),
+        @('mintopo.cpp', '(?ms)^#pragma code_seg\("PAGE"\)\r?\nNTSTATUS\r?\nCMiniportTopology::PropertyHandlerJackDescription3\b.*?^\}'),
+        @('speakertopo.cpp', '(?ms)^        else if \(PropertyRequest->PropertyItem->Id == KSPROPERTY_JACK_DESCRIPTION3\).*?^        \}'),
+        @('speakertoptable.h', '(?ms)^    \{\r?\n        &KSPROPSETID_Jack,\r?\n        KSPROPERTY_JACK_DESCRIPTION3,.*?^    \},')
+    )
+    foreach ($section in $jackV3Sections) {
+        $relative = 'audio\sysvad\EndpointsCommon\' + $section[0]
+        $sourceText = [IO.File]::ReadAllText((Join-Path $output $relative)).Replace("`r`n", "`n")
+        $sourceText = [regex]::Replace($sourceText, '[ \t]+(?=\n)', '')
+        $matches = [regex]::Matches($sourceText, $section[1])
+        if ($matches.Count -ne 1) { throw "Jack v3 compatibility section mismatch: $relative" }
+        $original = $matches[0].Value
+        Edit-PinnedFile $relative @($original, "#if (NTDDI_VERSION >= NTDDI_WIN10_NI)`n$original`n#endif")
+    }
     Edit-PinnedFile 'audio\sysvad\EndpointsCommon\EndpointsCommon.vcxproj' @(
         @('  <ItemDefinitionGroup Condition="''$(Configuration)|$(Platform)''==''Release|x64''">
     <ResourceCompile>
