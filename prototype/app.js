@@ -1687,10 +1687,8 @@ function applyInlineAudioSettings(driverChanged = false) {
 
 $('#audio-driver-select').addEventListener('change', () => applyInlineAudioSettings(true));
 $('#configure-asio4all').addEventListener('click', () => nativeEvent('configureAsio4All'));
-$('#test-engine-output').addEventListener('click', () => {
-  if (window.confirm('请先调低耳机或音箱音量。将播放2秒测试音，期间暂时替代演奏和网页声音。是否继续？')) nativeEvent('testEngineOutput');
-});
-$('#export-audio-path').addEventListener('click', () => nativeEvent('exportAudioPathDiagnostic'));
+$('#download-asio4all').addEventListener('click', () => nativeEvent('downloadAsio4All'));
+$('#download-vbcable').addEventListener('click', () => nativeEvent('downloadVBCable'));
 ['#audio-output-select','#audio-rate-select','#audio-buffer-select'].forEach(id => $(id).addEventListener('change', () => applyInlineAudioSettings(false)));
 $('#audio-auto-optimize').addEventListener('click', () => {
   setAudioControlsBusy(true);
@@ -2057,8 +2055,6 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   setAudioOptions($('#audio-driver-select'), state?.types, state?.type, value => {
     const name = String(value);
     if (name.includes('ASIO4ALL')) return name;
-    if (/^ASIO$/i.test(name)) return '共享低延迟测试（KoordASIO）';
-    if (/RAW Test Mode/i.test(name)) return 'RAW测试模式（共享）';
     if (/Low Latency|低延迟/i.test(name)) return `${name}（推荐·共享）`;
     return `${name}（共享）`;
   });
@@ -2072,7 +2068,7 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   const sharedAsioActive = state?.sharedAsioActive === true;
   const asioBridge = String(state?.type || '').includes('ASIO4ALL');
   $('#audio-driver-help').textContent = asioBridge
-    ? '实际输出使用 ASIO4ALL；浏览器等系统声音经风吟虚拟扬声器一起混音输出'
+    ? '默认低延迟方案：ASIO4ALL 输出，VB-CABLE 接收网页声音；浏览器输出保持“默认”'
     : sharedAsioActive
     ? '风吟通过 KoordASIO 共享输出；网页、微信等仍使用 Windows 默认扬声器'
     : rawTest
@@ -2084,15 +2080,10 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
     ? '当前设备仅上报这一个可用采样率'
     : '伴奏视频和软音源推荐使用 48000 Hz';
   $('#audio-buffer-help').textContent = asioBridge
-    ? '显示驱动实际缓冲区；切换失败会报错，不会悄悄提高到 512。配置驱动时请先暂停音频。'
+    ? '直接选择缓冲区并自动保存：128 延迟低，256 更稳定，512 适合较高负载；不支持时恢复原设置。'
     : buffers.length <= 1
     ? (lowLatency ? '当前设备驱动仅上报这一个可用缓冲值' : '普通 Windows Audio 由系统固定缓冲；请点击“自动优化”')
     : '128 延迟低；出现爆音时可改为 256';
-  const sharedAsioStatus = $('#shared-asio-status');
-  sharedAsioStatus.hidden = state?.sharedAsioAvailable !== true && !sharedAsioActive;
-  $('#shared-asio-message').textContent = sharedAsioActive
-    ? '共享低延迟已启用。无需修改浏览器输出设备，也不需要管理员权限。'
-    : '已检测到 KoordASIO，可在“声音模式”中选择共享低延迟测试。';
   const latency = Number(state?.latency);
   const latencyText = Number.isFinite(latency) && latency > 0 ? `${latency.toFixed(1)} ms · ${latency <= 10 ? '优秀' : latency <= 20 ? '良好' : '偏高'}` : '音频未运行 · 暂无延迟数据';
   $('#audio-latency-value').textContent = latencyText;

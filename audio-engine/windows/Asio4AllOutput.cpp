@@ -26,6 +26,13 @@ bool Asio4AllOutput::start(AudioEngineCore& engine, std::uint32_t requestedFrame
     const auto result = device->open({}, outputs, engineSampleRate, static_cast<int>(requestedFrames));
     if (result.isNotEmpty()) { error = std::wstring(result.toWideCharPointer()); stop(); return false; }
     const auto actual = device->getCurrentBufferSizeSamples();
+    if (actual != static_cast<int>(requestedFrames))
+    {
+        error = L"ASIO4ALL did not accept the requested buffer: requested="
+            + std::to_wstring(requestedFrames) + L", actual=" + std::to_wstring(actual);
+        stop();
+        return false;
+    }
     const auto channelNames = device->getOutputChannelNames();
     juce::Logger::writeToLog("ASIO4ALL opened channels=" + channelNames.joinIntoString(", "));
     if (channelNames.size() < 2

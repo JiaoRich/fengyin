@@ -1,4 +1,5 @@
 #include "AudioEngineCore.h"
+#include "../audio-engine/common/PerformanceMixPolicy.h"
 
 #include <array>
 #include <algorithm>
@@ -39,8 +40,8 @@ int main()
     core.render(outputs, 2, 128);
     for (std::size_t i = 0; i < left.size(); ++i)
     {
-        assert(std::abs(left[i] - 0.75f) < 0.000001f);
-        assert(std::abs(right[i]) < 0.000001f);
+        assert(std::abs(left[i] - (0.25f + 0.5f * accompanimentGain)) < 0.000001f);
+        assert(std::abs(right[i] - (-0.25f + 0.25f * accompanimentGain)) < 0.000001f);
     }
     auto counters = core.getCounters();
     assert(counters.renderCallbacks == 1);
@@ -90,8 +91,8 @@ int main()
         {
             assert(std::isfinite(left[i]));
             assert(std::isfinite(right[i]));
-            assert(std::abs(left[i] - 0.2f) < 0.0001f);
-            assert(std::abs(right[i] + 0.2f) < 0.0001f);
+            assert(std::abs(left[i] - 0.2f * accompanimentGain) < 0.0001f);
+            assert(std::abs(right[i] + 0.2f * accompanimentGain) < 0.0001f);
         }
     }
     assert(core.getCounters().systemUnderflows == 0);

@@ -18,5 +18,5 @@ class WasapiRawPatchTests(unittest.TestCase):
         preferred = audio[audio.index("AudioDeviceService::preferredLiveDeviceType"):audio.index("AudioDeviceService::configureAutomaticType")]
         self.assertNotIn("RAW Test Mode", preferred)
         ui = (ROOT / "prototype" / "app.js").read_text(encoding="utf-8")
-        self.assertIn("RAW测试模式（共享）", ui)
+        self.assertNotIn("RAW测试模式（共享）", ui)
         self.assertIn("不修改驱动、不独占设备", ui)

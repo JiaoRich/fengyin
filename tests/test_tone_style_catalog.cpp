@@ -22,6 +22,7 @@ void checkStyles(const juce::String& key)
     const auto styles = fengyin::ToneStyleCatalog::forInstrument(key);
     const auto expected = key == "alto-sax" ? 3 : (key == "soprano-sax" || key == "tenor-sax" ? 2 : 1);
     assert(styles.size() == expected);
+    for (const auto& style : styles) assert(style.settings.outputGain >= 1.0f);
     if (expected == 1) assert(styles[0].name == juce::String::fromUTF8("自然原声"));
     for (int i=1;i<styles.size();++i) assert(styles[i].id != styles[i-1].id);
 }
@@ -40,6 +41,32 @@ void checkSaxophoneSwamProfiles(const juce::String& key)
 
 int main()
 {
+    // Fixed performance gain must preserve weak-breath dynamics and silence.
+    fengyin::MasterOutputService quiet, louder;
+    for (auto* chain : { &quiet, &louder }) {
+        auto settings = chain->getToneStyle();
+        settings.reverbMix = settings.saturation = settings.harshControl = settings.warmth = 0;
+        chain->setToneStyle(settings);
+        chain->setSmartOptimisationEnabled(false);
+        chain->setSampleRate(48000);
+    }
+    float a[128]{}, b[128]{};
+    float* qa[]{a}; float* qb[]{b};
+    quiet.processInstrument(qa, 1, 128);
+    louder.processInstrument(qb, 1, 128);
+    for (float x : a) assert(x == 0);
+    double power = 0;
+    for (int block = 0; block < 80; ++block) {
+        for (int i=0;i<128;++i) { a[i]=0.01f*std::sin((block*128+i)*0.1f); b[i]=2*a[i]; }
+        quiet.processInstrument(qa, 1, 128);
+        louder.processInstrument(qb, 1, 128);
+        for (int i=0;i<128;++i) {
+            assert(std::isfinite(a[i]) && std::isfinite(b[i]));
+            assert(std::abs(b[i]-2*a[i]) < 0.00001f);
+            power += a[i]*a[i];
+        }
+    }
+    assert(power > 0);
     // Real instrument chain receives Air, while the accompaniment/master path
     // remains unchanged. Existing preset aggregate defaults keep Air disabled.
     assert(fengyin::ToneStyleCatalog::forInstrument("soprano-sax")[0].settings.air == 0.0f);

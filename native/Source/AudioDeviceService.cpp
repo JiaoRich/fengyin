@@ -92,11 +92,15 @@ AudioDeviceService::~AudioDeviceService()
 juce::String AudioDeviceService::initialise()
 {
    #if JUCE_WINDOWS
-    // A public build enters the isolated engine only when its signed virtual
-    // speaker is actually active. Developer packages can opt in explicitly;
-    // machines without the complete driver fall through immediately to the
-    // established Windows shared path, with no startup delay or system change.
+    // Prefer the verified VB-CABLE + ASIO4ALL route. Missing prerequisites
+    // leave Windows shared output available without changing system drivers.
     auto* audioSettings = properties.getUserSettings();
+    if (audioSettings != nullptr && audioSettings->getIntValue("productionAudioRouteRevision", 0) < 1)
+    {
+        audioSettings->setValue("productionAudioRouteRevision", 1);
+        audioSettings->setValue("audioEngineEnabled", true);
+        audioSettings->setValue("audioEngineBuffer", 128);
+    }
     const auto engineEnabled = audioSettings == nullptr
         || audioSettings->getBoolValue("audioEngineEnabled", true);
     if (engineEnabled && (audioengine::AudioEngineProcessController::isAvailable()
@@ -216,22 +220,12 @@ juce::StringArray AudioDeviceService::getAvailableDeviceTypes()
 {
     juce::StringArray names;
    #if JUCE_WINDOWS
-    if (audioengine::AudioEngineProcessController::isAvailable()) names.add(engineModeName);
+    names.add(engineModeName); // Missing prerequisites get an explicit error, never a hidden mode.
    #endif
     for (auto* type : manager.getAvailableDeviceTypes())
     {
-        if (isWindowsSharedType(type->getTypeName()))
+        if (isWindowsSharedType(type->getTypeName()) && !type->getTypeName().containsIgnoreCase("RAW Test Mode"))
             names.add(type->getTypeName());
-        else if (isAsioType(type->getTypeName()))
-        {
-            type->scanForDevices();
-            for (const auto& device : type->getDeviceNames(false))
-                if (isSupportedSharedAsioDevice(device))
-                {
-                    names.add(type->getTypeName());
-                    break;
-                }
-        }
     }
     return names;
 }
@@ -397,6 +391,8 @@ juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName
             return juce::String::fromUTF8("风吟低延迟模式仅支持 128、256 或 512 采样");
         if (std::abs(sampleRate - static_cast<double>(audioengine::engineSampleRate)) > 0.5)
             return juce::String::fromUTF8("风吟低延迟模式固定使用 48000 Hz");
+        const auto previousFrames = manager.getCurrentAudioDevice() != nullptr
+            ? manager.getCurrentAudioDevice()->getCurrentBufferSizeSamples() : 128;
         manager.closeAudioDevice();
         engineProcess.stop();
         lastError = startIsolatedAudioEngine(bufferSize);
@@ -412,7 +408,11 @@ juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName
         }
         else
         {
-            (void) manager.initialise(0, 2, nullptr, true);
+            const auto requestedError = lastError;
+            const auto recoveryError = startIsolatedAudioEngine(previousFrames);
+            lastError = requestedError + (recoveryError.isEmpty()
+                ? juce::String::fromUTF8("；已恢复原缓冲区")
+                : juce::String::fromUTF8("；恢复失败：") + recoveryError);
         }
         return lastError;
     }

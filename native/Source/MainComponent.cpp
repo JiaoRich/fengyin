@@ -657,6 +657,8 @@ void MainComponent::setupWebInterface()
             const auto message = audio.configureAsio4All();
             if (webInterface) webInterface->emitEventIfBrowserIsVisible("editorResult", message);
         })
+        .withEventListener("downloadAsio4All", [](juce::var) { juce::URL("https://asio4all.org/download/").launchInDefaultBrowser(); })
+        .withEventListener("downloadVBCable", [](juce::var) { juce::URL("https://vb-audio.com/Cable/").launchInDefaultBrowser(); })
         .withEventListener("testEngineOutput", [this](juce::var)
         {
             const auto message = audio.requestEngineTestTone();

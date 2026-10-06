@@ -34,5 +34,21 @@ class VBCableTrialTests(unittest.TestCase):
                      "audio-engine/client/AudioEngineProcessController.cpp"]:
             self.assertIn("matchesVirtualEndpoint", self.read(name))
 
+    def test_production_route_needs_no_launcher(self):
+        header = self.read("audio-engine/common/VirtualEndpointChoice.h")
+        self.assertNotIn("GetEnvironmentVariableW", header)
+        self.assertIn("return true;", header)
+
+    def test_buffer_mismatch_rejected_and_previous_buffer_restored(self):
+        self.assertIn("actual != static_cast<int>(requestedFrames)", self.read("audio-engine/windows/Asio4AllOutput.cpp"))
+        self.assertIn("startIsolatedAudioEngine(previousFrames)", self.read("native/Source/AudioDeviceService.cpp"))
+
+    def test_production_ui_has_no_test_buttons(self):
+        html = self.read("prototype/index.html")
+        for button in ['test-engine-output', 'export-audio-path', 'shared-asio-status']:
+            self.assertNotIn('id="' + button + '"', html)
+        self.assertIn('id="download-asio4all"', html)
+        self.assertIn('id="audio-buffer-select"', html)
+
 if __name__ == "__main__":
     unittest.main()

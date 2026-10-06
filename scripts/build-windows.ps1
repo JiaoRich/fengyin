@@ -105,6 +105,8 @@ if (Test-Path (Join-Path $SignedDriverDir "FengYinAudio.inf")) {
 }
 Copy-Item (Join-Path $ProjectRoot "README.md") $PackageDir -Force
 Copy-Item (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES.md") $PackageDir -Force
+& (Join-Path $PSScriptRoot "prepare-vbcable.ps1") -Destination (Join-Path $PackageDir "components\VB-CABLE")
+Copy-Item (Join-Path $ProjectRoot "installer\AudioComponents.txt") $PackageDir -Force
 if (Test-Path $FfmpegPath) {
     Copy-Item $FfmpegPath (Join-Path $PackageDir "ffmpeg.exe") -Force
 } else {

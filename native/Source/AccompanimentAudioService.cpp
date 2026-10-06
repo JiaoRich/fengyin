@@ -1,4 +1,5 @@
 #include "AccompanimentAudioService.h"
+#include "../../audio-engine/common/PerformanceMixPolicy.h"
 namespace fengyin
 {
 AccompanimentAudioService::AccompanimentAudioService() { formats.registerBasicFormats(); readAheadThread.startThread(); }
@@ -65,6 +66,7 @@ void AccompanimentAudioService::mixInto(float* const* outputs, int outputChannel
     mixBuffer.clear();
     juce::AudioSourceChannelInfo info(&mixBuffer, 0, sampleCount);
     transport.getNextAudioBlock(info);
+    mixBuffer.applyGain(audioengine::accompanimentGain);
     for (int channel = 0; channel < outputChannels; ++channel)
         if (outputs[channel] != nullptr)
             juce::FloatVectorOperations::add(outputs[channel],

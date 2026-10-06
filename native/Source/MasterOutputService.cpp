@@ -1,4 +1,5 @@
 #include "MasterOutputService.h"
+#include "../../audio-engine/common/PerformanceMixPolicy.h"
 
 #include <cmath>
 
@@ -164,6 +165,9 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
 
     // 用户设置的“安全上限”只约束乐器总线，不得修改伴奏原声。
     const auto instrumentCeiling = limiterCeiling.load(std::memory_order_relaxed);
+    for (int channel = 0; channel < channels; ++channel)
+        if (outputs[channel] != nullptr)
+            juce::FloatVectorOperations::multiply(outputs[channel], audioengine::performanceGain, samples);
     for (int sample = 0; sample < samples; ++sample)
     {
         float linkedPeak = 0.0f;

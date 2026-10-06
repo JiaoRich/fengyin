@@ -47,13 +47,13 @@ class KoordAsioSharedModeTests(unittest.TestCase):
         asio_branch = select[select.index("if (isAsioType(typeName))"):select.index("manager.setCurrentAudioDeviceType")]
         self.assertNotIn("manager.setCurrentAudioDeviceType(", asio_branch)
 
-    def test_ui_describes_shared_koordasio_in_plain_language(self):
+    def test_production_ui_replaces_koordasio_trial_with_vbcable(self):
         html = (ROOT / "prototype" / "index.html").read_text(encoding="utf-8")
         js = (ROOT / "prototype" / "app.js").read_text(encoding="utf-8")
-        self.assertIn('id="shared-asio-status"', html)
-        self.assertIn("共享低延迟测试（KoordASIO）", js)
-        self.assertIn("state?.sharedAsioAvailable", js)
-        self.assertIn("无需修改浏览器输出设备", js)
+        self.assertNotIn('id="shared-asio-status"', html)
+        self.assertIn("VB-CABLE 接收网页声音", js)
+        self.assertIn('id="download-vbcable"', html)
+        self.assertNotIn("state?.sharedAsioAvailable", js)
 
     def test_failed_buffer_change_restores_exact_koordasio_setup(self):
         audio = (ROOT / "native" / "Source" / "AudioDeviceService.cpp").read_text(encoding="utf-8")

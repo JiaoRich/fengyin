@@ -1,4 +1,5 @@
 #include "AudioEngineCore.h"
+#include "../common/PerformanceMixPolicy.h"
 
 #include <algorithm>
 #include <cmath>
@@ -142,8 +143,8 @@ void AudioEngineCore::render(float* const* outputs, std::uint32_t outputChannels
         instrumentMissing = ! instrument.next(instrumentLeft, instrumentRight) || instrumentMissing;
         systemMissing = ! system.next(systemLeft, systemRight) || systemMissing;
 
-        auto left = instrumentLeft + systemLeft;
-        auto right = instrumentRight + systemRight;
+        auto left = instrumentLeft + systemLeft * accompanimentGain;
+        auto right = instrumentRight + systemRight * accompanimentGain;
         instrumentMaximum = std::max({ instrumentMaximum, std::abs(instrumentLeft), std::abs(instrumentRight) });
         systemMaximum = std::max({ systemMaximum, std::abs(systemLeft), std::abs(systemRight) });
         if (toneRemaining > 0)

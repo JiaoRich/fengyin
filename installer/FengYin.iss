@@ -32,6 +32,7 @@ Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 SetupLogging=yes
+InfoBeforeFile={#SourceDir}\AudioComponents.txt
 CloseApplications=yes
 RestartApplications=no
 UninstallDisplayName=风吟
@@ -41,6 +42,7 @@ Name: "chinesesimp"; MessagesFile: "{#ChineseMessages}"
 
 [Tasks]
 Name: "desktopicon"; Description: "在桌面创建快捷方式"; GroupDescription: "快捷方式："; Flags: unchecked
+Name: "vbcable"; Description: "安装 VB-CABLE 基础版（VB-Audio 捐赠软件，安装后需重启）"; GroupDescription: "低延迟组件："; Check: NeedsVBCable
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "MicrosoftEdgeWebview2Setup.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -52,15 +54,27 @@ Name: "{autodesktop}\风吟"; Filename: "{app}\FengYin.exe"; Tasks: desktopicon
 
 [Run]
 Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "正在检查视频与精美界面运行组件…"; Flags: waituntilterminated
-Filename: "{app}\FengYin.exe"; Description: "启动风吟"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\components\VB-CABLE\VBCABLE_Setup_x64.exe"; WorkingDir: "{app}\components\VB-CABLE"; Tasks: vbcable; Check: NeedsVBCable; StatusMsg: "请在 VB-CABLE 原厂窗口中点击 Install Driver，完成后重启电脑"; Flags: waituntilterminated
+Filename: "{app}\FengYin.exe"; Description: "启动风吟"; Check: CanLaunchNow; Flags: nowait postinstall skipifsilent
 
 [Code]
 var
   DriverNeedsRestart: Boolean;
 
+function NeedsVBCable(): Boolean;
+begin
+  Result := not RegKeyExists(HKLM, 'SYSTEM\CurrentControlSet\Services\VBAudioVACMME')
+    and not RegKeyExists(HKLM, 'SYSTEM\CurrentControlSet\Services\VBAudioVACWDM');
+end;
+
 function NeedRestart(): Boolean;
 begin
-  Result := DriverNeedsRestart;
+  Result := DriverNeedsRestart or WizardIsTaskSelected('vbcable');
+end;
+
+function CanLaunchNow(): Boolean;
+begin
+  Result := not WizardIsTaskSelected('vbcable');
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);

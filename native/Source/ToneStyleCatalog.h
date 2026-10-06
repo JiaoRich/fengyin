@@ -268,6 +268,9 @@ ToneParameterValue {"index:26:eqenabled",0.0f},
 ToneParameterValue {"index:25:compressor",0.0f},
 ToneParameterValue {"index:32:reverbmix",0.0f},
 ToneParameterValue {"index:34:mainvolume",0.527731895f}}; result.add(s); }
+// The imported reference packs carried -6 dB effect-output trims in addition
+// to SWAM's -9/-12 dB main level. Do not duplicate that attenuation in release.
+for (auto& style : result) style.settings.outputGain = juce::jmax(1.0f, style.settings.outputGain);
 if (!result.isEmpty()) return result;
 ToneStyleDefinition s; s.id="natural"; s.name=juce::String::fromUTF8("自然原声"); return {s};
 }

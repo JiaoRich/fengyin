@@ -1,0 +1,14 @@
+﻿风吟低延迟组件
+
+VB-CABLE 基础版由 VB-Audio 开发：https://vb-audio.com/Cable/
+VB-CABLE 是 donationware（捐赠软件），不是风吟自行开发的驱动。
+欢迎在使用后向作者捐赠或购买许可：https://shop.vb-audio.com/en/win-apps/11-vb-cable.html
+风吟保留其原始安装文件和说明。安装时将打开原厂安装界面，请点击 Install Driver，安装完成后重启电脑。
+企业、机构等专业部署应按作者条款另行取得相应许可：https://vb-audio.com/Services/licensing.htm
+
+ASIO4ALL 不随风吟捆绑。请单独从 https://asio4all.org/download/ 下载并安装。
+请使用已验证的 2.22 版本；不要使用来源不明的修改版。
+两个组件安装并重启后，风吟默认使用低延迟方案；缺少组件时仍可使用 Windows 共享模式。
+浏览器在音量合成器中的输出设备请保持“默认”，不要固定到虚拟扬声器。
+缓冲区直接在风吟声音设置中选择；首次实际声卡选错时才需要高级输出设置。
+风吟卸载时不会卸载这些可被其他应用使用的第三方驱动。
