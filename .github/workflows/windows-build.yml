@@ -2,6 +2,11 @@ name: Windows 编译与安装包
 
 on:
   workflow_dispatch:
+    inputs:
+      vbcable_trial:
+        description: Package opt-in VB-CABLE portable trial
+        type: boolean
+        default: false
   push:
     branches: [main]
   pull_request:
@@ -37,6 +42,22 @@ jobs:
           if (Test-Path build-windows/Testing) {
             Compress-Archive -Path build-windows/Testing -DestinationPath windows-test-results.zip -Force
           }
+
+      - name: 准备 VB-CABLE 可选测试入口
+        if: inputs.vbcable_trial == true
+        shell: powershell
+        run: |
+          Copy-Item scripts/vbcable-trial/Start-VBCable-Test.cmd dist/FengYin/
+          Copy-Item scripts/vbcable-trial/README.txt dist/FengYin/VB-CABLE-README.txt
+
+      - name: 上传 VB-CABLE 免安装测试版
+        if: inputs.vbcable_trial == true
+        uses: actions/upload-artifact@v5
+        with:
+          name: FengYin-VBCABLE-Trial
+          path: dist/FengYin/
+          if-no-files-found: error
+          retention-days: 14
 
       - name: 上传 Windows 安装包
         if: success()

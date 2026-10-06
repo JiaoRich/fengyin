@@ -288,6 +288,8 @@ if(BUILD_TESTING)
     else()
         add_compile_options(-UNDEBUG)
     endif()
+    add_executable(FengYinVirtualEndpointTests tests/test_virtual_endpoint_choice.cpp)
+    add_test(NAME virtual_endpoint_selection COMMAND FengYinVirtualEndpointTests)
     add_executable(FengYinPresetTests
         tests/test_sound_preset_store.cpp
         native/Source/SoundPresetStore.cpp

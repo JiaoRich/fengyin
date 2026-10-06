@@ -1,4 +1,5 @@
 #include "DefaultEndpointRouter.h"
+#include "../common/VirtualEndpointChoice.h"
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -194,7 +195,7 @@ std::wstring findVirtual(IMMDeviceEnumerator& enumerator)
         Microsoft::WRL::ComPtr<IMMDevice> device;
         std::wstring id, name;
         if (SUCCEEDED(collection->Item(index, &device)) && device
-            && readDevice(*device.Get(), id, name) && isVirtual(id, name))
+            && readDevice(*device.Get(), id, name) && matchesVirtualEndpoint(name, vbCableTrial()))
             return id;
     }
     return {};
@@ -212,7 +213,8 @@ std::wstring findFirstPhysical(IMMDeviceEnumerator& enumerator)
         Microsoft::WRL::ComPtr<IMMDevice> device;
         std::wstring id, name;
         if (SUCCEEDED(collection->Item(index, &device)) && device
-            && readDevice(*device.Get(), id, name) && ! isVirtual(id, name))
+            && readDevice(*device.Get(), id, name) && ! isVirtual(id, name)
+            && ! matchesVirtualEndpoint(name, true))
             return id;
     }
     return {};
@@ -258,7 +260,7 @@ bool DefaultEndpointRouter::routeSystemAudioToFengYin(std::wstring& physicalEndp
     const auto virtualId = findVirtual(*enumerator.Get());
     if (virtualId.empty())
     {
-        error = L"FengYin Shared Speaker is not installed";
+        error = vbCableTrial() ? L"VB-CABLE CABLE Input is not installed or enabled" : L"FengYin Shared Speaker is not installed";
         restore();
         return false;
     }

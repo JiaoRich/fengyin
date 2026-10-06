@@ -1,4 +1,5 @@
 #include "AudioEngineProcessController.h"
+#include "../common/VirtualEndpointChoice.h"
 
 #include <chrono>
 #include <thread>
@@ -43,8 +44,7 @@ bool isFengYinEndpoint(IMMDevice& device)
     {
         return static_cast<wchar_t>(std::towlower(character));
     });
-    return identity.find(L"fengyin") != std::wstring::npos
-        || identity.find(L"风吟共享扬声器") != std::wstring::npos;
+    return matchesVirtualEndpoint(identity, vbCableTrial());
 }
 }
 #endif

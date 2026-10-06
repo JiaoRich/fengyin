@@ -1,4 +1,5 @@
 #include "WasapiLoopbackInput.h"
+#include "../common/VirtualEndpointChoice.h"
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -39,8 +40,7 @@ bool isFengYinSpeaker(IMMDevice& device)
     {
         return static_cast<wchar_t>(std::towlower(character));
     });
-    return name.find(L"fengyin") != std::wstring::npos
-        || name.find(L"风吟共享扬声器") != std::wstring::npos;
+    return matchesVirtualEndpoint(name, vbCableTrial(), vbCableTrial());
 }
 
 enum class SampleEncoding
@@ -72,7 +72,7 @@ SampleEncoding getSampleEncoding(const WAVEFORMATEX& format)
 Microsoft::WRL::ComPtr<IMMDevice> findFengYinSpeaker(IMMDeviceEnumerator& enumerator)
 {
     Microsoft::WRL::ComPtr<IMMDeviceCollection> collection;
-    if (FAILED(enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &collection))) return {};
+    if (FAILED(enumerator.EnumAudioEndpoints(vbCableTrial() ? eCapture : eRender, DEVICE_STATE_ACTIVE, &collection))) return {};
     UINT count = 0;
     if (FAILED(collection->GetCount(&count))) return {};
     for (UINT index = 0; index < count; ++index)
@@ -163,6 +163,10 @@ void WasapiLoopbackInput::run(SharedAudioRegion* destination) noexcept
         if (mmcss != nullptr) AvRevertMmThreadCharacteristics(mmcss);
         if (audioEvent != nullptr) CloseHandle(audioEvent);
         running.store(false, std::memory_order_release);
+        capture.Reset();
+        client.Reset();
+        device.Reset();
+        enumerator.Reset();
         if (SUCCEEDED(com)) CoUninitialize();
     };
     if (FAILED(com)) { fail(L"Cannot initialize loopback COM"); return; }
@@ -172,11 +176,20 @@ void WasapiLoopbackInput::run(SharedAudioRegion* destination) noexcept
     if (! device) hr = HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
     if (SUCCEEDED(hr)) hr = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, &client);
     if (SUCCEEDED(hr)) hr = client->GetMixFormat(&mixFormat);
-    const auto encoding = mixFormat != nullptr ? getSampleEncoding(*mixFormat)
+    // Convert only the browser capture stream, never the ASIO instrument stream.
+    WAVEFORMATEX cableFormat {};
+    cableFormat.wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
+    cableFormat.nChannels = engineChannels;
+    cableFormat.nSamplesPerSec = engineSampleRate;
+    cableFormat.wBitsPerSample = 32;
+    cableFormat.nBlockAlign = engineChannels * sizeof(float);
+    cableFormat.nAvgBytesPerSec = engineSampleRate * cableFormat.nBlockAlign;
+    const auto* streamFormat = vbCableTrial() ? &cableFormat : mixFormat;
+    const auto encoding = streamFormat != nullptr ? getSampleEncoding(*streamFormat)
                                                : SampleEncoding::unsupported;
     if (FAILED(hr) || encoding == SampleEncoding::unsupported)
     {
-        fail(L"FengYin virtual speaker format must be 48 kHz stereo PCM");
+        fail(vbCableTrial() ? L"Cannot open VB-CABLE CABLE Output. Install the base VB-CABLE and enable its recording endpoint." : L"FengYin virtual speaker format must be 48 kHz stereo PCM");
         finish();
         return;
     }
@@ -188,15 +201,17 @@ void WasapiLoopbackInput::run(SharedAudioRegion* destination) noexcept
         return;
     }
     hr = client->Initialize(AUDCLNT_SHAREMODE_SHARED,
-                            AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK
+                            (vbCableTrial() ? (AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY) : AUDCLNT_STREAMFLAGS_LOOPBACK) | AUDCLNT_STREAMFLAGS_EVENTCALLBACK
                                 | AUDCLNT_STREAMFLAGS_NOPERSIST,
-                            0, 0, mixFormat, nullptr);
+                            0, 0, streamFormat, nullptr);
     if (SUCCEEDED(hr)) hr = client->SetEventHandle(audioEvent);
     if (SUCCEEDED(hr)) hr = client->GetService(IID_PPV_ARGS(&capture));
     if (SUCCEEDED(hr)) hr = client->Start();
     if (FAILED(hr))
     {
-        fail(L"Cannot start FengYin virtual speaker capture");
+        const auto message = std::wstring(vbCableTrial() ? L"Cannot start VB-CABLE capture (check Windows microphone access for desktop apps)." : L"Cannot start FengYin virtual speaker capture")
+            + L" HRESULT=" + std::to_wstring(static_cast<unsigned long>(hr));
+        fail(message.c_str());
         finish();
         return;
     }

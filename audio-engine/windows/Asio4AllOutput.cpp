@@ -39,9 +39,10 @@ bool Asio4AllOutput::start(AudioEngineCore& engine, std::uint32_t requestedFrame
     }
     for (int index = 0; index < juce::jmin(2, channelNames.size()); ++index)
         if (channelNames[index].containsIgnoreCase("fengyin")
+            || channelNames[index].containsIgnoreCase("cable")
             || channelNames[index].contains(juce::String::fromUTF8("风吟")))
         {
-            error = L"ASIO4ALL output points to the FengYin virtual speaker. Select only the physical speaker/headphones in the ASIO4ALL panel.";
+            error = L"ASIO4ALL output points to a virtual cable/speaker. Select only the physical speaker/headphones in the ASIO4ALL panel.";
             stop();
             return false;
         }

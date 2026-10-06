@@ -1,6 +1,7 @@
 #include "AudioDeviceService.h"
 #include "AudioHardwareIdentity.h"
 #include "FengYinEngineAudioIODevice.h"
+#include "../../audio-engine/common/VirtualEndpointChoice.h"
 #include <algorithm>
 
 namespace
@@ -302,7 +303,9 @@ juce::String AudioDeviceService::selectDeviceType(const juce::String& typeName)
     if (typeName == engineModeName)
     {
         if (! audioengine::AudioEngineProcessController::isAvailable())
-            return juce::String::fromUTF8("风吟共享扬声器尚未安装或未启用");
+            return juce::String::fromUTF8(fengyin::audioengine::vbCableTrial()
+                ? "VB-CABLE 尚未安装或 CABLE Input 未启用，请安装基础版 VB-CABLE 后重启电脑"
+                : "风吟共享扬声器尚未安装或未启用");
         manager.closeAudioDevice();
         auto* settings = properties.getUserSettings();
         const auto requestedFrames = settings != nullptr

@@ -3,6 +3,7 @@
 #include "NamedSharedAudioRegion.h"
 #include "Asio4AllOutput.h"
 #include "WasapiLoopbackInput.h"
+#include "../common/VirtualEndpointChoice.h"
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -68,6 +69,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     logFile.getParentDirectory().createDirectory();
     juce::FileLogger logger(logFile, "ASIO4ALL bridge starting", 256 * 1024);
     juce::Logger::setCurrentLogger(&logger);
+    juce::Logger::writeToLog(vbCableTrial() ? "SystemAudio=VB-CABLE capture (CABLE Output); route=CABLE Input" : "SystemAudio=FengYin speaker loopback");
     struct ResetLogger { ~ResetLogger() { juce::Logger::setCurrentLogger(nullptr); } } resetLogger;
     std::wstring preferredEndpointId;
     std::uint32_t requestedFrames = 256;
@@ -220,6 +222,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     const auto loopbackStarted = loopback.start(*systemMapping.get(), loopbackError);
     if (routeSystemAudio && ! loopbackStarted)
     {
+        juce::Logger::writeToLog("System capture failed: " + juce::String(loopbackError.c_str()));
         output.stop();
         router.restore();
         CloseHandle(stopEvent);
