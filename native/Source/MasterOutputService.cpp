@@ -165,6 +165,7 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
 
     // 用户设置的“安全上限”只约束乐器总线，不得修改伴奏原声。
     const auto instrumentCeiling = limiterCeiling.load(std::memory_order_relaxed);
+    float blockPeak = 0.0f;
     for (int channel = 0; channel < channels; ++channel)
         if (outputs[channel] != nullptr)
             juce::FloatVectorOperations::multiply(outputs[channel], audioengine::performanceGain, samples);
@@ -175,10 +176,12 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
             if (outputs[channel] != nullptr)
                 linkedPeak = juce::jmax(linkedPeak, std::abs(outputs[channel][sample]));
         const auto safety = linkedPeak > instrumentCeiling ? instrumentCeiling / linkedPeak : 1.0f;
+        blockPeak = juce::jmax(blockPeak, linkedPeak * safety);
         for (int channel = 0; channel < channels; ++channel)
             if (outputs[channel] != nullptr)
                 outputs[channel][sample] *= safety;
     }
+    instrumentPeak.store(blockPeak, std::memory_order_relaxed);
 }
 
 void MasterOutputService::processMaster(float* const* outputs, int channels, int samples) noexcept

@@ -1,6 +1,20 @@
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 let studioUnlocked = false, studioSavedId = '', studioExportAfterSave = false;
+let compactMode = false;
+function applyWindowMode(compact) {
+  compactMode = !!compact;
+  document.body.classList.toggle('compact-mode', compactMode);
+  $('#window-mode-toggle').textContent = compactMode ? '全屏' : '精简模式';
+  $('#quick-tones')?.classList.remove('open');
+  if (compactMode) showPage('play');
+}
+$('#window-mode-toggle').onclick = () => nativeEvent('setCompactMode', {compact:!compactMode});
+window.__JUCE__?.backend?.addEventListener('windowModeChanged', applyWindowMode);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !compactMode && !document.querySelector('[role="dialog"]:not([hidden])'))
+    nativeEvent('setCompactMode', {compact:true});
+});
 
 const titles = {play:'开始演奏',sounds:'音色方案',chain:'调音师工作台',wind:'智能适配',audio:'声音设置',settings:'软件设置'};
 const presets = [
@@ -453,6 +467,7 @@ function toast(message) {
 }
 
 function showPage(page) {
+  if (compactMode) page = 'play';
   if (page === 'chain' && !studioUnlocked) return openStudioLogin();
   $$('.nav-item,.page').forEach(el => el.classList.remove('active'));
   const button = $(`.nav-item[data-page="${page}"]`);
@@ -874,7 +889,7 @@ function renderPresets() {
   let order=[]; try { order=JSON.parse(localStorage.getItem('fengyin-card-order-swam')||'[]'); } catch {}
   cards.sort((a,b)=>(order.includes(a.id)?order.indexOf(a.id):1e9)-(order.includes(b.id)?order.indexOf(b.id):1e9));
   $('#preset-grid').innerHTML=cards.map(c=>`<section class="instrument-preset-card compact ${latestBackendState.activeToneVariantId===c.id?'active':''}" data-card-key="${escapeHtml(c.id)}" tabindex="0" role="button">
-    <h3>${escapeHtml(c.name)}</h3><span class="card-drag-handle" draggable="true" aria-label="拖动排序">⠿</span>
+    <h3>${escapeHtml(c.name)}</h3><div class="tone-level" aria-label="当前音色演奏电平">${'<i></i>'.repeat(12)}</div><span class="card-drag-handle" draggable="true" aria-label="拖动排序">⠿</span>
     ${c.index>=0?'<button class="delete-tone" type="button">删除</button>':''}
     ${c.missing?'<small>缺少音源</small>':toneLoadInFlight&&pendingPresetNavigation?.name===c.name?'<small>正在加载…</small>':''}</section>`).join('');
   function load(c) {
@@ -897,6 +912,11 @@ function renderPresets() {
   if(!quick){quick=document.createElement('div');quick.id='quick-tones';document.body.appendChild(quick);}
   quick.innerHTML=cards.map((c,i)=>`<button class="${latestBackendState.activeToneVariantId===c.id?'active':''}" data-tone="${i}">${escapeHtml(c.name)}${c.missing?' · 缺少音源':''}</button>`).join('');
   quick.querySelectorAll('button').forEach(b=>b.onclick=()=>load(cards[Number(b.dataset.tone)]));
+  const compactList = $('#compact-tones');
+  if (compactList) {
+    compactList.innerHTML = '<h3>音色方案</h3>' + cards.map((c,i)=>`<button type="button" title="${escapeHtml(c.name)}" class="${latestBackendState.activeToneVariantId===c.id?'active':''}" aria-pressed="${latestBackendState.activeToneVariantId===c.id}" data-tone="${i}"><span>${escapeHtml(c.name)}</span>${c.missing?'<small>缺少音源</small>':''}</button>`).join('');
+    compactList.querySelectorAll('button').forEach(b=>b.onclick=()=>load(cards[Number(b.dataset.tone)]));
+  }
 }
 renderPresets();
 {
@@ -905,7 +925,7 @@ renderPresets();
   const hide=()=>{clearTimeout(hoverTimer);hoverTimer=setTimeout(()=>$('#quick-tones')?.classList.remove('open'),250);};
   entry.addEventListener('mouseenter',()=>{clearTimeout(hoverTimer);hoverTimer=setTimeout(()=>{
     const panel=$('#quick-tones'); if(!panel)return;
-    const rect=entry.getBoundingClientRect();panel.style.left=`${rect.right+8}px`;panel.style.top=`${Math.max(12,Math.min(rect.top,innerHeight-360))}px`;
+    const rect=entry.getBoundingClientRect();panel.style.left=`${rect.right+8}px`;panel.style.top='16px';
     panel.classList.add('open');panel.onmouseenter=()=>clearTimeout(hoverTimer);panel.onmouseleave=hide;
   },200);});
   entry.addEventListener('mouseleave',hide);
@@ -1695,6 +1715,7 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   $('#export-current-tone').disabled = !state.pluginLoaded || !!state.pluginLoading || state.pluginBrand !== 'swam';
   renderBendRange(state);
   latestBackendState = state || {};
+  if (typeof state.compactMode === 'boolean' && state.compactMode !== compactMode) applyWindowMode(state.compactMode);
   const connected = !!state.deviceConnected;
   const adapterDeviceKey = String(state.deviceIdentifier || state.deviceId || state.deviceName || state.deviceProfileName || 'connected-device');
   const hasExplicitMatchState = typeof state.deviceMatched === 'boolean' || typeof state.breathMatched === 'boolean';
@@ -2349,6 +2370,12 @@ function draw(timestamp = performance.now()) {
   tick += simulating ? .045 : .008;
   const breath = hardwareBreath ?? 0;
   const safeBreath = Math.max(0,Math.min(100,breath));
+  document.body.style.setProperty('--breath-energy', String(safeBreath / 100));
+  document.body.style.setProperty('--breath-speed', `${14-safeBreath*.1}s`);
+  const tonePeak = currentPluginLoaded ? Math.min(1, Math.max(0, Number(latestBackendState.instrumentPeak || 0))) : 0;
+  $$('#preset-grid .active .tone-level i').forEach((bar,i) => {
+    bar.style.transform = `scaleY(${Math.max(.05,tonePeak*(.45+.55*Math.abs(Math.sin(i*.85+timestamp*.006))))})`;
+  });
   const styles = getComputedStyle(document.body);
   const a = styles.getPropertyValue('--accent').trim();
   const b = styles.getPropertyValue('--accent-2').trim();
@@ -2410,7 +2437,7 @@ document.head.append(studioCss);
 $('#page-settings .panel').insertAdjacentHTML('beforeend',`<div class="tone-diagnostic-section"><button id="studio-entry" type="button">调音师入口</button><span id="studio-session-status" role="status"></span></div>`);
 document.body.insertAdjacentHTML('beforeend',`<div class="studio-login" id="studio-login" hidden role="dialog" aria-modal="true" aria-labelledby="studio-login-title"><div><h2 id="studio-login-title">调音师入口</h2><label>密码<input id="studio-password" type="password" autocomplete="off"></label><p id="studio-login-status" role="status"></p><footer><button id="studio-login-cancel">取消</button><button id="studio-login-confirm" class="primary-button">进入</button></footer></div></div>`);
 $('#page-chain .panel').insertAdjacentHTML('afterbegin',`<div class="studio-toolbar"><div><button id="studio-new">新建音色</button> <button id="studio-import">导入方案包</button> <button id="studio-show-drafts">草稿箱</button></div><button id="studio-exit">退出调音师</button></div><p id="studio-import-status" role="status" hidden></p><div id="studio-drafts" hidden></div>`);
-$('#custom-tone-editor .custom-tone-step').insertAdjacentHTML('beforeend',`<div class="studio-names"><label>乐器名称<input id="studio-instrument-name" placeholder="例如：高音萨克斯、二胡"></label><label>音色风格<input id="studio-style-name" placeholder="例如：丝滑抒情"></label></div>`);
+$('#custom-tone-editor .custom-tone-step').insertAdjacentHTML('beforeend',`<div class="studio-names"><input id="studio-instrument-name" type="hidden"><label>音色名称<input id="studio-style-name" placeholder="例如：次中萨-醇厚" aria-describedby="tone-name-limit"><small id="tone-name-limit">最多10个字（含字母、数字、标点）</small></label></div>`);
 $('#custom-effects-step').insertAdjacentHTML('afterbegin',`<div id="studio-effects"><h3>第三方效果器</h3><div class="studio-fx-add" id="studio-fx-add"></div><div id="studio-fx-chain"></div><p class="studio-final-label">最后 · 风吟内置效果</p></div>`);
 document.querySelector('#custom-effects-step > h3').after($('#studio-effects'));
 document.querySelector('#custom-effects-step .expert-inline h3')?.setAttribute('hidden','');
@@ -2419,6 +2446,7 @@ $('#studio-fx-add').append($('#effect-select'),$('#load-effect'));
 $('#save-expert').insertAdjacentHTML('afterend','<button id="studio-export" type="button">导出方案包</button>');
 $('#start-custom-tone').textContent='创建调音草稿';
 $('#studio-entry').onclick=()=>studioUnlocked?showPage('chain'):openStudioLogin();
+$('#studio-style-name').maxLength=10;
 function openStudioLogin(){
   const dialog=$('#studio-login'); if(!dialog)return;
   dialog.hidden=false; $('#studio-password').value=''; $('#studio-login-status').textContent=''; $('#studio-password').focus();
@@ -2465,7 +2493,8 @@ $('#studio-exit').onclick=()=>{
 function saveStudioDraft(exportAfter, publish=false){
   if(!studioUnlocked||!currentPluginLoaded||!customSourceReady)return toast('请先加载并设置一个乐器');
   const name=$('#studio-style-name').value.trim(), instrumentName=$('#studio-instrument-name').value.trim();
-  if(!name||!instrumentName)return toast('请填写乐器名称和音色风格');
+  if(!name)return toast('请填写音色名称');
+  if([...name].length>10)return toast('音色名称最多10个字，请缩短后保存');
   const duplicate=savedPresets.find(p=>p.name===name&&p.id!==studioSavedId);
   if(duplicate&&!window.confirm('已有同名方案，确定覆盖？取消后可修改名称另存。'))return;
   if(latestBackendState.pluginLoading||latestBackendState.effectLoading)return toast('请等待加载完成');

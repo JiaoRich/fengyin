@@ -217,6 +217,10 @@ void MainComponent::setupWebInterface()
             .withStatusBarDisabled()
             .withBackgroundColour(juce::Colour(0xff07101d)))
         .withNativeIntegrationEnabled()
+        .withEventListener("setCompactMode", [this](juce::var payload)
+        {
+            requestCompactMode(static_cast<bool>(payload.getProperty("compact", false)));
+        })
         .withEventListener("webReady", [this](juce::var)
         {
             webInterfaceReady = true;
@@ -518,8 +522,13 @@ void MainComponent::setupWebInterface()
                 if (webInterface) webInterface->emitEventIfBrowserIsVisible("studioSaveResult", juce::String());
                 return;
             }
-            studioInstrumentName = payload.getProperty("instrumentName", currentInstrumentChineseName).toString().trim();
+            studioInstrumentName = currentInstrumentChineseName;
             const auto name = payload.getProperty("name", {}).toString().trim();
+            if (name.isEmpty() || name.length() > 10)
+            {
+                if (webInterface) webInterface->emitEventIfBrowserIsVisible("studioSaveResult", juce::String());
+                return;
+            }
             const auto baseStyleId = payload.getProperty("baseStyleId", currentToneStyleId).toString();
             const auto settings = payload.getProperty("settings", juce::var());
             masterOutput.setToneStyle(customToneSettingsFromPayload(settings));
@@ -1079,6 +1088,38 @@ void MainComponent::paint(juce::Graphics& g)
     }
 }
 
+void MainComponent::requestCompactMode(bool compact)
+{
+    if (compact == compactMode || windowModePromptOpen) return;
+    const juce::Component::SafePointer<MainComponent> safe(this);
+    auto apply = [safe, compact](int result)
+    {
+        if (safe == nullptr) return;
+        safe->windowModePromptOpen = false;
+        if (result == 0) return;
+        if (compact)
+        {
+            safe->accompaniment.pause();
+            if (safe->webInterface)
+                safe->webInterface->emitEventIfBrowserIsVisible("pauseForDriverChange", juce::var());
+        }
+        safe->compactMode = compact;
+        if (safe->webInterface)
+            safe->webInterface->emitEventIfBrowserIsVisible("windowModeChanged", compact);
+        if (safe->onWindowModeChanged) safe->onWindowModeChanged(compact);
+    };
+    if (compact && webVideoFile.existsAsFile())
+    {
+        windowModePromptOpen = true;
+        juce::AlertWindow::showAsync(juce::MessageBoxOptions()
+            .withIconType(juce::MessageBoxIconType::QuestionIcon)
+            .withTitle(utf8("切换到精简模式？"))
+            .withMessage(utf8("精简模式下视频伴奏不可用。切换将暂停当前视频及伴奏，请使用网页或其他伴奏来源。"))
+            .withButton(utf8("暂停并切换")).withButton(utf8("取消")), apply);
+    }
+    else apply(1);
+}
+
 void MainComponent::resized()
 {
     if (webInterface != nullptr)
@@ -1420,6 +1461,7 @@ void MainComponent::timerCallback()
         state->setProperty("pluginLoading", pluginLoading);
         state->setProperty("pluginBrand", currentPluginBrand);
         state->setProperty("instrumentChineseName", currentInstrumentChineseName);
+        state->setProperty("compactMode", compactMode);
         state->setProperty("instrumentKey", currentInstrumentKey);
         state->setProperty("bendRange", bendRange);
         state->setProperty("bendRangeApplied", bendRangeApplied);
@@ -1454,6 +1496,7 @@ void MainComponent::timerCallback()
         state->setProperty("presetEditing", editingPresetId.isNotEmpty());
         state->setProperty("activePresetName", currentPresetDisplayName);
         state->setProperty("outputLeftPeak", masterOutput.getLeftPeak());
+        state->setProperty("instrumentPeak", currentAudio.ready && !pluginLoading ? masterOutput.getInstrumentPeak() : 0.0f);
         state->setProperty("outputRightPeak", masterOutput.getRightPeak());
         state->setProperty("activePresetCustom", currentPresetIsCustom);
         state->setProperty("activePresetId", currentPresetId);

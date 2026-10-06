@@ -67,6 +67,12 @@ int main()
         }
     }
     assert(power > 0);
+    assert(quiet.getInstrumentPeak() > 0.0f);
+    const auto instrumentPeak = quiet.getInstrumentPeak();
+    // Browser/accompaniment/master-only processing must not drive the tone meter.
+    for (auto& sample : a) sample = 0.8f;
+    quiet.processMaster(qa, 1, 128);
+    assert(quiet.getInstrumentPeak() == instrumentPeak);
     // Real instrument chain receives Air, while the accompaniment/master path
     // remains unchanged. Existing preset aggregate defaults keep Air disabled.
     assert(fengyin::ToneStyleCatalog::forInstrument("soprano-sax")[0].settings.air == 0.0f);

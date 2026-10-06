@@ -48,6 +48,7 @@ public:
     [[nodiscard]] float getWarmth() const noexcept { return warmth.load(); }
     [[nodiscard]] ToneStyleSettings getToneStyle() const noexcept;
     [[nodiscard]] float getLeftPeak() const noexcept { return leftPeak.load(); }
+    [[nodiscard]] float getInstrumentPeak() const noexcept { return instrumentPeak.load(std::memory_order_relaxed); }
     [[nodiscard]] float getRightPeak() const noexcept { return rightPeak.load(); }
     [[nodiscard]] uint64_t getOverloadSamples() const noexcept { return overloadSamples.load(); }
 
@@ -58,6 +59,7 @@ public:
     bool getSpectrum(std::array<float, spectrumBands>& result);
 
 private:
+    std::atomic<float> instrumentPeak { 0.0f };
     struct ProfileSettings
     {
         float toneBias = 0.0f;

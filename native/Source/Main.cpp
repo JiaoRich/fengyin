@@ -35,14 +35,16 @@ public:
     void systemRequestedQuit() override { quit(); }
 
 private:
-    class MainWindow final : public juce::DocumentWindow
+    class MainWindow final : public juce::DocumentWindow, private juce::Timer
     {
     public:
         explicit MainWindow(juce::String name)
             : DocumentWindow(std::move(name), juce::Colour(0xff07101d), allButtons)
         {
             setUsingNativeTitleBar(true);
-            setContentOwned(new MainComponent(), true);
+            content = new MainComponent();
+            setContentOwned(content, true);
+            content->onWindowModeChanged = [this](bool compact) { applyMode(compact); };
             setResizable(true, true);
             setResizeLimits(1120, 700, 2560, 1600);
             const auto display = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay();
@@ -51,12 +53,46 @@ private:
             centreWithSize(juce::jmin(1440, juce::jmax(1120, available.getWidth() - 32)),
                            juce::jmin(900, juce::jmax(700, available.getHeight() - 32)));
             setVisible(true);
+            setFullScreen(true);
+            startTimer(250);
+        }
+
+        void maximiseButtonPressed() override { content->requestCompactMode(!content->compactMode); }
+        bool keyPressed(const juce::KeyPress& key) override
+        {
+            if (key == juce::KeyPress::escapeKey && isFullScreen())
+            { content->requestCompactMode(true); return true; }
+            return DocumentWindow::keyPressed(key);
+        }
+
+        void applyMode(bool compact)
+        {
+            if (! compact) { setResizeLimits(1120, 700, 7680, 4320); setFullScreen(true); return; }
+            const auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect(getBounds());
+            const auto area = display != nullptr ? display->userBounds.toNearestInt() : juce::Rectangle<int>(0, 0, 1366, 768);
+            setResizeLimits(480, 560, 960, 2160);
+            setFullScreen(false);
+            const int width = juce::jmin(area.getWidth(), juce::jlimit(480, 680, area.getWidth() * 2 / 5));
+            setBounds(area.getRight() - width, area.getY(), width, area.getHeight());
         }
 
         void closeButtonPressed() override
         {
             juce::JUCEApplication::getInstance()->systemRequestedQuit();
         }
+    private:
+        void timerCallback() override
+        {
+            // Native OS restore gestures may bypass maximiseButtonPressed.
+            if (! isMinimised() && ! isFullScreen() && ! content->compactMode)
+            {
+                setFullScreen(true); // Cancelling the video prompt retains the full layout.
+                content->requestCompactMode(true);
+            }
+            else if (isFullScreen() && content->compactMode)
+                content->requestCompactMode(false);
+        }
+        MainComponent* content = nullptr;
     };
 
     std::unique_ptr<MainWindow> mainWindow;

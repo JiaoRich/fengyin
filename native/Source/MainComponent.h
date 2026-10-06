@@ -27,8 +27,12 @@ public:
 
     void paint(juce::Graphics&) override;
     void resized() override;
+    void requestCompactMode(bool compact);
+    std::function<void(bool)> onWindowModeChanged;
+    bool compactMode = false;
 
 private:
+    bool windowModePromptOpen = false;
     enum class Page { play, sounds, chain, wind, audio, settings };
     enum class Theme { neon = 1, gold, minimal };
     void showPage(Page page);
