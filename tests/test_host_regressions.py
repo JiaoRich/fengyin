@@ -355,7 +355,7 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("instrumentModelValues[static_cast<size_t>(index)]", HOST)
 
     def test_kong_hides_model_switcher_and_uses_real_artwork(self):
-        self.assertIn("modelSwitcher.hidden = isKong", JS)
+        self.assertIn("modelSwitcher.hidden = true", JS)
         self.assertIn("const kongInstrumentArtwork", JS)
         self.assertIn("picture.hidden = !artwork", JS)
         assets = ROOT / "assets" / "instruments"

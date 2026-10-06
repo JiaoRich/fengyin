@@ -62,7 +62,7 @@ private:
     void refreshPresetChoices();
     void saveCurrentPreset();
     void commitCurrentPreset(const juce::String& name);
-    void commitCustomPreset(const juce::String& name, const juce::String& baseStyleId);
+    void commitCustomPreset(const juce::String& name, const juce::String& baseStyleId, bool publish = false);
     fengyin::ToneStyleSettings customToneSettingsFromPayload(const juce::var& payload) const;
     void loadSelectedPreset(std::function<void(bool, const juce::String&)> completion = {});
     void completeLoadedPreset(const fengyin::SoundPreset& preset,

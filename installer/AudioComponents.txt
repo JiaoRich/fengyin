@@ -6,7 +6,8 @@ VB-CABLE 是 donationware（捐赠软件），不是风吟自行开发的驱动�
 风吟保留其原始安装文件和说明。安装时将打开原厂安装界面，请点击 Install Driver，安装完成后重启电脑。
 企业、机构等专业部署应按作者条款另行取得相应许可：https://vb-audio.com/Services/licensing.htm
 
-ASIO4ALL 不随风吟捆绑。请单独从 https://asio4all.org/download/ 下载并安装。
+ASIO4ALL 原版安装文件附于 components\\ASIO4ALL\\ASIO4ALL_2_22.exe，请运行安装并阅读原厂许可条款。
+官方网站：https://asio4all.org/about/download-asio4all/
 请使用已验证的 2.22 版本；不要使用来源不明的修改版。
 两个组件安装并重启后，风吟默认使用低延迟方案；缺少组件时仍可使用 Windows 共享模式。
 浏览器在音量合成器中的输出设备请保持“默认”，不要固定到虚拟扬声器。

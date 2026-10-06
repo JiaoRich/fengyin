@@ -33,3 +33,12 @@ body.low-performance .brand-glyph{animation:none!important}
 .tone-diagnostic-section button { padding: 10px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--accent-soft); color: var(--accent); cursor: pointer; }
 .tone-diagnostic-section button:disabled { opacity: .45; cursor: not-allowed; }
 .tone-diagnostic-section p { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+/* One card per complete tone; handles and delete buttons are separate actions. */
+#page-sounds #preset-grid .instrument-preset-card.compact{position:relative;display:flex;flex-direction:column;justify-content:center;min-height:110px;padding:24px;cursor:pointer}
+#preset-grid .card-drag-handle{top:12px;right:12px;padding:6px}
+#preset-grid .delete-tone{align-self:flex-end;margin-top:12px}
+#quick-tones{display:none;position:fixed;z-index:10000;width:380px;max-width:65vw;max-height:340px;overflow:auto;padding:14px;border:1px solid var(--accent);border-radius:14px;background:var(--panel,#102435);box-shadow:0 12px 35px #0008}
+#quick-tones.open{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#quick-tones button.active{outline:2px solid var(--accent)}
+#quick-tones button{padding:15px;color:var(--text);background:var(--accent-soft);border:1px solid var(--line);border-radius:10px;cursor:pointer}
+#instrument-model-switcher,#tone-style-switcher{display:none!important}

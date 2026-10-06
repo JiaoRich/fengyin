@@ -186,6 +186,8 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
     applyTheme(Theme::neon);
     showPage(Page::play);
     setupWebInterface();
+    // Discover dependencies on a fresh installation, without creating tones.
+    if (pluginCatalog.getPlugins().isEmpty()) startPluginScan();
     startTimerHz(30);
     // 网页主界面本身包含完整引导，不再启动会遮挡演奏页面的原生模态窗口。
     autoGuideShown = true;
@@ -493,7 +495,7 @@ void MainComponent::setupWebInterface()
         })
         .withEventListener("setInstrumentModel", [this](juce::var payload)
         {
-            if (! isActivated || currentPluginBrand != "swam" || ! pluginHost.hasPlugin()) return;
+            if (! isActivated || ! studioUnlocked || currentPluginBrand != "swam" || ! pluginHost.hasPlugin()) return;
             const auto index = static_cast<int>(payload.getProperty("index", -1));
             if (! pluginHost.selectInstrumentModel(index)) return;
             applyCurrentSwamToneStyle();
@@ -521,7 +523,10 @@ void MainComponent::setupWebInterface()
             const auto baseStyleId = payload.getProperty("baseStyleId", currentToneStyleId).toString();
             const auto settings = payload.getProperty("settings", juce::var());
             masterOutput.setToneStyle(customToneSettingsFromPayload(settings));
-            commitCustomPreset(name, baseStyleId);
+            const auto overwriteId = payload.getProperty("overwriteId", juce::String()).toString();
+            for (const auto& existing : cachedPresets)
+                if (existing.id == overwriteId && existing.customTone) editingPresetId = overwriteId;
+            commitCustomPreset(name, baseStyleId, static_cast<bool>(payload.getProperty("publish", false)));
         })
         .withEventListener("setSmartOptimisation", [this](juce::var payload)
         {
@@ -1051,9 +1056,7 @@ void MainComponent::paint(juce::Graphics& g)
     const auto width = visual.getWidth() / static_cast<float>(bars);
     for (int i = 0; i < bars; ++i)
     {
-        const auto simulated = 0.18f + 0.82f * std::abs(std::sin(simulatedPhase + static_cast<float>(i) * 0.24f));
-        const auto level = snapshot.deviceConnected ? spectrumLevels[static_cast<size_t>(i)]
-                                                    : simulated * (0.35f + snapshot.breath * 0.65f);
+        const auto level = spectrumLevels[static_cast<size_t>(i)];
         const auto height = 8.0f + level * 105.0f;
         g.fillRoundedRectangle(visual.getX() + static_cast<float>(i) * width + 2.0f,
                                visual.getBottom() - height - 12.0f,
@@ -1450,6 +1453,8 @@ void MainComponent::timerCallback()
         state->setProperty("effectLoading", effectLoading);
         state->setProperty("presetEditing", editingPresetId.isNotEmpty());
         state->setProperty("activePresetName", currentPresetDisplayName);
+        state->setProperty("outputLeftPeak", masterOutput.getLeftPeak());
+        state->setProperty("outputRightPeak", masterOutput.getRightPeak());
         state->setProperty("activePresetCustom", currentPresetIsCustom);
         state->setProperty("activePresetId", currentPresetId);
         state->setProperty("appVersion", JUCE_APPLICATION_VERSION_STRING);
@@ -1539,6 +1544,7 @@ void MainComponent::timerCallback()
             item->setProperty("instrumentChineseName", preset.instrumentChineseName);
             item->setProperty("customTone", preset.customTone);
             item->setProperty("studioDraft", preset.studioDraft);
+            item->setProperty("published", preset.published);
             item->setProperty("baseToneStyleId", preset.baseToneStyleId);
             item->setProperty("containerInstrument", preset.containerInstrument);
             item->setProperty("containerAdapter", preset.containerAdapter);
@@ -1635,11 +1641,11 @@ void MainComponent::timerCallback()
     }
     else
     {
-        const auto simulatedBreath = 0.52f + 0.25f * std::sin(simulatedPhase * 0.55f);
+        const auto simulatedBreath = 0.0f;
         snapshot.breath = simulatedBreath;
-        deviceStatus.setText(utf8("○ 未检测到电吹管 · 当前显示模拟数据"), juce::dontSendNotification);
-        noteLabel.setText("5\nG4", juce::dontSendNotification);
-        breathLabel.setText(utf8("模拟气息 ") + juce::String(juce::roundToInt(simulatedBreath * 100.0f)) + "%",
+        deviceStatus.setText(utf8("○ 未检测到电吹管"), juce::dontSendNotification);
+        noteLabel.setText("—", juce::dontSendNotification);
+        breathLabel.setText(utf8("气息强度 ") + juce::String(juce::roundToInt(simulatedBreath * 100.0f)) + "%",
                             juce::dontSendNotification);
     }
     repaint();
@@ -2320,7 +2326,7 @@ fengyin::ToneStyleSettings MainComponent::customToneSettingsFromPayload(const ju
     return result;
 }
 
-void MainComponent::commitCustomPreset(const juce::String& name, const juce::String& baseStyleId)
+void MainComponent::commitCustomPreset(const juce::String& name, const juce::String& baseStyleId, bool publish)
 {
     if (name.isEmpty() || ! studioUnlocked || studioInstrumentName.isEmpty() || ! pluginHost.hasPlugin())
     {
@@ -2329,15 +2335,18 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
     }
     fengyin::SoundPreset preset;
     for (const auto& existing : cachedPresets)
-        if (existing.studioDraft && editingPresetId.isNotEmpty() && existing.id == editingPresetId)
+        if (editingPresetId.isNotEmpty() && existing.id == editingPresetId)
         {
             preset = existing;
             break;
         }
+    // Saving a draft must not silently change an already published tone.
+    if (preset.published && !publish) preset.id.clear();
     if (preset.id.isEmpty()) preset.id = juce::Uuid().toString();
     preset.name = name;
     preset.pluginIdentifier = pluginHost.getPluginIdentifier();
-    preset.studioDraft = true;
+    preset.published = publish;
+    preset.studioDraft = !publish;
     preset.instrumentDescriptionXml = pluginHost.getInstrumentDescriptionXml();
     preset.instrumentState = currentPluginBrand == "kong" ? juce::MemoryBlock() : pluginHost.captureInstrumentState();
     preset.effects = pluginHost.captureEffectChain();
@@ -2477,7 +2486,7 @@ void MainComponent::importStudioPackage()
 void MainComponent::exportStudioDraft(const juce::String& id)
 {
     auto preset = presetStore.findById(id);
-    if (! preset || ! preset->studioDraft || studioExportChooser) return;
+    if (! preset || ! studioUnlocked || studioExportChooser) return;
     studioExportChooser = std::make_unique<juce::FileChooser>(utf8("导出方案包（插件安装文件另行分发）"),
         juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
             .getChildFile(juce::File::createLegalFileName(preset->instrumentChineseName + "-" + preset->name) + ".fytonepack"),

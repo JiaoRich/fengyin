@@ -44,6 +44,7 @@ struct SoundPreset
     float bass = 0.0f;
     float air = 0.0f;
     bool studioDraft = false;
+    bool published = false;
     juce::String instrumentDescriptionXml;
     juce::MemoryBlock instrumentState;
     EffectChainStates effects;

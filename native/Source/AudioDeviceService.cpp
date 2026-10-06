@@ -95,11 +95,13 @@ juce::String AudioDeviceService::initialise()
     // Prefer the verified VB-CABLE + ASIO4ALL route. Missing prerequisites
     // leave Windows shared output available without changing system drivers.
     auto* audioSettings = properties.getUserSettings();
-    if (audioSettings != nullptr && audioSettings->getIntValue("productionAudioRouteRevision", 0) < 1)
+    if (audioSettings != nullptr && audioSettings->getIntValue("productionAudioRouteRevision", 0) < 2)
     {
-        audioSettings->setValue("productionAudioRouteRevision", 1);
-        audioSettings->setValue("audioEngineEnabled", true);
-        audioSettings->setValue("audioEngineBuffer", 128);
+        audioSettings->setValue("productionAudioRouteRevision", 2);
+        if (!audioSettings->getBoolValue("audioModeExplicitChoice", false))
+            audioSettings->setValue("audioEngineEnabled", true);
+        if (!audioSettings->containsKey("audioEngineBuffer"))
+            audioSettings->setValue("audioEngineBuffer", 128);
     }
     const auto engineEnabled = audioSettings == nullptr
         || audioSettings->getBoolValue("audioEngineEnabled", true);
@@ -280,7 +282,7 @@ juce::String AudioDeviceService::configureAsio4All()
     manager.closeAudioDevice();
     engineProcess.stop();
     if (auto* settings = properties.getUserSettings())
-        settings->setValue("audioEngineEnabled", false);
+        settings->setValue("audioEngineEnabled", true);
     const auto executable = juce::File::getSpecialLocation(juce::File::currentExecutableFile)
         .getSiblingFile("FengYinAudioEngine.exe");
     if (! executable.startAsProcess("--configure-asio"))
@@ -293,6 +295,8 @@ juce::String AudioDeviceService::configureAsio4All()
 
 juce::String AudioDeviceService::selectDeviceType(const juce::String& typeName)
 {
+    if (auto* settings = properties.getUserSettings())
+        settings->setValue("audioModeExplicitChoice", true);
    #if JUCE_WINDOWS
     if (typeName == engineModeName)
     {

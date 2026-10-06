@@ -42,7 +42,7 @@ ToneParameterValue {"index:30:eqhighgain",0.5f},
 ToneParameterValue {"index:31:earlyreflectiongain",0.5f},
 ToneParameterValue {"index:32:reverbmix",0.5f},
 ToneParameterValue {"index:33:reverbtime",0.5f},
-ToneParameterValue {"index:34:mainvolume",0.858734131f},
+ToneParameterValue {"index:34:mainvolume",1.0f},
 ToneParameterValue {"index:35:mainvolumeprocessing",0.0f},
 ToneParameterValue {"index:36:panpot",0.5f},
 ToneParameterValue {"index:74:portamentocontrol",0.0f},
@@ -108,7 +108,7 @@ ToneParameterValue {"index:30:eqhighgain",0.5f},
 ToneParameterValue {"index:31:earlyreflectiongain",0.5f},
 ToneParameterValue {"index:32:reverbmix",0.5f},
 ToneParameterValue {"index:33:reverbtime",0.5f},
-ToneParameterValue {"index:34:mainvolume",0.858734131f},
+ToneParameterValue {"index:34:mainvolume",1.0f},
 ToneParameterValue {"index:35:mainvolumeprocessing",0.0f},
 ToneParameterValue {"index:36:panpot",0.5f},
 ToneParameterValue {"index:74:portamentocontrol",0.0f},
@@ -163,7 +163,7 @@ ToneParameterValue {"index:91:releasetime",0.333333343f},
 ToneParameterValue {"index:26:eqenabled",0.0f},
 ToneParameterValue {"index:25:compressor",0.0f},
 ToneParameterValue {"index:32:reverbmix",0.0f},
-ToneParameterValue {"index:34:mainvolume",0.624032259f}}; result.add(s); }
+ToneParameterValue {"index:34:mainvolume",1.0f}}; result.add(s); }
 if (key == "alto-sax") { ToneStyleDefinition s; s.id="deep"; s.name=juce::String::fromUTF8("深情");
 s.settings = {0.2f,0.1f,0.32f,0.58f,1.0f,0.0f,0.0f,0.55f,0.3f,1.0f,0.5f,0.0f,0.15f};
 s.swam.enabled=true; s.swam.releaseModel="SAX 2 DRY";
@@ -189,7 +189,7 @@ ToneParameterValue {"index:91:releasetime",0.333333343f},
 ToneParameterValue {"index:26:eqenabled",0.0f},
 ToneParameterValue {"index:25:compressor",0.0f},
 ToneParameterValue {"index:32:reverbmix",0.0f},
-ToneParameterValue {"index:34:mainvolume",0.624032259f}}; result.add(s); }
+ToneParameterValue {"index:34:mainvolume",1.0f}}; result.add(s); }
 if (key == "alto-sax") { ToneStyleDefinition s; s.id="pop"; s.name=juce::String::fromUTF8("流行");
 s.settings = {0.4f,0.1f,0.32f,0.58f,1.0f,0.0f,0.0f,0.55f,0.3f,1.0f,0.5f,-0.08f,0.3f};
 s.swam.enabled=true; s.swam.releaseModel="SAX 2 BRIGHT";
@@ -215,7 +215,7 @@ ToneParameterValue {"index:91:releasetime",0.333333343f},
 ToneParameterValue {"index:26:eqenabled",0.0f},
 ToneParameterValue {"index:25:compressor",0.0f},
 ToneParameterValue {"index:32:reverbmix",0.0f},
-ToneParameterValue {"index:34:mainvolume",0.624032259f}}; result.add(s); }
+ToneParameterValue {"index:34:mainvolume",1.0f}}; result.add(s); }
 if (key == "tenor-sax") { ToneStyleDefinition s; s.id="mellow"; s.name=juce::String::fromUTF8("醇厚");
 s.settings = {-0.5f,0.32f,0.22f,0.65f,1.0f,0.0f,0.08f,0.58f,0.58f,1.0f,1.0f,0.12f,0.0f};
 s.swam.enabled=true; s.swam.releaseModel="SAX 3 WARM";
@@ -241,7 +241,7 @@ ToneParameterValue {"index:91:releasetime",0.333333343f},
 ToneParameterValue {"index:26:eqenabled",0.0f},
 ToneParameterValue {"index:25:compressor",0.0f},
 ToneParameterValue {"index:32:reverbmix",0.0f},
-ToneParameterValue {"index:34:mainvolume",0.527731895f}}; result.add(s); }
+ToneParameterValue {"index:34:mainvolume",1.0f}}; result.add(s); }
 if (key == "tenor-sax") { ToneStyleDefinition s; s.id="warm"; s.name=juce::String::fromUTF8("温暖");
 s.settings = {0.05f,0.16f,0.12f,0.65f,1.0f,0.0f,0.0f,0.58f,0.58f,1.0f,1.0f,0.02f,0.0f};
 s.swam.enabled=true; s.swam.releaseModel="SAX 3 SMOOTH";
@@ -267,7 +267,7 @@ ToneParameterValue {"index:91:releasetime",0.333333343f},
 ToneParameterValue {"index:26:eqenabled",0.0f},
 ToneParameterValue {"index:25:compressor",0.0f},
 ToneParameterValue {"index:32:reverbmix",0.0f},
-ToneParameterValue {"index:34:mainvolume",0.527731895f}}; result.add(s); }
+ToneParameterValue {"index:34:mainvolume",1.0f}}; result.add(s); }
 // The imported reference packs carried -6 dB effect-output trims in addition
 // to SWAM's -9/-12 dB main level. Do not duplicate that attenuation in release.
 for (auto& style : result) style.settings.outputGain = juce::jmax(1.0f, style.settings.outputGain);

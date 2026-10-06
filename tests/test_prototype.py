@@ -52,9 +52,9 @@ class PrototypeStructureTests(unittest.TestCase):
 
     def test_sound_libraries_follow_scanned_plugins(self):
         self.assertIn('id="library-tabs"', HTML)
-        self.assertIn("const hasSwam = availableInstruments.some", JS)
-        self.assertIn("const hasKong = availableInstruments.some", JS)
-        self.assertIn("tab.hidden = !available", JS)
+        self.assertIn("for (const key of ['soprano-sax','alto-sax','tenor-sax'])", JS)
+        self.assertIn("if(p.studioDraft || !p.published) return", JS)
+        self.assertIn("$('#library-tabs').hidden=true", JS)
         self.assertIn("key.startsWith('kong-suona')", JS)
         self.assertIn('"kong-yangqin"', (ROOT / "native" / "Source" / "KongInstrumentCatalog.h").read_text(encoding="utf-8"))
 
@@ -190,27 +190,27 @@ class PrototypeStructureTests(unittest.TestCase):
 
     def test_drafts_are_managed_only_in_tuner_workspace(self):
         render_body = JS.split("function renderPresets()", 1)[1].split("renderPresets();", 1)[0]
-        self.assertIn("innerHTML = scanCard + instrumentCards", render_body)
+        self.assertNotIn("scanCard", render_body)
         self.assertIn('data-studio-delete=', JS)
-        self.assertIn("filter(({preset})=>preset.studioDraft)", JS)
+        self.assertIn("filter(({preset})=>preset.customTone)", JS)
         self.assertIn("if (page === 'chain' && !studioUnlocked)", JS)
 
     def test_installed_plugins_and_custom_variants_share_instrument_cards(self):
-        self.assertIn("availableInstruments.map((instrument,pluginIndex)", JS)
+        self.assertIn("const pluginIndex=availableInstruments.findIndex", JS)
         self.assertIn('class="instrument-preset-card compact', JS)
         self.assertNotIn("data-action=\"edit-custom\"", JS)
-        self.assertIn("const tones = [...customs,...builtins]", JS)
-        self.assertIn("nativeEvent('editPreset',{index:presetIndex})", JS)
+        self.assertIn("id:`builtin:${key}:${style.id}`", JS)
+        self.assertIn("nativeEvent('editPreset',{index})", JS)
         self.assertIn("nativeEvent('saveCustomPreset'", JS)
 
     def test_sound_plan_page_is_compact_and_exposes_rescan(self):
         sound_page = HTML.split('id="page-sounds"', 1)[1].split('id="page-chain"', 1)[0]
         self.assertNotIn('<h2>音色方案</h2>', sound_page)
-        self.assertIn('data-action="scan-sounds"', JS)
-        self.assertIn('支持 SWAM、空音 VST3', JS)
-        self.assertIn('data-action="scan-folder"', JS)
-        self.assertIn('class="plugin-original-name"', JS)
-        self.assertIn('originalName:instrument.label || instrument.name', JS)
+        self.assertNotIn('data-action="scan-sounds"', JS)
+        self.assertIn("if(p.studioDraft || !p.published) return", JS)
+        self.assertNotIn('data-action="scan-folder"', JS)
+        self.assertNotIn('class="plugin-original-name"', JS)
+        self.assertIn('class="delete-tone"', JS)
         self.assertIn('.preset-grid{grid-template-columns:repeat(3,minmax(280px,1fr))', HTML)
         self.assertIn('draggable="true"', JS)
         self.assertIn("nativeEvent('reorderInstrumentCards'", JS)

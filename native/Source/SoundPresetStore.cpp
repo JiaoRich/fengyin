@@ -127,6 +127,7 @@ std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<Soun
         child->setAttribute("bass", static_cast<double>(preset.bass));
         child->setAttribute("air", static_cast<double>(preset.air));
         child->setAttribute("studioDraft", preset.studioDraft);
+        child->setAttribute("published", preset.published);
         child->createNewChildElement("INSTRUMENT_DESCRIPTION")->addTextElement(preset.instrumentDescriptionXml);
         child->createNewChildElement("INSTRUMENT_STATE")->addTextElement(preset.instrumentState.toBase64Encoding());
         for (const auto& effect : preset.effects)
@@ -200,6 +201,7 @@ juce::Array<SoundPreset> SoundPresetStore::fromXml(const juce::XmlElement& root)
         preset.bass = static_cast<float>(child->getDoubleAttribute("bass", 0.0));
         preset.air = static_cast<float>(child->getDoubleAttribute("air", 0.0));
         preset.studioDraft = child->getBoolAttribute("studioDraft", false);
+        preset.published = child->getBoolAttribute("published", false);
         bool validState = true;
         if (const auto* description = child->getChildByName("INSTRUMENT_DESCRIPTION"))
             preset.instrumentDescriptionXml = description->getAllSubText();

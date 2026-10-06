@@ -108,6 +108,10 @@ int main()
     fengyin::SoundPreset preset;
     preset.id="test";preset.name="Style";preset.instrumentChineseName="Sax";preset.pluginIdentifier="instrument";
     preset.studioDraft=true;preset.instrumentState=juce::MemoryBlock("state",5);
+    preset.published=true;
+    const auto publicationXml=fengyin::SoundPresetStore::toXml({preset});
+    const auto publicationReload=fengyin::SoundPresetStore::fromXml(*publicationXml);
+    assert(publicationReload.size()==1 && publicationReload[0].published);
     preset.instrumentModelName="Model A";
     juce::PluginDescription description;description.name="Test FX";description.version="1.2";description.pluginFormatName="VST3";description.uniqueId=42;
     preset.instrumentDescriptionXml=description.createXml()->toString();
@@ -117,6 +121,7 @@ int main()
     juce::String importError;
     const auto imported = fengyin::TonePackage::read(file, importError);
     assert(imported && importError.isEmpty() && imported->studioDraft && imported->id != preset.id);
+    assert(!imported->published); // Importing never publishes automatically.
     assert(imported->instrumentState == preset.instrumentState);
     assert(imported->instrumentModelName == preset.instrumentModelName);
     assert(imported->effects[0].state == preset.effects[0].state && imported->effects[0].bypassed);

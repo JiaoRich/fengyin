@@ -105,6 +105,7 @@ struct TonePackage
             return fail("方案包缺少音源参数");
         preset.id = juce::Uuid().toString();
         preset.studioDraft = true;
+        preset.published = false;
         preset.customTone = true;
         error.clear();
         return preset;

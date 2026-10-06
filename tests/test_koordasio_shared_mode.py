@@ -52,7 +52,7 @@ class KoordAsioSharedModeTests(unittest.TestCase):
         js = (ROOT / "prototype" / "app.js").read_text(encoding="utf-8")
         self.assertNotIn('id="shared-asio-status"', html)
         self.assertIn("VB-CABLE 接收网页声音", js)
-        self.assertIn('id="download-vbcable"', html)
+        self.assertNotIn('id="download-vbcable"', html)
         self.assertNotIn("state?.sharedAsioAvailable", js)
 
     def test_failed_buffer_change_restores_exact_koordasio_setup(self):

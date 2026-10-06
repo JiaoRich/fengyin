@@ -47,7 +47,7 @@ class VBCableTrialTests(unittest.TestCase):
         html = self.read("prototype/index.html")
         for button in ['test-engine-output', 'export-audio-path', 'shared-asio-status']:
             self.assertNotIn('id="' + button + '"', html)
-        self.assertIn('id="download-asio4all"', html)
+        self.assertNotIn('id="download-asio4all"', html)
         self.assertIn('id="audio-buffer-select"', html)
 
 if __name__ == "__main__":
