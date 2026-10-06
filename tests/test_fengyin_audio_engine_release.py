@@ -124,10 +124,14 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         installer = self.read("installer/FengYin.iss")
         self.assertIn("test-fengyin-production-driver.ps1", release)
         self.assertIn("Get-AuthenticodeSignature", validator)
-        self.assertIn("FengYinDriverSetup.exe", installer)
-        self.assertIn("--uninstall", installer)
-        self.assertIn("为保护系统声音", installer)
-        self.assertNotIn("#if HasAudioDriver ==", installer)
+        self.assertNotIn("FengYinDriverSetup.exe", installer)
+        self.assertNotIn("HasAudioDriver", installer)
+        self.assertNotIn("CurUninstallStepChanged", installer)
+        self.assertIn("HKLM64", installer)
+        self.assertIn("InprocServer32", installer)
+        self.assertIn("FileExists(RemoveQuotes(Server))", installer)
+        self.assertIn("Tasks: asio4all; Check: NeedsASIO4ALL", installer)
+        self.assertNotIn("FengYinDriverSetup.exe", self.read("scripts/build-windows.ps1"))
 
     def test_production_driver_handoff_is_strict_and_repeatable(self):
         prepare = self.read("scripts/prepare-driver-submission.ps1")

@@ -10,9 +10,6 @@
 #ifndef ChineseMessages
   #define ChineseMessages "compiler:Languages\ChineseSimplified.isl"
 #endif
-#ifndef HasAudioDriver
-  #define HasAudioDriver 0
-#endif
 
 [Setup]
 AppId={{BA041761-FF1B-4F84-B055-AE70EC8C883B}
@@ -41,6 +38,7 @@ UninstallDisplayName=风吟
 Name: "chinesesimp"; MessagesFile: "{#ChineseMessages}"
 
 [Tasks]
+Name: "asio4all"; Description: "安装 ASIO4ALL 64位低延迟组件（请完成原厂安装向导）"; GroupDescription: "低延迟组件："; Check: NeedsASIO4ALL
 Name: "desktopicon"; Description: "在桌面创建快捷方式"; GroupDescription: "快捷方式："; Flags: unchecked
 Name: "vbcable"; Description: "安装 VB-CABLE 基础版（VB-Audio 捐赠软件，安装后需重启）"; GroupDescription: "低延迟组件："; Check: NeedsVBCable
 
@@ -55,13 +53,31 @@ Name: "{group}\安装 VB-CABLE 网页声音组件"; Filename: "{app}\components\
 Name: "{autodesktop}\风吟"; Filename: "{app}\FengYin.exe"; Tasks: desktopicon
 
 [Run]
+Filename: "{app}\components\ASIO4ALL\ASIO4ALL_2_22.exe"; Tasks: asio4all; Check: NeedsASIO4ALL; StatusMsg: "请完成 ASIO4ALL 原厂安装向导"; Flags: waituntilterminated
 Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "正在检查视频与精美界面运行组件…"; Flags: waituntilterminated
 Filename: "{app}\components\VB-CABLE\VBCABLE_Setup_x64.exe"; WorkingDir: "{app}\components\VB-CABLE"; Tasks: vbcable; Check: NeedsVBCable; StatusMsg: "请在 VB-CABLE 原厂窗口中点击 Install Driver，完成后重启电脑"; Flags: waituntilterminated
 Filename: "{app}\FengYin.exe"; Description: "启动风吟"; Check: CanLaunchNow; Flags: nowait postinstall skipifsilent
 
 [Code]
+
+function NeedsASIO4ALL(): Boolean;
 var
-  DriverNeedsRestart: Boolean;
+  Names: TArrayOfString;
+  I: Integer;
+  ClassId, Server: String;
+begin
+  Result := True;
+  if RegGetSubkeyNames(HKLM64, 'SOFTWARE\ASIO', Names) then
+    for I := 0 to GetArrayLength(Names) - 1 do
+      if Pos('ASIO4ALL', Uppercase(Names[I])) > 0 then
+        if RegQueryStringValue(HKLM64, 'SOFTWARE\ASIO\' + Names[I], 'CLSID', ClassId) then
+          if RegQueryStringValue(HKLM64, 'SOFTWARE\Classes\CLSID\' + ClassId + '\InprocServer32', '', Server) then
+            if FileExists(RemoveQuotes(Server)) then
+            begin
+              Result := False;
+              Exit;
+            end;
+end;
 
 function NeedsVBCable(): Boolean;
 begin
@@ -71,47 +87,10 @@ end;
 
 function NeedRestart(): Boolean;
 begin
-  Result := DriverNeedsRestart or WizardIsTaskSelected('vbcable');
+  Result := WizardIsTaskSelected('vbcable');
 end;
 
 function CanLaunchNow(): Boolean;
 begin
-  Result := not WizardIsTaskSelected('vbcable');
-end;
-
-procedure CurStepChanged(CurStep: TSetupStep);
-var
-  ResultCode: Integer;
-begin
-  #if HasAudioDriver
-  if CurStep = ssPostInstall then
-  begin
-    if not Exec(ExpandConstant('{app}\FengYinDriverSetup.exe'),
-      '--install "' + ExpandConstant('{app}\driver\FengYinAudio.inf') + '"',
-      '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
-      RaiseException('无法启动风吟音频驱动安装程序。');
-    if (ResultCode <> 0) and (ResultCode <> 3010) then
-      RaiseException(Format('风吟音频驱动安装失败（错误码 %d），本次安装已停止。', [ResultCode]));
-    if ResultCode = 3010 then
-      DriverNeedsRestart := True;
-  end;
-  #endif
-end;
-
-procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
-var
-  ResultCode: Integer;
-begin
-  #if HasAudioDriver
-  if CurUninstallStep = usUninstall then
-  begin
-    if not Exec(ExpandConstant('{app}\FengYinDriverSetup.exe'), '--uninstall', '',
-      SW_HIDE, ewWaitUntilTerminated, ResultCode) then
-      RaiseException('无法启动风吟音频驱动卸载程序。');
-    if (ResultCode <> 0) and (ResultCode <> 3010) then
-      RaiseException(Format('为保护系统声音，风吟没有删除虚拟音频设备（错误码 %d）。请先重启电脑，再重新卸载。', [ResultCode]));
-    if ResultCode = 3010 then
-      DriverNeedsRestart := True;
-  end;
-  #endif
+  Result := not WizardIsTaskSelected('vbcable') and not NeedsASIO4ALL();
 end;

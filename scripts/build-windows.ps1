@@ -12,8 +12,6 @@ $FfmpegPath = Join-Path $ProjectRoot "third_party\ffmpeg\windows\ffmpeg.exe"
 $FfmpegPackageDir = Join-Path $PackageDir "tools\ffmpeg"
 $NugetPackageDir = Join-Path $ProjectRoot "third_party\nuget-packages"
 $WebViewBootstrapperPath = Join-Path $PackageDir "MicrosoftEdgeWebview2Setup.exe"
-$SignedDriverDir = Join-Path $ProjectRoot "third_party\fengyin-audio-driver\windows-x64"
-$PackagedDriverDir = Join-Path $PackageDir "driver"
 $PreparedFfmpeg = Join-Path $env:TEMP ("fengyin-ffmpeg-" + [guid]::NewGuid().ToString("N"))
 
 function Invoke-Checked([string]$StepName, [scriptblock]$Command) {
@@ -76,33 +74,11 @@ if (-not (Test-Path $BuiltExe)) { throw "未找到主程序编译结果：$Built
 Copy-Item $BuiltExe (Join-Path $PackageDir "FengYin.exe") -Force
 $AudioEngineExe = Join-Path $BuildDir "Release\FengYinAudioEngine.exe"
 $AudioWatchdogExe = Join-Path $BuildDir "Release\FengYinAudioWatchdog.exe"
-$DriverSetupExe = Join-Path $BuildDir "Release\FengYinDriverSetup.exe"
 if (-not (Test-Path $AudioEngineExe)) { throw "未找到独立音频引擎：$AudioEngineExe" }
 if (-not (Test-Path $AudioWatchdogExe)) { throw "未找到音频恢复守护程序：$AudioWatchdogExe" }
-if (-not (Test-Path $DriverSetupExe)) { throw "未找到虚拟音频驱动安装程序：$DriverSetupExe" }
 Copy-Item $AudioEngineExe (Join-Path $PackageDir "FengYinAudioEngine.exe") -Force
 Copy-Item $AudioWatchdogExe (Join-Path $PackageDir "FengYinAudioWatchdog.exe") -Force
-Copy-Item $DriverSetupExe (Join-Path $PackageDir "FengYinDriverSetup.exe") -Force
-if (Test-Path (Join-Path $SignedDriverDir "FengYinAudio.inf")) {
-    Write-Host "正在验证 Microsoft Hardware Dev Center 正式签名驱动..." -ForegroundColor Cyan
-    & (Join-Path $PSScriptRoot "test-fengyin-production-driver.ps1") -DriverDir $SignedDriverDir
-    if ($LASTEXITCODE -ne 0) { throw "正式驱动验证失败：$LASTEXITCODE" }
-    $DriverFiles = @("FengYinAudio.inf", "FengYinAudio.cat", "TabletAudioSample.sys")
-    foreach ($DriverFile in $DriverFiles) {
-        $DriverPath = Join-Path $SignedDriverDir $DriverFile
-        if (-not (Test-Path $DriverPath)) {
-            throw "已签名驱动包不完整，缺少：$DriverFile"
-        }
-    }
-    New-Item -ItemType Directory -Force -Path $PackagedDriverDir | Out-Null
-    Copy-Item (Join-Path $SignedDriverDir "*") $PackagedDriverDir -Force
-    $HasAudioDriver = 1
-} else {
-    # Public builds must never install a CI test certificate or enable Windows
-    # test-signing. The signed package is supplied only after Partner Center
-    # attestation; until then the existing shared-audio path remains intact.
-    $HasAudioDriver = 0
-}
+# The public installer uses VB-CABLE. Never package or invoke the experimental driver.
 Copy-Item (Join-Path $ProjectRoot "README.md") $PackageDir -Force
 Copy-Item (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES.md") $PackageDir -Force
 & (Join-Path $PSScriptRoot "prepare-vbcable.ps1") -Destination (Join-Path $PackageDir "components\VB-CABLE")
@@ -174,7 +150,7 @@ if ((Get-Item $ChineseMessages).Length -lt 10000) {
 }
 Invoke-Checked "中文安装包生成" {
     & $Iscc "/DSourceDir=$PackageDir" "/DOutputDir=$InstallerDir" "/DAppVersion=$Version" `
-        "/DChineseMessages=$ChineseMessages" "/DHasAudioDriver=$HasAudioDriver" `
+        "/DChineseMessages=$ChineseMessages" `
         (Join-Path $ProjectRoot "installer\FengYin.iss")
 }
 
