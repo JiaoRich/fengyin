@@ -20,7 +20,7 @@ struct PublishedToneDefinition
 // The release catalogue is deliberately explicit. Installing another plug-in
 // must never make an unreviewed tone appear in the customer-facing library.
 inline constexpr std::array<PublishedToneDefinition, 37> publishedToneCatalog {{
-    { "soprano-kenny",       "高萨-肯萨",       "soprano-sax",       "kenny",          PublishedToneKind::swamStyle,   {} },
+    { "soprano-kenny",       "高萨-肯尼基",     "soprano-sax",       "kenny",          PublishedToneKind::swamPackage, "soprano-kenny.fytonepack" },
     { "soprano-pop",         "高萨-流行",       "soprano-sax",       "pop-high",       PublishedToneKind::swamStyle,   {} },
     { "alto-jazz",           "中萨-爵士",       "alto-sax",          "jazz",           PublishedToneKind::swamStyle,   {} },
     { "alto-deep",           "中萨-深情",       "alto-sax",          "deep",           PublishedToneKind::swamStyle,   {} },

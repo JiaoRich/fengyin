@@ -1,3 +1,4 @@
+import hashlib
 import pathlib
 import unittest
 
@@ -136,6 +137,7 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
     def test_public_package_bundles_and_installs_fresh_air(self):
         build = self.read("scripts/build-windows.ps1")
         prepare = self.read("scripts/prepare-fresh-air.ps1")
+        self.assertTrue(prepare.isascii(), "Windows PowerShell 5 must parse this helper without a UTF-8 BOM")
         release = self.read("scripts/check-release.ps1")
         installer = self.read("installer/FengYin.iss")
         expected_hash = "C50D3CE92ACB7524B1A4C962F9ADFCCE100FBEB957715B8788051D73F0D02A73"
@@ -168,7 +170,7 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
     def test_release_tone_catalog_is_explicit_and_all_embedded_assets_exist(self):
         catalog = self.read("native/Source/PublishedToneCatalog.h")
         expected_names = [
-            "高萨-肯萨", "高萨-流行", "中萨-爵士", "中萨-深情", "中萨-流行",
+            "高萨-肯尼基", "高萨-流行", "中萨-爵士", "中萨-深情", "中萨-流行",
             "次中萨-醇厚", "次中萨-温暖", "次中萨-气包音", "上低萨-爵士", "上低萨-流行",
             "小号", "高音小号", "中音长号", "低音长号", "长笛", "短笛", "单簧管", "双簧管", "巴松管",
             "小提琴独奏", "中提琴独奏", "大提琴独奏", "小提琴重奏", "中提琴重奏", "大提琴重奏",
@@ -178,11 +180,18 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         for name in expected_names:
             self.assertEqual(catalog.count(f'"{name}"'), 1, name)
         self.assertNotIn("扫描本机", catalog)
-        assets = [ROOT / "assets/tone-packages/tenor-air-pocket.fytonepack"]
+        assets = [
+            ROOT / "assets/tone-packages/soprano-kenny.fytonepack",
+            ROOT / "assets/tone-packages/tenor-air-pocket.fytonepack",
+        ]
         assets.extend((ROOT / "assets/tone-packages/kong").glob("*.kam"))
-        self.assertEqual(len(assets), 13)
+        self.assertEqual(len(assets), 14)
         for asset in assets:
             self.assertTrue(asset.is_file() and asset.stat().st_size > 300, asset)
+        self.assertEqual(
+            hashlib.sha256((ROOT / "assets/tone-packages/soprano-kenny.fytonepack").read_bytes()).hexdigest(),
+            "361379611f09669f11b3bde791e7afcc9f36188a5259140723b35a57495352a9",
+        )
 
     def test_kong_release_routes_multichannel_techniques(self):
         host = self.read("native/Source/PluginHostEngine.cpp")

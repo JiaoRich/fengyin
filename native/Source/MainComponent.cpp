@@ -17,6 +17,7 @@ const auto licensePublicKey = juce::String("5,d47f8d2272ed935eb504695cc78aa24a67
 struct EmbeddedToneAsset { const void* data = nullptr; int size = 0; };
 EmbeddedToneAsset embeddedToneAsset(std::string_view name)
 {
+    if (name == "soprano-kenny.fytonepack") return { BinaryData::sopranokenny_fytonepack, BinaryData::sopranokenny_fytonepackSize };
     if (name == "tenor-air-pocket.fytonepack") return { BinaryData::tenorairpocket_fytonepack, BinaryData::tenorairpocket_fytonepackSize };
     if (name == "erhu.kam") return { BinaryData::erhu_kam, BinaryData::erhu_kamSize };
     if (name == "guzheng.kam") return { BinaryData::guzheng_kam, BinaryData::guzheng_kamSize };

@@ -24,7 +24,7 @@ const auto addReleaseStyle = [&result](const char* id, const char* name,
     };
     result.add(style);
 };
-if (key == "soprano-sax") { ToneStyleDefinition s; s.id="kenny"; s.name=juce::String::fromUTF8("肯萨");
+if (key == "soprano-sax") { ToneStyleDefinition s; s.id="kenny"; s.name=juce::String::fromUTF8("肯尼基");
 s.settings = {0.0f,0.626179993f,0.344393998f,0.579999983f,1.64999998f,0.0350000001f,0.0700000003f,0.568009973f,0.560000002f,0.879999995f,1.0f,0.0f,0.0f};
 s.swam.enabled=true; s.swam.releaseModel="SAX 0 FLAT";
 s.swam.releaseParameters = {

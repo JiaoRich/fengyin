@@ -86,6 +86,7 @@ let pluginListSignature = '';
 let savedPresets = [];
 let presetListSignature = '';
 let hardwareBreath = null;
+let compactRimBreath = 0;
 let currentArtworkKey = '';
 let currentInstrument = null;
 let bendState = {pluginLoaded:false}, bendDialogKey = '', bendSelection = 0, bendBusy = false;
@@ -130,7 +131,7 @@ const toneStyleLibrary = {
   "soprano-sax": [
     {
       "id": "kenny",
-      "name": "肯萨",
+      "name": "肯尼基",
       "description": "",
       "eq": 0.0,
       "reverb": 34.4393998384476,
@@ -919,7 +920,25 @@ function renderPresets() {
   const compactList = $('#compact-tones');
   if (compactList) {
     compactList.innerHTML = '<h3>音色方案</h3>' + cards.map((c,i)=>`<button type="button" title="${escapeHtml(c.name)}" class="${latestBackendState.activeToneVariantId===c.id?'active':''}" aria-pressed="${latestBackendState.activeToneVariantId===c.id}" data-tone="${i}"><span>${escapeHtml(c.name)}</span>${c.missing?'<small>缺少音源</small>':''}</button>`).join('');
-    compactList.querySelectorAll('button').forEach(b=>b.onclick=()=>load(cards[Number(b.dataset.tone)]));
+    compactList.querySelectorAll('button').forEach(b=>{
+      b.onclick=()=>load(cards[Number(b.dataset.tone)]);
+      const label=b.querySelector('span');
+      const startScroll=()=>{
+        label.classList.remove('scrolling');
+        label.style.removeProperty('--tone-scroll-distance');
+        label.style.removeProperty('--tone-scroll-duration');
+        const distance=Math.max(0,label.scrollWidth-label.clientWidth);
+        if(distance<2) return;
+        label.style.setProperty('--tone-scroll-distance',`${distance}px`);
+        label.style.setProperty('--tone-scroll-duration',`${Math.max(2.4,distance/24).toFixed(2)}s`);
+        label.classList.add('scrolling');
+      };
+      const stopScroll=()=>label.classList.remove('scrolling');
+      b.addEventListener('mouseenter',startScroll);
+      b.addEventListener('mouseleave',stopScroll);
+      b.addEventListener('focus',startScroll);
+      b.addEventListener('blur',stopScroll);
+    });
   }
 }
 renderPresets();
@@ -2382,8 +2401,10 @@ function draw(timestamp = performance.now()) {
   tick += simulating ? .045 : .008;
   const breath = hardwareBreath ?? 0;
   const safeBreath = Math.max(0,Math.min(100,breath));
-  document.body.style.setProperty('--breath-energy', String(safeBreath / 100));
-  document.body.style.setProperty('--breath-speed', `${14-safeBreath*.1}s`);
+  const rimTarget = safeBreath / 100;
+  compactRimBreath += (rimTarget - compactRimBreath) * (rimTarget > compactRimBreath ? .12 : .055);
+  document.body.style.setProperty('--breath-energy', compactRimBreath.toFixed(3));
+  document.body.style.setProperty('--breath-speed', `${12-compactRimBreath*6}s`);
   const tonePeak = currentPluginLoaded ? Math.min(1, Math.max(0, Number(latestBackendState.instrumentPeak || 0))) : 0;
   $$('#preset-grid .active .tone-level i').forEach((bar,i) => {
     bar.style.transform = `scaleY(${Math.max(.05,tonePeak*(.45+.55*Math.abs(Math.sin(i*.85+timestamp*.006))))})`;

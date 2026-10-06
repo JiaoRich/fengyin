@@ -36,6 +36,7 @@ juce_add_binary_data(FengYinWebAssets SOURCES
     prototype/styles.css
     prototype/app.js
     assets/fengyin-app-icon.png
+    assets/tone-packages/soprano-kenny.fytonepack
     assets/tone-packages/tenor-air-pocket.fytonepack
     assets/tone-packages/kong/erhu.kam
     assets/tone-packages/kong/guzheng.kam

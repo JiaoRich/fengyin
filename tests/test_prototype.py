@@ -85,6 +85,21 @@ class PrototypeStructureTests(unittest.TestCase):
             self.assertIn(f'value="{theme}"', HTML)
         self.assertIn("drawThemeAtmosphere", JS)
 
+    def test_compact_mode_visual_polish_is_theme_driven(self):
+        self.assertIn('class="compact-brand"', HTML)
+        self.assertIn("更好用的智能软音源平台", HTML)
+        self.assertIn("公众号：风吟软音源", HTML)
+        self.assertIn('class="compact-action-row"', HTML)
+        self.assertIn("grid-template-columns:repeat(4,minmax(0,1fr))", HTML)
+        self.assertIn("grid-template-columns:repeat(2,minmax(0,1fr))", HTML)
+        self.assertIn("@keyframes compact-tone-scroll", HTML)
+        self.assertIn("body.compact-mode .app-shell:before", HTML)
+        self.assertIn("filter:blur(11px) saturate(1.35)", HTML)
+        self.assertIn("background:linear-gradient(135deg,var(--accent-soft),var(--accent-2-soft)),var(--panel-2)", HTML)
+        self.assertIn("let compactRimBreath = 0", JS)
+        self.assertIn("compactRimBreath +=", JS)
+        self.assertIn("label.scrollWidth-label.clientWidth", JS)
+
     def test_sound_panel_starts_at_its_minimum_height(self):
         self.assertNotIn('id="layout-resizer"', HTML)
         self.assertIn(".lower-stage{flex:0 0 clamp(148px,17vh,178px)", HTML)

@@ -422,7 +422,7 @@ class HostRegressionTests(unittest.TestCase):
             self.assertIn(f'"{protected}"', HOST)
         self.assertIn("parameter == instrumentModelParameter", HOST)
         self.assertEqual(TONE_STYLES.count('s.swam.releaseParameters ='), 7)
-        for name in ('肯萨','流行高音','爵士','深情','流行','醇厚','温暖'):
+        for name in ('肯尼基','流行高音','爵士','深情','流行','醇厚','温暖'):
             self.assertIn(name, TONE_STYLES)
         self.assertIn('currentDescription.version != "3.9.4"', HOST)
 
