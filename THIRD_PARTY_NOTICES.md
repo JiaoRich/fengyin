@@ -1,5 +1,11 @@
 # 第三方组件说明
 
+## Fresh Air 1.0.8
+
+The Windows installer includes the original Fresh Air 1.0.8 installer supplied
+by the product owner. Fresh Air is developed by Slate Digital and is used by
+the bundled “次中萨-气包音” tone scheme.
+
 风吟使用下列第三方组件。此文件是发布检查清单，不替代各组件的正式许可证文本。
 
 ## JUCE

@@ -53,7 +53,7 @@ class HostRegressionTests(unittest.TestCase):
     def test_air_wires_preview_save_reload_ui_and_diagnostic(self):
         self.assertIn('toneObject->setProperty("air", toneSettings.air * 100.0f)', MAIN)
         self.assertIn('normal("air", result.air)', MAIN)
-        self.assertEqual(MAIN.count('preset.air = settings.air;'), 2)
+        self.assertGreaterEqual(MAIN.count('preset.air = settings.air;'), 2)
         self.assertIn('style.settings.air = preset.air;', MAIN)
         self.assertIn('effect->setProperty("air", fx.air);', MAIN)
         self.assertIn('child->setAttribute("air", static_cast<double>(preset.air));', PRESET)

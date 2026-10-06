@@ -134,6 +134,7 @@ public:
     [[nodiscard]] juce::var getSwamToneAudit() const { return swamToneAudit; }
     bool applyStandardSwamExpressionCurve();
     bool setBendRange(int semitones);
+    void configureKongTechniqueProfile(const juce::String& instrumentKey) noexcept;
 
     void noteOn(int noteNumber, float velocity, double timestampSeconds = 0.0) noexcept override;
     void noteOff(int noteNumber, double timestampSeconds = 0.0) noexcept override;
@@ -188,6 +189,14 @@ private:
     std::atomic<bool> kongExpressionMode { false };
     std::atomic<int> swamExpressionController { 11 };
     std::atomic<int> lastBreathMidiValue { -1 };
+    struct KongTechniqueRoute { int channel = 0; int keyswitch = -1; };
+    std::array<KongTechniqueRoute, static_cast<size_t>(PerformanceTechnique::count)> kongTechniqueRoutes {};
+    std::array<std::atomic<float>, static_cast<size_t>(PerformanceTechnique::count)> kongTechniqueInputs {};
+    std::array<std::atomic<bool>, 128> activeNotes {};
+    std::array<std::atomic<float>, 128> activeVelocities {};
+    std::atomic<int> performanceChannel { 1 };
+    std::atomic<int> lastPitchWheel { 8192 };
+    void switchPerformanceChannel(int channel) noexcept;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginHostEngine)
 };

@@ -11,7 +11,7 @@ $InstallerDir = Join-Path $ProjectRoot "dist\installer"
 $FfmpegPath = Join-Path $ProjectRoot "third_party\ffmpeg\windows\ffmpeg.exe"
 $FfmpegPackageDir = Join-Path $PackageDir "tools\ffmpeg"
 $NugetPackageDir = Join-Path $ProjectRoot "third_party\nuget-packages"
-$WebViewBootstrapperPath = Join-Path $PackageDir "MicrosoftEdgeWebview2Setup.exe"
+$WebViewOfflineInstallerPath = Join-Path $PackageDir "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
 $PreparedFfmpeg = Join-Path $env:TEMP ("fengyin-ffmpeg-" + [guid]::NewGuid().ToString("N"))
 
 function Invoke-Checked([string]$StepName, [scriptblock]$Command) {
@@ -83,6 +83,7 @@ Copy-Item (Join-Path $ProjectRoot "README.md") $PackageDir -Force
 Copy-Item (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES.md") $PackageDir -Force
 & (Join-Path $PSScriptRoot "prepare-vbcable.ps1") -Destination (Join-Path $PackageDir "components\VB-CABLE")
 & (Join-Path $PSScriptRoot "prepare-asio4all.ps1") -Destination (Join-Path $PackageDir "components\ASIO4ALL")
+& (Join-Path $PSScriptRoot "prepare-fresh-air.ps1") -Destination (Join-Path $PackageDir "components\Fresh Air")
 Copy-Item (Join-Path $ProjectRoot "installer\AudioComponents.txt") $PackageDir -Force
 if (Test-Path $FfmpegPath) {
     Copy-Item $FfmpegPath (Join-Path $PackageDir "ffmpeg.exe") -Force
@@ -92,12 +93,17 @@ if (Test-Path $FfmpegPath) {
     Copy-Item (Join-Path $PreparedFfmpeg "*") $FfmpegPackageDir -Force
 }
 
-Write-Host "正在准备 Microsoft Edge WebView2 运行环境安装程序..." -ForegroundColor Cyan
+Write-Host "正在准备 Microsoft Edge WebView2 x64 离线运行环境..." -ForegroundColor Cyan
 Invoke-WebRequest -UseBasicParsing `
-    -Uri "https://go.microsoft.com/fwlink/p/?LinkId=2124703" `
-    -OutFile $WebViewBootstrapperPath
-if ((Get-Item $WebViewBootstrapperPath).Length -lt 1MB) {
-    throw "WebView2 运行环境安装程序下载不完整。"
+    -Uri "https://go.microsoft.com/fwlink/?linkid=2124701" `
+    -OutFile $WebViewOfflineInstallerPath
+if ((Get-Item $WebViewOfflineInstallerPath).Length -lt 100MB) {
+    throw "WebView2 x64 离线运行环境下载不完整。"
+}
+$WebViewSignature = Get-AuthenticodeSignature -FilePath $WebViewOfflineInstallerPath
+if ($WebViewSignature.Status -ne 'Valid' -or
+    $WebViewSignature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
+    throw "WebView2 x64 离线运行环境未通过微软数字签名验证。"
 }
 
 $ExePath = Join-Path $PackageDir "FengYin.exe"

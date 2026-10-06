@@ -343,12 +343,19 @@ PerformanceTechnique MidiInputService::targetForRole(PerformanceTechnique role) 
     if (role == PerformanceTechnique::portamento) return PerformanceTechnique::portamento;
     if (role == PerformanceTechnique::growl)
     {
+        if (techniqueContext == "kong-suona" || techniqueContext == "kong-dizi"
+            || techniqueContext == "kong-sheng") return PerformanceTechnique::flutter;
+        if (techniqueContext == "kong-guzheng" || techniqueContext == "kong-liuqin"
+            || techniqueContext == "kong-pipa" || techniqueContext == "kong-sanxian")
+            return PerformanceTechnique::tremolo;
         if (techniqueContext == "woodwind") return PerformanceTechnique::flutter;
         if (techniqueContext == "strings") return PerformanceTechnique::tremolo;
         return PerformanceTechnique::growl;
     }
     if (role == PerformanceTechnique::mute)
     {
+        if (techniqueContext == "kong-dizi") return PerformanceTechnique::tremolo;
+        if (techniqueContext == "kong-matouqin") return PerformanceTechnique::pizzicato;
         if (techniqueContext == "strings") return PerformanceTechnique::pizzicato;
         if (techniqueContext == "woodwind" || techniqueContext == "saxophone")
             return PerformanceTechnique::alternateFingering;

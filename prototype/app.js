@@ -92,6 +92,7 @@ let bendState = {pluginLoaded:false}, bendDialogKey = '', bendSelection = 0, ben
 let bendHintTimer = null, lastBendKey = '';
 let currentPluginLoaded = false;
 let pendingPresetNavigation = null;
+let publishedTones = [];
 let toneLoadInFlight=false, queuedToneLoad=null;
 let lastToneDragAt=0;
 let customToneMode = 'idle';
@@ -322,10 +323,12 @@ function buildAdaptiveTechniquePlan(key = '', state = {}) {
 
 function mergeBackendTechniquePlan(key, state, mappings) {
   const roles = [
-    {id:'vibrato',name:'颤动控制',description:'萨克斯颤音、提琴揉弦、铜管唇颤音',icon:'≈',strength:55,index:1},
-    {id:'growl',name:'质感控制',description:'萨克斯嘶吼、木管花舌、弦乐颤弓',icon:'≋',strength:50,index:0},
-    {id:'portamento',name:'滑音控制',description:'根据当前乐器控制滑音与过渡',icon:'⌁',strength:45,index:3},
-    {id:'mute',name:'特殊技巧',description:'弱音器、拨奏或替代指法',icon:'◇',strength:50,index:8}
+    {id:'vibrato',name:'咬嘴／压力',description:'连续信号；随音色自动变成颤音、揉弦等',icon:'≈',strength:55,index:1},
+    {id:'growl',name:'体感控制',description:'抬管等连续动作；自动对应嘶吼、花舌、颤弓',icon:'≋',strength:50,index:0},
+    {id:'portamento',name:'摇杆／拇指控制',description:'连续控制滑音与音色过渡',icon:'⌁',strength:45,index:3},
+    {id:'mute',name:'功能键 1',description:'瞬时开关技巧，具体功能由当前音色决定',icon:'1',strength:50,index:8},
+    {id:'altFingering',name:'功能键 2',description:'第二个瞬时技巧控制位',icon:'2',strength:50,index:7},
+    {id:'halfValve',name:'功能键 3',description:'第三个瞬时技巧控制位',icon:'3',strength:50,index:9}
   ];
   if (!window.__JUCE__?.backend?.emitEvent || !Array.isArray(mappings)) return roles.map(item=>({...item,mode:'breath',featured:true}));
   const modes = ['breath','breath','hardware','hardware','breath'];
@@ -874,12 +877,10 @@ function renderPresets() {
   if (draggedInstrumentCardKey) return;
   $('#library-tabs').hidden=true; $('#library-context').hidden=true;
   const cards=[];
-  for (const key of ['soprano-sax','alto-sax','tenor-sax']) {
-    const pluginIndex=availableInstruments.findIndex(p=>p.instrumentKey===key);
-    for (const style of toneStylesForInstrument(key)) cards.push({
-      id:`builtin:${key}:${style.id}`, name:`${key==='soprano-sax'?'高音萨':key==='alto-sax'?'中音萨':'次中萨'}-${style.name}`,
-      pluginIndex, styleId:style.id, index:-1, missing:pluginIndex<0
-    });
+  for (const tone of publishedTones) {
+    const pluginIndex=availableInstruments.findIndex(p=>tone.kind==='kong' ? p.brand==='kong' : p.instrumentKey===tone.instrumentKey);
+    cards.push({id:`builtin:${tone.instrumentKey}:${tone.styleId}`,catalogId:tone.id,name:tone.name,
+      pluginIndex,styleId:tone.styleId,instrumentKey:tone.instrumentKey,kind:tone.kind,index:-1,missing:pluginIndex<0});
   }
   savedPresets.forEach((p,index)=>{
     if(p.studioDraft || !p.published) return;
@@ -897,8 +898,11 @@ function renderPresets() {
     if(toneLoadInFlight){queuedToneLoad=()=>load(c);return;}
     if(latestBackendState.pluginLoading||latestBackendState.effectLoading)return toast('正在加载，请稍候');
     toneLoadInFlight=true;
-    pendingPresetNavigation=c.index>=0?{kind:'preset',name:c.name}:{kind:'plugin',name:c.name,styleId:c.styleId};
-    nativeEvent(c.index>=0?'loadPreset':'loadPlugin',c.index>=0?{index:c.index}:{index:c.pluginIndex});
+    pendingPresetNavigation=c.index>=0?{kind:'preset',name:c.name}
+      :{kind:c.kind==='swam'?'plugin':'published',name:c.name,styleId:c.styleId};
+    if(c.index>=0) nativeEvent('loadPreset',{index:c.index});
+    else if(c.kind==='swam') nativeEvent('loadPlugin',{index:c.pluginIndex});
+    else nativeEvent('loadPublishedTone',{id:c.catalogId});
     toast(`正在载入：${c.name}`);
     renderPresets();
   }
@@ -1280,7 +1284,7 @@ function renderAdapterTechniqueGrid() {
     return `<article class="adapter-technique-item" data-technique-id="${escapeHtml(item.id)}">
       <header><span>${item.icon}</span><div><h3>${escapeHtml(item.name)}</h3><small>${escapeHtml(item.description)}</small></div></header>
       ${hardware
-        ? `<button class="adapter-map-source ${learning ? 'learning' : ''}" type="button">${learning ? '等待操作…' : mapped ? `✓ ${escapeHtml(sourceDescription(item))}` : '点击映射'}</button>`
+        ? `<div class="adapter-map-actions"><button class="adapter-map-source ${learning ? 'learning' : ''}" type="button">${learning ? '等待操作…' : mapped ? `✓ ${escapeHtml(sourceDescription(item))}` : '点击映射'}</button>${mapped?'<button class="adapter-clear-source" type="button">清除</button>':''}</div>`
         : `<label class="adapter-technique-strength"><span>效果强度</span><input type="range" min="0" max="100" value="${Number(item.strength || 50)}"><b>${Number(item.strength || 50)}%</b></label>`}
     </article>`;
   }).join('');
@@ -1289,6 +1293,13 @@ function renderAdapterTechniqueGrid() {
     event.stopPropagation();
     const item = items.find(candidate => candidate.id === button.closest('[data-technique-id]')?.dataset.techniqueId);
     if (item) startTechniqueLearning(item,true);
+  }));
+  $$('.adapter-clear-source').forEach(button => button.addEventListener('click', event => {
+    event.preventDefault();event.stopPropagation();
+    const item=items.find(candidate=>candidate.id===button.closest('[data-technique-id]')?.dataset.techniqueId);
+    if(!item)return;
+    nativeEvent('removeTechniqueMapping',{technique:item.index});
+    item.sourceType=0;item.sourceNumber=-1;renderAdapterTechniqueGrid();
   }));
   $$('#adapter-technique-grid input[type="range"]').forEach(input => input.addEventListener('input', event => {
     const id = input.closest('[data-technique-id]')?.dataset.techniqueId;
@@ -1811,6 +1822,7 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   $('#load-effect').textContent = state.effectLoading ? '正在加载…' : '添加效果器';
   $('#load-effect').disabled = !!state.effectLoading || !!state.pluginLoading || !state.pluginLoaded;
   availableInstruments = Array.isArray(state.instruments) ? state.instruments : [];
+  publishedTones = Array.isArray(state.publishedTones) ? state.publishedTones : [];
   availableEffects = Array.isArray(state.effects) ? state.effects : [];
   savedPresets = Array.isArray(state.presets) ? state.presets : [];
   if (!state.presetEditing && editingPresetName) {
@@ -1847,7 +1859,7 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
       renderToneStyleSwitcher();
     }
   }
-  const nextPresetSignature = JSON.stringify([savedPresets, availableInstruments, state.kongInstruments, state.kongLibrary, !!state.scanning,state.activeToneVariantId,!!state.pluginLoading]);
+  const nextPresetSignature = JSON.stringify([publishedTones,savedPresets, availableInstruments, state.kongInstruments, state.kongLibrary, !!state.scanning,state.activeToneVariantId,!!state.pluginLoading]);
   if (nextPresetSignature !== presetListSignature) {
     presetListSignature = nextPresetSignature;
     renderPresets();
@@ -1931,7 +1943,7 @@ function completeToneLoad(){
 window.__JUCE__?.backend?.addEventListener('pluginLoadResult', result => {
   completeToneLoad();
   if (result?.success) expertDirty = false;
-  if (!pendingPresetNavigation || !['plugin','custom-create'].includes(pendingPresetNavigation.kind)) return;
+  if (!pendingPresetNavigation || !['plugin','published','custom-create'].includes(pendingPresetNavigation.kind)) return;
   const pending = pendingPresetNavigation;
   pendingPresetNavigation = null;
   if (!result.success) return toast(result.message || '音色载入失败');
@@ -1943,7 +1955,7 @@ window.__JUCE__?.backend?.addEventListener('pluginLoadResult', result => {
     refreshInlineExpert();
     return toast('音源已加载，可以边吹边调整');
   }
-  if (pending.styleId) nativeEvent('setToneStyle', {id:pending.styleId});
+  if (pending.kind === 'plugin' && pending.styleId) nativeEvent('setToneStyle', {id:pending.styleId});
   showPage('play');
   toast(`已应用：${pending.name}`);
 });

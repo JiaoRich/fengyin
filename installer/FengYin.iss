@@ -41,21 +41,24 @@ Name: "chinesesimp"; MessagesFile: "{#ChineseMessages}"
 Name: "asio4all"; Description: "安装 ASIO4ALL 64位低延迟组件（请完成原厂安装向导）"; GroupDescription: "低延迟组件："; Check: NeedsASIO4ALL
 Name: "desktopicon"; Description: "在桌面创建快捷方式"; GroupDescription: "快捷方式："; Flags: unchecked
 Name: "vbcable"; Description: "安装 VB-CABLE 基础版（VB-Audio 捐赠软件，安装后需重启）"; GroupDescription: "低延迟组件："; Check: NeedsVBCable
+Name: "freshair"; Description: "安装 Fresh Air 1.0.8 音色效果器（次中萨-气包音必需）"; GroupDescription: "音色组件："; Check: NeedsFreshAir
 
 [Files]
-Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "MicrosoftEdgeWebview2Setup.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#SourceDir}\MicrosoftEdgeWebview2Setup.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceDir}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Icons]
 Name: "{group}\风吟"; Filename: "{app}\FengYin.exe"
 Name: "{group}\安装 ASIO4ALL 低延迟组件"; Filename: "{app}\components\ASIO4ALL\ASIO4ALL_2_22.exe"
 Name: "{group}\安装 VB-CABLE 网页声音组件"; Filename: "{app}\components\VB-CABLE\VBCABLE_Setup_x64.exe"
+Name: "{group}\安装 Fresh Air 音色效果器"; Filename: "{app}\components\Fresh Air\Setup Fresh Air v1.0.8.exe"
 Name: "{autodesktop}\风吟"; Filename: "{app}\FengYin.exe"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\components\ASIO4ALL\ASIO4ALL_2_22.exe"; Tasks: asio4all; Check: NeedsASIO4ALL; StatusMsg: "请完成 ASIO4ALL 原厂安装向导"; Flags: waituntilterminated
-Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "正在检查视频与精美界面运行组件…"; Flags: waituntilterminated
+Filename: "{tmp}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; Parameters: "/silent /install"; StatusMsg: "正在安装视频与精美界面离线运行组件…"; Flags: waituntilterminated
 Filename: "{app}\components\VB-CABLE\VBCABLE_Setup_x64.exe"; WorkingDir: "{app}\components\VB-CABLE"; Tasks: vbcable; Check: NeedsVBCable; StatusMsg: "请在 VB-CABLE 原厂窗口中点击 Install Driver，完成后重启电脑"; Flags: waituntilterminated
+Filename: "{app}\components\Fresh Air\Setup Fresh Air v1.0.8.exe"; Parameters: "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-"; Tasks: freshair; Check: NeedsFreshAir; AfterInstall: VerifyFreshAirInstalled; StatusMsg: "正在安装 Fresh Air 1.0.8 音色效果器…"; Flags: waituntilterminated
 Filename: "{app}\FengYin.exe"; Description: "启动风吟"; Check: CanLaunchNow; Flags: nowait postinstall skipifsilent
 
 [Code]
@@ -83,6 +86,23 @@ function NeedsVBCable(): Boolean;
 begin
   Result := not RegKeyExists(HKLM, 'SYSTEM\CurrentControlSet\Services\VBAudioVACMME')
     and not RegKeyExists(HKLM, 'SYSTEM\CurrentControlSet\Services\VBAudioVACWDM');
+end;
+
+function HasFreshAir(): Boolean;
+begin
+  Result := FileExists(ExpandConstant('{commoncf64}\VST3\Fresh Air.vst3'))
+    or FileExists(ExpandConstant('{commoncf64}\VST3\Slate Digital\Fresh Air.vst3'));
+end;
+
+function NeedsFreshAir(): Boolean;
+begin
+  Result := not HasFreshAir();
+end;
+
+procedure VerifyFreshAirInstalled();
+begin
+  if NeedsFreshAir() then
+    RaiseException('Fresh Air 1.0.8 安装未完成：未找到 Slate Digital\Fresh Air.vst3。');
 end;
 
 function NeedRestart(): Boolean;

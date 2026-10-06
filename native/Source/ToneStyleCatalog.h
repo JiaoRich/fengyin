@@ -6,6 +6,24 @@ struct ToneStyleDefinition { juce::String id, name, description; ToneStyleSettin
 class ToneStyleCatalog { public:
 static juce::Array<ToneStyleDefinition> forInstrument(const juce::String& key) {
 juce::Array<ToneStyleDefinition> result;
+const auto addReleaseStyle = [&result](const char* id, const char* name,
+                                       ToneStyleSettings settings)
+{
+    ToneStyleDefinition style;
+    style.id = id;
+    style.name = juce::String::fromUTF8(name);
+    style.settings = settings;
+    style.swam.enabled = true;
+    // Only identifiers common to supported SWAM families are forced here.
+    // Instrument-specific synthesis parameters remain at the vendor defaults.
+    style.swam.releaseParameters = {
+        ToneParameterValue { "index:26:eqenabled", 0.0f },
+        ToneParameterValue { "index:25:compressor", 0.0f },
+        ToneParameterValue { "index:32:reverbmix", 0.0f },
+        ToneParameterValue { "index:34:mainvolume", 1.0f }
+    };
+    result.add(style);
+};
 if (key == "soprano-sax") { ToneStyleDefinition s; s.id="kenny"; s.name=juce::String::fromUTF8("肯萨");
 s.settings = {0.0f,0.626179993f,0.344393998f,0.579999983f,1.64999998f,0.0350000001f,0.0700000003f,0.568009973f,0.560000002f,0.879999995f,1.0f,0.0f,0.0f};
 s.swam.enabled=true; s.swam.releaseModel="SAX 0 FLAT";
@@ -268,6 +286,25 @@ ToneParameterValue {"index:26:eqenabled",0.0f},
 ToneParameterValue {"index:25:compressor",0.0f},
 ToneParameterValue {"index:32:reverbmix",0.0f},
 ToneParameterValue {"index:34:mainvolume",1.0f}}; result.add(s); }
+if (key == "baritone-sax") {
+    addReleaseStyle("jazz", "爵士", {-0.08f,0.28f,0.18f,0.58f,1.6f,0.04f,0.10f,0.48f,0.56f,0.90f,1.0f,0.08f,0.02f});
+    addReleaseStyle("pop", "流行", {0.12f,0.12f,0.12f,0.56f,1.8f,0.05f,0.14f,0.44f,0.54f,0.90f,1.0f,0.03f,0.04f});
+}
+if (key == "trumpet") addReleaseStyle("natural", "自然原声", {0.0f,0.12f,0.14f,0.58f,1.7f,0.04f,0.16f,0.42f,0.54f,0.88f,1.0f,0.0f,0.04f});
+if (key == "piccolo-trumpet") addReleaseStyle("natural", "自然原声", {-0.05f,0.10f,0.13f,0.58f,1.7f,0.03f,0.22f,0.40f,0.56f,0.86f,1.0f,0.0f,0.03f});
+if (key == "alto-trombone") addReleaseStyle("natural", "自然原声", {-0.04f,0.18f,0.16f,0.60f,1.6f,0.04f,0.12f,0.45f,0.55f,0.90f,1.0f,0.02f,0.02f});
+if (key == "bass-trombone") addReleaseStyle("natural", "自然原声", {-0.08f,0.22f,0.15f,0.56f,1.8f,0.04f,0.12f,0.46f,0.56f,0.90f,1.0f,0.08f,0.01f});
+if (key == "flute") addReleaseStyle("natural", "自然原声", {0.05f,0.10f,0.20f,0.62f,1.4f,0.02f,0.10f,0.50f,0.60f,0.92f,1.0f,0.0f,0.08f});
+if (key == "piccolo") addReleaseStyle("natural", "自然原声", {-0.05f,0.08f,0.18f,0.60f,1.5f,0.02f,0.22f,0.46f,0.60f,0.90f,1.0f,0.0f,0.05f});
+if (key == "clarinet") addReleaseStyle("natural", "自然原声", {-0.03f,0.22f,0.18f,0.62f,1.4f,0.02f,0.08f,0.48f,0.58f,0.90f,1.0f,0.01f,0.03f});
+if (key == "oboe") addReleaseStyle("natural", "自然原声", {-0.06f,0.16f,0.20f,0.60f,1.5f,0.03f,0.20f,0.50f,0.58f,0.90f,1.0f,0.0f,0.04f});
+if (key == "bassoon") addReleaseStyle("natural", "自然原声", {-0.08f,0.24f,0.18f,0.60f,1.5f,0.03f,0.10f,0.48f,0.58f,0.90f,1.0f,0.05f,0.02f});
+if (key == "violin") addReleaseStyle("natural", "自然原声", {0.02f,0.18f,0.22f,0.62f,1.4f,0.02f,0.14f,0.52f,0.60f,0.94f,1.0f,0.0f,0.06f});
+if (key == "viola") addReleaseStyle("natural", "自然原声", {-0.04f,0.24f,0.21f,0.61f,1.45f,0.02f,0.10f,0.52f,0.60f,0.94f,1.0f,0.03f,0.04f});
+if (key == "cello") addReleaseStyle("natural", "自然原声", {-0.06f,0.28f,0.22f,0.60f,1.5f,0.02f,0.08f,0.54f,0.60f,0.94f,1.0f,0.06f,0.03f});
+if (key == "violin-section") addReleaseStyle("natural", "自然原声", {0.0f,0.16f,0.25f,0.60f,1.5f,0.02f,0.12f,0.58f,0.62f,1.0f,1.0f,0.0f,0.05f});
+if (key == "viola-section") addReleaseStyle("natural", "自然原声", {-0.04f,0.22f,0.24f,0.60f,1.5f,0.02f,0.10f,0.58f,0.62f,1.0f,1.0f,0.03f,0.04f});
+if (key == "cello-section") addReleaseStyle("natural", "自然原声", {-0.06f,0.26f,0.24f,0.58f,1.55f,0.02f,0.08f,0.58f,0.62f,1.0f,1.0f,0.06f,0.03f});
 // The imported reference packs carried -6 dB effect-output trims in addition
 // to SWAM's -9/-12 dB main level. Do not duplicate that attenuation in release.
 for (auto& style : result) style.settings.outputGain = juce::jmax(1.0f, style.settings.outputGain);

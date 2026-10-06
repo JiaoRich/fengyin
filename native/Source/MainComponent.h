@@ -13,6 +13,7 @@
 #include "AccompanimentAudioService.h"
 #include "MasterOutputService.h"
 #include "ToneStyleCatalog.h"
+#include "PublishedToneCatalog.h"
 #include "KongInstrumentCatalog.h"
 #include "ContainerPluginAdapter.h"
 #include "TechniqueAdvisor.h"
@@ -57,6 +58,7 @@ private:
     void refreshPluginChoices();
     void loadSelectedPlugin();
     void loadKongInstrument(const juce::String& instrumentKey, const juce::String& instrumentName);
+    void loadPublishedTone(const juce::String& catalogueId);
     void beginContainerInstrument(const juce::String& adapter);
     void commitContainerInstrument(const juce::String& name);
     void cancelContainerInstrument();

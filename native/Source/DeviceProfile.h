@@ -44,7 +44,7 @@ public:
                      false, true, true, true, true, true };
         if (contains(name, "wudi") || contains(name, "wu di") || contains(name, "无笛"))
             return { "wudi", "无笛电吹管", 2, 11, 2, 0.9f, 0.24f,
-                     false, true, true, false, true, true };
+                     false, true, true, true, true, true };
         return { "generic-wind-controller", "通用电吹管", 2, 11, 2, 0.9f, 0.28f,
                  false, false, false, false, true, true };
     }

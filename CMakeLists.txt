@@ -36,6 +36,19 @@ juce_add_binary_data(FengYinWebAssets SOURCES
     prototype/styles.css
     prototype/app.js
     assets/fengyin-app-icon.png
+    assets/tone-packages/tenor-air-pocket.fytonepack
+    assets/tone-packages/kong/erhu.kam
+    assets/tone-packages/kong/guzheng.kam
+    assets/tone-packages/kong/hulusi.kam
+    assets/tone-packages/kong/liuqin.kam
+    assets/tone-packages/kong/matouqin.kam
+    assets/tone-packages/kong/qudi.kam
+    assets/tone-packages/kong/xun.kam
+    assets/tone-packages/kong/suona.kam
+    assets/tone-packages/kong/sanxian.kam
+    assets/tone-packages/kong/pipa.kam
+    assets/tone-packages/kong/sheng.kam
+    assets/tone-packages/kong/nanxiao.kam
     assets/instruments/instrument_soprano_sax.png
     assets/instruments/instrument_alto_sax.png
     assets/instruments/instrument_tenor_sax.png
@@ -114,6 +127,7 @@ target_sources(FengYin PRIVATE
     native/Source/MasterOutputService.h
     native/Source/MasterOutputService.cpp
     native/Source/ToneStyleCatalog.h
+    native/Source/PublishedToneCatalog.h
     native/Source/SwamToneProfile.h
     native/Source/SwamExpressionCurve.cpp
     native/Source/SwamExpressionCurve.h

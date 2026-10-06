@@ -2,21 +2,22 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const source=fs.readFileSync('prototype/app.js','utf8');
 const body=source.slice(source.indexOf('function renderPresets()'),source.indexOf('\nrenderPresets();',source.indexOf('function renderPresets()')));
 const elements={};const get=s=>elements[s]||(elements[s]={hidden:false,innerHTML:'',querySelectorAll:()=>[]});
-const context={console,Date,toneLoadInFlight:false,pendingPresetNavigation:null,draggedInstrumentCardKey:'',availableInstruments:[],savedPresets:[],latestBackendState:{},
+const catalogue=Array.from({length:37},(_,i)=>({id:`tone-${i}`,name:`Tone ${i}`,instrumentKey:i<2?'alto-sax':i===36?'kong-erhu':`missing-${i}`,styleId:i===36?'release':'natural',kind:i===36?'kong':'swam'}));
+const context={console,Date,toneLoadInFlight:false,pendingPresetNavigation:null,draggedInstrumentCardKey:'',availableInstruments:[],savedPresets:[],publishedTones:catalogue,latestBackendState:{},
   localStorage:{getItem:()=>null},$ :get,$$:()=>[],bindInstrumentSorting:()=>{},escapeHtml:x=>String(x),
   toneStylesForInstrument:key=>Array.from({length:key==='alto-sax'?3:2},(_,i)=>({id:String(i),name:`tone${i}`}))};
 vm.createContext(context);vm.runInContext(body,context);
 context.renderPresets();
-assert.equal((get('#preset-grid').innerHTML.match(/data-card-key=/g)||[]).length,7);
-assert.equal((get('#preset-grid').innerHTML.match(/缺少音源/g)||[]).length,7);
-context.availableInstruments=[{instrumentKey:'alto-sax',pluginId:'alto'},{instrumentKey:'violin',pluginId:'violin'}];
+assert.equal((get('#preset-grid').innerHTML.match(/data-card-key=/g)||[]).length,37);
+assert.equal((get('#preset-grid').innerHTML.match(/缺少音源/g)||[]).length,37);
+context.availableInstruments=[{instrumentKey:'alto-sax',pluginId:'alto'},{instrumentKey:'violin',pluginId:'violin'},{brand:'kong',pluginId:'qin'}];
 context.savedPresets=[{id:'old',name:'old',customTone:true,pluginId:'alto'},
  {id:'draft',name:'draft',published:true,studioDraft:true},
  {id:'published',name:'Published',published:true,pluginId:'alto'}];
 context.renderPresets();
 const html=get('#preset-grid').innerHTML;
-assert.equal((html.match(/data-card-key=/g)||[]).length,8);
-assert(!html.includes('builtin:violin'));
+assert.equal((html.match(/data-card-key=/g)||[]).length,38);
+assert(html.includes('builtin:kong-erhu:release'));
 assert(!html.includes('custom:old'));assert(!html.includes('custom:draft'));
 assert(html.includes('custom:published'));
 assert.equal((html.match(/class="delete-tone"/g)||[]).length,1);

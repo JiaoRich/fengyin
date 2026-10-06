@@ -52,7 +52,8 @@ class PrototypeStructureTests(unittest.TestCase):
 
     def test_sound_libraries_follow_scanned_plugins(self):
         self.assertIn('id="library-tabs"', HTML)
-        self.assertIn("for (const key of ['soprano-sax','alto-sax','tenor-sax'])", JS)
+        self.assertIn("for (const tone of publishedTones)", JS)
+        self.assertIn('std::array<PublishedToneDefinition, 37>', (ROOT / "native" / "Source" / "PublishedToneCatalog.h").read_text(encoding="utf-8"))
         self.assertIn("if(p.studioDraft || !p.published) return", JS)
         self.assertIn("$('#library-tabs').hidden=true", JS)
         self.assertIn("key.startsWith('kong-suona')", JS)
@@ -199,7 +200,7 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertIn("const pluginIndex=availableInstruments.findIndex", JS)
         self.assertIn('class="instrument-preset-card compact', JS)
         self.assertNotIn("data-action=\"edit-custom\"", JS)
-        self.assertIn("id:`builtin:${key}:${style.id}`", JS)
+        self.assertIn("id:`builtin:${tone.instrumentKey}:${tone.styleId}`", JS)
         self.assertIn("nativeEvent('editPreset',{index})", JS)
         self.assertIn("nativeEvent('saveCustomPreset'", JS)
 

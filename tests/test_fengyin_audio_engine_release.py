@@ -133,6 +133,68 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         self.assertIn("Tasks: asio4all; Check: NeedsASIO4ALL", installer)
         self.assertNotIn("FengYinDriverSetup.exe", self.read("scripts/build-windows.ps1"))
 
+    def test_public_package_bundles_and_installs_fresh_air(self):
+        build = self.read("scripts/build-windows.ps1")
+        prepare = self.read("scripts/prepare-fresh-air.ps1")
+        release = self.read("scripts/check-release.ps1")
+        installer = self.read("installer/FengYin.iss")
+        expected_hash = "C50D3CE92ACB7524B1A4C962F9ADFCCE100FBEB957715B8788051D73F0D02A73"
+        self.assertIn("prepare-fresh-air.ps1", build)
+        self.assertIn(expected_hash, prepare)
+        self.assertIn(expected_hash, release)
+        self.assertIn('Name: "freshair"', installer)
+        self.assertIn("NeedsFreshAir", installer)
+        self.assertIn(r"VST3\Fresh Air.vst3", installer)
+        self.assertIn(r"VST3\Slate Digital\Fresh Air.vst3", installer)
+        self.assertIn("/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-", installer)
+        self.assertIn("AfterInstall: VerifyFreshAirInstalled", installer)
+        self.assertIn("RaiseException", installer)
+
+    def test_public_package_uses_verified_offline_webview_runtime(self):
+        build = self.read("scripts/build-windows.ps1")
+        release = self.read("scripts/check-release.ps1")
+        installer = self.read("installer/FengYin.iss")
+        expected_name = "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
+        self.assertIn("linkid=2124701", build)
+        self.assertIn(expected_name, build)
+        self.assertIn(expected_name, release)
+        self.assertIn(expected_name, installer)
+        self.assertIn("Get-AuthenticodeSignature", build)
+        self.assertIn("Get-AuthenticodeSignature", release)
+        self.assertIn("Microsoft Corporation", build)
+        self.assertIn("Microsoft Corporation", release)
+        self.assertNotIn("MicrosoftEdgeWebview2Setup.exe", installer)
+
+    def test_release_tone_catalog_is_explicit_and_all_embedded_assets_exist(self):
+        catalog = self.read("native/Source/PublishedToneCatalog.h")
+        expected_names = [
+            "高萨-肯萨", "高萨-流行", "中萨-爵士", "中萨-深情", "中萨-流行",
+            "次中萨-醇厚", "次中萨-温暖", "次中萨-气包音", "上低萨-爵士", "上低萨-流行",
+            "小号", "高音小号", "中音长号", "低音长号", "长笛", "短笛", "单簧管", "双簧管", "巴松管",
+            "小提琴独奏", "中提琴独奏", "大提琴独奏", "小提琴重奏", "中提琴重奏", "大提琴重奏",
+            "二胡", "古筝", "葫芦丝", "柳琴", "马头琴", "曲笛", "埙", "唢呐", "三弦", "琵琶", "笙", "南箫",
+        ]
+        self.assertIn("std::array<PublishedToneDefinition, 37>", catalog)
+        for name in expected_names:
+            self.assertEqual(catalog.count(f'"{name}"'), 1, name)
+        self.assertNotIn("扫描本机", catalog)
+        assets = [ROOT / "assets/tone-packages/tenor-air-pocket.fytonepack"]
+        assets.extend((ROOT / "assets/tone-packages/kong").glob("*.kam"))
+        self.assertEqual(len(assets), 13)
+        for asset in assets:
+            self.assertTrue(asset.is_file() and asset.stat().st_size > 300, asset)
+
+    def test_kong_release_routes_multichannel_techniques(self):
+        host = self.read("native/Source/PluginHostEngine.cpp")
+        midi = self.read("native/Source/MidiInputService.cpp")
+        self.assertIn('key == "kong-suona"', host)
+        self.assertIn('key == "kong-dizi"', host)
+        self.assertIn("switchPerformanceChannel", host)
+        self.assertIn("route(PerformanceTechnique::flutter, 2, -1)", host)
+        self.assertIn("route(PerformanceTechnique::tremolo, 3, -1)", host)
+        self.assertIn('techniqueContext == "kong-suona"', midi)
+        self.assertIn('techniqueContext == "kong-pipa"', midi)
+
     def test_production_driver_handoff_is_strict_and_repeatable(self):
         prepare = self.read("scripts/prepare-driver-submission.ps1")
         importer = self.read("scripts/import-signed-driver.ps1")

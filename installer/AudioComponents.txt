@@ -9,6 +9,10 @@ VB-CABLE 是 donationware（捐赠软件），不是风吟自行开发的驱动�
 ASIO4ALL 原版安装文件附于 components\\ASIO4ALL\\ASIO4ALL_2_22.exe，请运行安装并阅读原厂许可条款。
 官方网站：https://asio4all.org/about/download-asio4all/
 请使用已验证的 2.22 版本；不要使用来源不明的修改版。
+
+Fresh Air 1.0.8 由 Slate Digital 开发，是“次中萨-气包音”方案所需的 VST3 效果器。
+风吟安装程序会在未检测到该组件时安装内附的 Fresh Air 1.0.8。
+
 两个组件安装并重启后，风吟默认使用低延迟方案；缺少组件时仍可使用 Windows 共享模式。
 浏览器在音量合成器中的输出设备请保持“默认”，不要固定到虚拟扬声器。
 缓冲区直接在风吟声音设置中选择；首次实际声卡选错时才需要高级输出设置。

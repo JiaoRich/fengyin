@@ -10,7 +10,10 @@ $RequiredFiles = @(
     "FengYinAudioWatchdog.exe",
     "README.md",
     "THIRD_PARTY_NOTICES.md",
-    "MicrosoftEdgeWebview2Setup.exe"
+    "MicrosoftEdgeWebView2RuntimeInstallerX64.exe",
+    "components\ASIO4ALL\ASIO4ALL_2_22.exe",
+    "components\VB-CABLE\VBCABLE_Setup_x64.exe",
+    "components\Fresh Air\Setup Fresh Air v1.0.8.exe"
 )
 foreach ($Name in $RequiredFiles) {
     $Path = Join-Path $PackageDir $Name
@@ -38,4 +41,19 @@ if (Test-Path $DriverDir) {
 $Size = (Get-ChildItem $PackageDir -Recurse -File | Measure-Object Length -Sum).Sum
 if ($Size -lt 1MB) { throw "发布检查失败：客户程序目录体积异常。" }
 
-Write-Host "发布检查通过：主程序、独立音频引擎、恢复守护程序和说明文件齐全，客户目录未发现私钥。" -ForegroundColor Green
+$FreshAirInstaller = Join-Path $PackageDir "components\Fresh Air\Setup Fresh Air v1.0.8.exe"
+$FreshAirHash = (Get-FileHash $FreshAirInstaller -Algorithm SHA256).Hash
+if ($FreshAirHash -ne "C50D3CE92ACB7524B1A4C962F9ADFCCE100FBEB957715B8788051D73F0D02A73") {
+    throw "发布检查失败：Fresh Air 1.0.8 安装程序哈希不匹配。"
+}
+$WebViewInstaller = Join-Path $PackageDir "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
+if ((Get-Item $WebViewInstaller).Length -lt 100MB) {
+    throw "发布检查失败：WebView2 x64 离线运行环境文件不完整。"
+}
+$WebViewSignature = Get-AuthenticodeSignature -FilePath $WebViewInstaller
+if ($WebViewSignature.Status -ne 'Valid' -or
+    $WebViewSignature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
+    throw "发布检查失败：WebView2 x64 离线运行环境未通过微软数字签名验证。"
+}
+
+Write-Host "发布检查通过：主程序、音频组件、Fresh Air 1.0.8 和说明文件齐全，客户目录未发现私钥。" -ForegroundColor Green

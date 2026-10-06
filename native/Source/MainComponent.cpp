@@ -14,6 +14,42 @@ const juce::Colour cyan { 0xff43d9ff };
 const juce::Colour violet { 0xff9b63ff };
 juce::String utf8(const char* text) { return juce::String::fromUTF8(text); }
 const auto licensePublicKey = juce::String("5,d47f8d2272ed935eb504695cc78aa24a67e8b7a006c2e62e31c047727e7963e836cc0e36bf528b328e4eb0e73cacdc7a52160c961027a7fc7c77195d8a8e3568ca07e82303a9cb256b5627ea1ad8815a224801576ac89b548030474b1743f7e067cbd2ade4cc983a1973ca0a775b4c7c84e863ddf5cabb49ab5d684b8672fdad");
+struct EmbeddedToneAsset { const void* data = nullptr; int size = 0; };
+EmbeddedToneAsset embeddedToneAsset(std::string_view name)
+{
+    if (name == "tenor-air-pocket.fytonepack") return { BinaryData::tenorairpocket_fytonepack, BinaryData::tenorairpocket_fytonepackSize };
+    if (name == "erhu.kam") return { BinaryData::erhu_kam, BinaryData::erhu_kamSize };
+    if (name == "guzheng.kam") return { BinaryData::guzheng_kam, BinaryData::guzheng_kamSize };
+    if (name == "hulusi.kam") return { BinaryData::hulusi_kam, BinaryData::hulusi_kamSize };
+    if (name == "liuqin.kam") return { BinaryData::liuqin_kam, BinaryData::liuqin_kamSize };
+    if (name == "matouqin.kam") return { BinaryData::matouqin_kam, BinaryData::matouqin_kamSize };
+    if (name == "qudi.kam") return { BinaryData::qudi_kam, BinaryData::qudi_kamSize };
+    if (name == "xun.kam") return { BinaryData::xun_kam, BinaryData::xun_kamSize };
+    if (name == "suona.kam") return { BinaryData::suona_kam, BinaryData::suona_kamSize };
+    if (name == "sanxian.kam") return { BinaryData::sanxian_kam, BinaryData::sanxian_kamSize };
+    if (name == "pipa.kam") return { BinaryData::pipa_kam, BinaryData::pipa_kamSize };
+    if (name == "sheng.kam") return { BinaryData::sheng_kam, BinaryData::sheng_kamSize };
+    if (name == "nanxiao.kam") return { BinaryData::nanxiao_kam, BinaryData::nanxiao_kamSize };
+    return {};
+}
+
+fengyin::ToneStyleSettings kongReleaseSettings(std::string_view key)
+{
+    using S = fengyin::ToneStyleSettings;
+    if (key == "kong-erhu")     return S {-0.02f, 0.26f, 0.22f, 0.60f, 1.50f, 0.02f, 0.10f, 0.52f, 0.60f, 0.94f, 1.00f, 0.02f, 0.03f};
+    if (key == "kong-guzheng")  return S { 0.04f, 0.14f, 0.24f, 0.62f, 1.40f, 0.02f, 0.08f, 0.56f, 0.62f, 0.98f, 1.00f, 0.00f, 0.05f};
+    if (key == "kong-hulusi")   return S {-0.03f, 0.22f, 0.20f, 0.62f, 1.40f, 0.02f, 0.08f, 0.50f, 0.60f, 0.94f, 1.00f, 0.02f, 0.03f};
+    if (key == "kong-liuqin")   return S { 0.10f, 0.12f, 0.16f, 0.60f, 1.50f, 0.02f, 0.14f, 0.46f, 0.56f, 0.92f, 1.00f, 0.00f, 0.05f};
+    if (key == "kong-matouqin") return S {-0.10f, 0.32f, 0.22f, 0.58f, 1.60f, 0.03f, 0.08f, 0.54f, 0.60f, 0.94f, 1.00f, 0.08f, 0.02f};
+    if (key == "kong-dizi")     return S { 0.08f, 0.10f, 0.20f, 0.62f, 1.40f, 0.02f, 0.12f, 0.50f, 0.58f, 0.94f, 1.00f, 0.00f, 0.08f};
+    if (key == "kong-xun")      return S {-0.12f, 0.32f, 0.26f, 0.62f, 1.35f, 0.02f, 0.06f, 0.58f, 0.64f, 0.96f, 1.00f, 0.06f, 0.01f};
+    if (key == "kong-suona")    return S { 0.08f, 0.12f, 0.16f, 0.56f, 1.60f, 0.03f, 0.20f, 0.44f, 0.54f, 0.90f, 1.00f, 0.00f, 0.04f};
+    if (key == "kong-sanxian")  return S {-0.02f, 0.22f, 0.18f, 0.58f, 1.60f, 0.03f, 0.10f, 0.46f, 0.56f, 0.92f, 1.00f, 0.04f, 0.02f};
+    if (key == "kong-pipa")     return S { 0.06f, 0.12f, 0.18f, 0.58f, 1.60f, 0.03f, 0.14f, 0.48f, 0.58f, 0.94f, 1.00f, 0.00f, 0.05f};
+    if (key == "kong-sheng")    return S { 0.02f, 0.18f, 0.22f, 0.60f, 1.50f, 0.02f, 0.10f, 0.54f, 0.60f, 0.96f, 1.00f, 0.02f, 0.04f};
+    if (key == "kong-nanxiao")  return S {-0.08f, 0.28f, 0.24f, 0.62f, 1.35f, 0.02f, 0.06f, 0.58f, 0.62f, 0.96f, 1.00f, 0.03f, 0.04f};
+    return {};
+}
 }
 
 MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.getMachineCode())
@@ -276,6 +312,10 @@ void MainComponent::setupWebInterface()
             if (isActivated)
                 loadKongInstrument(payload.getProperty("instrumentKey", {}).toString(),
                                    payload.getProperty("instrumentName", {}).toString());
+        })
+        .withEventListener("loadPublishedTone", [this](juce::var payload)
+        {
+            if (isActivated) loadPublishedTone(payload.getProperty("id", {}).toString());
         })
         .withEventListener("beginContainerInstrument", [this](juce::var payload)
         {
@@ -1511,10 +1551,12 @@ void MainComponent::timerCallback()
         juce::Array<juce::var> techniqueMappings;
         struct RoleDescription { fengyin::PerformanceTechnique role; const char* id; const char* name; };
         for (const auto& role : {
-                RoleDescription { fengyin::PerformanceTechnique::vibrato, "vibrato", "颤动控制" },
-                RoleDescription { fengyin::PerformanceTechnique::growl, "growl", "质感控制" },
-                RoleDescription { fengyin::PerformanceTechnique::portamento, "portamento", "滑音控制" },
-                RoleDescription { fengyin::PerformanceTechnique::mute, "mute", "特殊技巧" } })
+                RoleDescription { fengyin::PerformanceTechnique::vibrato, "vibrato", "咬嘴／压力" },
+                RoleDescription { fengyin::PerformanceTechnique::growl, "growl", "体感控制" },
+                RoleDescription { fengyin::PerformanceTechnique::portamento, "portamento", "摇杆／拇指控制" },
+                RoleDescription { fengyin::PerformanceTechnique::mute, "mute", "功能键 1" },
+                RoleDescription { fengyin::PerformanceTechnique::alternateFingering, "altFingering", "功能键 2" },
+                RoleDescription { fengyin::PerformanceTechnique::halfValve, "halfValve", "功能键 3" } })
         {
             auto item = std::make_unique<juce::DynamicObject>();
             item->setProperty("technique", static_cast<int>(role.role));
@@ -1524,8 +1566,8 @@ void MainComponent::timerCallback()
             item->setProperty("pluginSupported", true);
             item->setProperty("hardwareAvailable", true);
             item->setProperty("supported", true);
-            item->setProperty("recommendedSource", utf8("映射一次，切换乐器继续使用"));
-            item->setProperty("recommendationReason", utf8("全局控制角色"));
+            item->setProperty("recommendedSource", utf8("只学习硬件信号，具体技巧随音色自动切换"));
+            item->setProperty("recommendationReason", utf8("全局硬件控制位"));
             item->setProperty("defaultMode", static_cast<int>(fengyin::TechniqueControlMode::breath));
             item->setProperty("featured", true);
             item->setProperty("sourceType", 0);
@@ -1575,6 +1617,20 @@ void MainComponent::timerCallback()
         state->setProperty("kongInstruments", juce::var(pluginCatalog.getKongInstruments()));
         state->setProperty("kongLibrary", pluginCatalog.getKongLibraryState());
         state->setProperty("effects", juce::var(effects));
+        juce::Array<juce::var> publishedTones;
+        for (const auto& tone : fengyin::publishedToneCatalog)
+        {
+            auto item = std::make_unique<juce::DynamicObject>();
+            item->setProperty("id", utf8(tone.id.data()));
+            item->setProperty("name", utf8(tone.name.data()));
+            item->setProperty("instrumentKey", utf8(tone.instrumentKey.data()));
+            item->setProperty("styleId", utf8(tone.styleId.data()));
+            item->setProperty("kind", tone.kind == fengyin::PublishedToneKind::kongProject ? "kong"
+                : tone.kind == fengyin::PublishedToneKind::swamPackage ? "package" : "swam");
+            item->setProperty("assetName", utf8(tone.assetName.data()));
+            publishedTones.add(juce::var(item.release()));
+        }
+        state->setProperty("publishedTones", juce::var(publishedTones));
         juce::Array<juce::var> presets;
         for (const auto& preset : cachedPresets)
         {
@@ -1990,6 +2046,131 @@ void MainComponent::loadKongInstrument(const juce::String& instrumentKey, const 
             currentInstrumentChineseName = utf8("空音 Qin Engine");
             select();
         });
+}
+
+void MainComponent::loadPublishedTone(const juce::String& catalogueId)
+{
+    const fengyin::PublishedToneDefinition* definition = nullptr;
+    for (const auto& candidate : fengyin::publishedToneCatalog)
+        if (catalogueId == utf8(candidate.id.data())) { definition = &candidate; break; }
+
+    const auto report = [this](bool success, const juce::String& message)
+    {
+        pluginStatus.setText(message, juce::dontSendNotification);
+        if (webInterface == nullptr) return;
+        auto result = std::make_unique<juce::DynamicObject>();
+        result->setProperty("success", success);
+        result->setProperty("message", message);
+        webInterface->emitEventIfBrowserIsVisible("pluginLoadResult", juce::var(result.release()));
+    };
+    if (definition == nullptr || definition->kind == fengyin::PublishedToneKind::swamStyle)
+    {
+        report(false, utf8("未找到内置音色方案"));
+        return;
+    }
+    const auto asset = embeddedToneAsset(definition->assetName);
+    if (asset.data == nullptr || asset.size <= 0)
+    {
+        report(false, utf8("内置音色数据缺失，请重新安装风吟"));
+        return;
+    }
+
+    if (definition->kind == fengyin::PublishedToneKind::swamPackage)
+    {
+        const auto file = juce::File::getSpecialLocation(juce::File::tempDirectory)
+            .getNonexistentChildFile("fengyin-release-tone", ".fytonepack", false);
+        if (! file.replaceWithData(asset.data, static_cast<size_t>(asset.size)))
+        {
+            report(false, utf8("无法准备内置音色数据"));
+            return;
+        }
+        juce::String error;
+        auto imported = fengyin::TonePackage::read(file, error);
+        file.deleteFile();
+        if (! imported)
+        {
+            report(false, utf8("内置音色校验失败：") + error);
+            return;
+        }
+        auto preset = *imported;
+        preset.id = utf8(definition->id.data());
+        preset.name = utf8(definition->name.data());
+        preset.studioDraft = false;
+        preset.published = true;
+        preset.customTone = false;
+        completeLoadedPreset(preset, [this, definition, report](bool success, const juce::String& message)
+        {
+            if (success)
+            {
+                currentToneStyleId = utf8(definition->styleId.data());
+                currentPresetDisplayName = utf8(definition->name.data());
+                currentPresetId.clear();
+                currentPresetIsCustom = false;
+            }
+            report(success, message);
+        });
+        return;
+    }
+
+    juce::PluginDescription qin;
+    bool found = false;
+    for (const auto& candidate : cachedInstrumentPlugins)
+        if (fengyin::SupportedInstrumentClassifier::classify(candidate.name, candidate.manufacturerName,
+                                                               candidate.fileOrIdentifier)
+            == fengyin::SupportedInstrumentClassifier::Brand::kong)
+        { qin = candidate; found = true; break; }
+    if (! found)
+    {
+        report(false, utf8("未找到 QinEngineV3，请先安装空音并重启风吟"));
+        return;
+    }
+
+    juce::MemoryBlock project(asset.data, static_cast<size_t>(asset.size));
+    const auto pluginState = fengyin::KongProjectFile::toPluginState(project);
+    if (pluginState.getSize() == 0)
+    {
+        report(false, utf8("内置空音方案损坏，未加载"));
+        return;
+    }
+    fengyin::SoundPreset preset;
+    preset.id = utf8(definition->id.data());
+    preset.name = utf8(definition->name.data());
+    preset.pluginIdentifier = qin.createIdentifierString();
+    preset.instrumentDescriptionXml = qin.createXml()->toString();
+    preset.pluginBrand = "kong";
+    preset.instrumentKey = utf8(definition->instrumentKey.data());
+    preset.instrumentChineseName = utf8(definition->name.data());
+    preset.toneStyleId = preset.baseToneStyleId = utf8(definition->styleId.data());
+    preset.samplerState = pluginState;
+    preset.containerProjectState = project;
+    preset.containerInstrument = true;
+    preset.containerAdapter = "kong-v3";
+    preset.published = true;
+    const auto settings = kongReleaseSettings(definition->instrumentKey);
+    preset.eqTone = settings.tone;
+    preset.warmth = settings.warmth;
+    preset.reverbMix = settings.reverbMix;
+    preset.compressionThreshold = settings.compressionThreshold;
+    preset.compressionRatio = settings.compressionRatio;
+    preset.saturation = settings.saturation;
+    preset.harshControl = settings.harshControl;
+    preset.reverbRoomSize = settings.reverbRoomSize;
+    preset.reverbDamping = settings.reverbDamping;
+    preset.reverbWidth = settings.reverbWidth;
+    preset.outputGain = settings.outputGain;
+    preset.bass = settings.bass;
+    preset.air = settings.air;
+    completeLoadedPreset(preset, [this, definition, report](bool success, const juce::String& message)
+    {
+        if (success)
+        {
+            currentToneStyleId = utf8(definition->styleId.data());
+            currentPresetDisplayName = utf8(definition->name.data());
+            currentPresetId.clear();
+            currentPresetIsCustom = false;
+        }
+        report(success, message);
+    });
 }
 
 void MainComponent::beginContainerInstrument(const juce::String& adapter)
@@ -3006,7 +3187,7 @@ void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
     style.settings.tone = preset.eqTone;
     style.settings.warmth = preset.warmth;
     style.settings.reverbMix = preset.reverbMix;
-    if (preset.customTone)
+    if (preset.customTone || preset.published)
     {
         style.settings.compressionThreshold = preset.compressionThreshold;
         style.settings.compressionRatio = preset.compressionRatio;
@@ -3080,12 +3261,14 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName, bool ap
             ? utf8(fengyin::SwamPluginClassifier::instrumentChineseName(pluginName.toStdString())) : utf8("空音 Qin Engine");
     }
     pluginHost.setKongExpressionMode(currentPluginBrand == "kong");
+    pluginHost.configureKongTechniqueProfile(currentPluginBrand == "kong" ? currentInstrumentKey : juce::String());
     if (currentPluginBrand == "swam" && applyDefaults)
         pluginHost.applyStandardSwamExpressionCurve();
     // Complete all plugin-state changes before the real-time callback begins.
     pluginHost.attachTo(audio.getDeviceManager());
     juce::Logger::writeToLog("Plugin output attached");
-    midi.setTechniqueContext(fengyin::SwamPluginClassifier::familyKey(family));
+    midi.setTechniqueContext(currentPluginBrand == "kong" ? currentInstrumentKey
+        : utf8(fengyin::SwamPluginClassifier::familyKey(family)));
     midi.setPerformanceSink(&pluginHost);
     configureTechniqueDefaults();
     if (currentPluginBrand == "kong")
@@ -3286,7 +3469,9 @@ void MainComponent::configureTechniqueDefaults()
             std::pair { fengyin::PerformanceTechnique::vibrato, 0.55f },
             std::pair { fengyin::PerformanceTechnique::growl, 0.50f },
             std::pair { fengyin::PerformanceTechnique::portamento, 0.45f },
-            std::pair { fengyin::PerformanceTechnique::mute, 0.50f } })
+            std::pair { fengyin::PerformanceTechnique::mute, 0.50f },
+            std::pair { fengyin::PerformanceTechnique::alternateFingering, 0.50f },
+            std::pair { fengyin::PerformanceTechnique::halfValve, 0.50f } })
     {
         fengyin::TechniqueMapping mapping;
         mapping.technique = role;

@@ -832,13 +832,18 @@ bool PluginHostEngine::rebuildConnections()
 
 void PluginHostEngine::noteOn(int noteNumber, float velocity, double timestampSeconds) noexcept
 {
-    queue(juce::MidiMessage::noteOn(1, juce::jlimit(0, 127, noteNumber),
+    const auto note = juce::jlimit(0, 127, noteNumber);
+    activeNotes[static_cast<size_t>(note)].store(true, std::memory_order_relaxed);
+    activeVelocities[static_cast<size_t>(note)].store(juce::jlimit(0.0f, 1.0f, velocity), std::memory_order_relaxed);
+    queue(juce::MidiMessage::noteOn(performanceChannel.load(std::memory_order_relaxed), note,
                                     juce::jlimit(0.0f, 1.0f, velocity)), timestampSeconds);
 }
 
 void PluginHostEngine::noteOff(int noteNumber, double timestampSeconds) noexcept
 {
-    queue(juce::MidiMessage::noteOff(1, juce::jlimit(0, 127, noteNumber)), timestampSeconds);
+    const auto note = juce::jlimit(0, 127, noteNumber);
+    activeNotes[static_cast<size_t>(note)].store(false, std::memory_order_relaxed);
+    queue(juce::MidiMessage::noteOff(performanceChannel.load(std::memory_order_relaxed), note), timestampSeconds);
 }
 
 void PluginHostEngine::breathChanged(float value, double timestampSeconds) noexcept
@@ -849,7 +854,7 @@ void PluginHostEngine::breathChanged(float value, double timestampSeconds) noexc
     // The controller's raw 0..127 value is routed to exactly one expression
     // destination. Sending CC2 and CC11 together can drive two mappings inside
     // SWAM and is the main cause of plateaus and conflicting expression curves.
-    queue(juce::MidiMessage::controllerEvent(1,
+    queue(juce::MidiMessage::controllerEvent(performanceChannel.load(std::memory_order_relaxed),
         kongExpressionMode.load(std::memory_order_relaxed)
             ? 1 : swamExpressionController.load(std::memory_order_relaxed), midiValue), timestampSeconds);
 }
@@ -859,21 +864,86 @@ void PluginHostEngine::pitchBendChanged(float bipolarValue, double timestampSeco
     const auto pitch = juce::jlimit(0, 16383,
         juce::roundToInt(8192.0f + juce::jlimit(-1.0f, 1.0f, bipolarValue)
                          * (bipolarValue < 0.0f ? 8192.0f : 8191.0f)));
-    queue(juce::MidiMessage::pitchWheel(1, pitch), timestampSeconds);
+    lastPitchWheel.store(pitch, std::memory_order_relaxed);
+    queue(juce::MidiMessage::pitchWheel(performanceChannel.load(std::memory_order_relaxed), pitch), timestampSeconds);
 }
 
 void PluginHostEngine::techniqueChanged(PerformanceTechnique technique, float value) noexcept
 {
     const auto index = static_cast<size_t>(technique);
     if (index >= techniqueValues.size()) return;
-    techniqueValues[index].store(juce::jlimit(0.0f, 1.0f, value), std::memory_order_relaxed);
+    const auto safeValue = juce::jlimit(0.0f, 1.0f, value);
+    if (kongExpressionMode.load(std::memory_order_relaxed))
+    {
+        const auto previous = kongTechniqueInputs[index].exchange(safeValue, std::memory_order_relaxed);
+        const auto route = kongTechniqueRoutes[index];
+        if (route.keyswitch >= 0 && (previous <= 0.5f) != (safeValue <= 0.5f))
+            queue(safeValue > 0.5f ? juce::MidiMessage::noteOn(1, route.keyswitch, static_cast<juce::uint8>(100))
+                                   : juce::MidiMessage::noteOff(1, route.keyswitch), 0.0);
+        if (route.channel > 1)
+        {
+            int desired = 1;
+            for (size_t routeIndex = 0; routeIndex < kongTechniqueRoutes.size(); ++routeIndex)
+                if (kongTechniqueRoutes[routeIndex].channel > desired
+                    && kongTechniqueInputs[routeIndex].load(std::memory_order_relaxed) > 0.5f)
+                    desired = kongTechniqueRoutes[routeIndex].channel;
+            switchPerformanceChannel(desired);
+        }
+        if (route.channel > 0 || route.keyswitch >= 0) return;
+    }
+    techniqueValues[index].store(safeValue, std::memory_order_relaxed);
     techniqueDirty[index].store(true, std::memory_order_release);
+}
+
+void PluginHostEngine::switchPerformanceChannel(int channel) noexcept
+{
+    channel = juce::jlimit(1, 16, channel);
+    const auto previous = performanceChannel.exchange(channel, std::memory_order_relaxed);
+    if (previous == channel) return;
+    for (int note = 0; note < 128; ++note)
+        if (activeNotes[static_cast<size_t>(note)].load(std::memory_order_relaxed))
+        {
+            queue(juce::MidiMessage::noteOff(previous, note), 0.0);
+            queue(juce::MidiMessage::noteOn(channel, note,
+                activeVelocities[static_cast<size_t>(note)].load(std::memory_order_relaxed)), 0.0);
+        }
+    const auto breathValue = juce::jmax(0, lastBreathMidiValue.load(std::memory_order_relaxed));
+    queue(juce::MidiMessage::controllerEvent(channel, 1, breathValue), 0.0);
+    queue(juce::MidiMessage::pitchWheel(channel, lastPitchWheel.load(std::memory_order_relaxed)), 0.0);
+}
+
+void PluginHostEngine::configureKongTechniqueProfile(const juce::String& key) noexcept
+{
+    for (auto& route : kongTechniqueRoutes) route = {};
+    for (auto& value : kongTechniqueInputs) value.store(0.0f, std::memory_order_relaxed);
+    switchPerformanceChannel(1);
+    const auto route = [this](PerformanceTechnique technique, int channel, int keyswitch)
+    { kongTechniqueRoutes[static_cast<size_t>(technique)] = { channel, keyswitch }; };
+    if (key == "kong-suona") route(PerformanceTechnique::flutter, 2, -1);
+    else if (key == "kong-dizi")
+    {
+        route(PerformanceTechnique::flutter, 2, -1);
+        route(PerformanceTechnique::tremolo, 3, -1);
+    }
+    else if (key == "kong-erhu") route(PerformanceTechnique::vibrato, 0, 14);
+    else if (key == "kong-guzheng") route(PerformanceTechnique::tremolo, 0, 16);
+    else if (key == "kong-hulusi") route(PerformanceTechnique::vibrato, 0, 19);
+    else if (key == "kong-liuqin") route(PerformanceTechnique::tremolo, 0, 18);
+    else if (key == "kong-matouqin") route(PerformanceTechnique::pizzicato, 0, 20);
+    else if (key == "kong-nanxiao") route(PerformanceTechnique::vibrato, 0, 13);
+    else if (key == "kong-pipa") route(PerformanceTechnique::tremolo, 0, 18);
+    else if (key == "kong-sanxian") route(PerformanceTechnique::tremolo, 0, 20);
+    else if (key == "kong-sheng") route(PerformanceTechnique::flutter, 0, 21);
+    else if (key == "kong-xun") route(PerformanceTechnique::vibrato, 0, 14);
 }
 
 void PluginHostEngine::resetPerformance() noexcept
 {
     lastBreathMidiValue.store(-1, std::memory_order_relaxed);
     player.requestPerformanceReset();
+    performanceChannel.store(1, std::memory_order_relaxed);
+    lastPitchWheel.store(8192, std::memory_order_relaxed);
+    for (auto& note : activeNotes) note.store(false, std::memory_order_relaxed);
     for (size_t index = 0; index < techniqueValues.size(); ++index)
     {
         techniqueValues[index].store(0.0f, std::memory_order_relaxed);

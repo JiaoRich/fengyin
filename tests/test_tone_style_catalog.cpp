@@ -1,6 +1,7 @@
 #include "ToneStyleCatalog.h"
 #include "KongInstrumentCatalog.h"
 #include "KongLibraryLocator.h"
+#include "PublishedToneCatalog.h"
 #include <cassert>
 #include <cmath>
 
@@ -20,7 +21,8 @@ bool materiallyDifferent(const fengyin::ToneStyleSettings& first,
 void checkStyles(const juce::String& key)
 {
     const auto styles = fengyin::ToneStyleCatalog::forInstrument(key);
-    const auto expected = key == "alto-sax" ? 3 : (key == "soprano-sax" || key == "tenor-sax" ? 2 : 1);
+    const auto expected = key == "alto-sax" ? 3
+        : (key == "soprano-sax" || key == "tenor-sax" || key == "baritone-sax" ? 2 : 1);
     assert(styles.size() == expected);
     for (const auto& style : styles) assert(style.settings.outputGain >= 1.0f);
     if (expected == 1) assert(styles[0].name == juce::String::fromUTF8("自然原声"));
@@ -30,7 +32,12 @@ void checkStyles(const juce::String& key)
 void checkSaxophoneSwamProfiles(const juce::String& key)
 {
     const auto styles = fengyin::ToneStyleCatalog::forInstrument(key);
-    if (key == "baritone-sax") { assert(styles.size()==1); return; }
+    if (key == "baritone-sax")
+    {
+        assert(styles.size() == 2);
+        for (const auto& style : styles) assert(style.swam.enabled && ! style.swam.releaseParameters.isEmpty());
+        return;
+    }
     for (const auto& style : styles) {
         assert(style.swam.enabled && !style.swam.releaseParameters.isEmpty());
         assert(style.swam.releaseModel.isNotEmpty());
@@ -41,6 +48,14 @@ void checkSaxophoneSwamProfiles(const juce::String& key)
 
 int main()
 {
+    static_assert(fengyin::publishedToneCatalog.size() == 37);
+    for (size_t i = 0; i < fengyin::publishedToneCatalog.size(); ++i)
+    {
+        const auto& tone = fengyin::publishedToneCatalog[i];
+        assert(!tone.id.empty() && !tone.name.empty() && !tone.instrumentKey.empty());
+        for (size_t j = i + 1; j < fengyin::publishedToneCatalog.size(); ++j)
+            assert(tone.id != fengyin::publishedToneCatalog[j].id);
+    }
     // Fixed performance gain must preserve weak-breath dynamics and silence.
     fengyin::MasterOutputService quiet, louder;
     for (auto* chain : { &quiet, &louder }) {
