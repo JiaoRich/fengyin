@@ -45,16 +45,16 @@ bool Asio4AllOutput::start(AudioEngineCore& engine, std::uint32_t requestedFrame
     }
     const auto channelNames = device->getOutputChannelNames();
     juce::Logger::writeToLog("ASIO4ALL opened channels=" + channelNames.joinIntoString(", "));
-    if (channelNames.size() < 2
+    if (!selectedEndpoint && (channelNames.size() < 2
         || channelNames[0].containsIgnoreCase("Not Connected")
         || channelNames[1].containsIgnoreCase("Not Connected")
-        || channelNames[0].trim().isEmpty() || channelNames[1].trim().isEmpty())
+        || channelNames[0].trim().isEmpty() || channelNames[1].trim().isEmpty()))
     {
         error = L"ASIO4ALL has no connected physical output (Not Connected). The Realtek output could not start; audio callbacks alone do not indicate a working device.";
         stop();
         return false;
     }
-    for (int index = 0; index < juce::jmin(2, channelNames.size()); ++index)
+    for (int index = 0; !selectedEndpoint && index < juce::jmin(2, channelNames.size()); ++index)
         if (channelNames[index].containsIgnoreCase("fengyin")
             || channelNames[index].containsIgnoreCase("cable")
             || channelNames[index].contains(juce::String::fromUTF8("风吟")))
