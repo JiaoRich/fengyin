@@ -2,6 +2,17 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 let studioUnlocked = false, studioSavedId = '', studioExportAfterSave = false;
 let compactMode = false;
+const windowControls = document.createElement('div');
+windowControls.className = 'compact-window-controls';
+windowControls.innerHTML = '<button type="button" aria-label="最小化" data-action="minimise">−</button><button type="button" aria-label="关闭" data-action="close">×</button>';
+$('.window-mode-bar').appendChild(windowControls);
+windowControls.addEventListener('click', e => {
+  const action = e.target.closest('[data-action]')?.dataset.action;
+  if (action) nativeEvent('windowAction', {action});
+});
+$('.compact-brand').addEventListener('pointerdown', e => {
+  if (compactMode && e.button === 0) nativeEvent('windowAction', {action:'drag'});
+});
 function applyWindowMode(compact) {
   compactMode = !!compact;
   document.body.classList.toggle('compact-mode', compactMode);
@@ -1599,7 +1610,7 @@ function startFullTrial() {
     return;
   }
   const startedAt = Date.now();
-  localStorage.setItem('fengyin-prototype-trial-1.1.1-start', String(startedAt));
+  localStorage.setItem('fengyin-prototype-trial-1.1.2-start', String(startedAt));
   renderLicenseState({trialActive:true, trialRemainingSeconds:60*60});
   toast('1小时完整试用已开始');
 }
@@ -1728,6 +1739,46 @@ function applyInlineAudioSettings(driverChanged = false) {
 
 $('#audio-driver-select').addEventListener('change', () => applyInlineAudioSettings(true));
 $('#configure-asio4all').addEventListener('click', () => nativeEvent('configureAsio4All'));
+const soundCheckDialog = document.createElement('dialog');
+soundCheckDialog.style.cssText='max-width:480px;width:calc(100% - 48px);padding:24px;border:1px solid var(--line);border-radius:18px;background:var(--panel);color:var(--text)';
+document.body.appendChild(soundCheckDialog);
+let soundCheckChoices=[], soundCheckIndex=0, soundCheckWaiting=false;
+function soundCheckClose(keep=false) {
+  nativeEvent('finishSoundCheck',{keep}); soundCheckDialog.close(); soundCheckWaiting=false;
+}
+function soundCheckNext() {
+  if (soundCheckIndex >= soundCheckChoices.length) {
+    soundCheckDialog.innerHTML='<h2>未找到正确输出</h2><p>可以恢复原设置，在声音模式中选择 Windows Audio 共享输出，再选择耳机或音响。此电脑的 ASIO4ALL 端点可能需要手动设置。</p><button data-check="cancel">恢复原设置并关闭</button>';
+    return;
+  }
+  soundCheckWaiting=true;
+  soundCheckDialog.innerHTML='<h2>请听测试声音</h2><p id="sound-check-device"></p><p id="sound-check-message">正在切换，请稍候…</p><div id="sound-check-feedback" hidden><button data-check="correct">声音位置正确</button><button data-check="next">仍从电脑扬声器发出</button><button data-check="next">没有声音</button><button data-check="next">两边都有声音</button></div><button data-check="cancel">取消并恢复</button>';
+  soundCheckDialog.querySelector('#sound-check-device').textContent=soundCheckChoices[soundCheckIndex].name;
+  nativeEvent('trySoundCheck',{id:soundCheckChoices[soundCheckIndex++].id});
+}
+$('#sound-check').onclick=()=>{
+  soundCheckDialog.innerHTML='<h2>您的电脑接了耳机或音响吗？</h2><p>请先检查连接线已插好，并调低耳机或音响的音量。检测会短暂暂停演奏。</p><button data-check="start">已连接耳机／音响，开始检测</button><button data-check="start">使用电脑扬声器</button><button data-check="cancel">取消</button>';
+  soundCheckDialog.showModal();
+};
+soundCheckDialog.addEventListener('cancel',e=>{e.preventDefault();soundCheckClose();});
+soundCheckDialog.addEventListener('click',e=>{
+  const action=e.target.closest('[data-check]')?.dataset.check;
+  if(action==='cancel') soundCheckClose();
+  if(action==='start') { e.target.disabled=true;nativeEvent('beginSoundCheck'); }
+  if(action==='correct'&&!soundCheckWaiting) soundCheckClose(true);
+  if(action==='next'&&!soundCheckWaiting) soundCheckNext();
+});
+window.__JUCE__?.backend?.addEventListener('soundCheckChoices',choices=>{
+  if(!soundCheckDialog.open) {nativeEvent('finishSoundCheck',{keep:false});return;}
+  soundCheckChoices=Array.isArray(choices)?choices:[];soundCheckIndex=0;soundCheckNext();
+});
+window.__JUCE__?.backend?.addEventListener('soundCheckResult',message=>{
+  if(!soundCheckDialog.open)return;
+  soundCheckWaiting=false;
+  soundCheckDialog.querySelector('#sound-check-message').textContent=String(message);
+  soundCheckDialog.querySelector('#sound-check-feedback').hidden=false;
+  soundCheckDialog.querySelector('[data-check="correct"]').disabled=!String(message).startsWith('正在播放');
+});
 
 
 ['#audio-output-select','#audio-rate-select','#audio-buffer-select'].forEach(id => $(id).addEventListener('change', () => applyInlineAudioSettings(false)));
@@ -2184,7 +2235,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.1 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.2 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},
@@ -2216,7 +2267,7 @@ if (!window.__JUCE__?.backend?.emitEvent) {
   if(new URLSearchParams(location.search).has('review')) renderLicenseState({activated:true});
   else if(localStorage.getItem('fengyin-prototype-license') === 'active') renderLicenseState({activated:true});
   else {
-    const trialStartedAt = Number(localStorage.getItem('fengyin-prototype-trial-1.1.1-start') || 0);
+    const trialStartedAt = Number(localStorage.getItem('fengyin-prototype-trial-1.1.2-start') || 0);
     const trialRemaining = Math.max(0, 60*60 - Math.floor((Date.now() - trialStartedAt) / 1000));
     renderLicenseState(trialStartedAt > 0 && trialRemaining > 0
       ? {trialActive:true, trialRemainingSeconds:trialRemaining}

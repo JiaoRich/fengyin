@@ -1,6 +1,7 @@
 #include "PerformanceReset.h"
 #include "KongPerformancePolicy.h"
 #include "TechniqueSignal.h"
+#include "BreathResponse.h"
 #include <array>
 #include <iostream>
 #include <vector>
@@ -14,6 +15,13 @@ int main()
     };
     // Keep checks active in release builds too. This models independent MIDI
     // controllers, not Qin's audio engine; real-plugin sound still needs testing.
+    require(fengyin::performanceBreath(0) == 0, "No breath must remain silent");
+    require(fengyin::performanceBreath(1) == 1, "Full breath must retain full scale");
+    require(std::abs(fengyin::performanceBreath(0.3f) - .431f) < .001f, "Curve must match traced reference");
+    require(fengyin::performanceBreath(0.8f) > 0.8f, "Strong breath must approach maximum more easily");
+    for (int i = 0; i < 127; ++i)
+        require(fengyin::performanceBreath(i / 127.0f) < fengyin::performanceBreath((i+1) / 127.0f),
+                "Breath response must remain strictly increasing");
     require(fengyin::techniquePitchAmount(8192) == 0.0f, "Wheel centre must release technique");
     require(fengyin::techniquePitchAmount(0) == 1.0f, "Negative wheel must reach full technique");
     require(fengyin::techniquePitchAmount(16383) == 1.0f, "Positive wheel must reach full technique");

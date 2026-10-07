@@ -28,9 +28,9 @@ SwamExpressionCurve::Result findAndApply(juce::XmlElement& element)
             set("out_max", SwamExpressionCurve::outputMaximum);
             set("shape", SwamExpressionCurve::shape);
             set("symmetry", SwamExpressionCurve::symmetry);
-            if (curve->getIntAttribute("bypass", 0) != 0)
+            if (curve->getIntAttribute("bypass", 0) != 1)
             {
-                curve->setAttribute("bypass", 0);
+                curve->setAttribute("bypass", 1);
                 result.changed = true;
             }
             if (curve->getIntAttribute("bipolar", 0) != 0)

@@ -42,7 +42,7 @@ int main()
     assert(near(curve->getDoubleAttribute("out_max"), fengyin::SwamExpressionCurve::outputMaximum));
     assert(near(curve->getDoubleAttribute("shape"), fengyin::SwamExpressionCurve::shape));
     assert(near(curve->getDoubleAttribute("symmetry"), fengyin::SwamExpressionCurve::symmetry));
-    assert(curve->getIntAttribute("bypass") == 0);
+    assert(curve->getIntAttribute("bypass") == 1);
     assert(curve->getIntAttribute("bipolar") == 0);
 
     auto* growl = expression->getNextElement();

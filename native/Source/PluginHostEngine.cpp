@@ -1,4 +1,5 @@
 #include "PluginHostEngine.h"
+#include "BreathResponse.h"
 #include "SerialEffectRouting.h"
 #include "ScopedGraphPause.h"
 #include "KongInstrumentCatalog.h"
@@ -886,7 +887,7 @@ void PluginHostEngine::noteOff(int noteNumber, double timestampSeconds) noexcept
 
 void PluginHostEngine::breathChanged(float value, double timestampSeconds) noexcept
 {
-    const auto midiValue = juce::jlimit(0, 127, juce::roundToInt(value * 127.0f));
+    const auto midiValue = juce::jlimit(0, 127, juce::roundToInt(performanceBreath(value) * 127.0f));
     if (lastBreathMidiValue.exchange(midiValue, std::memory_order_relaxed) == midiValue)
         return;
     // The controller's raw 0..127 value is routed to exactly one expression

@@ -98,6 +98,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
                 configureAsio = true;
         LocalFree(arguments);
     }
+    const bool manualPhysicalOutput = !preferredEndpointId.empty();
     HANDLE singleton = CreateMutexW(nullptr, TRUE, engineSingletonName);
     if (singleton == nullptr || GetLastError() == ERROR_ALREADY_EXISTS)
     {
@@ -196,7 +197,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     }
     Asio4AllOutput output;
     // No WASAPI substitution or silent escalation to a larger period.
-    const auto outputStarted = output.start(core, requestedFrames, preferredEndpointId, error);
+    const auto outputStarted = output.start(core, requestedFrames, preferredEndpointId, error, manualPhysicalOutput);
     if (! outputStarted)
     {
         logAudioSessions();
@@ -266,13 +267,17 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         {
             std::wstring newPhysicalEndpoint, routeError;
             if (router.pollPhysicalDefaultChange(newPhysicalEndpoint, routeError)
-                && ! newPhysicalEndpoint.empty() && newPhysicalEndpoint != preferredEndpointId)
+                && !manualPhysicalOutput && ! newPhysicalEndpoint.empty() && newPhysicalEndpoint != preferredEndpointId)
             {
-                // WDM default endpoint IDs cannot select ASIO channels.
-                // Keep routing browser audio, but leave the working ASIO
-                // stream untouched; hardware selection belongs to ASIO4ALL.
-                preferredEndpointId = newPhysicalEndpoint;
-                juce::Logger::writeToLog("Windows default changed; ASIO4ALL channel selection preserved");
+                const auto previous = preferredEndpointId;
+                output.stop();
+                if (output.start(core,requestedFrames,newPhysicalEndpoint,routeError,true))
+                    preferredEndpointId=newPhysicalEndpoint;
+                else
+                {
+                    juce::Logger::writeToLog("Endpoint switch failed; restoring previous output: " + juce::String(routeError.c_str()));
+                    output.start(core,requestedFrames,previous,routeError);
+                }
             }
         }
         if (output.isRunning())

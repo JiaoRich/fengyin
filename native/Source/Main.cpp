@@ -53,6 +53,21 @@ private:
             content = new MainComponent();
             setContentOwned(content, true);
             content->onWindowModeChanged = [this](bool compact) { applyMode(compact); };
+            content->onWindowAction = [this](const juce::String& action)
+            {
+                if (action == "close") closeButtonPressed();
+                else if (action == "minimise") setMinimised(true);
+                else if (action == "drag")
+                {
+                   #if JUCE_WINDOWS
+                    if (auto* peer = getPeer())
+                    {
+                        ReleaseCapture();
+                        PostMessage(static_cast<HWND>(peer->getNativeHandle()), WM_NCLBUTTONDOWN, HTCAPTION, 0);
+                    }
+                   #endif
+                }
+            };
             setResizable(true, true);
             setResizeLimits(1120, 700, 2560, 1600);
             const auto display = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay();
@@ -75,15 +90,24 @@ private:
 
         void applyMode(bool compact)
         {
-            if (! compact) { updateRoundedWindow(false); setResizeLimits(1120, 700, 7680, 4320); setFullScreen(true); return; }
+            borderless = compact;
+            roundedWidth = -1;
+            if (! compact) { updateRoundedWindow(false); setUsingNativeTitleBar(true); setResizable(true, true); setResizeLimits(1120, 700, 7680, 4320); setFullScreen(true); return; }
             const auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect(getBounds());
             const auto area = display != nullptr ? display->userBounds.toNearestInt() : juce::Rectangle<int>(0, 0, 1366, 768);
             setResizeLimits(480, 560, 960, 2160);
             setFullScreen(false);
-            const int width = juce::jmin(area.getWidth(), juce::jlimit(480, 680, area.getWidth() * 2 / 5));
-            setBounds(area.getRight() - width, area.getY(), width, area.getHeight());
+            setUsingNativeTitleBar(false);
+            setTitleBarHeight(0);
+            setResizable(false, false);
+            const auto safeArea = area.reduced(12);
+            const int width = juce::jmin(safeArea.getWidth(), juce::jlimit(480, 680, area.getWidth() * 2 / 5));
+            setBounds(safeArea.getRight() - width, safeArea.getY(), width, safeArea.getHeight());
             updateRoundedWindow(true);
         }
+
+        juce::BorderSize<int> getBorderThickness() const override
+        { return borderless ? juce::BorderSize<int>(0) : DocumentWindow::getBorderThickness(); }
 
         void closeButtonPressed() override
         {
@@ -112,6 +136,7 @@ private:
            #endif
         }
         bool roundedApplied = false;
+        bool borderless = false;
         int roundedWidth = -1, roundedHeight = -1, roundedRadius = -1;
         void timerCallback() override
         {

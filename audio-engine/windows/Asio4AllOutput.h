@@ -15,7 +15,7 @@ class Asio4AllOutput final : private juce::AudioIODeviceCallback
 {
 public:
     ~Asio4AllOutput() override { stop(); }
-    bool start(AudioEngineCore&, std::uint32_t, const std::wstring&, std::wstring&);
+    bool start(AudioEngineCore&, std::uint32_t, const std::wstring&, std::wstring&, bool requireMatch = false);
     void stop() noexcept;
     bool isRunning() const noexcept;
     std::uint32_t actualBufferFrames() const noexcept { return frames.load(); }

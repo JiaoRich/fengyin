@@ -257,6 +257,11 @@ void MainComponent::setupWebInterface()
             .withStatusBarDisabled()
             .withBackgroundColour(juce::Colour(0xff07101d)))
         .withNativeIntegrationEnabled()
+        .withEventListener("windowAction", [this](juce::var payload)
+        {
+            if (compactMode && onWindowAction)
+                onWindowAction(payload.getProperty("action", "").toString());
+        })
         .withEventListener("setCompactMode", [this](juce::var payload)
         {
             requestCompactMode(static_cast<bool>(payload.getProperty("compact", false)));
@@ -714,6 +719,19 @@ void MainComponent::setupWebInterface()
         {
             const auto message = audio.configureAsio4All();
             if (webInterface) webInterface->emitEventIfBrowserIsVisible("editorResult", message);
+        })
+        .withEventListener("beginSoundCheck", [this](juce::var)
+        { if (webInterface) webInterface->emitEventIfBrowserIsVisible("soundCheckChoices", audio.beginSoundCheck()); })
+        .withEventListener("trySoundCheck", [this](juce::var payload)
+        {
+            const auto result=audio.trySoundCheck(payload.getProperty("id", "").toString());
+            if (webInterface) webInterface->emitEventIfBrowserIsVisible("soundCheckResult",result);
+        })
+        .withEventListener("finishSoundCheck", [this](juce::var payload)
+        {
+            const auto result=audio.finishSoundCheck(static_cast<bool>(payload.getProperty("keep",false)));
+            if (webInterface) webInterface->emitEventIfBrowserIsVisible("editorResult",result);
+            emitAudioSettingsState(true,result);
         })
         .withEventListener("downloadAsio4All", [](juce::var) { juce::URL("https://asio4all.org/download/").launchInDefaultBrowser(); })
         .withEventListener("downloadVBCable", [](juce::var) { juce::URL("https://vb-audio.com/Cable/").launchInDefaultBrowser(); })
@@ -3337,7 +3355,7 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName, bool ap
     }
     pluginHost.setKongExpressionMode(currentPluginBrand == "kong");
     pluginHost.configureKongTechniqueProfile(currentPluginBrand == "kong" ? currentInstrumentKey : juce::String());
-    if (currentPluginBrand == "swam" && applyDefaults)
+    if (currentPluginBrand == "swam")
         pluginHost.applyStandardSwamExpressionCurve();
     // Complete all plugin-state changes before the real-time callback begins.
     pluginHost.attachTo(audio.getDeviceManager());

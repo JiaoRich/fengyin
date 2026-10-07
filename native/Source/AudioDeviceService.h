@@ -38,6 +38,9 @@ public:
     [[nodiscard]] bool isSharedAsioModeActive();
     juce::String selectDeviceType(const juce::String& typeName);
     juce::String configureAsio4All();
+    juce::var beginSoundCheck();
+    juce::String trySoundCheck(const juce::String& endpoint);
+    juce::String finishSoundCheck(bool keep);
     juce::String requestEngineTestTone() { return engineProcess.requestTestTone()
         ? juce::String::fromUTF8("正在播放2秒低音量测试音，请记录是否听到。")
         : juce::String::fromUTF8("独立引擎未运行，无法播放测试音。请直接导出诊断，不必反复切换。"); }
@@ -69,6 +72,10 @@ public:
     [[nodiscard]] juce::AudioDeviceManager& getDeviceManager() noexcept { return manager; }
 
 private:
+    bool soundCheckActive = false, soundCheckWasEngine = false;
+    juce::String soundCheckPrevious, soundCheckCandidate;
+    juce::StringArray soundCheckCandidates;
+    std::unique_ptr<juce::XmlElement> soundCheckSetup;
     juce::String startIsolatedAudioEngine(int requestedFrames = 128);
     juce::AudioIODeviceType* findType(const juce::String& typeName);
     juce::String preferredLiveDeviceType();

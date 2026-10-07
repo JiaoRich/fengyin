@@ -31,6 +31,7 @@ public:
     void resized() override;
     void requestCompactMode(bool compact);
     std::function<void(bool)> onWindowModeChanged;
+    std::function<void(juce::String)> onWindowAction;
     bool compactMode = false;
 
 private:

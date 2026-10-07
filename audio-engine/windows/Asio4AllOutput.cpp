@@ -1,10 +1,11 @@
 #include "Asio4AllOutput.h"
 #include "NamedSharedAudioRegion.h"
+#include "AsioEndpointSelection.h"
 
 namespace fengyin::audioengine
 {
 bool Asio4AllOutput::start(AudioEngineCore& engine, std::uint32_t requestedFrames,
-                         const std::wstring&, std::wstring& error)
+                         const std::wstring& preferredEndpoint, std::wstring& error, bool requireMatch)
 {
     stop();
     type.reset(juce::AudioIODeviceType::createAudioIODeviceType_ASIO());
@@ -21,6 +22,15 @@ bool Asio4AllOutput::start(AudioEngineCore& engine, std::uint32_t requestedFrame
     }
     device.reset(type->createDevice(selected, {}));
     if (! device) { error = L"Cannot create ASIO4ALL device"; stop(); return false; }
+    device->close();
+    const bool selectedEndpoint = selectAsioEndpoint(device->getFengYinAsioInterface(), preferredEndpoint);
+    juce::Logger::writeToLog(selectedEndpoint ? "ASIO endpoint selected by KS identity"
+        : "ASIO endpoint identity unavailable; preserving driver selection");
+    if (requireMatch && !selectedEndpoint)
+    {
+        error=L"Cannot match the requested physical output to an ASIO4ALL pin. Use Windows shared output or select the output in the ASIO4ALL panel.";
+        stop(); return false;
+    }
     juce::BigInteger outputs;
     outputs.setRange(0, 2, true);
     const auto result = device->open({}, outputs, engineSampleRate, static_cast<int>(requestedFrames));

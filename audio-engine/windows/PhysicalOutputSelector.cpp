@@ -38,6 +38,9 @@ bool isFengYinVirtualEndpoint(const std::wstring& id, const std::wstring& name)
 {
     const auto combined = lower(id + L" " + name);
     return combined.find(L"fengyin") != std::wstring::npos
+        || combined.find(L"vb-audio") != std::wstring::npos
+        || combined.find(L"cable input") != std::wstring::npos
+        || combined.find(L"cable in ") != std::wstring::npos
         || combined.find(L"风吟共享扬声器") != std::wstring::npos;
 }
 

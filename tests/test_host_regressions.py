@@ -165,8 +165,8 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('result.controller = element.getIntAttribute("msb", -1)', curve)
         self.assertNotIn('setAttribute("msb"', curve)
         self.assertNotIn('setAttribute("channel"', curve)
-        self.assertIn("outputMaximum = 116.0", header)
-        self.assertIn("shape = 0.10", header)
+        self.assertIn("outputMaximum = 127.0", header)
+        self.assertIn("shape = 0.0", header)
 
     def test_transpose_releases_active_notes_and_uses_note_map(self):
         self.assertIn("void MidiInputService::setTransposeSemitones", MIDI)

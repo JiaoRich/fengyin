@@ -144,9 +144,15 @@ body.compact-mode .instrument-heading>div:first-child{min-width:0;flex:1}
 body.compact-mode .instrument-actions{margin:0;flex-shrink:0}
 body.compact-mode .compact-action-row{grid-template-columns:repeat(2,minmax(0,1fr))}
 body.compact-mode .compact-action-row>button{overflow:visible;text-overflow:clip}
-body.compact-mode .app-shell:after{display:none}
-body.compact-mode .app-shell{border-radius:20px}
-body.compact-mode .app-shell:before{inset:0;border:0;border-radius:20px;background:radial-gradient(ellipse at 0% 40%,var(--accent),transparent 36%),radial-gradient(ellipse at 100% 65%,var(--accent-2),transparent 36%);mask:none;-webkit-mask:none;animation:none;filter:none;box-shadow:inset 0 0 48px 4px var(--accent);opacity:calc(var(--breath-energy,0)*.26);transition:none}
+body.compact-mode .app-shell{border-radius:20px;padding:12px}
+body.compact-mode .app-shell:before,body.compact-mode .app-shell:after{display:block;background:conic-gradient(#ff547c,#ffb545,#fff072,#59efb2,#46dfff,#8174ff,#ef68eb,#ff547c) border-box;animation:none;transition:opacity .12s linear}
+body.compact-mode .app-shell:before{inset:5px;border:12px solid transparent;border-radius:20px;filter:blur(10px) saturate(1.3);opacity:calc(.04 + var(--breath-energy,0)*.96)}
+body.compact-mode .app-shell:after{inset:3px;border:3px solid transparent;border-radius:17px;filter:drop-shadow(0 0 5px #9b85ff);opacity:calc(.08 + var(--breath-energy,0)*.92)}
+.compact-window-controls{display:none}
+body.compact-mode .compact-window-controls{display:flex;gap:4px;align-items:center}
+body.compact-mode .compact-brand{cursor:move;user-select:none;flex:1;min-width:0}
+body.compact-mode .window-mode-bar{gap:6px}
+body.compact-mode .compact-window-controls button{padding:6px 9px;background:transparent;color:var(--text)}
 #quick-tones,#quick-tones.open{display:grid;grid-template-columns:1fr 1fr}
 #quick-tones{visibility:hidden;opacity:0;pointer-events:none;transform:translateX(-18px) scale(.94);transition:opacity .2s,transform .22s,visibility .22s}
 #quick-tones.open{visibility:visible;opacity:1;pointer-events:auto;transform:none}
@@ -317,9 +323,10 @@ body:not(.compact-mode) #master-volume-value{display:none}
         <div class="audio-setting"><label for="audio-buffer-select">缓冲区</label><select id="audio-buffer-select"><option value="128">128（推荐）</option></select><small id="audio-buffer-help">128 延迟低；出现爆音时可改为 256</small></div>
       </div><div class="audio-summary"><div><span>当前预计延迟</span><strong class="green" id="audio-latency-value">正在检测…</strong></div><p id="audio-apply-status">首次启动和更换耳机、音响或声卡后会自动完成稳定性预检。</p><button id="audio-auto-optimize" type="button">智能优化</button></div>
       <div class="shared-asio-status"><strong>低延迟组件</strong><span>首次使用请运行安装目录 components 中附带的两个组件安装程序，并按提示重启。浏览器输出保持“默认”，启动和退出时自动切换。VB-CABLE 来自 VB-Audio，为捐赠软件，欢迎向作者支付许可费用。</span></div>
+      <button id="sound-check" type="button">声音检测</button>
       <details><summary>高级输出设备设置</summary><div class="shared-asio-status"><button id="configure-asio4all" type="button">选择实际扬声器或耳机</button><span>仅首次输出设备不正确时使用。只启用实际声卡输出，不启用虚拟线缆或麦克风。缓冲区直接在上方调整。</span></div></details>
       <div class="super-latency-card" hidden><div><span>板载声卡进阶优化</span><strong>超级低延迟优化</strong><p id="super-latency-status">正在检查系统声卡…</p></div><div class="super-latency-actions"><button id="restore-audio-driver" type="button" hidden>恢复原驱动</button><button id="super-latency-optimize" class="primary-button" type="button">开始优化</button></div></div></div></section>
-<section class="page" id="page-settings"><div class="panel glass"><div class="activation"><div><p>试用与永久授权</p><h3 id="license-title">可开始1小时完整试用</h3><div class="machine-code-row"><span id="machine-code">本机识别码：FY-8K2M-4R7P</span><button id="copy-machine-code" type="button">复制机器码</button></div></div><div class="license-actions"><button id="start-trial" type="button">开始1小时完整试用</button><input id="license-code" placeholder="请输入唯一激活码"><button id="activate" class="primary-button">永久激活</button></div></div><div class="settings-grid"><label class="toggle-row">智能音频优化（推荐）<input id="smart-audio" type="checkbox" checked><i></i></label><label class="toggle-row">低性能电脑模式<input id="low-performance" type="checkbox"><i></i></label><label class="toggle-row">启动时进入演奏页面<input type="checkbox" checked><i></i></label><label class="toggle-row">自动保存设置<input type="checkbox" checked><i></i></label><label class="toggle-row">检查软件更新<input type="checkbox" checked><i></i></label></div><div class="tone-diagnostic-section"><button id="export-current-tone" class="secondary-button" type="button" disabled>导出当前音色参数</button><p id="tone-diagnostic-status" role="status"></p></div><p class="prototype-note">风吟 1.1.1 · 本地运行，不会保存或上传个人资料。</p></div></section>
+<section class="page" id="page-settings"><div class="panel glass"><div class="activation"><div><p>试用与永久授权</p><h3 id="license-title">可开始1小时完整试用</h3><div class="machine-code-row"><span id="machine-code">本机识别码：FY-8K2M-4R7P</span><button id="copy-machine-code" type="button">复制机器码</button></div></div><div class="license-actions"><button id="start-trial" type="button">开始1小时完整试用</button><input id="license-code" placeholder="请输入唯一激活码"><button id="activate" class="primary-button">永久激活</button></div></div><div class="settings-grid"><label class="toggle-row">智能音频优化（推荐）<input id="smart-audio" type="checkbox" checked><i></i></label><label class="toggle-row">低性能电脑模式<input id="low-performance" type="checkbox"><i></i></label><label class="toggle-row">启动时进入演奏页面<input type="checkbox" checked><i></i></label><label class="toggle-row">自动保存设置<input type="checkbox" checked><i></i></label><label class="toggle-row">检查软件更新<input type="checkbox" checked><i></i></label></div><div class="tone-diagnostic-section"><button id="export-current-tone" class="secondary-button" type="button" disabled>导出当前音色参数</button><p id="tone-diagnostic-status" role="status"></p></div><p class="prototype-note">风吟 1.1.2 · 本地运行，不会保存或上传个人资料。</p></div></section>
     </main>
   </div>
   <div class="license-lock" id="license-lock" hidden>
