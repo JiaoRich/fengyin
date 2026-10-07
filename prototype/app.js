@@ -1743,12 +1743,12 @@ const soundCheckDialog = document.createElement('dialog');
 soundCheckDialog.style.cssText='max-width:480px;width:calc(100% - 48px);padding:24px;border:1px solid var(--line);border-radius:18px;background:var(--panel);color:var(--text)';
 document.body.appendChild(soundCheckDialog);
 let soundCheckChoices=[], soundCheckIndex=0, soundCheckWaiting=false;
-function soundCheckClose(keep=false) {
-  nativeEvent('finishSoundCheck',{keep}); soundCheckDialog.close(); soundCheckWaiting=false;
+function soundCheckClose(keep=false,sharedFallback=false) {
+  nativeEvent('finishSoundCheck',{keep,sharedFallback}); soundCheckDialog.close(); soundCheckWaiting=false;
 }
 function soundCheckNext() {
   if (soundCheckIndex >= soundCheckChoices.length) {
-    soundCheckDialog.innerHTML='<h2>未找到正确输出</h2><p>可以恢复原设置，在声音模式中选择 Windows Audio 共享输出，再选择耳机或音响。此电脑的 ASIO4ALL 端点可能需要手动设置。</p><button data-check="cancel">恢复原设置并关闭</button>';
+    soundCheckDialog.innerHTML='<h2>未找到正确输出</h2><p>此电脑的 ASIO4ALL 端点可能需要手动设置。可先切换到 Windows 共享兼容输出，再在输出设备中选择耳机或音响。</p><button data-check="fallback">使用共享兼容输出</button><button data-check="cancel">恢复原设置并关闭</button>';
     return;
   }
   soundCheckWaiting=true;
@@ -1764,6 +1764,7 @@ soundCheckDialog.addEventListener('cancel',e=>{e.preventDefault();soundCheckClos
 soundCheckDialog.addEventListener('click',e=>{
   const action=e.target.closest('[data-check]')?.dataset.check;
   if(action==='cancel') soundCheckClose();
+  if(action==='fallback') soundCheckClose(false,true);
   if(action==='start') { e.target.disabled=true;nativeEvent('beginSoundCheck'); }
   if(action==='correct'&&!soundCheckWaiting) soundCheckClose(true);
   if(action==='next'&&!soundCheckWaiting) soundCheckNext();

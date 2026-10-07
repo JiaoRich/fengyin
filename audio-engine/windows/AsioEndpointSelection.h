@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <mmdeviceapi.h>
 #include <devicetopology.h>
+#include <ks.h>
 #include <wrl/client.h>
 #include <juce_core/juce_core.h>
 #include <vector>
@@ -82,7 +83,7 @@ inline bool selectAsioEndpoint(void* driver, const std::wstring& endpoint)
             }
             DWORD flow = 0, channels = 0, flags = 0;
             if (chosenD < 0
-                || c.api->getPin(1, chosenD, chosenI, c.pin, &flow, 4) != 0 || flow != 0
+                || c.api->getPin(1, chosenD, chosenI, c.pin, &flow, 4) != 0 || flow != KSPIN_DATAFLOW_IN
                 || c.api->getPin(2, chosenD, chosenI, c.pin, &channels, 4) != 0 || channels < 2
                 || c.api->getPin(0, chosenD, chosenI, c.pin, &flags, 4) != 0
                 || (flags & 0x20000000u) != 0) return FALSE;
@@ -110,7 +111,7 @@ inline bool selectAsioEndpoint(void* driver, const std::wstring& endpoint)
                     for (long p=0; ok && p<128; ++p)
                     {
                         if (c.api->getPin(1,d,i,p,&value,4)!=0) break;
-                        if (value==0) ok = change(d,i,p,d==chosenD && i==chosenI && p==c.pin);
+                        if (value==KSPIN_DATAFLOW_IN) ok = change(d,i,p,d==chosenD && i==chosenI && p==c.pin);
                     }
                 }
             }

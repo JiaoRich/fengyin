@@ -729,7 +729,12 @@ void MainComponent::setupWebInterface()
         })
         .withEventListener("finishSoundCheck", [this](juce::var payload)
         {
-            const auto result=audio.finishSoundCheck(static_cast<bool>(payload.getProperty("keep",false)));
+            auto result=audio.finishSoundCheck(static_cast<bool>(payload.getProperty("keep",false)));
+            if (static_cast<bool>(payload.getProperty("sharedFallback",false)))
+            {
+                const auto error=audio.selectDeviceType("Windows Audio");
+                result=error.isEmpty() ? utf8("已切换到 Windows 共享兼容输出。") : error;
+            }
             if (webInterface) webInterface->emitEventIfBrowserIsVisible("editorResult",result);
             emitAudioSettingsState(true,result);
         })
