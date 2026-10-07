@@ -31,6 +31,15 @@ juce_add_gui_app(FengYin
     NEEDS_WEBVIEW2 TRUE
 )
 
+execute_process(COMMAND git rev-parse --short=12 HEAD
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    OUTPUT_VARIABLE FENGYIN_BUILD_REVISION OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET)
+if(NOT FENGYIN_BUILD_REVISION)
+    set(FENGYIN_BUILD_REVISION "source-archive")
+endif()
+target_compile_definitions(FengYin PRIVATE FENGYIN_BUILD_REVISION="${FENGYIN_BUILD_REVISION}")
+
 juce_add_binary_data(FengYinWebAssets SOURCES
     prototype/index.html
     prototype/styles.css

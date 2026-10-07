@@ -97,8 +97,7 @@ bool RecordingAudioProcessorPlayer::enqueueMidi(const juce::MidiMessage& message
 
     const auto timestamp = timestampSeconds > 0.0
         ? timestampSeconds : juce::Time::getMillisecondCounterHiRes() * 0.001;
-    auto& queue = timestampSeconds > 0.0 ? midiQueue : controlQueue;
-    if (! queue.push(message.getRawData(), size, timestamp))
+    if (! midiQueue.push(message.getRawData(), size, timestamp))
     {
         resetRequested.store(true, std::memory_order_release);
         return false;
@@ -204,9 +203,6 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
         onsetTrace.record(message, event.timestampSeconds);
         getMidiMessageCollector().addMessageToQueue(message);
     }
-    for (std::size_t count = 0; count < midiQueueSize && controlQueue.pop(event); ++count)
-        getMidiMessageCollector().addMessageToQueue(
-            juce::MidiMessage(event.bytes.data(), static_cast<int>(event.size), event.timestampSeconds));
     const auto probing = latencyProbeActive.load(std::memory_order_acquire);
     if (probing)
         addLatencyProbeMessages(numSamples, nowSeconds);
@@ -914,6 +910,11 @@ void PluginHostEngine::switchPerformanceChannel(int channel) noexcept
     channel = juce::jlimit(1, 16, channel);
     const auto previous = performanceChannel.exchange(channel, std::memory_order_relaxed);
     if (previous == channel) return;
+    // Initialise the destination before retriggering a held note. Qin can latch
+    // controller state at attack; sending expression after Note On is too late.
+    const auto breathValue = juce::jmax(0, lastBreathMidiValue.load(std::memory_order_relaxed));
+    queue(juce::MidiMessage::controllerEvent(channel, 1, breathValue), 0.0);
+    queue(juce::MidiMessage::pitchWheel(channel, lastPitchWheel.load(std::memory_order_relaxed)), 0.0);
     for (int note = 0; note < 128; ++note)
         if (activeNotes[static_cast<size_t>(note)].load(std::memory_order_relaxed))
         {
@@ -921,9 +922,6 @@ void PluginHostEngine::switchPerformanceChannel(int channel) noexcept
             queue(juce::MidiMessage::noteOn(channel, note,
                 activeVelocities[static_cast<size_t>(note)].load(std::memory_order_relaxed)), 0.0);
         }
-    const auto breathValue = juce::jmax(0, lastBreathMidiValue.load(std::memory_order_relaxed));
-    queue(juce::MidiMessage::controllerEvent(channel, 1, breathValue), 0.0);
-    queue(juce::MidiMessage::pitchWheel(channel, lastPitchWheel.load(std::memory_order_relaxed)), 0.0);
 }
 
 void PluginHostEngine::configureKongTechniqueProfile(const juce::String& key) noexcept

@@ -24,6 +24,8 @@ public:
         logger.reset(juce::FileLogger::createDefaultAppLogger("FengYin", "plugin-host.log",
             "FengYin " + getApplicationVersion() + " started"));
         juce::Logger::setCurrentLogger(logger.get());
+        juce::Logger::writeToLog("BUILD revision=" FENGYIN_BUILD_REVISION " onset=2 ordered-midi=1");
+        juce::Logger::writeToLog("BUILD executable=" + juce::File::getSpecialLocation(juce::File::currentExecutableFile).getFullPathName());
         mainWindow = std::make_unique<MainWindow>(getApplicationName());
     }
 

@@ -6,9 +6,21 @@ namespace fengyin {
 // Disk logging is performed only by the UI timer.
 class MidiOnsetTrace {
 public:
-    void begin() noexcept { remaining.store(2048); endsAt.store(juce::Time::getMillisecondCounterHiRes()*.001+30); }
+    // Arm at load, but begin the timed window on the first musical Note On.
+    // Users may spend minutes choosing a preset before they start playing.
+    void begin() noexcept { remaining.store(2048); endsAt.store(-1.0); }
     void record(const juce::MidiMessage& message, double timestamp) noexcept {
-        if (remaining.load()<=0 || juce::Time::getMillisecondCounterHiRes()*.001>endsAt.load()) return;
+        if (remaining.load()<=0) return;
+        const auto now = juce::Time::getMillisecondCounterHiRes()*.001;
+        auto end = endsAt.load();
+        if (end < 0.0)
+        {
+            // Exclude low keyswitch notes and idle controller noise while armed.
+            if (!message.isNoteOn() || message.getNoteNumber() < 36) return;
+            end = now + 30.0;
+            endsAt.store(end);
+        }
+        if (now>end) return;
         if (!message.isNoteOnOrOff() && !message.isController()) return;
         remaining.fetch_sub(1);
         queue.push(message.getRawData(),message.getRawDataSize(),timestamp);

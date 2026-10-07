@@ -4,6 +4,7 @@
 #include "PublishedToneCatalog.h"
 #include <cassert>
 #include <cmath>
+#include <iostream>
 
 namespace
 {
@@ -48,6 +49,28 @@ void checkSaxophoneSwamProfiles(const juce::String& key)
 
 int main()
 {
+    // An identical sustained signal must not remain quieter for an entire first
+    // note after silence. Run the actual FengYin instrument and master DSP.
+    for(bool smart : {false,true}) {
+        fengyin::MasterOutputService chain;
+        chain.setSampleRate(48000);
+        chain.setSmartOptimisationEnabled(smart);
+        float samples[128]{}; float* channels[]{samples};
+        const auto render=[&](bool sounding) {
+            double power=0;int count=0;
+            for(int block=0;block<750;++block) {
+                for(int i=0;i<128;++i) samples[i]=sounding?.08f*std::sin((block*128+i)*2*juce::MathConstants<double>::pi*440/48000):0;
+                chain.processInstrument(channels,1,128);
+                chain.processMaster(channels,1,128);
+                if(block>=375)for(float sample:samples){power+=sample*sample;++count;}
+            }
+            return std::sqrt(power/count);
+        };
+        render(false);const double first=render(true),second=render(true);
+        const double ratio=first/second;
+        std::cout<<"DSP smart="<<smart<<" first RMS="<<first<<" second RMS="<<second<<" ratio="<<ratio<<"\n";
+        assert(std::isfinite(ratio) && ratio>.8 && ratio<1.25);
+    }
     static_assert(fengyin::publishedToneCatalog.size() == 37);
     for (size_t i = 0; i < fengyin::publishedToneCatalog.size(); ++i)
     {

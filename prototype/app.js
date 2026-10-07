@@ -955,10 +955,17 @@ function closeQuickTones() {
 {
   const entry=document.querySelector('.nav-item[data-page="sounds"]');
   const backdrop=document.createElement('div');
-  backdrop.id='quick-tones-backdrop';document.body.appendChild(backdrop);
+  // Keep the backdrop in the same stacking context as the sidebar. A body-level
+  // overlay otherwise covers the entire z-index:1 app shell, including the
+  // supposedly higher sidebar, and synthesizes repeated leave/enter events.
+  backdrop.id='quick-tones-backdrop';$('.app-shell').appendChild(backdrop);
   backdrop.onclick=closeQuickTones;
-  const hide=()=>{clearTimeout(quickHoverTimer);quickHoverTimer=setTimeout(closeQuickTones,250);};
+  const hide=()=>{clearTimeout(quickHoverTimer);quickHoverTimer=setTimeout(()=>{
+    if(entry.matches(':hover') || $('#quick-tones')?.matches(':hover'))return;
+    closeQuickTones();
+  },250);};
   entry.addEventListener('mouseenter',()=>{
+    clearTimeout(quickHoverTimer);
     if(quickReopenBlocked || compactMode)return;
     clearTimeout(quickHoverTimer);quickHoverTimer=setTimeout(()=>{
       const panel=$('#quick-tones');if(!panel)return;

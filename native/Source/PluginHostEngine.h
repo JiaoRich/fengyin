@@ -15,6 +15,7 @@
 #include "AccompanimentAudioService.h"
 #include "MasterOutputService.h"
 #include "RealtimeMidiQueue.h"
+#include "OrderedMidiQueue.h"
 #include "MidiOnsetTrace.h"
 #include "SwamToneProfile.h"
 #include "SwamExpressionCurve.h"
@@ -35,7 +36,7 @@ public:
     void flushOnsetTrace() { onsetTrace.flush("audio-collector"); }
     void requestPerformanceReset() noexcept { resetRequested.store(true, std::memory_order_release); }
     void setKongResetMode(bool enabled) noexcept { kongResetMode.store(enabled, std::memory_order_release); }
-    [[nodiscard]] uint64_t getDroppedMidiEventCount() const noexcept { return midiQueue.droppedCount() + controlQueue.droppedCount(); }
+    [[nodiscard]] uint64_t getDroppedMidiEventCount() const noexcept { return midiQueue.droppedCount(); }
     std::atomic<uint64_t> callbackCount { 0 }, callbackOverruns { 0 }, signalBlocks { 0 };
     std::atomic<float> diagnosticSourcePeak { 0 };
     void audioDeviceIOCallbackWithContext(const float* const* inputs, int numInputs, float* const* outputs,
@@ -49,10 +50,7 @@ private:
     void addResetMessages(double timestampSeconds);
     void addLatencyProbeMessages(int numSamples, double timestampSeconds);
 
-    RealtimeMidiQueue<midiQueueSize> midiQueue;
-    // Timestamped MIDI callback and untimestamped message-thread commands never
-    // share a producer index. Both queues have exactly one consumer.
-    RealtimeMidiQueue<midiQueueSize> controlQueue;
+    OrderedMidiQueue<midiQueueSize> midiQueue;
     std::atomic<bool> resetRequested { false };
     std::atomic<bool> kongResetMode { false };
     std::atomic<bool> latencyProbeActive { false };
