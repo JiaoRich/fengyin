@@ -2,11 +2,12 @@
 
 namespace fengyin
 {
-MidiInputService::MidiInputService()
+MidiInputService::MidiInputService(bool persistSettings)
 {
     activeOutputNotes.fill(-1);
     techniqueHardwareInput.fill(0.0f);
     techniqueBreathInput.fill(0.0f);
+    if (!persistSettings) return;
     juce::PropertiesFile::Options options;
     options.applicationName = "FengYinMidi";
     options.filenameSuffix = ".settings";
@@ -335,6 +336,7 @@ void MidiInputService::setTechniqueContext(const juce::String& instrumentFamily)
 {
     const auto next = instrumentFamily.isNotEmpty() ? instrumentFamily : juce::String("other");
     techniqueContext = next;
+    if (next.startsWith("kong-")) onsetTrace.begin();
 }
 
 PerformanceTechnique MidiInputService::targetForRole(PerformanceTechnique role) const noexcept
@@ -553,6 +555,7 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
     // sample offset instead of quantising every event to the next block boundary.
     const auto timestampSeconds = message.getTimeStamp() > 0.0
         ? message.getTimeStamp() : juce::Time::getMillisecondCounterHiRes() * 0.001;
+    onsetTrace.record(message, timestampSeconds);
     if (handleTechniqueMessage(message, sink))
         return;
 

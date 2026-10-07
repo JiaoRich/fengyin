@@ -13,6 +13,7 @@
 #include "IntelligentTechniqueProcessor.h"
 #include "MidiPerformanceSink.h"
 #include "PitchKey.h"
+#include "MidiOnsetTrace.h"
 
 namespace fengyin
 {
@@ -43,7 +44,7 @@ struct TechniqueLearnResult
 class MidiInputService final : private juce::MidiInputCallback
 {
 public:
-    MidiInputService();
+    explicit MidiInputService(bool persistSettings = true);
     ~MidiInputService() override;
 
     std::vector<juce::MidiDeviceInfo> getAvailableDevices() const;
@@ -72,11 +73,14 @@ public:
     void setTechniqueMappings(const juce::Array<TechniqueMapping>& mappings);
     [[nodiscard]] juce::Array<TechniqueMapping> getTechniqueMappings() const;
     void setTechniqueContext(const juce::String& instrumentFamily);
+    void flushOnsetTrace() { onsetTrace.flush("input"); }
     void beginTechniqueLearn(PerformanceTechnique technique) noexcept;
     void cancelTechniqueLearn() noexcept;
     [[nodiscard]] TechniqueLearnResult consumeTechniqueLearnResult() noexcept;
 
 private:
+    friend struct MidiInputServiceTestAccess;
+    MidiOnsetTrace onsetTrace;
     void handleIncomingMidiMessage(juce::MidiInput*, const juce::MidiMessage&) override;
     juce::String controllerSettingKey() const;
     juce::String techniqueSettingKey() const;

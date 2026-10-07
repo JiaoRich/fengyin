@@ -1395,6 +1395,8 @@ void MainComponent::timerCallback()
     }
     if (++lowLatencyMonitorTicks >= 60)
     {
+        midi.flushOnsetTrace();
+        pluginHost.flushOnsetTrace();
         lowLatencyMonitorTicks = 0;
         // 运行中只告警，绝不在演奏背后改缓冲或重启音频设备。
         if (masterOutput.isSmartOptimisationEnabled()

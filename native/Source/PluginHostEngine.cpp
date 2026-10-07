@@ -201,6 +201,7 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
     for (std::size_t count = 0; count < midiQueueSize && midiQueue.pop(event); ++count)
     {
         juce::MidiMessage message(event.bytes.data(), static_cast<int>(event.size), event.timestampSeconds);
+        onsetTrace.record(message, event.timestampSeconds);
         getMidiMessageCollector().addMessageToQueue(message);
     }
     for (std::size_t count = 0; count < midiQueueSize && controlQueue.pop(event); ++count)
@@ -931,6 +932,8 @@ void PluginHostEngine::configureKongTechniqueProfile(const juce::String& key) no
     for (auto& value : kongTechniqueInputs) value.store(0.0f, std::memory_order_relaxed);
     switchPerformanceChannel(1);
     if (key.isEmpty()) return;
+    player.beginOnsetTrace();
+    juce::Logger::writeToLog("ONSET begin 30s bounded capture: " + key);
     const auto state = captureContainerState();
     if (state.getSize() < 9) return;
     const auto* bytes = static_cast<const char*>(state.getData());

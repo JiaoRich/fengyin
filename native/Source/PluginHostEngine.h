@@ -15,6 +15,7 @@
 #include "AccompanimentAudioService.h"
 #include "MasterOutputService.h"
 #include "RealtimeMidiQueue.h"
+#include "MidiOnsetTrace.h"
 #include "SwamToneProfile.h"
 #include "SwamExpressionCurve.h"
 #include "ToneParameterValue.h"
@@ -30,6 +31,8 @@ public:
     void setMasterOutputService(MasterOutputService* service) noexcept { masterOutput = service; }
     void setLatencyProbeActive(bool active) noexcept;
     bool enqueueMidi(const juce::MidiMessage& message, double timestampSeconds) noexcept;
+    void beginOnsetTrace() noexcept { onsetTrace.begin(); }
+    void flushOnsetTrace() { onsetTrace.flush("audio-collector"); }
     void requestPerformanceReset() noexcept { resetRequested.store(true, std::memory_order_release); }
     void setKongResetMode(bool enabled) noexcept { kongResetMode.store(enabled, std::memory_order_release); }
     [[nodiscard]] uint64_t getDroppedMidiEventCount() const noexcept { return midiQueue.droppedCount() + controlQueue.droppedCount(); }
@@ -42,6 +45,7 @@ public:
     void audioDeviceStopped() override;
 private:
     static constexpr std::size_t midiQueueSize = 8192;
+    MidiOnsetTrace onsetTrace;
     void addResetMessages(double timestampSeconds);
     void addLatencyProbeMessages(int numSamples, double timestampSeconds);
 
@@ -135,6 +139,7 @@ public:
     bool applyStandardSwamExpressionCurve();
     bool setBendRange(int semitones);
     void configureKongTechniqueProfile(const juce::String& instrumentKey) noexcept;
+    void flushOnsetTrace() { player.flushOnsetTrace(); }
 
     void noteOn(int noteNumber, float velocity, double timestampSeconds = 0.0) noexcept override;
     void noteOff(int noteNumber, double timestampSeconds = 0.0) noexcept override;
