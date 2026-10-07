@@ -836,6 +836,8 @@ void PluginHostEngine::noteOn(int noteNumber, float velocity, double timestampSe
     velocity = performanceVelocity(kong, velocity);
     if (kong)
     {
+        queue(kongBreathExpression(performanceChannel.load(std::memory_order_relaxed),
+            lastBreathMidiValue.load(std::memory_order_relaxed)), timestampSeconds);
         bool playing = false;
         for (const auto& held : activeNotes) playing |= held.load(std::memory_order_relaxed);
         if (!playing)
@@ -876,9 +878,12 @@ void PluginHostEngine::breathChanged(float value, double timestampSeconds) noexc
     // The controller's raw 0..127 value is routed to exactly one expression
     // destination. Sending CC2 and CC11 together can drive two mappings inside
     // SWAM and is the main cause of plateaus and conflicting expression curves.
-    queue(juce::MidiMessage::controllerEvent(performanceChannel.load(std::memory_order_relaxed),
-        kongExpressionMode.load(std::memory_order_relaxed)
-            ? 1 : swamExpressionController.load(std::memory_order_relaxed), midiValue), timestampSeconds);
+    const auto channel = performanceChannel.load(std::memory_order_relaxed);
+    if (kongExpressionMode.load(std::memory_order_relaxed))
+        queue(kongBreathExpression(channel, midiValue), timestampSeconds);
+    else
+        queue(juce::MidiMessage::controllerEvent(channel,
+            swamExpressionController.load(std::memory_order_relaxed), midiValue), timestampSeconds);
 }
 
 void PluginHostEngine::pitchBendChanged(float bipolarValue, double timestampSeconds) noexcept
@@ -952,7 +957,7 @@ void PluginHostEngine::switchPerformanceChannel(int channel) noexcept
     // Initialise the destination before retriggering a held note. Qin can latch
     // controller state at attack; sending expression after Note On is too late.
     const auto breathValue = juce::jmax(0, lastBreathMidiValue.load(std::memory_order_relaxed));
-    queue(juce::MidiMessage::controllerEvent(channel, 1, breathValue), 0.0);
+    queue(kongBreathExpression(channel, breathValue), 0.0);
     queue(juce::MidiMessage::pitchWheel(channel, lastPitchWheel.load(std::memory_order_relaxed)), 0.0);
     for (int note = 0; note < 128; ++note)
         if (activeNotes[static_cast<size_t>(note)].load(std::memory_order_relaxed))

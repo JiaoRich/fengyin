@@ -24,10 +24,19 @@ int main()
         require(cc[11] == 0, "SWAM reset behaviour changed");
         fengyin::sendPerformanceReset(true, apply);
         require(cc[11] == 127 && cc[1] == 0, "Qin reset must release expression mute and clear breath");
-        apply(juce::MidiMessage::controllerEvent(1, 1, 96));
-        require(cc[11] == 127 && cc[1] == 96, "Qin expression remains muted while blowing");
+        for (int breath : {0, 10, 32, 64, 96, 127, 64, 0})
+        {
+            apply(fengyin::kongBreathExpression(1, breath));
+            require(cc[11] == breath && cc[1] == 0, "Qin breath must drive expression, not modulation");
+        }
     }
     std::vector<juce::MidiMessage> messages;
+    for (int channel = 1; channel <= 16; ++channel)
+    {
+        const auto expression = fengyin::kongBreathExpression(channel, 64);
+        require(expression.getChannel() == channel && expression.getControllerNumber() == 11
+            && expression.getControllerValue() == 64, "Destination slot expression must follow breath");
+    }
     for (int velocity : {10, 11, 17, 48, 68, 127})
     {
         const auto input = static_cast<float>(velocity) / 127.0f;

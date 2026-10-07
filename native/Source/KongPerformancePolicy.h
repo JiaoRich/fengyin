@@ -3,6 +3,10 @@
 
 namespace fengyin
 {
+inline juce::MidiMessage kongBreathExpression(int channel, int value)
+{
+    return juce::MidiMessage::controllerEvent(channel, 11, juce::jlimit(0, 127, value));
+}
 // Wind attacks arrive before breath settles. Do not latch that transient low
 // velocity into Qin's sample gain; dynamics continue through its breath CC.
 inline float performanceVelocity(bool kong, float input) noexcept

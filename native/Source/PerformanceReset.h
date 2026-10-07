@@ -4,9 +4,9 @@
 
 namespace fengyin
 {
-// Qin uses CC1 for the wind controller and a separate CC11 expression gain.
-// Clearing CC11 while subsequently sending only CC1 leaves the instrument muted.
-// This is runtime MIDI state, not a reason to rewrite the saved sampler preset.
+// Clear modulation and release the expression gain during plugin reset.
+// Qin's live breath path now drives CC11 (including zero on breath release),
+// and re-sends it before each attack. Do not route breath into modulation CC1.
 template <typename Send>
 void sendPerformanceReset(bool kong, Send&& send)
 {
