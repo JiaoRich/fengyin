@@ -1,4 +1,5 @@
 #include "MidiInputService.h"
+#include "TechniqueSignal.h"
 
 namespace fengyin
 {
@@ -455,7 +456,7 @@ float MidiInputService::techniqueMessageValue(const juce::MidiMessage& message) 
 {
     if (message.isController()) return static_cast<float>(message.getControllerValue()) / 127.0f;
     if (message.isChannelPressure()) return static_cast<float>(message.getChannelPressureValue()) / 127.0f;
-    if (message.isPitchWheel()) return static_cast<float>(message.getPitchWheelValue()) / 16383.0f;
+    if (message.isPitchWheel()) return techniquePitchAmount(message.getPitchWheelValue());
     if (message.isNoteOn()) return message.getFloatVelocity();
     if (message.isNoteOff()) return 0.0f;
     return 0.0f;
@@ -486,7 +487,7 @@ bool MidiInputService::handleTechniqueMessage(const juce::MidiMessage& message, 
     const auto ordinaryPlayedNote = sourceType == TechniqueSourceType::note
         && breath.load(std::memory_order_relaxed) > 0.03f;
     const auto meaningfulContinuousSignal = sourceType == TechniqueSourceType::pitchWheel
-        ? std::abs(inputValue - 0.5f) > 0.18f : inputValue > 0.55f;
+        ? inputValue > 0.36f : inputValue > 0.55f;
     const auto validLearningSignal = sourceType == TechniqueSourceType::note
         ? message.isNoteOn() && ! ordinaryPlayedNote : meaningfulContinuousSignal;
     if (learningTechnique.load(std::memory_order_acquire) && validLearningSignal
@@ -501,7 +502,12 @@ bool MidiInputService::handleTechniqueMessage(const juce::MidiMessage& message, 
 
     bool consumedMessage = false;
     const juce::SpinLock::ScopedTryLockType lock(techniqueLock);
-    if (! lock.isLocked()) return false;
+    if (! lock.isLocked())
+    {
+        // Never let a potentially mapped wheel escape as an audible pitch bend
+        // merely because the UI is updating its mapping. Notes still pass.
+        return message.isPitchWheel() || capturedByLearn;
+    }
     for (const auto& mapping : techniqueMappings)
     {
         if (mapping.sourceType != sourceType || (sourceType == TechniqueSourceType::controller && mapping.sourceNumber != sourceNumber)

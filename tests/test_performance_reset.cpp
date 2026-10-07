@@ -1,5 +1,6 @@
 #include "PerformanceReset.h"
 #include "KongPerformancePolicy.h"
+#include "TechniqueSignal.h"
 #include <array>
 #include <iostream>
 #include <vector>
@@ -13,6 +14,13 @@ int main()
     };
     // Keep checks active in release builds too. This models independent MIDI
     // controllers, not Qin's audio engine; real-plugin sound still needs testing.
+    require(fengyin::techniquePitchAmount(8192) == 0.0f, "Wheel centre must release technique");
+    require(fengyin::techniquePitchAmount(0) == 1.0f, "Negative wheel must reach full technique");
+    require(fengyin::techniquePitchAmount(16383) == 1.0f, "Positive wheel must reach full technique");
+    require(fengyin::techniquePitchAmount(8191) < 0.001f, "Centre jitter must not trigger technique");
+    for (int value = 8192; value < 16383; ++value)
+        require(fengyin::techniquePitchAmount(value) <= fengyin::techniquePitchAmount(value + 1),
+                "Wheel technique response must be monotonic");
     std::array<int, 128> cc {};
     const auto apply = [&cc](const juce::MidiMessage& message)
     {
@@ -45,16 +53,25 @@ int main()
         require(std::abs(fengyin::performanceVelocity(false, input) - input) < 0.0001f,
                 "SWAM velocity must remain unchanged");
     }
-    fengyin::changeKongArticulation(1, 26, [](int) { return false; }, [](int) { return 0.75f; },
+    fengyin::changeKongArticulation(1, 26, [](int) { return false; },
         [&](const auto& message) { messages.push_back(message); });
     require(messages.empty(), "Idle bite must not emit keyswitch notes");
-    fengyin::changeKongArticulation(1, 26, [](int n) { return n == 60; }, [](int) { return 96.0f / 127.0f; },
+    fengyin::changeKongArticulation(1, 26, [](int n) { return n == 60; },
         [&](const auto& message) { messages.push_back(message); });
-    require(messages.size() == 4 && messages[0].isNoteOff() && messages[0].getNoteNumber() == 60
-        && messages[1].isNoteOn() && messages[1].getNoteNumber() == 26
-        && messages[2].isNoteOff() && messages[2].getNoteNumber() == 26
-        && messages[3].isNoteOn() && messages[3].getNoteNumber() == 60,
-        "Release old articulation before selecting and retriggering new articulation");
+    require(messages.size() == 2 && messages[0].isNoteOn() && messages[0].getNoteNumber() == 26
+        && messages[1].isNoteOff() && messages[1].getNoteNumber() == 26,
+        "Articulation must not interrupt or retrigger the musical note");
+    messages.clear();
+    for (int cycle = 0; cycle < 100; ++cycle)
+    {
+        for (int key : {26, 24})
+            fengyin::changeKongArticulation(1, key, [](int n) { return n == 60; },
+                [&](const auto& message) { messages.push_back(message); });
+    }
+    require(messages.size() == 400, "Repeated bite/release must emit exactly paired keyswitches");
+    for (const auto& message : messages)
+        require(message.isNoteOnOrOff() && (message.getNoteNumber() == 24 || message.getNoteNumber() == 26),
+            "Bite/release must not change pitch, expression or the held musical note");
     messages.clear();
     fengyin::sendPerformanceReset(true, [&](const auto& message) { messages.push_back(message); });
     require(messages.size() == 6, "Reset packet changed unexpectedly");

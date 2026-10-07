@@ -1,6 +1,12 @@
 #include <juce_gui_extra/juce_gui_extra.h>
 #include "MainComponent.h"
 #include "PluginScanWorker.h"
+#if JUCE_WINDOWS
+ #ifndef NOMINMAX
+  #define NOMINMAX
+ #endif
+ #include <windows.h>
+#endif
 
 class FengYinApplication final : public juce::JUCEApplication
 {
@@ -69,13 +75,14 @@ private:
 
         void applyMode(bool compact)
         {
-            if (! compact) { setResizeLimits(1120, 700, 7680, 4320); setFullScreen(true); return; }
+            if (! compact) { updateRoundedWindow(false); setResizeLimits(1120, 700, 7680, 4320); setFullScreen(true); return; }
             const auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect(getBounds());
             const auto area = display != nullptr ? display->userBounds.toNearestInt() : juce::Rectangle<int>(0, 0, 1366, 768);
             setResizeLimits(480, 560, 960, 2160);
             setFullScreen(false);
             const int width = juce::jmin(area.getWidth(), juce::jlimit(480, 680, area.getWidth() * 2 / 5));
             setBounds(area.getRight() - width, area.getY(), width, area.getHeight());
+            updateRoundedWindow(true);
         }
 
         void closeButtonPressed() override
@@ -83,8 +90,32 @@ private:
             juce::JUCEApplication::getInstance()->systemRequestedQuit();
         }
     private:
+        void updateRoundedWindow(bool rounded)
+        {
+           #if JUCE_WINDOWS
+            auto* peer = getPeer();
+            if (peer == nullptr) return;
+            auto hwnd = static_cast<HWND>(peer->getNativeHandle());
+            RECT bounds {};
+            if (!GetWindowRect(hwnd, &bounds)) return;
+            const int width = bounds.right - bounds.left, height = bounds.bottom - bounds.top;
+            const int radius = juce::roundToInt(20.0 * peer->getPlatformScaleFactor());
+            if (rounded == roundedApplied && width == roundedWidth && height == roundedHeight && radius == roundedRadius) return;
+            auto region = rounded ? CreateRoundRectRgn(0, 0, width + 1, height + 1, radius * 2, radius * 2) : nullptr;
+            if (rounded && region == nullptr) return;
+            if (SetWindowRgn(hwnd, region, TRUE) == 0)
+            { if (region != nullptr) DeleteObject(region); return; }
+            // Windows owns the region after successful SetWindowRgn.
+            roundedApplied = rounded; roundedWidth = width; roundedHeight = height; roundedRadius = radius;
+           #else
+            juce::ignoreUnused(rounded);
+           #endif
+        }
+        bool roundedApplied = false;
+        int roundedWidth = -1, roundedHeight = -1, roundedRadius = -1;
         void timerCallback() override
         {
+            if (!isMinimised()) updateRoundedWindow(content->compactMode && !isFullScreen());
             // Native OS restore gestures may bypass maximiseButtonPressed.
             if (! isMinimised() && ! isFullScreen() && ! content->compactMode)
             {

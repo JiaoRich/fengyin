@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.0 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.1 LANGUAGES C CXX)
+add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -100,6 +101,9 @@ juce_add_binary_data(FengYinWebAssets SOURCES
     assets/instruments/instrument_kong_guqin.png
     assets/instruments/instrument_kong_sheng.png
     assets/instruments/instrument_kong_ruan.png
+    assets/instruments/instrument_kong_xun.png
+    assets/instruments/instrument_kong_liuqin.png
+    assets/instruments/instrument_kong_sanxian.png
     assets/instruments/instrument_kong_xiao.png
     assets/instruments/instrument_kong_banhu.png
 )

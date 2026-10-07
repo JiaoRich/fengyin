@@ -3,7 +3,7 @@ namespace fengyin
 {
 namespace
 {
-constexpr juce::int64 trialDurationSeconds = 3 * 24 * 60 * 60;
+constexpr juce::int64 trialDurationSeconds = 60 * 60;
 constexpr juce::int64 clockRollbackToleranceMs = 5 * 60 * 1000;
 constexpr juce::int64 lastSeenWriteIntervalMs = 5 * 60 * 1000;
 const auto trialSecret = juce::String("FengYin-Trial-2026-Offline-Guard");
@@ -22,9 +22,9 @@ juce::String trialPayload(const LicenseService::TrialRecord& record)
 }
 }
 LicenseService::LicenseService(juce::String publicKeyText, juce::File storageDirectory,
-                               std::function<juce::int64()> currentTimeMillis)
+                               std::function<juce::int64()> currentTimeMillis, juce::String releaseVersion)
     : publicKey(publicKeyText), storageDirectoryOverride(std::move(storageDirectory)),
-      timeProvider(std::move(currentTimeMillis)) {}
+      timeProvider(std::move(currentTimeMillis)), trialVersion(std::move(releaseVersion)) {}
 juce::String LicenseService::createMachineCode(const juce::StringArray& sourceIdentifiers)
 {
     auto identifiers = sourceIdentifiers;
@@ -160,11 +160,12 @@ juce::File LicenseService::getStorageDirectory() const
 juce::Array<juce::File> LicenseService::getTrialFiles() const
 {
     juce::Array<juce::File> files;
-    files.add(getStorageDirectory().getChildFile("trial.dat"));
+    const auto filename = "trial-" + digestFor(trialVersion) + ".dat";
+    files.add(getStorageDirectory().getChildFile(filename));
     if (storageDirectoryOverride == juce::File())
     {
         const auto shared = juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory)
-                                .getChildFile("FengYin").getChildFile("trial.dat");
+                                .getChildFile("FengYin").getChildFile(filename);
         if (shared != files[0]) files.add(shared);
     }
     return files;
@@ -189,7 +190,7 @@ std::optional<LicenseService::TrialRecord> LicenseService::readTrialRecord(const
     const auto matchesDevice = record.machineCode == normaliseMachineCode(getMachineCode())
                            || record.machineCode == normaliseMachineCode(getLegacyMachineCode());
     if (! matchesDevice || record.startedAtMs <= 0
-        || record.lastSeenAtMs < record.startedAtMs || fields[5] != digestFor(payload + "|" + trialSecret))
+        || record.lastSeenAtMs < record.startedAtMs || fields[5] != digestFor(payload + "|" + trialSecret + "|" + trialVersion))
         return TrialRecord { getMachineCode(), 1, nowMillis(), true };
     return record;
 }
@@ -197,7 +198,7 @@ std::optional<LicenseService::TrialRecord> LicenseService::readTrialRecord(const
 bool LicenseService::saveTrialRecord(const TrialRecord& record) const
 {
     const auto payload = trialPayload(record);
-    const auto encoded = juce::Base64::toBase64(payload + "|" + digestFor(payload + "|" + trialSecret));
+    const auto encoded = juce::Base64::toBase64(payload + "|" + digestFor(payload + "|" + trialSecret + "|" + trialVersion));
     bool savedPrimary = false;
     auto files = getTrialFiles();
     for (int index = 0; index < files.size(); ++index)
@@ -232,7 +233,7 @@ LicenseStatus LicenseService::getTrialStatus()
         }
     }
     if (! anyFile)
-        return { false, false, false, 0, juce::String::fromUTF8("可开始3天完整试用"), {} };
+        return { false, false, false, 0, juce::String::fromUTF8("可开始1小时完整试用"), {} };
     if (! combined.has_value())
         return { false, false, true, 0, juce::String::fromUTF8("试用信息异常，请激活后继续使用"), {} };
 
@@ -248,7 +249,7 @@ LicenseStatus LicenseService::getTrialStatus()
         saveTrialRecord(record);
         return { false, false, true, 0,
                  clockRolledBack ? juce::String::fromUTF8("检测到系统时间异常，试用已停止，请激活后继续使用")
-                                 : juce::String::fromUTF8("3天完整试用已结束，请激活后继续使用"), {} };
+                                 : juce::String::fromUTF8("1小时完整试用已结束，请激活后继续使用"), {} };
     }
 
     if (now - record.lastSeenAtMs >= lastSeenWriteIntervalMs)
@@ -256,7 +257,7 @@ LicenseStatus LicenseService::getTrialStatus()
         record.lastSeenAtMs = now;
         saveTrialRecord(record);
     }
-    return { false, true, false, remaining, juce::String::fromUTF8("3天完整试用中"), {} };
+    return { false, true, false, remaining, juce::String::fromUTF8("1小时完整试用中"), {} };
 }
 
 juce::int64 LicenseService::nowMillis() const

@@ -806,6 +806,8 @@ juce::File MainComponent::prepareLocalWebInterface()
         "assets/instruments/instrument_kong_suona.png", "assets/instruments/instrument_kong_hulusi.png",
         "assets/instruments/instrument_kong_yangqin.png", "assets/instruments/instrument_kong_guqin.png",
         "assets/instruments/instrument_kong_sheng.png", "assets/instruments/instrument_kong_ruan.png",
+        "assets/instruments/instrument_kong_xun.png", "assets/instruments/instrument_kong_liuqin.png",
+        "assets/instruments/instrument_kong_sanxian.png",
         "assets/instruments/instrument_kong_xiao.png", "assets/instruments/instrument_kong_banhu.png"
     };
     for (const auto& relative : files)
@@ -944,6 +946,9 @@ std::optional<juce::WebBrowserComponent::Resource> MainComponent::getWebResource
             { "instrument_kong_yangqin.png", BinaryData::instrument_kong_yangqin_png, BinaryData::instrument_kong_yangqin_pngSize },
             { "instrument_kong_guqin.png", BinaryData::instrument_kong_guqin_png, BinaryData::instrument_kong_guqin_pngSize },
             { "instrument_kong_sheng.png", BinaryData::instrument_kong_sheng_png, BinaryData::instrument_kong_sheng_pngSize },
+            { "instrument_kong_xun.png", BinaryData::instrument_kong_xun_png, BinaryData::instrument_kong_xun_pngSize },
+            { "instrument_kong_liuqin.png", BinaryData::instrument_kong_liuqin_png, BinaryData::instrument_kong_liuqin_pngSize },
+            { "instrument_kong_sanxian.png", BinaryData::instrument_kong_sanxian_png, BinaryData::instrument_kong_sanxian_pngSize },
             { "instrument_kong_ruan.png", BinaryData::instrument_kong_ruan_png, BinaryData::instrument_kong_ruan_pngSize },
             { "instrument_kong_xiao.png", BinaryData::instrument_kong_xiao_png, BinaryData::instrument_kong_xiao_pngSize },
             { "instrument_kong_banhu.png", BinaryData::instrument_kong_banhu_png, BinaryData::instrument_kong_banhu_pngSize }
@@ -2916,7 +2921,7 @@ void MainComponent::showSetupGuide(bool automatic)
                  + utf8("3. 声音设备：") + mark(audioReady) + "\n"
                  + utf8("4. SWAM 音源：") + mark(pluginsReady) + "\n\n";
     const juce::String instructions[] {
-        {}, utf8("您可以先开始3天完整试用，满意后再永久激活。"),
+        {}, utf8("您可以先开始1小时完整试用，满意后再永久激活。"),
         utf8("请连接并打开电吹管，然后运行连接向导。"),
         utf8("请检查耳机或音响。风吟会自动选择 Windows 共享低延迟方案。"),
         utf8("最后扫描电脑中的 SWAM/VST3 音源。首次扫描可能需要一些时间。"),
@@ -3582,13 +3587,13 @@ void MainComponent::refreshLicenseUi()
         licenseButton.setButtonText(utf8("✓ 永久版"));
     else if (currentLicenseStatus.trialActive)
     {
-        const auto hours = juce::jmax<juce::int64>(1, (currentLicenseStatus.trialRemainingSeconds + 3599) / 3600);
-        licenseButton.setButtonText(utf8("试用剩余 ") + juce::String(hours) + utf8(" 小时"));
+        const auto minutes = juce::jmax<juce::int64>(1, (currentLicenseStatus.trialRemainingSeconds + 59) / 60);
+        licenseButton.setButtonText(utf8("试用剩余 ") + juce::String(minutes) + utf8(" 分钟"));
     }
     else if (currentLicenseStatus.trialExpired)
         licenseButton.setButtonText(utf8("试用已到期 · 去激活"));
     else
-        licenseButton.setButtonText(utf8("开始3天试用"));
+        licenseButton.setButtonText(utf8("开始1小时试用"));
     licenseButton.setColour(juce::TextButton::buttonColourId,
                             isPermanent ? juce::Colour(0xff176b57)
                                         : currentLicenseStatus.trialActive ? juce::Colour(0xff17617a)
@@ -3641,17 +3646,17 @@ void MainComponent::showActivationDialog()
     }
 
     auto explanation = current.trialExpired
-        ? utf8("3天完整试用已经结束。请输入永久激活码后继续使用。")
+        ? utf8("1小时完整试用已经结束。请输入永久激活码后继续使用。")
         : current.trialActive
             ? utf8("当前正在完整试用。您也可以随时输入永久激活码。")
-            : utf8("您可以立即开始3天完整试用，或输入永久激活码。试用开始后会连续计算72小时。 ");
+            : utf8("您可以立即开始1小时完整试用，或输入永久激活码。试用开始后会连续计算1小时。 ");
     activationDialog = std::make_unique<juce::AlertWindow>(utf8("试用与激活风吟"),
         explanation + utf8("\n\n本机码：") + license.getMachineCode(),
         juce::MessageBoxIconType::QuestionIcon);
     activationDialog->addTextEditor("code", {}, utf8("唯一激活码"));
     activationDialog->addButton(utf8("确认激活"), 1, juce::KeyPress(juce::KeyPress::returnKey));
     if (! current.trialActive && ! current.trialExpired)
-        activationDialog->addButton(utf8("开始3天完整试用"), 2);
+        activationDialog->addButton(utf8("开始1小时完整试用"), 2);
     activationDialog->addButton(utf8("取消"), 0, juce::KeyPress(juce::KeyPress::escapeKey));
     activationDialog->enterModalState(true, juce::ModalCallbackFunction::create([this](int result)
     {
@@ -3672,7 +3677,7 @@ void MainComponent::showActivationDialog()
             juce::AlertWindow::showMessageBoxAsync(status.trialActive ? juce::MessageBoxIconType::InfoIcon
                                                                        : juce::MessageBoxIconType::WarningIcon,
                                                    status.trialActive ? utf8("完整试用已开始") : utf8("无法开始试用"),
-                                                   status.trialActive ? utf8("从现在起72小时内，风吟全部功能均可使用。")
+                                                   status.trialActive ? utf8("从现在起1小时内，风吟全部功能均可使用。")
                                                                       : status.message);
         }
         activationDialog.reset();

@@ -9,9 +9,9 @@ juce::File RecordingService::nextRecordingFile(const juce::File& folder,
                                                 const juce::String& instrumentChineseName,
                                                 const juce::String& date)
 {
-    auto safeName = instrumentChineseName.trim().replaceCharacters("\\/:*?\"<>|", "_________");
-    if (safeName.isEmpty()) safeName = juce::String::fromUTF8("风吟");
-    const auto day = date.isNotEmpty() ? date : juce::Time::getCurrentTime().formatted("%Y%m%d");
+    juce::ignoreUnused(instrumentChineseName);
+    const auto safeName = juce::String::fromUTF8("风吟演奏录音");
+    const auto day = date.isNotEmpty() ? date.substring(juce::jmax(0, date.length() - 6)) : juce::Time::getCurrentTime().formatted("%y%m%d");
     for (int sequence = 1; sequence < 10000; ++sequence)
     {
         const auto candidate = folder.getChildFile(safeName + "-" + day + "-" + juce::String(sequence) + ".wav");

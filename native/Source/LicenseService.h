@@ -18,7 +18,8 @@ class LicenseService
 {
 public:
     explicit LicenseService(juce::String publicKeyText = {}, juce::File storageDirectory = {},
-                            std::function<juce::int64()> currentTimeMillis = {});
+                            std::function<juce::int64()> currentTimeMillis = {},
+                            juce::String releaseVersion = FENGYIN_RELEASE_VERSION);
     juce::String getMachineCode() const;
     LicenseStatus getStatus();
     LicenseStatus startTrial();
@@ -50,5 +51,6 @@ private:
     juce::RSAKey publicKey;
     juce::File storageDirectoryOverride;
     std::function<juce::int64()> timeProvider;
+    juce::String trialVersion;
 };
 }

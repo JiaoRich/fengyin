@@ -10,6 +10,10 @@
 
 namespace fengyin {
 struct MidiInputServiceTestAccess {
+    static void wheelWhileMappingBusy(MidiInputService& service) {
+        const juce::SpinLock::ScopedLockType lock(service.techniqueLock);
+        service.handleIncomingMidiMessage(nullptr, juce::MidiMessage::pitchWheel(1, 16383));
+    }
     static void send(MidiInputService& service, juce::MidiMessage message, double time) {
         message.setTimeStamp(time);
         service.handleIncomingMidiMessage(nullptr, message);
@@ -22,7 +26,8 @@ struct Sink : fengyin::MidiPerformanceSink {
     void noteOn(int, float v, double t) noexcept override { events.push_back({'N',v,t}); }
     void noteOff(int, double t) noexcept override { events.push_back({'O',0,t}); }
     void breathChanged(float v, double t) noexcept override { events.push_back({'B',v,t}); }
-    void pitchBendChanged(float, double) noexcept override {}
+    void pitchBendChanged(float v, double t) noexcept override { events.push_back({'P',v,t}); }
+    void techniqueChanged(fengyin::PerformanceTechnique, float v) noexcept override { events.push_back({'T',v,0}); }
 };
 int main() {
     struct TraceLogger : juce::Logger {
@@ -98,6 +103,29 @@ int main() {
     assert(sink.events.size()==3 && sink.events[1].type=='B');
     assert(std::abs(sink.events[1].value-80.f/127)<.001f);
     assert(std::abs(sink.events[2].value-70.f/127)<.001f);
+    fengyin::TechniqueMapping mapping;
+    mapping.technique = fengyin::PerformanceTechnique::vibrato;
+    mapping.sourceType = fengyin::TechniqueSourceType::pitchWheel;
+    mapping.mode = fengyin::TechniqueControlMode::hardware;
+    mapping.strength = 1.0f;
+    service.setTechniqueMappings({mapping});
+    sink.events.clear();
+    for (int cycle = 0; cycle < 100; ++cycle) {
+        send(juce::MidiMessage::pitchWheel(1, 8192), 40);
+        send(juce::MidiMessage::pitchWheel(1, 16383), 40.1);
+        send(juce::MidiMessage::pitchWheel(1, 8192), 40.2);
+        assert(sink.events[sink.events.size()-3].value == 0);
+        assert(sink.events[sink.events.size()-2].value == 1);
+        assert(sink.events.back().value == 0);
+    }
+    for (const auto& e : sink.events) assert(e.type == 'T');
+    sink.events.clear();
+    fengyin::MidiInputServiceTestAccess::wheelWhileMappingBusy(service);
+    assert(sink.events.empty()); // No transient bypass into ordinary bend.
+    service.setTechniqueMappings({});
+    sink.events.clear();
+    send(juce::MidiMessage::pitchWheel(1, 16383), 41);
+    assert(sink.events.size() == 1 && sink.events[0].type == 'P' && sink.events[0].value == 1);
     service.setPerformanceSink(nullptr);
     // Exercise the real JUCE collector after FengYin's realtime queue, including
     // a breath update and Note On sharing the exact timestamp.

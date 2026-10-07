@@ -868,6 +868,20 @@ void PluginHostEngine::noteOff(int noteNumber, double timestampSeconds) noexcept
     const auto note = juce::jlimit(0, 127, noteNumber);
     activeNotes[static_cast<size_t>(note)].store(false, std::memory_order_relaxed);
     queue(juce::MidiMessage::noteOff(performanceChannel.load(std::memory_order_relaxed), note), timestampSeconds);
+    if (kongExpressionMode.load(std::memory_order_relaxed))
+    {
+        bool playing = false;
+        for (const auto& held : activeNotes) playing |= held.load(std::memory_order_relaxed);
+        // End the phrase, not each articulation change. Clear any sampler-held
+        // notes in all configured slots without resetting pitch or effect tails.
+        if (!playing)
+            for (int channel = 1; channel <= 16; ++channel)
+            {
+                bool used = channel == performanceChannel.load(std::memory_order_relaxed);
+                for (const auto& route : kongTechniqueRoutes) used |= route.channel == channel;
+                if (used) queue(juce::MidiMessage::allNotesOff(channel), timestampSeconds);
+            }
+    }
 }
 
 void PluginHostEngine::breathChanged(float value, double timestampSeconds) noexcept
@@ -929,7 +943,6 @@ void PluginHostEngine::techniqueChanged(PerformanceTechnique technique, float va
                 changeKongArticulation(route.channel, selected,
                     [this, &route](int note) { return performanceChannel.load(std::memory_order_relaxed) == route.channel
                         && activeNotes[static_cast<size_t>(note)].load(std::memory_order_relaxed); },
-                    [this](int note) { return activeVelocities[static_cast<size_t>(note)].load(std::memory_order_relaxed); },
                     [this](const auto& message) { queue(message, 0.0); });
             }
         }

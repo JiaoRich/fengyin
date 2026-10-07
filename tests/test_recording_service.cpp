@@ -60,10 +60,12 @@ int main()
                             .getChildFile("fengyin-recording-test-" + juce::Uuid().toString());
     const auto file = folder.getChildFile("test.wav");
     const auto namedFirst = fengyin::RecordingService::nextRecordingFile(folder, juce::String::fromUTF8("高音萨克斯"), "20260911");
-    assert(namedFirst.getFileName() == juce::String::fromUTF8("高音萨克斯-20260911-1.wav"));
+    assert(namedFirst.getFileName() == juce::String::fromUTF8("风吟演奏录音-260911-1.wav"));
     assert(namedFirst.create().wasOk());
-    const auto namedSecond = fengyin::RecordingService::nextRecordingFile(folder, juce::String::fromUTF8("高音萨克斯"), "20260911");
-    assert(namedSecond.getFileName() == juce::String::fromUTF8("高音萨克斯-20260911-2.wav"));
+    const auto namedSecond = fengyin::RecordingService::nextRecordingFile(folder, juce::String::fromUTF8("二胡"), "20260911");
+    assert(namedSecond.getFileName() == juce::String::fromUTF8("风吟演奏录音-260911-2.wav"));
+    assert(fengyin::RecordingService::nextRecordingFile(folder, {}, "261007").getFileName()
+        == juce::String::fromUTF8("风吟演奏录音-261007-1.wav"));
     fengyin::RecordingService recorder;
     assert(recorder.startToFile(file, 48000.0, 2));
     juce::AudioBuffer<float> audio(2, 4800);

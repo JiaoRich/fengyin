@@ -47,18 +47,33 @@ int main()
     assert(! notStarted.canUseFeatures() && ! notStarted.trialExpired);
     const auto started = trialService.startTrial();
     assert(started.trialActive && started.canUseFeatures());
-    assert(started.trialRemainingSeconds == 3 * 24 * 60 * 60);
+    assert(started.trialRemainingSeconds == 60 * 60);
 
-    now += 71LL * 60 * 60 * 1000;
+    now += 3599LL * 1000;
     assert(trialService.getStatus().trialActive);
-    now += 2LL * 60 * 60 * 1000;
+    assert(trialService.getStatus().trialRemainingSeconds == 1);
+    now += 1000;
     const auto expired = trialService.getStatus();
     assert(expired.trialExpired && ! expired.canUseFeatures());
 
     fengyin::LicenseService restarted(publicKey.toString(), trialFolder, [&now] { return now; });
     assert(restarted.getStatus().trialExpired);
+    assert(restarted.startTrial().trialExpired);
+    fengyin::LicenseService nextVersion(publicKey.toString(), trialFolder, [&now] { return now; }, "next-version");
+    assert(! nextVersion.getStatus().trialExpired);
+    assert(nextVersion.startTrial().trialRemainingSeconds == 3600);
+    now += 60 * 1000;
+    fengyin::LicenseService nextRestart(publicKey.toString(), trialFolder, [&now] { return now; }, "next-version");
+    assert(nextRestart.startTrial().trialRemainingSeconds == 3540);
+    assert(restarted.getStatus().trialExpired);
 
     // New licences use firmware identity, not the filesystem/OS installation.
+    fengyin::LicenseService rollback(publicKey.toString(), trialFolder, [&now] { return now; }, "rollback-test");
+    assert(rollback.startTrial().trialActive);
+    now -= 6 * 60 * 1000;
+    assert(rollback.getStatus().trialExpired);
+    now += 6 * 60 * 1000;
+
     const auto hardware = juce::SystemStats::getUniqueDeviceID().trim();
     assert(hardware.isNotEmpty());
     const auto hardwareMachine = fengyin::LicenseService::createMachineCode({ "FY-HARDWARE-2", hardware });
@@ -67,6 +82,7 @@ int main()
     assert(restarted.activate(hardwareCode).activated);
     fengyin::LicenseService reopened(publicKey.toString(), trialFolder, [&now] { return now; });
     assert(reopened.getStatus().activated);
+    assert(nextVersion.getStatus().activated);
 
     // Upgrade must not revoke an old signed licence on the same installation.
     using Flags = juce::SystemStats::MachineIdFlags;

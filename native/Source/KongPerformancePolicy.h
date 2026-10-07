@@ -14,16 +14,16 @@ inline float performanceVelocity(bool kong, float input) noexcept
     return kong ? 96.0f / 127.0f : juce::jlimit(0.0f, 1.0f, input);
 }
 
-template <typename Held, typename Velocity, typename Send>
-void changeKongArticulation(int channel, int key, Held held, Velocity velocity, Send send)
+template <typename Held, typename Send>
+void changeKongArticulation(int channel, int key, Held held, Send send)
 {
     bool playing = false;
     for (int note = 0; note < 128; ++note)
-        if (held(note)) { playing = true; send(juce::MidiMessage::noteOff(channel, note)); }
+        if (held(note)) { playing = true; break; }
     if (!playing) return; // Idle controls must not create sampler voices.
+    // Send only the articulation command. Releasing/retriggering the musical
+    // note here restarts the sample attack and introduces an audible gap.
     send(juce::MidiMessage::noteOn(channel, key, static_cast<juce::uint8>(100)));
     send(juce::MidiMessage::noteOff(channel, key));
-    for (int note = 0; note < 128; ++note)
-        if (held(note)) send(juce::MidiMessage::noteOn(channel, note, velocity(note)));
 }
 }

@@ -21,7 +21,8 @@ public:
             endsAt.store(end);
         }
         if (now>end) return;
-        if (!message.isNoteOnOrOff() && !message.isController()) return;
+        if (!message.isNoteOnOrOff() && !message.isController()
+            && !message.isPitchWheel() && !message.isChannelPressure()) return;
         remaining.fetch_sub(1);
         queue.push(message.getRawData(),message.getRawDataSize(),timestamp);
     }

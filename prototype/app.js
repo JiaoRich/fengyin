@@ -229,8 +229,8 @@ const kongInstrumentArtwork = {
   'kong-bawu':'instrument_kong_dizi.png', 'kong-guanzi':'instrument_kong_dizi.png',
   'kong-yangqin':'instrument_kong_yangqin.png', 'kong-guqin':'instrument_kong_guqin.png',
   'kong-sheng':'instrument_kong_sheng.png', 'kong-ruan':'instrument_kong_ruan.png',
-  'kong-ruan-2':'instrument_kong_ruan.png', 'kong-liuqin':'instrument_kong_ruan.png',
-  'kong-sanxian':'instrument_kong_ruan.png'
+  'kong-ruan-2':'instrument_kong_ruan.png', 'kong-liuqin':'instrument_kong_liuqin.png',
+  'kong-sanxian':'instrument_kong_sanxian.png', 'kong-xun':'instrument_kong_xun.png'
 };
 
 const techniqueLibrary = {
@@ -395,12 +395,15 @@ function showInstrumentArtwork(key, chineseName = '') {
         : /古琴/.test(name) ? 'instrument_kong_guqin.png'
         : /琵琶/.test(name) ? 'instrument_kong_pipa.png'
         : /扬琴/.test(name) ? 'instrument_kong_yangqin.png'
-        : /中阮|阮|柳琴|三弦/.test(name) ? 'instrument_kong_ruan.png'
+        : /柳琴/.test(name) ? 'instrument_kong_liuqin.png'
+        : /三弦/.test(name) ? 'instrument_kong_sanxian.png'
+        : /埙/.test(name) ? 'instrument_kong_xun.png'
+        : /中阮|阮/.test(name) ? 'instrument_kong_ruan.png'
         : /唢呐/.test(name) ? 'instrument_kong_suona.png'
         : /葫芦丝/.test(name) ? 'instrument_kong_hulusi.png'
         : /笙/.test(name) ? 'instrument_kong_sheng.png'
         : /箫/.test(name) ? 'instrument_kong_xiao.png'
-        : /笛|巴乌|管子|埙/.test(name) ? 'instrument_kong_dizi.png' : null);
+        : /笛|巴乌|管子/.test(name) ? 'instrument_kong_dizi.png' : null);
     picture.hidden = !artwork;
     if (artwork) {
       picture.src = `../assets/instruments/${artwork}`;
@@ -1136,7 +1139,10 @@ function formatTime(seconds) {
 }
 
 $('#theme').addEventListener('change', event => document.body.dataset.theme = event.target.value);
-$('#master-volume').addEventListener('input', event => nativeEvent('setMasterVolume', {value:Number(event.target.value)/100}));
+$('#master-volume').addEventListener('input', event => {
+  $('#master-volume-value').textContent = `${event.target.value}%`;
+  nativeEvent('setMasterVolume', {value:Number(event.target.value)/100});
+});
 const transposeNames = new Map([[0,'C调'],[1,'降D调'],[2,'D调'],[3,'降E调'],[4,'E调'],[5,'F调'],[6,'升F调'],[7,'G调'],[8,'降A调'],[9,'A调'],[10,'降B调'],[11,'B调']]);
 const transposeDialog = $('#transpose-dialog');
 function updateTransposeDisplay(targetKey) {
@@ -1555,9 +1561,7 @@ $('#smart-audio').addEventListener('change', event => {
 
 function trialTimeText(seconds) {
   const safe = Math.max(0, Number(seconds) || 0);
-  const days = Math.floor(safe / 86400);
-  const hours = Math.ceil((safe % 86400) / 3600);
-  return days > 0 ? `${days}天${hours ? `${hours}小时` : ''}` : `${Math.max(1, hours)}小时`;
+  return `${Math.ceil(safe / 60)}分钟`;
 }
 
 function renderLicenseState(state = {}) {
@@ -1579,25 +1583,25 @@ function renderLicenseState(state = {}) {
   }
   lock.hidden = false;
   $('#license-lock-primary').dataset.action = trialExpired ? 'activate' : 'trial';
-  $('#license-lock-primary').textContent = trialExpired ? '输入永久激活码' : '开始3天完整试用';
+  $('#license-lock-primary').textContent = trialExpired ? '输入永久激活码' : '开始1小时完整试用';
   $('#license-lock-kicker').textContent = trialExpired ? '完整试用已结束' : '欢迎使用风吟';
-  $('#license-lock-title').textContent = trialExpired ? '激活后继续演奏' : '开始3天完整试用';
+  $('#license-lock-title').textContent = trialExpired ? '激活后继续演奏' : '开始1小时完整试用';
   $('#license-lock-message').textContent = trialExpired
     ? '试用期间保存的设置会继续保留。完成永久激活后，全部功能会立即恢复。'
-    : '请准备好电吹管和软音源后再开始。点击后将连续计算72小时，全部功能均可使用。';
-  $('#license-title').textContent = trialExpired ? '3天试用已结束' : '可开始3天完整试用';
+    : '请准备好电吹管和软音源后再开始。点击后将连续计算1小时，全部功能均可使用。';
+  $('#license-title').textContent = trialExpired ? '1小时试用已结束' : '可开始1小时完整试用';
 }
 
 function startFullTrial() {
   if (window.__JUCE__?.backend?.emitEvent) {
     nativeEvent('startTrial');
-    toast('正在开始3天完整试用…');
+    toast('正在开始1小时完整试用…');
     return;
   }
   const startedAt = Date.now();
-  localStorage.setItem('fengyin-prototype-trial-start', String(startedAt));
-  renderLicenseState({trialActive:true, trialRemainingSeconds:3*24*60*60});
-  toast('3天完整试用已开始');
+  localStorage.setItem('fengyin-prototype-trial-1.1.1-start', String(startedAt));
+  renderLicenseState({trialActive:true, trialRemainingSeconds:60*60});
+  toast('1小时完整试用已开始');
 }
 
 $('#start-trial').addEventListener('click', startFullTrial);
@@ -2212,8 +2216,8 @@ if (!window.__JUCE__?.backend?.emitEvent) {
   if(new URLSearchParams(location.search).has('review')) renderLicenseState({activated:true});
   else if(localStorage.getItem('fengyin-prototype-license') === 'active') renderLicenseState({activated:true});
   else {
-    const trialStartedAt = Number(localStorage.getItem('fengyin-prototype-trial-start') || 0);
-    const trialRemaining = Math.max(0, 3*24*60*60 - Math.floor((Date.now() - trialStartedAt) / 1000));
+    const trialStartedAt = Number(localStorage.getItem('fengyin-prototype-trial-1.1.1-start') || 0);
+    const trialRemaining = Math.max(0, 60*60 - Math.floor((Date.now() - trialStartedAt) / 1000));
     renderLicenseState(trialStartedAt > 0 && trialRemaining > 0
       ? {trialActive:true, trialRemainingSeconds:trialRemaining}
       : {trialExpired:trialStartedAt > 0});
