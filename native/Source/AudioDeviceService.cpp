@@ -373,7 +373,9 @@ juce::String AudioDeviceService::finishSoundCheck(bool keep)
     if (keep)
     {
         properties.getUserSettings()->setValue("physicalEndpoint",soundCheckCandidate);
-        properties.saveIfNeeded(); soundCheckSetup.reset();
+        properties.getUserSettings()->setValue("audioEngineEnabled",true);
+        properties.getUserSettings()->setValue("audioModeExplicitChoice",true);
+        saveSettings(); properties.saveIfNeeded(); soundCheckSetup.reset();
         return juce::String::fromUTF8("已记住这个输出设备。");
     }
     manager.closeAudioDevice(); engineProcess.stop();

@@ -4,6 +4,7 @@
 )
 
 $ErrorActionPreference = "Stop"
+$env:PYTHONUTF8 = "1"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $BuildDir = Join-Path $ProjectRoot "build-windows"
 $PackageDir = Join-Path $ProjectRoot "dist\FengYin"
@@ -32,6 +33,8 @@ if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
     throw "没有找到 Python，无法准备发布依赖。"
 }
+# Fail inexpensive source regressions before the native build, not after it.
+Invoke-Checked "发布源码预检" { python -m unittest discover -s (Join-Path $ProjectRoot "tests") -p "test_*.py" }
 if (-not (Test-Path $FfmpegPath)) {
     Write-Host "预检并校验 FFmpeg 发布依赖..." -ForegroundColor Cyan
     Invoke-Checked "FFmpeg 下载与校验" { python (Join-Path $PSScriptRoot "prepare_ffmpeg.py") $PreparedFfmpeg }
