@@ -1,10 +1,35 @@
 #include "SoundPresetStore.h"
 #include "KongProjectFile.h"
+#include "KongReleaseStates.h"
 #include <cassert>
 #include <cmath>
 
 int main()
 {
+    const auto releaseFile = juce::File(juce::String::fromUTF8(__FILE__)).getParentDirectory().getParentDirectory()
+        .getChildFile("assets/tone-packages/kong/release-states.xml");
+    const auto releaseXml = releaseFile.loadFileAsString();
+    auto releaseRoot = juce::parseXML(releaseXml);
+    assert(releaseRoot && releaseRoot->getNumChildElements() == 12);
+    for (const auto* asset : {"erhu.kam", "guzheng.kam", "hulusi.kam", "liuqin.kam",
+                             "matouqin.kam", "qudi.kam", "xun.kam", "suona.kam",
+                             "sanxian.kam", "pipa.kam", "sheng.kam", "nanxiao.kam"})
+    {
+        const auto state = fengyin::KongReleaseStates::read(releaseXml, asset);
+        assert(state.getSize() > 1000);
+        bool compared = false;
+        for (auto* entry : releaseRoot->getChildIterator())
+            if (entry->getStringAttribute("asset") == asset)
+            {
+                juce::MemoryBlock original;
+                assert(original.fromBase64Encoding(entry->getAllSubText()));
+                assert(state == original); // Keep every slot/channel/keyswitch byte.
+                compared = true;
+            }
+        assert(compared);
+    }
+    assert(fengyin::KongReleaseStates::read(releaseXml, "missing.kam").isEmpty());
+    assert(fengyin::KongReleaseStates::read("<invalid/>", "erhu.kam").isEmpty());
     const auto directory = juce::File::getSpecialLocation(juce::File::tempDirectory)
         .getNonexistentChildFile("fengyin-preset-test", {}, true);
     directory.createDirectory();

@@ -3,6 +3,7 @@
 #include "TonePackage.h"
 #include "BinaryData.h"
 #include "KongProjectFile.h"
+#include "KongReleaseStates.h"
 #include <algorithm>
 #include <cstring>
 
@@ -2106,7 +2107,7 @@ void MainComponent::loadPublishedTone(const juce::String& catalogueId)
         preset.studioDraft = false;
         preset.published = true;
         preset.customTone = false;
-        completeLoadedPreset(preset, [this, definition, report](bool success, const juce::String& message)
+        loadPreset(preset, [this, definition, report](bool success, const juce::String& message)
         {
             if (success)
             {
@@ -2134,7 +2135,9 @@ void MainComponent::loadPublishedTone(const juce::String& catalogueId)
     }
 
     juce::MemoryBlock project(asset.data, static_cast<size_t>(asset.size));
-    const auto pluginState = fengyin::KongProjectFile::toPluginState(project);
+    const auto pluginState = fengyin::KongReleaseStates::read(
+        juce::String::fromUTF8(BinaryData::releasestates_xml, BinaryData::releasestates_xmlSize),
+        utf8(definition->assetName.data()));
     if (pluginState.getSize() == 0)
     {
         report(false, utf8("内置空音方案损坏，未加载"));
@@ -3074,6 +3077,17 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
         return;
     }
     auto preset = cachedPresets.getReference(index);
+    loadPreset(std::move(preset), std::move(completion));
+}
+
+void MainComponent::loadPreset(fengyin::SoundPreset preset,
+                              std::function<void(bool, const juce::String&)> completion)
+{
+    if (pluginLoading)
+    {
+        if (completion) completion(false, utf8("音源正在加载，请稍候，不要重复点击"));
+        return;
+    }
 
     if (preset.studioDraft && ! studioUnlocked)
     {

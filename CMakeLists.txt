@@ -50,6 +50,7 @@ juce_add_binary_data(FengYinWebAssets SOURCES
     assets/tone-packages/kong/pipa.kam
     assets/tone-packages/kong/sheng.kam
     assets/tone-packages/kong/nanxiao.kam
+    assets/tone-packages/kong/release-states.xml
     assets/instruments/instrument_soprano_sax.png
     assets/instruments/instrument_alto_sax.png
     assets/instruments/instrument_tenor_sax.png

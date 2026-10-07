@@ -85,9 +85,24 @@ begin
 end;
 
 function NeedsVBCable(): Boolean;
+var
+  ResultCode: Integer;
+  Arguments: String;
 begin
-  Result := not RegKeyExists(HKLM, 'SYSTEM\CurrentControlSet\Services\VBAudioVACMME')
-    and not RegKeyExists(HKLM, 'SYSTEM\CurrentControlSet\Services\VBAudioVACWDM');
+  { A service registry key can survive device removal. Check a present PnP
+    device instead; code 14 means installed but awaiting a restart. }
+  Arguments := '-NoProfile -NonInteractive -Command "try { ' +
+    '$d = Get-CimInstance Win32_PnPEntity -ErrorAction Stop | Where-Object { ' +
+    '$_.Present -eq $true -and $_.Service -in @(''VBAudioVACMME'',''VBAudioVACWDM'') ' +
+    '-and $_.ConfigManagerErrorCode -in @(0,14) }; ' +
+    'if ($d) { exit 0 } else { exit 1 } } catch { exit 2 }"';
+  Result := True;
+  if Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+          Arguments, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    Log('VB-CABLE present-device check returned ' + IntToStr(ResultCode));
+    Result := ResultCode <> 0;
+  end;
 end;
 
 procedure ExplainVBCableInstall();
@@ -126,5 +141,5 @@ end;
 
 function CanLaunchNow(): Boolean;
 begin
-  Result := not VBCableInstalledThisRun and not NeedsASIO4ALL();
+  Result := not VBCableInstalledThisRun and not NeedsASIO4ALL() and not NeedsVBCable();
 end;

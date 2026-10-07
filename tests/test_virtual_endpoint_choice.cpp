@@ -6,6 +6,10 @@ int main()
     assert(matchesVirtualEndpoint(L"Speakers (FengYin)", false));
     assert(matchesVirtualEndpoint(L"风吟共享扬声器", false));
     assert(matchesVirtualEndpoint(L"CABLE Input (VB-Audio Virtual Cable)", true));
+    assert(matchesVirtualEndpoint(L"CABLE Input", true));
+    assert(matchesVirtualEndpoint(L"CABLE Output", true, true));
+    assert(!matchesVirtualEndpoint(L"CABLE Output", true));
+    assert(!matchesVirtualEndpoint(L"CABLE Input", true, true));
     assert(matchesVirtualEndpoint(L"CABLE Output (VB-Audio Virtual Cable)", true, true));
     assert(!matchesVirtualEndpoint(L"CABLE Input (VB-Audio Virtual Cable)", true, true));
     assert(!matchesVirtualEndpoint(L"CABLE Output (VB-Audio Virtual Cable)", true));
