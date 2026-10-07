@@ -50,5 +50,14 @@ class VBCableTrialTests(unittest.TestCase):
         self.assertNotIn('id="download-asio4all"', html)
         self.assertIn('id="audio-buffer-select"', html)
 
+    def test_release_installer_cannot_silently_skip_vbcable(self):
+        installer = self.read("installer/FengYin.iss")
+        run_line = next(line for line in installer.splitlines()
+                        if line.startswith('Filename: "{app}\\components\\VB-CABLE'))
+        self.assertNotIn("Tasks: vbcable", run_line)
+        self.assertIn("Check: NeedsVBCable", run_line)
+        self.assertIn("AfterInstall: VerifyVBCableInstalled", run_line)
+        self.assertIn("RaiseException('VB-CABLE 未完成安装", installer)
+
 if __name__ == "__main__":
     unittest.main()

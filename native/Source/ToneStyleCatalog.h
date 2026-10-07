@@ -13,15 +13,12 @@ const auto addReleaseStyle = [&result](const char* id, const char* name,
     style.id = id;
     style.name = juce::String::fromUTF8(name);
     style.settings = settings;
-    style.swam.enabled = true;
-    // Only identifiers common to supported SWAM families are forced here.
-    // Instrument-specific synthesis parameters remain at the vendor defaults.
-    style.swam.releaseParameters = {
-        ToneParameterValue { "index:26:eqenabled", 0.0f },
-        ToneParameterValue { "index:25:compressor", 0.0f },
-        ToneParameterValue { "index:32:reverbmix", 0.0f },
-        ToneParameterValue { "index:34:mainvolume", 1.0f }
-    };
+    // These first-pass release tones are deliberately implemented by the
+    // version-independent FengYin output chain.  SWAM parameter indexes are
+    // different between instrument families even when the version label is
+    // identical, so forcing four guessed indexes produced a false 3.9.4
+    // compatibility warning and could alter the wrong controls.
+    style.swam.enabled = false;
     result.add(style);
 };
 if (key == "soprano-sax") { ToneStyleDefinition s; s.id="kenny"; s.name=juce::String::fromUTF8("肯尼基");

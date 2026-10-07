@@ -1127,7 +1127,10 @@ int PluginHostEngine::applySwamToneProfile(const SwamToneProfile& profile, bool 
         audit->setProperty("expectedAtApply", profile.releaseParameters.size());
         audit->setProperty("verifiedAtApply", 0);
         audit->setProperty("modelApplied", false);
-        if (currentDescription.version != "3.9.4") return 0;
+        // Some SWAM VST3 builds append a build/revision suffix to the semantic
+        // version (for example 3.9.4.x).  Treat those as the same compatible
+        // release instead of incorrectly warning a 3.9.4 user.
+        if (! currentDescription.version.trim().startsWith("3.9.4")) return 0;
         const auto retired = retiredToneParameters(previousReleaseParameters,
             profile.releaseParameters, releaseBaseline);
         const auto model = instrumentModelNames.indexOf(profile.releaseModel);

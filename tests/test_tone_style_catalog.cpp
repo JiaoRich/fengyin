@@ -35,7 +35,7 @@ void checkSaxophoneSwamProfiles(const juce::String& key)
     if (key == "baritone-sax")
     {
         assert(styles.size() == 2);
-        for (const auto& style : styles) assert(style.swam.enabled && ! style.swam.releaseParameters.isEmpty());
+        for (const auto& style : styles) assert(! style.swam.enabled && style.swam.releaseParameters.isEmpty());
         return;
     }
     for (const auto& style : styles) {

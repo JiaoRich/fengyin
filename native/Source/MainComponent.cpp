@@ -1557,7 +1557,14 @@ void MainComponent::timerCallback()
                 RoleDescription { fengyin::PerformanceTechnique::portamento, "portamento", "摇杆／拇指控制" },
                 RoleDescription { fengyin::PerformanceTechnique::mute, "mute", "功能键 1" },
                 RoleDescription { fengyin::PerformanceTechnique::alternateFingering, "altFingering", "功能键 2" },
-                RoleDescription { fengyin::PerformanceTechnique::halfValve, "halfValve", "功能键 3" } })
+                RoleDescription { fengyin::PerformanceTechnique::halfValve, "halfValve", "功能键 3" },
+                // These extra entries are not hardware slots. They expose the
+                // persisted on/off and strength values needed by the breath
+                // control page for the current instrument.
+                RoleDescription { fengyin::PerformanceTechnique::flutter, "flutter", "花舌／颤弓" },
+                RoleDescription { fengyin::PerformanceTechnique::overblow, "overblow", "超吹／泛音" },
+                RoleDescription { fengyin::PerformanceTechnique::breathNoise, "breathNoise", "气声" },
+                RoleDescription { fengyin::PerformanceTechnique::bowPressure, "bowPressure", "弓压" } })
         {
             auto item = std::make_unique<juce::DynamicObject>();
             item->setProperty("technique", static_cast<int>(role.role));
@@ -2161,17 +2168,48 @@ void MainComponent::loadPublishedTone(const juce::String& catalogueId)
     preset.outputGain = settings.outputGain;
     preset.bass = settings.bass;
     preset.air = settings.air;
-    completeLoadedPreset(preset, [this, definition, report](bool success, const juce::String& message)
+    if (pluginLoading)
     {
-        if (success)
+        report(false, utf8("音源正在加载，请稍候重试"));
+        return;
+    }
+    const auto status = audio.getStatus();
+    currentPluginBrand = "kong";
+    currentInstrumentKey = preset.instrumentKey;
+    currentInstrumentChineseName = preset.instrumentChineseName;
+    pluginStatus.setText(utf8("正在加载空音方案：") + preset.name, juce::dontSendNotification);
+    effectLoading = false;
+    pluginLoading = true;
+    pluginHost.loadAsync(qin,
+        status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
+        status.bufferSize > 0 ? status.bufferSize : 128,
+        pluginState,
+        [this, preset, definition, report](bool loaded, const juce::String& message)
         {
-            currentToneStyleId = utf8(definition->styleId.data());
-            currentPresetDisplayName = utf8(definition->name.data());
-            currentPresetId.clear();
-            currentPresetIsCustom = false;
-        }
-        report(success, message);
-    });
+            if (! loaded)
+            {
+                pluginLoading = false;
+                useTestSynth();
+                report(false, utf8("空音方案加载失败：") + message);
+                return;
+            }
+            // The KAM-backed QinEngine instance must become the live audio
+            // source before its FengYin effects are restored.  Previously this
+            // path only changed UI/preset state and left the old SWAM audible.
+            activatePluginOutput(message, false);
+            pluginLoading = false;
+            completeLoadedPreset(preset, [this, definition, report](bool success, const juce::String& result)
+            {
+                if (success)
+                {
+                    currentToneStyleId = utf8(definition->styleId.data());
+                    currentPresetDisplayName = utf8(definition->name.data());
+                    currentPresetId.clear();
+                    currentPresetIsCustom = false;
+                }
+                report(success, result);
+            });
+        });
 }
 
 void MainComponent::beginContainerInstrument(const juce::String& adapter)

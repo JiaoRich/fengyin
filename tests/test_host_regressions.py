@@ -424,7 +424,17 @@ class HostRegressionTests(unittest.TestCase):
         self.assertEqual(TONE_STYLES.count('s.swam.releaseParameters ='), 7)
         for name in ('肯尼基','流行高音','爵士','深情','流行','醇厚','温暖'):
             self.assertIn(name, TONE_STYLES)
-        self.assertIn('currentDescription.version != "3.9.4"', HOST)
+        self.assertIn('currentDescription.version.trim().startsWith("3.9.4")', HOST)
+
+    def test_published_kong_tone_replaces_the_live_swam_instance(self):
+        published = MAIN.split("void MainComponent::loadPublishedTone", 1)[1].split(
+            "void MainComponent::beginContainerInstrument", 1)[0]
+        self.assertIn("pluginHost.loadAsync(qin", published)
+        self.assertIn("pluginState", published)
+        self.assertIn("activatePluginOutput(message, false)", published)
+        qin_load = published.index("pluginHost.loadAsync(qin")
+        self.assertLess(published.index("activatePluginOutput(message, false)", qin_load),
+                        published.index("completeLoadedPreset(preset", qin_load))
 
     def test_custom_tone_settings_preserve_builtin_styles(self):
         self.assertIn('withEventListener("previewCustomTone"', MAIN)

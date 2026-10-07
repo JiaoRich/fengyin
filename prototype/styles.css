@@ -42,3 +42,6 @@ body.low-performance .brand-glyph{animation:none!important}
 #quick-tones button.active{outline:2px solid var(--accent)}
 #quick-tones button{padding:15px;color:var(--text);background:var(--accent-soft);border:1px solid var(--line);border-radius:10px;cursor:pointer}
 #instrument-model-switcher,#tone-style-switcher{display:none!important}
+.adapter-breath-controls{display:grid;gap:10px}
+.adapter-technique-toggle{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+.adapter-technique-toggle input{width:17px;height:17px;accent-color:var(--accent)}

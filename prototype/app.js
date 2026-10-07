@@ -1276,16 +1276,36 @@ function startTechniqueLearning(item,inline = false) {
 }
 
 function adapterTechniqueItems() {
-  const defaults = [
-    {id:'vibrato',name:'颤动控制',description:'颤音、揉弦或唇颤音',icon:'≈',strength:55,index:1,featured:true},
-    {id:'growl',name:'质感控制',description:'嘶吼、花舌或颤弓',icon:'≋',strength:50,index:0,featured:true},
-    {id:'portamento',name:'滑音控制',description:'滑音与连奏过渡',icon:'⌁',strength:45,index:3,featured:true},
-    {id:'mute',name:'特殊技巧',description:'弱音器、拨奏或替代指法',icon:'◇',strength:50,index:8,featured:true}
-  ];
-  return defaults.map(fallback => {
-    const item = techniquePlan.find(candidate => candidate.id === fallback.id);
-    return {...fallback,...(item || {}),mode:adapterMode};
-  });
+  if (adapterMode === 'hardware') {
+    // Hardware roles are device-level mappings and must stay available even
+    // before an instrument has been loaded.  Do not derive this panel from
+    // the current instrument technique plan: doing so hid function keys 2/3
+    // whenever the audio engine temporarily reported no active plug-in.
+    return mergeBackendTechniquePlan('', latestBackendState, techniqueMappings)
+      .map(item => ({...item,mode:'hardware'}));
+  }
+
+  const continuous = new Set(['vibrato','growl','flutter','overblow','breathNoise','bowPressure']);
+  const key = currentInstrument?.instrumentKey || latestBackendState.instrumentKey || '';
+  return buildTechniquePlan(key)
+    .filter(item => continuous.has(item.id))
+    .map(item => {
+      const saved = techniqueMappings.find(mapping => mapping.id === item.id);
+      const mode = Number(saved?.mode) === 4 ? 'off' : 'breath';
+      return {...item,mode,enabled:mode !== 'off',
+        strength:Number.isFinite(Number(saved?.strength)) ? Math.round(Number(saved.strength) * 100) : item.strength};
+    });
+}
+
+function updateLocalTechniqueConfiguration(id, mode, strength) {
+  let saved = techniqueMappings.find(mapping => mapping.id === id);
+  if (!saved) {
+    saved = {id,mode:mode === 'off' ? 4 : 1,strength};
+    techniqueMappings.push(saved);
+  } else {
+    saved.mode = mode === 'off' ? 4 : 1;
+    saved.strength = strength;
+  }
 }
 
 function renderAdapterTechniqueGrid() {
@@ -1304,7 +1324,7 @@ function renderAdapterTechniqueGrid() {
       <header><span>${item.icon}</span><div><h3>${escapeHtml(item.name)}</h3><small>${escapeHtml(item.description)}</small></div></header>
       ${hardware
         ? `<div class="adapter-map-actions"><button class="adapter-map-source ${learning ? 'learning' : ''}" type="button">${learning ? '等待操作…' : mapped ? `✓ ${escapeHtml(sourceDescription(item))}` : '点击映射'}</button>${mapped?'<button class="adapter-clear-source" type="button">清除</button>':''}</div>`
-        : `<label class="adapter-technique-strength"><span>效果强度</span><input type="range" min="0" max="100" value="${Number(item.strength || 50)}"><b>${Number(item.strength || 50)}%</b></label>`}
+        : `<div class="adapter-breath-controls"><label class="adapter-technique-toggle"><input type="checkbox" ${item.enabled === false ? '' : 'checked'}><span>${item.enabled === false ? '已关闭' : '已开启'}</span></label><label class="adapter-technique-strength"><span>效果强度</span><input type="range" min="0" max="100" value="${Number(item.strength || 50)}" ${item.enabled === false ? 'disabled' : ''}><b>${Number(item.strength || 50)}%</b></label></div>`}
     </article>`;
   }).join('');
   $$('.adapter-map-source').forEach(button => button.addEventListener('click', event => {
@@ -1320,12 +1340,23 @@ function renderAdapterTechniqueGrid() {
     nativeEvent('removeTechniqueMapping',{technique:item.index});
     item.sourceType=0;item.sourceNumber=-1;renderAdapterTechniqueGrid();
   }));
+  $$('#adapter-technique-grid .adapter-technique-toggle input').forEach(input => input.addEventListener('change', event => {
+    const id = input.closest('[data-technique-id]')?.dataset.techniqueId;
+    const item = items.find(candidate => candidate.id === id);
+    if (!item) return;
+    item.enabled = event.target.checked;
+    item.mode = item.enabled ? 'breath' : 'off';
+    updateLocalTechniqueConfiguration(id,item.mode,Number(item.strength || 50)/100);
+    nativeEvent('setTechniqueConfiguration',{techniqueId:id,mode:item.mode,strength:Number(item.strength || 50)/100});
+    adapterRenderSignature=''; renderAdapterTechniqueGrid();
+  }));
   $$('#adapter-technique-grid input[type="range"]').forEach(input => input.addEventListener('input', event => {
     const id = input.closest('[data-technique-id]')?.dataset.techniqueId;
-    const item = techniquePlan.find(candidate => candidate.id === id);
+    const item = items.find(candidate => candidate.id === id);
     const value = Number(event.target.value);
     event.target.nextElementSibling.textContent = `${value}%`;
     if (item) item.strength = value;
+    updateLocalTechniqueConfiguration(id,'breath',value/100);
     nativeEvent('setTechniqueConfiguration',{techniqueId:id,mode:'breath',strength:value/100});
   }));
 }
@@ -1383,10 +1414,6 @@ $$('[data-adapter-mode]').forEach(button => button.addEventListener('click', () 
   adapterMode = button.dataset.adapterMode;
   $$('[data-adapter-mode]').forEach(item => item.classList.toggle('active', item === button));
   globalTechniqueMode = adapterMode;
-  techniquePlan.forEach(item => {
-    item.mode = adapterMode;
-    nativeEvent('setTechniqueConfiguration',{techniqueId:item.id,mode:adapterMode,strength:Number(item.strength || 50)/100});
-  });
   $('#adapter-inline-hint').textContent = adapterMode === 'hardware'
     ? '映射一次即可用于所有音源；请选择一项技巧后操作对应按键、摇杆或吹嘴。'
     : '气息控制会按当前乐器转换成对应技巧，可分别调整效果强度。';
