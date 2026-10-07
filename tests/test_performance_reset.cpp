@@ -1,4 +1,5 @@
 #include "PerformanceReset.h"
+#include "KongPerformancePolicy.h"
 #include <array>
 #include <iostream>
 #include <vector>
@@ -27,6 +28,25 @@ int main()
         require(cc[11] == 127 && cc[1] == 96, "Qin expression remains muted while blowing");
     }
     std::vector<juce::MidiMessage> messages;
+    for (int velocity : {10, 11, 17, 48, 68, 127})
+    {
+        const auto input = static_cast<float>(velocity) / 127.0f;
+        require(std::abs(fengyin::performanceVelocity(true, input) - 96.0f / 127.0f) < 0.0001f,
+                "Qin first and subsequent attacks must have equal velocity");
+        require(std::abs(fengyin::performanceVelocity(false, input) - input) < 0.0001f,
+                "SWAM velocity must remain unchanged");
+    }
+    fengyin::changeKongArticulation(1, 26, [](int) { return false; }, [](int) { return 0.75f; },
+        [&](const auto& message) { messages.push_back(message); });
+    require(messages.empty(), "Idle bite must not emit keyswitch notes");
+    fengyin::changeKongArticulation(1, 26, [](int n) { return n == 60; }, [](int) { return 96.0f / 127.0f; },
+        [&](const auto& message) { messages.push_back(message); });
+    require(messages.size() == 4 && messages[0].isNoteOff() && messages[0].getNoteNumber() == 60
+        && messages[1].isNoteOn() && messages[1].getNoteNumber() == 26
+        && messages[2].isNoteOff() && messages[2].getNoteNumber() == 26
+        && messages[3].isNoteOn() && messages[3].getNoteNumber() == 60,
+        "Release old articulation before selecting and retriggering new articulation");
+    messages.clear();
     fengyin::sendPerformanceReset(true, [&](const auto& message) { messages.push_back(message); });
     require(messages.size() == 6, "Reset packet changed unexpectedly");
     require(messages[0].isAllNotesOff() && messages[1].isAllSoundOff(), "Old notes must stop before expression opens");

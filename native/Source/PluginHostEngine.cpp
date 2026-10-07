@@ -4,6 +4,7 @@
 #include "KongInstrumentCatalog.h"
 #include "KongProjectFile.h"
 #include "KongTechniqueMap.h"
+#include "KongPerformancePolicy.h"
 #include "BendRangeParameters.h"
 #include "PerformanceReset.h"
 #include "ToneRestorePlan.h"
@@ -831,6 +832,29 @@ bool PluginHostEngine::rebuildConnections()
 void PluginHostEngine::noteOn(int noteNumber, float velocity, double timestampSeconds) noexcept
 {
     const auto note = juce::jlimit(0, 127, noteNumber);
+    const auto kong = kongExpressionMode.load(std::memory_order_relaxed);
+    velocity = performanceVelocity(kong, velocity);
+    if (kong)
+    {
+        bool playing = false;
+        for (const auto& held : activeNotes) playing |= held.load(std::memory_order_relaxed);
+        if (!playing)
+            for (int channel = 1; channel <= 16; ++channel)
+            {
+                int selected = -1;
+                for (const auto& route : kongTechniqueRoutes)
+                    if (route.channel == channel && route.normalKey >= 0) { selected = route.normalKey; break; }
+                for (size_t i = 0; i < kongTechniqueRoutes.size(); ++i)
+                    if (kongTechniqueRoutes[i].channel == channel && kongTechniqueRoutes[i].keyswitch >= 0
+                        && kongTechniqueInputs[i].load(std::memory_order_relaxed) > 0.5f)
+                        selected = kongTechniqueRoutes[i].keyswitch;
+                if (selected >= 0)
+                {
+                    queue(juce::MidiMessage::noteOn(channel, selected, static_cast<juce::uint8>(100)), timestampSeconds);
+                    queue(juce::MidiMessage::noteOff(channel, selected), timestampSeconds);
+                }
+            }
+    }
     activeNotes[static_cast<size_t>(note)].store(true, std::memory_order_relaxed);
     activeVelocities[static_cast<size_t>(note)].store(juce::jlimit(0.0f, 1.0f, velocity), std::memory_order_relaxed);
     queue(juce::MidiMessage::noteOn(performanceChannel.load(std::memory_order_relaxed), note,
@@ -885,8 +909,23 @@ void PluginHostEngine::techniqueChanged(PerformanceTechnique technique, float va
                     selected = kongTechniqueRoutes[i].keyswitch;
             if (selected >= 0)
             {
-                queue(juce::MidiMessage::noteOn(route.channel, selected, static_cast<juce::uint8>(100)), 0.0);
-                queue(juce::MidiMessage::noteOff(route.channel, selected), 0.0);
+                // An inactive destination slot needs its articulation selected
+                // before switchPerformanceChannel starts the held note there.
+                if (performanceChannel.load(std::memory_order_relaxed) != route.channel)
+                {
+                    bool playing = false;
+                    for (const auto& held : activeNotes) playing |= held.load(std::memory_order_relaxed);
+                    if (playing)
+                    {
+                        queue(juce::MidiMessage::noteOn(route.channel, selected, static_cast<juce::uint8>(100)), 0.0);
+                        queue(juce::MidiMessage::noteOff(route.channel, selected), 0.0);
+                    }
+                }
+                changeKongArticulation(route.channel, selected,
+                    [this, &route](int note) { return performanceChannel.load(std::memory_order_relaxed) == route.channel
+                        && activeNotes[static_cast<size_t>(note)].load(std::memory_order_relaxed); },
+                    [this](int note) { return activeVelocities[static_cast<size_t>(note)].load(std::memory_order_relaxed); },
+                    [this](const auto& message) { queue(message, 0.0); });
             }
         }
         if (route.channel > 1)
