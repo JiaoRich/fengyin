@@ -40,7 +40,11 @@ if(NOT FENGYIN_BUILD_REVISION)
 endif()
 target_compile_definitions(FengYin PRIVATE FENGYIN_BUILD_REVISION="${FENGYIN_BUILD_REVISION}")
 
+file(GLOB FENGYIN_VOICE_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/assets/voice/*.wav")
 juce_add_binary_data(FengYinWebAssets SOURCES
+    ${FENGYIN_VOICE_FILES}
+    prototype/voice-catalog.js
+    prototype/voice-guide.js
     prototype/index.html
     prototype/styles.css
     prototype/app.js
@@ -391,6 +395,10 @@ if(BUILD_TESTING)
     target_include_directories(FengYinMidiOnsetTests PRIVATE native/Source)
     target_link_libraries(FengYinMidiOnsetTests PRIVATE juce::juce_audio_devices juce::juce_data_structures juce::juce_recommended_config_flags)
     add_test(NAME midi_phrase_onset COMMAND FengYinMidiOnsetTests)
+    add_executable(FengYinVoicePromptTests tests/test_voice_prompt.cpp)
+    target_include_directories(FengYinVoicePromptTests PRIVATE native/Source)
+    target_link_libraries(FengYinVoicePromptTests PRIVATE juce::juce_audio_utils juce::juce_recommended_config_flags)
+    add_test(NAME offline_voice_prompt COMMAND FengYinVoicePromptTests "${CMAKE_SOURCE_DIR}/assets/voice/V041.wav")
 
     add_executable(FengYinToneStyleTests tests/test_tone_style_catalog.cpp native/Source/MasterOutputService.cpp)
     target_include_directories(FengYinToneStyleTests PRIVATE native/Source)

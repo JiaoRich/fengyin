@@ -216,6 +216,7 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
     videoPlayer.setAccompanimentService(&accompaniment);
     midi.setPerformanceSink(&testSynth);
     audio.getDeviceManager().addAudioCallback(&testSynth);
+    audio.getDeviceManager().addAudioCallback(&voicePrompts);
     // 设备能力选择已完成；真实稳定性验证必须等软音源载入后再运行，
     // 否则空载 CPU/xrun 会对用户报出虚假的“优化完成”。
     refreshPresetChoices();
@@ -235,6 +236,7 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
 MainComponent::~MainComponent()
 {
     stopTimer();
+    audio.getDeviceManager().removeAudioCallback(&voicePrompts);
     pluginHost.setLatencyProbeActive(false);
     webVideoAudioExtractor.cancel();
     accompaniment.pause();
@@ -736,7 +738,17 @@ void MainComponent::setupWebInterface()
             if (webInterface) webInterface->emitEventIfBrowserIsVisible("editorResult",
                 ok ? utf8("诊断已保存到桌面，请将文本文件发给我。") : utf8("诊断导出失败，请检查桌面写入权限。"));
         })
-        .withEventListener("toggleRecording", [this](juce::var) { if (isActivated || recorder.isRecording()) toggleRecording(); })
+        .withEventListener("playVoice", [this](juce::var payload) {
+            const auto id=payload.getProperty("id",juce::String()).toString();
+            const int token=payload.getProperty("token",0);
+            int size=0;
+            const auto* data=BinaryData::getNamedResource((id+"_wav").toRawUTF8(),size);
+            const auto gain=static_cast<float>(payload.getProperty("volume",.45));
+            if(token<=0 || !data || recorder.isRecording() || !voicePrompts.play(data,size,token,gain))
+                if(webInterface)webInterface->emitEventIfBrowserIsVisible("voiceFinished",-token);
+        })
+        .withEventListener("stopVoice", [this](juce::var) {voicePrompts.stop();})
+        .withEventListener("toggleRecording", [this](juce::var) { voicePrompts.stop(); if (isActivated || recorder.isRecording()) toggleRecording(); })
         .withEventListener("showRecordings", [](juce::var)
         {
             const auto folder = fengyin::RecordingService::getRecordingsFolder();
@@ -775,7 +787,7 @@ juce::File MainComponent::prepareLocalWebInterface()
     const auto root = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
                           .getChildFile("FengYin").getChildFile("web-runtime");
     const juce::StringArray files {
-        "prototype/index.html", "prototype/styles.css", "prototype/app.js", "assets/fengyin-app-icon.png",
+        "prototype/index.html", "prototype/styles.css", "prototype/app.js", "prototype/voice-catalog.js", "prototype/voice-guide.js", "assets/fengyin-app-icon.png",
         "assets/instruments/instrument_soprano_sax.png", "assets/instruments/instrument_alto_sax.png",
         "assets/instruments/instrument_tenor_sax.png", "assets/instruments/instrument_baritone_sax.png",
         "assets/instruments/instrument_flugelhorn.png", "assets/instruments/instrument_trumpet.png",
@@ -887,6 +899,8 @@ std::optional<juce::WebBrowserComponent::Resource> MainComponent::getWebResource
     if (requested == "index.html") { data = BinaryData::index_html; size = BinaryData::index_htmlSize; mime = "text/html"; }
     else if (requested == "styles.css") { data = BinaryData::styles_css; size = BinaryData::styles_cssSize; mime = "text/css"; }
     else if (requested == "app.js") { data = BinaryData::app_js; size = BinaryData::app_jsSize; mime = "text/javascript"; }
+    else if (requested == "voice-catalog.js") { data = BinaryData::voicecatalog_js; size = BinaryData::voicecatalog_jsSize; mime = "text/javascript"; }
+    else if (requested == "voice-guide.js") { data = BinaryData::voiceguide_js; size = BinaryData::voiceguide_jsSize; mime = "text/javascript"; }
     else if (requested == "fengyin-app-icon.png" || requested == "assets/fengyin-app-icon.png")
     {
         data = BinaryData::fengyinappicon_png; size = BinaryData::fengyinappicon_pngSize; mime = "image/png";
@@ -1248,6 +1262,8 @@ void MainComponent::resized()
 
 void MainComponent::timerCallback()
 {
+    if(const auto token=voicePrompts.consumeFinished();token!=0 && webInterface)
+        webInterface->emitEventIfBrowserIsVisible("voiceFinished",token);
     if (superLowLatencyRunning && ++superLowLatencyPollTicks >= 30)
     {
         superLowLatencyPollTicks = 0;
@@ -3484,6 +3500,7 @@ void MainComponent::changeInstrumentBendRange(const juce::var& payload)
         auto result = std::make_unique<juce::DynamicObject>();
         result->setProperty("success", success);
         result->setProperty("message", message);
+        result->setProperty("value", bendRange);
         if (webInterface != nullptr)
             webInterface->emitEventIfBrowserIsVisible("bendRangeResult", juce::var(result.release()));
     };
@@ -3670,6 +3687,8 @@ void MainComponent::toggleRecording()
         recordButton.setButtonText(utf8("● 开始录音"));
         recordButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff253b52));
         recordingStatus.setText(utf8("已保存：") + recorder.getLastFile().getFullPathName(), juce::dontSendNotification);
+        if(webInterface)webInterface->emitEventIfBrowserIsVisible("recordingSaved",
+            recorder.getLastError().isEmpty() && recorder.getLastFile().existsAsFile());
         return;
     }
 

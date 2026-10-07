@@ -1067,11 +1067,12 @@ video.addEventListener('error', () => {
   }
   const reason = video.error?.message || `浏览器错误代码 ${video.error?.code || '未知'}`;
   toast(`视频无法播放：${reason}`);
+  window.fengyinVoice?.say('V037');
   $('#video-name').textContent = '视频编码不受支持，请转换为 H.264 + AAC';
 });
 
 function toggleVideo() {
-  if (!video.src) return toast('请先选择一个本地视频');
+  if (!video.src) { window.fengyinVoice?.say('V038'); return toast('请先选择一个本地视频'); }
   if (videoLoading || (window.__JUCE__?.backend?.emitEvent && !nativeAccompanimentReady))
     return toast('视频正在准备，请稍候');
   videoWantsPlaying = !videoWantsPlaying;
@@ -1158,6 +1159,7 @@ $('#transpose-grid').addEventListener('click', event => {
   nativeEvent('setKeyTranspose', {targetKey});
   transposeDialog.hidden = true;
   toast(`演奏调已设为${transposeNames.get(targetKey)}`);
+  window.fengyinVoice?.speakText(`演奏调已设为${transposeNames.get(targetKey)}。`);
 });
 $('#cancel-transpose').addEventListener('click', () => { transposeDialog.hidden = true; });
 transposeDialog.addEventListener('click', event => { if (event.target === transposeDialog) transposeDialog.hidden = true; });
@@ -1287,6 +1289,7 @@ function renderTechniqueMappings(force = false) {
   $('#technique-more').hidden = !techniquePlan.some(item => !item.featured);
 }
 function startTechniqueLearning(item,inline = false) {
+  window.fengyinVoice?.learning(item.name);
   window.fengyinTechniqueLearning = item.index;
   nativeEvent('beginTechniqueLearn', {techniqueId:item.id,toggle:false});
   if (inline) {
@@ -1368,6 +1371,7 @@ function renderAdapterTechniqueGrid() {
     const item=items.find(candidate=>candidate.id===button.closest('[data-technique-id]')?.dataset.techniqueId);
     if(!item)return;
     nativeEvent('removeTechniqueMapping',{technique:item.index});
+    window.fengyinVoice?.cleared(item.name);
     item.sourceType=0;item.sourceNumber=-1;renderAdapterTechniqueGrid();
   }));
   $$('#adapter-technique-grid .adapter-technique-toggle input').forEach(input => input.addEventListener('change', event => {
@@ -1378,6 +1382,7 @@ function renderAdapterTechniqueGrid() {
     item.mode = item.enabled ? 'breath' : 'off';
     updateLocalTechniqueConfiguration(id,item.mode,Number(item.strength || 50)/100);
     nativeEvent('setTechniqueConfiguration',{techniqueId:id,mode:item.mode,strength:Number(item.strength || 50)/100});
+    window.fengyinVoice?.speakText(`已${item.enabled?'开启':'关闭'}${item.name}气息控制。`);
     adapterRenderSignature=''; renderAdapterTechniqueGrid();
   }));
   $$('#adapter-technique-grid input[type="range"]').forEach(input => input.addEventListener('input', event => {
@@ -1525,11 +1530,13 @@ $('#cancel-technique-learning').addEventListener('click', () => {
   renderTechniqueMappings();
 });
 
-$('#record').addEventListener('click', event => {
+$('#record').addEventListener('click', async event => {
   if (!recording && video.src && window.__JUCE__?.backend?.emitEvent && !nativeAccompanimentReady) {
     return toast('伴奏音轨尚未准备好，请稍候再开始录音');
   }
+  if(!recording && window.fengyinVoice && !await window.fengyinVoice.beforeRecording())return;
   nativeEvent('toggleRecording');
+  if(window.__JUCE__?.backend)return;
   recording = !recording;
   event.target.textContent = recording ? '■ 停止录音' : '● 开始录音';
   event.target.style.color = recording ? 'var(--danger)' : '';
@@ -2035,6 +2042,7 @@ window.__JUCE__?.backend?.addEventListener('pluginLoadResult', result => {
   closeQuickTones();
   showPage('play');
   toast(`已应用：${pending.name}`);
+  window.fengyinVoice?.tone(pending.name);
 });
 window.__JUCE__?.backend?.addEventListener('presetLoadResult', result => {
   completeToneLoad();
@@ -2051,6 +2059,7 @@ window.__JUCE__?.backend?.addEventListener('presetLoadResult', result => {
     closeQuickTones();
     showPage('play');
     toast(`已载入：${pending.name}`);
+    window.fengyinVoice?.tone(pending.name);
   }
 });
 window.__JUCE__?.backend?.addEventListener('licenseStateResult', result => {

@@ -19,6 +19,7 @@
 #include "TechniqueAdvisor.h"
 #include "VideoAudioExtractor.h"
 #include "WindowsLowLatencyOptimizer.h"
+#include "VoicePromptService.h"
 
 class MainComponent final : public juce::Component, private juce::Timer
 {
@@ -114,6 +115,7 @@ private:
     fengyin::RecordingService recorder;
     fengyin::MasterOutputService masterOutput;
     fengyin::TestSynthEngine testSynth;
+    fengyin::VoicePromptService voicePrompts;
     fengyin::PluginCatalogService pluginCatalog;
     fengyin::PluginHostEngine pluginHost;
     fengyin::SoundPresetStore presetStore;

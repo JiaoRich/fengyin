@@ -6,7 +6,7 @@ const path=require('node:path');
  const b=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH || undefined});
  try {
  const p=await b.newPage();const errors=[];p.on('pageerror',e=>errors.push(e.message));
- await p.addInitScript(()=>{window.listeners={};window.__JUCE__={backend:{addEventListener:(n,f)=>listeners[n]=f,emitEvent:()=>{}}}});
+ await p.addInitScript(()=>{localStorage.setItem('fy-guide-seen','yes');window.listeners={};window.__JUCE__={backend:{addEventListener:(n,f)=>(listeners[n]??=[]).push(f),emitEvent:()=>{}}}});
  await p.goto(pathToFileURL(path.resolve('prototype/index.html')).href);
  for(const width of [1920,1366,1280]){
   await p.setViewportSize({width,height:800});
