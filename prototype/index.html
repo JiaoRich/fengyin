@@ -157,6 +157,10 @@ body.quick-tones-open .nav-item[data-page=sounds]{background:var(--accent-soft);
 body.low-performance #quick-tones-backdrop{backdrop-filter:none}
 body:not(.compact-mode) .window-mode-bar{display:none}
 .system-pills #window-mode-toggle{padding:7px 12px;border-radius:16px;border:1px solid var(--line);background:var(--accent-soft);color:var(--text);white-space:nowrap;cursor:pointer;font-size:12px}
+.system-pills{flex-shrink:0}
+.system-pills>span:last-of-type{flex:0 0 88px;width:88px;white-space:nowrap;text-align:center}
+#cpu{display:inline-block;min-width:4ch;text-align:right;font-variant-numeric:tabular-nums}
+#latency{display:inline-block;min-width:7ch;text-align:right;font-variant-numeric:tabular-nums}
 body:not(.compact-mode) main{padding-top:18px;padding-bottom:14px}
 body:not(.compact-mode) main>header{margin-bottom:14px;gap:12px}
 body:not(.compact-mode) #page-play.active{height:calc(100dvh - 116px);min-height:480px;display:flex;flex-direction:column;gap:12px}
