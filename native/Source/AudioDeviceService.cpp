@@ -709,7 +709,8 @@ bool AudioDeviceService::hasSustainedRuntimeInstability()
     const auto xruns = manager.getXRunCount();
     if (xruns < 0) return false;
     const auto cpuOverloaded = manager.getCpuUsage() >= 0.82;
-    if (xruns > observedXRunCount || cpuOverloaded)
+    // A counter increment alone does not establish audible loss.
+    if (xruns > observedXRunCount && cpuOverloaded)
         ++unstablePolls;
     else
         unstablePolls = 0;

@@ -189,7 +189,7 @@ private:
     std::atomic<bool> kongExpressionMode { false };
     std::atomic<int> swamExpressionController { 11 };
     std::atomic<int> lastBreathMidiValue { -1 };
-    struct KongTechniqueRoute { int channel = 0; int keyswitch = -1; };
+    struct KongTechniqueRoute { int channel = 0; int keyswitch = -1; int normalKey = -1; };
     std::array<KongTechniqueRoute, static_cast<size_t>(PerformanceTechnique::count)> kongTechniqueRoutes {};
     std::array<std::atomic<float>, static_cast<size_t>(PerformanceTechnique::count)> kongTechniqueInputs {};
     std::array<std::atomic<bool>, 128> activeNotes {};

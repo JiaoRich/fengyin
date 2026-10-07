@@ -196,11 +196,12 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
     def test_kong_release_routes_multichannel_techniques(self):
         host = self.read("native/Source/PluginHostEngine.cpp")
         midi = self.read("native/Source/MidiInputService.cpp")
-        self.assertIn('key == "kong-suona"', host)
-        self.assertIn('key == "kong-dizi"', host)
+        mapping = self.read("native/Source/KongTechniqueMap.h")
+        self.assertIn('slot.getProperty("KeyswitchNames")', mapping)
+        self.assertIn('slot.getProperty("IndexSelectedKeyswitch", 0)', mapping)
         self.assertIn("switchPerformanceChannel", host)
-        self.assertIn("route(PerformanceTechnique::flutter, 2, -1)", host)
-        self.assertIn("route(PerformanceTechnique::tremolo, 3, -1)", host)
+        self.assertIn('bind(PerformanceTechnique::flutter, {"Flutter", "Flutter2"})', host)
+        self.assertIn('int selected = route.normalKey', host)
         self.assertIn('techniqueContext == "kong-suona"', midi)
         self.assertIn('techniqueContext == "kong-pipa"', midi)
 

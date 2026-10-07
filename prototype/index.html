@@ -131,6 +131,43 @@ body.compact-mode .app-shell:after{z-index:9000;inset:2px;border-width:5px;borde
 @keyframes compact-tone-scroll{to{transform:translateX(calc(-1 * var(--tone-scroll-distance,0px)))}}
 @media(prefers-reduced-motion:reduce){body.compact-mode .app-shell:before,body.compact-mode .app-shell:after{animation:none}.tone-level i{transition:none}}
 </style>
+<style>
+/* Quiet theme scrollbars and an anchored tone picker. */
+#compact-tones,#quick-tones{scrollbar-width:thin;scrollbar-color:var(--accent-soft) transparent}
+#compact-tones::-webkit-scrollbar,#quick-tones::-webkit-scrollbar{width:5px}
+#compact-tones::-webkit-scrollbar-track,#quick-tones::-webkit-scrollbar-track{background:transparent}
+#compact-tones::-webkit-scrollbar-thumb,#quick-tones::-webkit-scrollbar-thumb{background:var(--accent-soft);border-radius:8px}
+#compact-tones::-webkit-scrollbar-thumb:hover,#quick-tones::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+#compact-tones::-webkit-scrollbar-button,#quick-tones::-webkit-scrollbar-button{display:none}
+body.compact-mode .instrument-heading{display:flex;align-items:flex-start;gap:8px}
+body.compact-mode .instrument-heading>div:first-child{min-width:0;flex:1}
+body.compact-mode .instrument-actions{margin:0;flex-shrink:0}
+body.compact-mode .compact-action-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+body.compact-mode .compact-action-row>button{overflow:visible;text-overflow:clip}
+body.compact-mode .app-shell:after{display:none}
+body.compact-mode .app-shell:before{inset:0;border:0;border-radius:16px;background:none;mask:none;-webkit-mask:none;animation:none;filter:none;box-shadow:inset 0 0 42px 5px var(--accent),inset 0 -22px 75px -28px var(--accent-2);opacity:calc(.025 + var(--breath-energy,0)*.38);transition:opacity .35s ease-out}
+#quick-tones,#quick-tones.open{display:grid;grid-template-columns:1fr 1fr}
+#quick-tones{visibility:hidden;opacity:0;pointer-events:none;transform:translateX(-18px) scale(.94);transition:opacity .2s,transform .22s,visibility .22s}
+#quick-tones.open{visibility:visible;opacity:1;pointer-events:auto;transform:none}
+#quick-tones-backdrop{position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.24);backdrop-filter:blur(4px);opacity:0;visibility:hidden;transition:opacity .2s,visibility .2s}
+body.quick-tones-open #quick-tones-backdrop{opacity:1;visibility:visible}
+body.quick-tones-open .sidebar{z-index:9999}
+body.quick-tones-open .nav-item[data-page=sounds]{background:var(--accent-soft);color:var(--accent)}
+@media(prefers-reduced-motion:reduce){#quick-tones,#quick-tones-backdrop{transition:none}}
+body.low-performance #quick-tones-backdrop{backdrop-filter:none}
+body:not(.compact-mode) .window-mode-bar{display:none}
+.system-pills #window-mode-toggle{padding:7px 12px;border-radius:16px;border:1px solid var(--line);background:var(--accent-soft);color:var(--text);white-space:nowrap;cursor:pointer;font-size:12px}
+body:not(.compact-mode) main{padding-top:18px;padding-bottom:14px}
+body:not(.compact-mode) main>header{margin-bottom:14px;gap:12px}
+body:not(.compact-mode) #page-play.active{height:calc(100dvh - 116px);min-height:480px;display:flex;flex-direction:column;gap:12px}
+body:not(.compact-mode) #page-play .stage-grid{flex:1;min-height:230px}
+body:not(.compact-mode) #page-play .video-card{height:100%;min-height:230px}
+body:not(.compact-mode) #page-play .instrument-art{min-height:80px}
+body:not(.compact-mode) #page-play .lower-stage{flex:0 0 auto;min-height:0;gap:10px}
+body:not(.compact-mode) #page-play .visualizer{height:clamp(80px,13vh,150px);min-height:80px;margin-top:0}
+body:not(.compact-mode) #page-play .action-bar{margin-top:10px;padding:8px 12px;flex-wrap:wrap}
+@media(max-width:1400px){body:not(.compact-mode) .top-brand-message{font-size:11px}.system-pills{gap:5px}.system-pills span{padding:7px;font-size:11px}}
+</style>
 </head>
 <body data-theme="neon">
   <div class="ambient ambient-a"></div>
@@ -226,7 +263,7 @@ body.compact-mode .app-shell:after{z-index:9000;inset:2px;border-width:5px;borde
           <div class="compact-action-row">
           <button id="record">● 开始录音</button>
           <button id="recording-manager">我的录音</button>
-          <button id="transpose-key" class="transpose-button" type="button" aria-haspopup="dialog">演奏调：<b id="transpose-key-name">C调</b></button>
+          <button id="transpose-key" class="transpose-button" type="button" aria-label="演奏调" aria-haspopup="dialog">调：<b id="transpose-key-name">C调</b></button>
           <div class="bend-control"><small id="bend-hint" hidden></small><button id="bend-range-button" class="transpose-button" type="button" aria-haspopup="dialog" disabled>弯音：<b id="bend-range-value">—</b></button></div>
           </div>
           <div class="global-controls">

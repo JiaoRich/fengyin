@@ -3,6 +3,7 @@
 #include "ScopedGraphPause.h"
 #include "KongInstrumentCatalog.h"
 #include "KongProjectFile.h"
+#include "KongTechniqueMap.h"
 #include "BendRangeParameters.h"
 #include "PerformanceReset.h"
 #include "ToneRestorePlan.h"
@@ -878,8 +879,19 @@ void PluginHostEngine::techniqueChanged(PerformanceTechnique technique, float va
         const auto previous = kongTechniqueInputs[index].exchange(safeValue, std::memory_order_relaxed);
         const auto route = kongTechniqueRoutes[index];
         if (route.keyswitch >= 0 && (previous <= 0.5f) != (safeValue <= 0.5f))
-            queue(safeValue > 0.5f ? juce::MidiMessage::noteOn(1, route.keyswitch, static_cast<juce::uint8>(100))
-                                   : juce::MidiMessage::noteOff(1, route.keyswitch), 0.0);
+        {
+            int selected = route.normalKey;
+            for (size_t i = 0; i < kongTechniqueRoutes.size(); ++i)
+                if (kongTechniqueRoutes[i].channel == route.channel
+                    && kongTechniqueRoutes[i].keyswitch >= 0
+                    && kongTechniqueInputs[i].load(std::memory_order_relaxed) > 0.5f)
+                    selected = kongTechniqueRoutes[i].keyswitch;
+            if (selected >= 0)
+            {
+                queue(juce::MidiMessage::noteOn(route.channel, selected, static_cast<juce::uint8>(100)), 0.0);
+                queue(juce::MidiMessage::noteOff(route.channel, selected), 0.0);
+            }
+        }
         if (route.channel > 1)
         {
             int desired = 1;
@@ -889,7 +901,8 @@ void PluginHostEngine::techniqueChanged(PerformanceTechnique technique, float va
                     desired = kongTechniqueRoutes[routeIndex].channel;
             switchPerformanceChannel(desired);
         }
-        if (route.channel > 0 || route.keyswitch >= 0) return;
+        // Never fall through to guessed generic parameters for unsupported Qin techniques.
+        return;
     }
     techniqueValues[index].store(safeValue, std::memory_order_relaxed);
     techniqueDirty[index].store(true, std::memory_order_release);
@@ -917,24 +930,27 @@ void PluginHostEngine::configureKongTechniqueProfile(const juce::String& key) no
     for (auto& route : kongTechniqueRoutes) route = {};
     for (auto& value : kongTechniqueInputs) value.store(0.0f, std::memory_order_relaxed);
     switchPerformanceChannel(1);
-    const auto route = [this](PerformanceTechnique technique, int channel, int keyswitch)
-    { kongTechniqueRoutes[static_cast<size_t>(technique)] = { channel, keyswitch }; };
-    if (key == "kong-suona") route(PerformanceTechnique::flutter, 2, -1);
-    else if (key == "kong-dizi")
+    if (key.isEmpty()) return;
+    const auto state = captureContainerState();
+    if (state.getSize() < 9) return;
+    const auto* bytes = static_cast<const char*>(state.getData());
+    const auto length = juce::ByteOrder::littleEndianInt(bytes + 4);
+    if (length > state.getSize() - 8) return;
+    auto wrapper = juce::parseXML(juce::String::fromUTF8(bytes + 8, static_cast<int>(length)));
+    if (!wrapper) return;
+    auto* component = wrapper->getChildByName("IComponent");
+    juce::MemoryBlock payload;
+    if (!component || !payload.fromBase64Encoding(component->getAllSubText())) return;
+    auto tree = juce::ValueTree::readFromData(payload.getData(), payload.getSize());
+    const auto bind = [this, &tree](PerformanceTechnique technique, const juce::StringArray& names)
     {
-        route(PerformanceTechnique::flutter, 2, -1);
-        route(PerformanceTechnique::tremolo, 3, -1);
-    }
-    else if (key == "kong-erhu") route(PerformanceTechnique::vibrato, 0, 14);
-    else if (key == "kong-guzheng") route(PerformanceTechnique::tremolo, 0, 16);
-    else if (key == "kong-hulusi") route(PerformanceTechnique::vibrato, 0, 19);
-    else if (key == "kong-liuqin") route(PerformanceTechnique::tremolo, 0, 18);
-    else if (key == "kong-matouqin") route(PerformanceTechnique::pizzicato, 0, 20);
-    else if (key == "kong-nanxiao") route(PerformanceTechnique::vibrato, 0, 13);
-    else if (key == "kong-pipa") route(PerformanceTechnique::tremolo, 0, 18);
-    else if (key == "kong-sanxian") route(PerformanceTechnique::tremolo, 0, 20);
-    else if (key == "kong-sheng") route(PerformanceTechnique::flutter, 0, 21);
-    else if (key == "kong-xun") route(PerformanceTechnique::vibrato, 0, 14);
+        const auto binding = findKongTechnique(tree, names);
+        kongTechniqueRoutes[static_cast<size_t>(technique)] = {binding.channel, binding.keyswitch, binding.normalKey};
+    };
+    bind(PerformanceTechnique::vibrato, {"Vib_Main", "Vib_Layers", "Vib_Mellow", "Vib_Bright"});
+    bind(PerformanceTechnique::flutter, {"Flutter", "Flutter2"});
+    bind(PerformanceTechnique::tremolo, {"Main_Shake_Mellow", "Roll", "Sus_Main_Roll", "Tremolo"});
+    bind(PerformanceTechnique::pizzicato, {"Pizz"});
 }
 
 void PluginHostEngine::resetPerformance() noexcept
@@ -946,6 +962,7 @@ void PluginHostEngine::resetPerformance() noexcept
     for (auto& note : activeNotes) note.store(false, std::memory_order_relaxed);
     for (size_t index = 0; index < techniqueValues.size(); ++index)
     {
+        kongTechniqueInputs[index].store(0.0f, std::memory_order_relaxed);
         techniqueValues[index].store(0.0f, std::memory_order_relaxed);
         techniqueDirty[index].store(true, std::memory_order_release);
     }

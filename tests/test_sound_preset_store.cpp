@@ -1,6 +1,7 @@
 #include "SoundPresetStore.h"
 #include "KongProjectFile.h"
 #include "KongReleaseStates.h"
+#include "KongTechniqueMap.h"
 #include <cassert>
 #include <cmath>
 
@@ -17,6 +18,25 @@ int main()
     {
         const auto state = fengyin::KongReleaseStates::read(releaseXml, asset);
         assert(state.getSize() > 1000);
+        auto wrapper = juce::parseXML(juce::String::fromUTF8(static_cast<const char*>(state.getData()) + 8,
+            static_cast<int>(juce::ByteOrder::littleEndianInt(static_cast<const char*>(state.getData()) + 4))));
+        juce::MemoryBlock component;
+        assert(component.fromBase64Encoding(wrapper->getChildByName("IComponent")->getAllSubText()));
+        const auto tree = juce::ValueTree::readFromData(component.getData(), component.getSize());
+        struct Expected { const char* asset; const char* technique; int note; };
+        for (const auto& expected : {Expected{"erhu.kam","Vib_Main",26}, {"guzheng.kam","Main_Shake_Mellow",28},
+            {"hulusi.kam","Vib_Main",26}, {"liuqin.kam","Roll",30}, {"matouqin.kam","Pizz",32},
+            {"qudi.kam","Vib_Main",29}, {"xun.kam","Vib_Main",27}, {"suona.kam","Flutter",35},
+            {"sanxian.kam","Sus_Main_Roll",32}, {"pipa.kam","Roll",32}, {"sheng.kam","Flutter",32},
+            {"nanxiao.kam","Vib_Main",30}})
+            if (juce::String(asset) == expected.asset)
+            {
+                const auto binding = fengyin::findKongTechnique(tree, {expected.technique});
+                assert(binding.keyswitch == expected.note);
+                assert(binding.channel == 1);
+                assert(binding.normalKey == 24);
+            }
+        assert(fengyin::findKongTechnique(tree, {"nonexistent-articulation"}).keyswitch == -1);
         bool compared = false;
         for (auto* entry : releaseRoot->getChildIterator())
             if (entry->getStringAttribute("asset") == asset)

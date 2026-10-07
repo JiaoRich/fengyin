@@ -1400,9 +1400,8 @@ void MainComponent::timerCallback()
         if (masterOutput.isSmartOptimisationEnabled()
             && audio.hasSustainedRuntimeInstability() && webInterface != nullptr)
         {
-            const auto message = utf8("检测到持续丢音，演奏未被中断；可在声音设置中重新优化");
-            webInterface->emitEventIfBrowserIsVisible("audioOptimisationResult", message);
-            emitAudioSettingsState(true, message);
+            // Keep performance diagnostics without interrupting the player with a toast.
+            juce::Logger::writeToLog("Sustained audio load and xrun increments; inspect audio diagnostics");
         }
     }
     const auto currentAudio = audio.getStatus();

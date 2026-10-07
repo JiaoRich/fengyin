@@ -6,10 +6,12 @@ function applyWindowMode(compact) {
   compactMode = !!compact;
   document.body.classList.toggle('compact-mode', compactMode);
   $('#window-mode-toggle').textContent = compactMode ? '全屏' : '精简模式';
-  $('#quick-tones')?.classList.remove('open');
+  (compactMode ? $('.window-mode-bar') : $('.system-pills')).appendChild($('#window-mode-toggle'));
+  closeQuickTones();
   if (compactMode) showPage('play');
 }
 $('#window-mode-toggle').onclick = () => nativeEvent('setCompactMode', {compact:!compactMode});
+$('.system-pills').appendChild($('#window-mode-toggle'));
 window.__JUCE__?.backend?.addEventListener('windowModeChanged', applyWindowMode);
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !compactMode && !document.querySelector('[role="dialog"]:not([hidden])'))
@@ -942,17 +944,38 @@ function renderPresets() {
   }
 }
 renderPresets();
+let quickHoverTimer;
+let quickReopenBlocked = false;
+function closeQuickTones() {
+  clearTimeout(quickHoverTimer);
+  $('#quick-tones')?.classList.remove('open');
+  document.body.classList.remove('quick-tones-open');
+  quickReopenBlocked = !!document.querySelector('.nav-item[data-page="sounds"]:hover');
+}
 {
   const entry=document.querySelector('.nav-item[data-page="sounds"]');
-  let hoverTimer;
-  const hide=()=>{clearTimeout(hoverTimer);hoverTimer=setTimeout(()=>$('#quick-tones')?.classList.remove('open'),250);};
-  entry.addEventListener('mouseenter',()=>{clearTimeout(hoverTimer);hoverTimer=setTimeout(()=>{
-    const panel=$('#quick-tones'); if(!panel)return;
-    const rect=entry.getBoundingClientRect();panel.style.left=`${rect.right+8}px`;panel.style.top='16px';
-    panel.classList.add('open');panel.onmouseenter=()=>clearTimeout(hoverTimer);panel.onmouseleave=hide;
-  },200);});
-  entry.addEventListener('mouseleave',hide);
-  entry.addEventListener('click',()=>$('#quick-tones')?.classList.remove('open'));
+  const backdrop=document.createElement('div');
+  backdrop.id='quick-tones-backdrop';document.body.appendChild(backdrop);
+  backdrop.onclick=closeQuickTones;
+  const hide=()=>{clearTimeout(quickHoverTimer);quickHoverTimer=setTimeout(closeQuickTones,250);};
+  entry.addEventListener('mouseenter',()=>{
+    if(quickReopenBlocked || compactMode)return;
+    clearTimeout(quickHoverTimer);quickHoverTimer=setTimeout(()=>{
+      const panel=$('#quick-tones');if(!panel)return;
+      const rect=entry.getBoundingClientRect();
+      panel.style.left=`${rect.right+8}px`;panel.style.top='16px';
+      panel.style.transformOrigin=`left ${rect.top+rect.height/2-16}px`;
+      panel.classList.add('open');document.body.classList.add('quick-tones-open');
+      panel.onmouseenter=()=>clearTimeout(quickHoverTimer);panel.onmouseleave=hide;
+    },180);
+  });
+  entry.addEventListener('mouseleave',()=>{quickReopenBlocked=false;hide();});
+  entry.addEventListener('click',closeQuickTones);
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape' && $('#quick-tones')?.classList.contains('open')){
+      e.stopImmediatePropagation();closeQuickTones();
+    }
+  },true);
 }
 
 function updateLibraryContext() {
@@ -2002,6 +2025,7 @@ window.__JUCE__?.backend?.addEventListener('pluginLoadResult', result => {
     return toast('音源已加载，可以边吹边调整');
   }
   if (pending.kind === 'plugin' && pending.styleId) nativeEvent('setToneStyle', {id:pending.styleId});
+  closeQuickTones();
   showPage('play');
   toast(`已应用：${pending.name}`);
 });
@@ -2017,6 +2041,7 @@ window.__JUCE__?.backend?.addEventListener('presetLoadResult', result => {
     showPage('chain');
     toast(`可以修改“${pending.name}”，完成后点击保存修改`);
   } else {
+    closeQuickTones();
     showPage('play');
     toast(`已载入：${pending.name}`);
   }
