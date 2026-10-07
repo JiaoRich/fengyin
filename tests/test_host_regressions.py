@@ -246,13 +246,22 @@ class HostRegressionTests(unittest.TestCase):
         self.assertNotIn("audio.beginAutomaticLatencyTuning();", constructor)
         self.assertIn('withEventListener("applyAudioSettings"', MAIN)
 
-    def test_three_day_trial_unlocks_features_and_expires_safely(self):
+    def test_asio_panel_restores_audio_after_exit(self):
+        source = (ROOT / "native/Source/AudioDeviceService.cpp").read_text(encoding="utf-8")
+        self.assertIn("asioPanelProcess.isRunning()", source)
+        self.assertIn("restoreAfterAsioPanel();", source)
+        self.assertIn("startIsolatedAudioEngine(resumeEngineBuffer)", source)
+        self.assertIn("beforeAsioPanel.get(), false", source)
+        self.assertNotIn('startAsProcess("--configure-asio")', source)
+
+    def test_one_hour_trial_unlocks_features_and_expires_safely(self):
         license_header = (ROOT / "native" / "Source" / "LicenseService.h").read_text(encoding="utf-8")
         license_source = (ROOT / "native" / "Source" / "LicenseService.cpp").read_text(encoding="utf-8")
         self.assertIn("trialActive", license_header)
         self.assertIn("trialExpired", license_header)
         self.assertIn("startTrial", license_source)
-        self.assertIn("3 * 24 * 60 * 60", license_source)
+        self.assertIn("trialDurationSeconds = 60 * 60", license_source)
+        self.assertIn("digestFor(trialVersion)", license_source)
         self.assertIn("clockRolledBack", license_source)
         self.assertIn('withEventListener("startTrial"', MAIN)
         self.assertIn("currentLicenseStatus.canUseFeatures()", MAIN)

@@ -85,6 +85,7 @@ AudioDeviceService::AudioDeviceService()
 AudioDeviceService::~AudioDeviceService()
 {
     stopTimer();
+    if (asioPanelOpen) asioPanelProcess.kill();
     manager.closeAudioDevice();
     engineProcess.stop();
 }
@@ -178,6 +179,12 @@ juce::String AudioDeviceService::startIsolatedAudioEngine(int requestedFrames)
 void AudioDeviceService::timerCallback()
 {
    #if JUCE_WINDOWS
+    if (asioPanelOpen)
+    {
+        if (asioPanelProcess.isRunning()) return;
+        restoreAfterAsioPanel();
+        return;
+    }
     if (engineProcess.isRunning()) return;
     stopTimer();
     manager.closeAudioDevice();
@@ -277,24 +284,47 @@ juce::Array<int> AudioDeviceService::getAvailableBufferSizes()
 juce::String AudioDeviceService::configureAsio4All()
 {
    #if JUCE_WINDOWS
+    if (asioPanelOpen) return juce::String::fromUTF8("ASIO4ALL 设置面板已打开，关闭后将自动恢复声音。");
+    beforeAsioPanel = manager.createStateXml();
+    resumeIsolatedEngine = engineProcess.isRunning();
+    if (auto* settings = properties.getUserSettings())
+        resumeEngineBuffer = settings->getIntValue("audioEngineBuffer", 128);
     stopTimer();
     tuningActive = false;
     manager.closeAudioDevice();
     engineProcess.stop();
-    if (auto* settings = properties.getUserSettings())
-        settings->setValue("audioEngineEnabled", true);
     const auto executable = juce::File::getSpecialLocation(juce::File::currentExecutableFile)
         .getSiblingFile("FengYinAudioEngine.exe");
-    if (! executable.startAsProcess("--configure-asio"))
+    if (! asioPanelProcess.start(juce::StringArray { executable.getFullPathName(), "--configure-asio" }, 0))
+    {
+        restoreAfterAsioPanel();
         return juce::String::fromUTF8("无法打开 ASIO4ALL 配置程序");
-    return juce::String::fromUTF8("已暂停风吟音频。请在 ASIO4ALL 中仅启用实际扬声器/耳机输出，关闭输入和风吟虚拟扬声器。关闭面板后重新选择风吟低延迟模式。");
+    }
+    asioPanelOpen = true;
+    startTimer(250);
+    return juce::String::fromUTF8("已暂停音频，关闭 ASIO4ALL 面板后将自动恢复声音。");
    #else
     return juce::String::fromUTF8("ASIO4ALL 仅用于 Windows");
    #endif
 }
 
+void AudioDeviceService::restoreAfterAsioPanel()
+{
+    asioPanelOpen = false;
+    stopTimer();
+    lastError = resumeIsolatedEngine ? startIsolatedAudioEngine(resumeEngineBuffer)
+        : manager.initialise(0, 2, beforeAsioPanel.get(), false);
+    beforeAsioPanel.reset();
+    if (lastError.isEmpty()) return;
+    manager.closeAudioDevice();
+    engineProcess.stop();
+    const auto recoveryError = manager.initialise(0, 2, nullptr, true);
+    if (recoveryError.isNotEmpty()) lastError += "; " + recoveryError;
+}
+
 juce::String AudioDeviceService::selectDeviceType(const juce::String& typeName)
 {
+    if (asioPanelOpen) return juce::String::fromUTF8("请先关闭 ASIO4ALL 面板，声音将自动恢复。");
     if (auto* settings = properties.getUserSettings())
         settings->setValue("audioModeExplicitChoice", true);
    #if JUCE_WINDOWS
@@ -385,6 +415,7 @@ juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName
                                                    double sampleRate,
                                                    int bufferSize)
 {
+    if (asioPanelOpen) return juce::String::fromUTF8("请先关闭 ASIO4ALL 面板，声音将自动恢复。");
     tuningActive = false;
     tuningCandidates.clear();
     tuningResults.clear();
@@ -845,6 +876,7 @@ bool AudioDeviceService::startNextLatencyCandidate()
 
 bool AudioDeviceService::beginAutomaticLatencyTuning(bool force)
 {
+    if (asioPanelOpen) return false;
     if (engineProcess.isRunning()) return false;
     if (tuningActive) return false;
     auto* settings = properties.getUserSettings();

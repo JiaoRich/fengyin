@@ -97,6 +97,12 @@ private:
     juce::String finishAutomaticLatencyTuning();
     void saveSettings();
     void timerCallback() override;
+    void restoreAfterAsioPanel();
+    juce::ChildProcess asioPanelProcess;
+    bool asioPanelOpen = false;
+    bool resumeIsolatedEngine = false;
+    int resumeEngineBuffer = 128;
+    std::unique_ptr<juce::XmlElement> beforeAsioPanel;
 
     juce::AudioDeviceManager manager;
     audioengine::AudioEngineProcessController engineProcess;
