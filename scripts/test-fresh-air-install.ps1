@@ -4,7 +4,7 @@ $report = Join-Path (Get-Location) 'fresh-air-install-test'
 New-Item -ItemType Directory -Force -Path $report | Out-Null
 $log = Join-Path $report 'install.log'
 $inf = Join-Path $report 'install.inf'
-$process = Start-Process -FilePath $installer -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /LOG=`"$log`" /SAVEINF=`"$inf`"" -PassThru
+$process = Start-Process -FilePath $installer -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /TYPE=full /LOG=`"$log`" /SAVEINF=`"$inf`"" -PassThru
 if (-not $process.WaitForExit(180000)) {
     Stop-Process -Id $process.Id -Force
     throw 'Fresh Air silent installation exceeded 180 seconds. See installer logs.'

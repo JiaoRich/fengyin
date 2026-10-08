@@ -57,7 +57,7 @@ Name: "{autodesktop}\风吟"; Filename: "{app}\FengYin.exe"; Tasks: desktopicon
 Filename: "{app}\components\ASIO4ALL\ASIO4ALL_2_22.exe"; Tasks: asio4all; Check: NeedsASIO4ALL; StatusMsg: "请完成 ASIO4ALL 原厂安装向导"; Flags: waituntilterminated
 Filename: "{tmp}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; Parameters: "/silent /install"; StatusMsg: "正在安装视频与精美界面离线运行组件…"; Flags: waituntilterminated
 Filename: "{app}\components\VB-CABLE\VBCABLE_Setup_x64.exe"; WorkingDir: "{app}\components\VB-CABLE"; Check: NeedsVBCable; BeforeInstall: ExplainVBCableInstall; AfterInstall: VerifyVBCableInstalled; StatusMsg: "正在安装 VB-CABLE 网页声音组件…"; Flags: waituntilterminated
-Filename: "{app}\components\Fresh Air\Setup Fresh Air v1.0.8.exe"; Parameters: "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /LOG=""{app}\components\Fresh Air\install.log"""; Tasks: freshair; Check: NeedsFreshAir; AfterInstall: VerifyFreshAirInstalled; StatusMsg: "正在安装 Fresh Air 1.0.8 音色效果器…"; Flags: waituntilterminated
+Filename: "{app}\components\Fresh Air\Setup Fresh Air v1.0.8.exe"; Parameters: "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /TYPE=full /LOG=""{app}\components\Fresh Air\install.log"""; Tasks: freshair; Check: NeedsFreshAir; AfterInstall: VerifyFreshAirInstalled; StatusMsg: "正在安装 Fresh Air 1.0.8 音色效果器…"; Flags: waituntilterminated
 Filename: "{app}\FengYin.exe"; Description: "启动风吟"; Check: CanLaunchNow; Flags: nowait postinstall skipifsilent
 
 [Code]
