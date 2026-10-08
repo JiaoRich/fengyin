@@ -39,6 +39,13 @@ bool isSupportedSharedAsioDevice(const juce::String& deviceName)
 }
 
 #if JUCE_WINDOWS
+bool isVirtualAudioOutput(const juce::String& name)
+{
+    return name.containsIgnoreCase("cable") || name.containsIgnoreCase("vb-audio")
+        || name.containsIgnoreCase("fengyin") || name.containsIgnoreCase("voicemeeter")
+        || name.contains(juce::String::fromUTF8("风吟共享"));
+}
+
 bool savedStateIsSupportedSharedAsio(const juce::XmlElement& state)
 {
     if (! isAsioType(state.getStringAttribute("deviceType"))) return false;
@@ -97,6 +104,7 @@ AudioDeviceService::~AudioDeviceService()
 
 juce::String AudioDeviceService::initialise()
 {
+    juce::String startupError;
    #if JUCE_WINDOWS
     // Prefer the verified VB-CABLE + ASIO4ALL route. Missing prerequisites
     // leave Windows shared output available without changing system drivers.
@@ -118,6 +126,7 @@ juce::String AudioDeviceService::initialise()
             ? audioSettings->getIntValue("audioEngineBuffer", 128) : 128;
         lastError = startIsolatedAudioEngine(requestedFrames);
         if (lastError.isEmpty()) return {};
+        startupError = lastError;
     }
    #endif
     std::unique_ptr<juce::XmlElement> saved;
@@ -130,16 +139,56 @@ juce::String AudioDeviceService::initialise()
     if (saved != nullptr && ! isWindowsSharedType(saved->getStringAttribute("deviceType"))
         && ! restoringSharedAsio)
         saved.reset();
-   #endif
+    if (saved != nullptr && isVirtualAudioOutput(saved->getStringAttribute("audioOutputDeviceName")))
+        saved.reset();
+    // Never ask JUCE to choose the system default: it may still be CABLE
+    // while the crashed engine's route-restoration watchdog is running.
+    lastError = saved != nullptr ? manager.initialise(0, 2, saved.get(), false)
+                                : restorePhysicalSharedOutput();
+    if (lastError.isNotEmpty() || manager.getCurrentAudioDevice() == nullptr)
+        lastError = restorePhysicalSharedOutput();
+    if (startupError.isNotEmpty())
+        lastError = startupError + (lastError.isEmpty()
+            ? juce::String::fromUTF8("；已临时使用实际设备的共享输出，低延迟模式尚未恢复")
+            : juce::String::fromUTF8("；共享输出恢复失败：") + lastError);
+   #else
     lastError = manager.initialise(0, 2, saved.get(), true);
-   #if JUCE_WINDOWS
-    if (restoringSharedAsio && (lastError.isNotEmpty() || manager.getCurrentAudioDevice() == nullptr))
-    {
-        manager.closeAudioDevice();
-        lastError = manager.initialise(0, 2, nullptr, true);
-    }
    #endif
     return lastError;
+}
+
+juce::String AudioDeviceService::restorePhysicalSharedOutput()
+{
+    manager.closeAudioDevice();
+    engineProcess.stop();
+   #if JUCE_WINDOWS
+    juce::String failure = juce::String::fromUTF8("未找到可用的实际扬声器或耳机");
+    for (const auto& typeName : { juce::String("Windows Audio (Low Latency Mode)"), juce::String("Windows Audio") })
+    {
+        auto* type = findType(typeName);
+        if (type == nullptr) continue;
+        type->scanForDevices();
+        auto names = type->getDeviceNames(false);
+        const auto defaultIndex = type->getDefaultDeviceIndex(false);
+        if (juce::isPositiveAndBelow(defaultIndex, names.size()))
+            names.move(defaultIndex, 0);
+        for (const auto& name : names)
+        {
+            if (isVirtualAudioOutput(name)) continue;
+            juce::XmlElement state("DEVICESETUP");
+            state.setAttribute("deviceType", typeName);
+            state.setAttribute("audioOutputDeviceName", name);
+            state.setAttribute("audioInputDeviceName", juce::String());
+            state.setAttribute("audioDeviceOutChans", "11");
+            failure = manager.initialise(0, 2, &state, false);
+            if (failure.isEmpty() && manager.getCurrentAudioDevice() != nullptr) return {};
+            manager.closeAudioDevice();
+        }
+    }
+    return failure.isNotEmpty() ? failure : juce::String::fromUTF8("实际音频设备未启动");
+   #else
+    return manager.initialise(0, 2, nullptr, true);
+   #endif
 }
 
 juce::String AudioDeviceService::startIsolatedAudioEngine(int requestedFrames)
@@ -195,9 +244,9 @@ void AudioDeviceService::timerCallback()
     stopTimer();
     manager.closeAudioDevice();
     engineProcess.stop();
-    const auto fallbackError = manager.initialise(0, 2, nullptr, true);
+    const auto fallbackError = restorePhysicalSharedOutput();
     lastError = fallbackError.isEmpty()
-        ? juce::String::fromUTF8("低延迟声音引擎已自动恢复为 Windows 共享输出")
+        ? juce::String::fromUTF8("低延迟引擎已停止；已临时使用实际设备的共享输出，低延迟模式尚未恢复")
         : juce::String::fromUTF8("低延迟声音引擎和 Windows 共享输出均未能恢复：") + fallbackError;
    #endif
 }
@@ -253,6 +302,11 @@ juce::StringArray AudioDeviceService::getAvailableOutputDevices(const juce::Stri
     {
         type->scanForDevices();
         auto devices = type->getDeviceNames(false);
+       #if JUCE_WINDOWS
+        if (isWindowsSharedType(typeName))
+            for (int index = devices.size() - 1; index >= 0; --index)
+                if (isVirtualAudioOutput(devices[index])) devices.remove(index);
+       #endif
         if (isAsioType(typeName))
             for (int index = devices.size() - 1; index >= 0; --index)
                 if (! isSupportedSharedAsioDevice(devices[index])) devices.remove(index);
@@ -325,7 +379,7 @@ void AudioDeviceService::restoreAfterAsioPanel()
     if (lastError.isEmpty()) return;
     manager.closeAudioDevice();
     engineProcess.stop();
-    const auto recoveryError = manager.initialise(0, 2, nullptr, true);
+    const auto recoveryError = restorePhysicalSharedOutput();
     if (recoveryError.isNotEmpty()) lastError += "; " + recoveryError;
 }
 
@@ -354,7 +408,10 @@ juce::String AudioDeviceService::selectDeviceType(const juce::String& typeName)
         }
         else
         {
-            (void) manager.initialise(0, 2, nullptr, true);
+            const auto recoveryError = restorePhysicalSharedOutput();
+            lastError += recoveryError.isEmpty()
+                ? juce::String::fromUTF8("；已切换到实际声卡的 Windows 共享输出")
+                : juce::String::fromUTF8("；恢复实际声卡失败：") + recoveryError;
         }
         return lastError;
     }
@@ -423,6 +480,10 @@ juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName
                                                    int bufferSize)
 {
     if (asioPanelOpen) return juce::String::fromUTF8("请先关闭 ASIO4ALL 面板，声音将自动恢复。");
+   #if JUCE_WINDOWS
+    if (!engineProcess.isRunning() && isVirtualAudioOutput(outputName))
+        return juce::String::fromUTF8("请选择实际扬声器或耳机，不能将虚拟线缆作为最终声音输出。");
+   #endif
     tuningActive = false;
     tuningCandidates.clear();
     tuningResults.clear();

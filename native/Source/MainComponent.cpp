@@ -3806,15 +3806,20 @@ void MainComponent::applyAudioSettingsFromWeb(const juce::var& payload)
 
     // KoordASIO 的 buffer 切换由 AudioDeviceService 在同一驱动内恢复。
     // 这里不重复切换设备类型，避免一次失败触发第二次驱动重启。
-    if (error.isNotEmpty() && ! previousWasSharedAsio && previous.ready && previous.deviceType.isNotEmpty())
+    bool restoredPrevious = false;
+    if (error.isNotEmpty() && ! previousWasSharedAsio && previous.ready && previous.deviceType.isNotEmpty()
+        && !audio.getStatus().ready)
     {
-        (void) audio.selectDeviceType(previous.deviceType);
-        (void) audio.applyOutputSetup(previous.deviceName, previous.sampleRate, previous.bufferSize);
+        const auto restoreTypeError = audio.selectDeviceType(previous.deviceType);
+        if (restoreTypeError.isEmpty())
+            restoredPrevious = audio.applyOutputSetup(previous.deviceName, previous.sampleRate,
+                                                      previous.bufferSize).isEmpty()
+                && audio.getStatus().ready;
     }
 
     emitAudioSettingsState(error.isEmpty(), error.isEmpty()
         ? utf8("设置已保存并立即生效")
-        : (previousWasSharedAsio ? error : utf8("无法应用，已恢复上一个可用设置：") + error));
+        : (restoredPrevious ? utf8("无法应用，已恢复上一个可用设置：") + error : error));
 }
 
 void MainComponent::showDeviceSettings()

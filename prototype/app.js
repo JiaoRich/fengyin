@@ -1612,7 +1612,7 @@ function startFullTrial() {
     return;
   }
   const startedAt = Date.now();
-  localStorage.setItem('fengyin-prototype-trial-1.1.4-start', String(startedAt));
+  localStorage.setItem('fengyin-prototype-trial-1.1.5-start', String(startedAt));
   renderLicenseState({trialActive:true, trialRemainingSeconds:60*60});
   toast('1小时完整试用已开始');
 }
@@ -2204,7 +2204,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.4 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.5 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},
@@ -2236,7 +2236,7 @@ if (!window.__JUCE__?.backend?.emitEvent) {
   if(new URLSearchParams(location.search).has('review')) renderLicenseState({activated:true});
   else if(localStorage.getItem('fengyin-prototype-license') === 'active') renderLicenseState({activated:true});
   else {
-    const trialStartedAt = Number(localStorage.getItem('fengyin-prototype-trial-1.1.4-start') || 0);
+    const trialStartedAt = Number(localStorage.getItem('fengyin-prototype-trial-1.1.5-start') || 0);
     const trialRemaining = Math.max(0, 60*60 - Math.floor((Date.now() - trialStartedAt) / 1000));
     renderLicenseState(trialStartedAt > 0 && trialRemaining > 0
       ? {trialActive:true, trialRemainingSeconds:trialRemaining}

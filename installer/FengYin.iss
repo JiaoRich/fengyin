@@ -5,7 +5,7 @@
   #define OutputDir "."
 #endif
 #ifndef AppVersion
-  #define AppVersion "1.1.4"
+  #define AppVersion "1.1.5"
 #endif
 #ifndef ChineseMessages
   #define ChineseMessages "compiler:Languages\ChineseSimplified.isl"
@@ -37,6 +37,9 @@ UninstallDisplayName=风吟
 [Languages]
 Name: "chinesesimp"; MessagesFile: "{#ChineseMessages}"
 
+[Messages]
+FinishedRestartMessage=风吟已安装完成。音频驱动需要重启电脑后才能正常使用。请保存其他工作，然后重启；重启后再打开风吟。
+
 [Tasks]
 Name: "asio4all"; Description: "安装 ASIO4ALL 64位低延迟组件（请完成原厂安装向导）"; GroupDescription: "低延迟组件："; Check: NeedsASIO4ALL
 Name: "desktopicon"; Description: "在桌面创建快捷方式"; GroupDescription: "快捷方式："; Flags: unchecked
@@ -54,7 +57,7 @@ Name: "{group}\安装 Fresh Air 音色效果器"; Filename: "{app}\components\Fr
 Name: "{autodesktop}\风吟"; Filename: "{app}\FengYin.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\components\ASIO4ALL\ASIO4ALL_2_22.exe"; Tasks: asio4all; Check: NeedsASIO4ALL; StatusMsg: "请完成 ASIO4ALL 原厂安装向导"; Flags: waituntilterminated
+Filename: "{app}\components\ASIO4ALL\ASIO4ALL_2_22.exe"; Tasks: asio4all; Check: NeedsASIO4ALL; AfterInstall: MarkAudioDriverRestart; StatusMsg: "请完成 ASIO4ALL 原厂安装向导"; Flags: waituntilterminated
 Filename: "{tmp}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; Parameters: "/silent /install"; StatusMsg: "正在安装视频与精美界面离线运行组件…"; Flags: waituntilterminated
 Filename: "{app}\components\VB-CABLE\VBCABLE_Setup_x64.exe"; WorkingDir: "{app}\components\VB-CABLE"; Check: NeedsVBCable; BeforeInstall: ExplainVBCableInstall; AfterInstall: VerifyVBCableInstalled; StatusMsg: "正在安装 VB-CABLE 网页声音组件…"; Flags: waituntilterminated
 Filename: "{app}\components\Fresh Air\Setup Fresh Air v1.0.8.exe"; Parameters: "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /TYPE=full /LOG=""{app}\components\Fresh Air\install.log"""; Tasks: freshair; Check: NeedsFreshAir; AfterInstall: VerifyFreshAirInstalled; StatusMsg: "正在安装 Fresh Air 1.0.8 音色效果器…"; Flags: waituntilterminated
@@ -64,6 +67,12 @@ Filename: "{app}\FengYin.exe"; Description: "启动风吟"; Check: CanLaunchNow;
 
 var
   VBCableInstalledThisRun: Boolean;
+  AudioDriverRestartRequired: Boolean;
+
+procedure MarkAudioDriverRestart();
+begin
+  AudioDriverRestartRequired := True;
+end;
 
 function NeedsASIO4ALL(): Boolean;
 var
@@ -157,10 +166,10 @@ end;
 
 function NeedRestart(): Boolean;
 begin
-  Result := VBCableInstalledThisRun;
+  Result := VBCableInstalledThisRun or AudioDriverRestartRequired;
 end;
 
 function CanLaunchNow(): Boolean;
 begin
-  Result := not VBCableInstalledThisRun and not NeedsASIO4ALL() and not NeedsVBCable();
+  Result := not NeedRestart() and not NeedsASIO4ALL() and not NeedsVBCable();
 end;

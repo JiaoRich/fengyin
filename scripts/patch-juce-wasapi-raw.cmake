@@ -25,6 +25,12 @@ replace_exact("${asio}"
     "        for (int i = 0; i < jmin (2, (int) totalNumInputChans); ++i)"
     "        for (int i = 0; i <\n           #if FENGYIN_ASIO_RENDER_ONLY\n             0;\n           #else\n             jmin (2, (int) totalNumInputChans);\n           #endif\n             ++i)")
 
+# Drivers may reject the constructor's probe while a jack is changing or the
+# endpoint is busy. JUCE must not clear null buffers after that failed probe.
+replace_exact("${asio}"
+    "                outputFormat[i].clear (bufferInfos[outputBufferIndex + i].buffers[0], preferredBufferSize);\n                outputFormat[i].clear (bufferInfos[outputBufferIndex + i].buffers[1], preferredBufferSize);"
+    "                if (auto* buffer = bufferInfos[outputBufferIndex + i].buffers[0])\n                    outputFormat[i].clear (buffer, preferredBufferSize);\n                if (auto* buffer = bufferInfos[outputBufferIndex + i].buffers[1])\n                    outputFormat[i].clear (buffer, preferredBufferSize);")
+
 set(header "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/juce_audio_devices.h")
 set(manager "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/audio_io/juce_AudioDeviceManager.cpp")
 set(wasapi "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp")

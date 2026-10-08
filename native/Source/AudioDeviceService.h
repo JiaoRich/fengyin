@@ -69,6 +69,7 @@ public:
     [[nodiscard]] juce::AudioDeviceManager& getDeviceManager() noexcept { return manager; }
 
 private:
+    juce::String restorePhysicalSharedOutput();
     juce::String startIsolatedAudioEngine(int requestedFrames = 128);
     juce::AudioIODeviceType* findType(const juce::String& typeName);
     juce::String preferredLiveDeviceType();

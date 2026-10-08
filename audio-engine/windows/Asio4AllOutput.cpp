@@ -20,14 +20,15 @@ bool Asio4AllOutput::start(AudioEngineCore& engine, std::uint32_t requestedFrame
         stop();
         return false;
     }
+    juce::Logger::writeToLog("ASIO startup stage: create driver and probe buffers");
     device.reset(type->createDevice(selected, {}));
     if (! device) { error = L"Cannot create ASIO4ALL device"; stop(); return false; }
     device->close();
-    if (refreshAsioEndpoints(device->getFengYinAsioInterface()))
-        juce::Logger::writeToLog("ASIO4ALL physical endpoint enumeration refreshed while idle");
-    // Do not change a working driver configuration during ordinary startup.
-    // Exact endpoint selection is requested only for an output switch.
-    const bool selectedEndpoint = requireMatch
+    juce::Logger::writeToLog("ASIO startup stage: match physical endpoint");
+    // Also select the physical endpoint on first launch. Windows' default may
+    // already be the bridge's virtual cable; preserving that selection blindly
+    // cannot provide an out-of-box physical output. Only mutate an exact KS match.
+    const bool selectedEndpoint = !preferredEndpoint.empty()
         && selectAsioEndpoint(device->getFengYinAsioInterface(), preferredEndpoint);
     juce::Logger::writeToLog(selectedEndpoint ? "ASIO endpoint selected by KS identity"
         : "ASIO endpoint identity unavailable; preserving driver selection");
@@ -38,6 +39,7 @@ bool Asio4AllOutput::start(AudioEngineCore& engine, std::uint32_t requestedFrame
     }
     juce::BigInteger outputs;
     outputs.setRange(0, 2, true);
+    juce::Logger::writeToLog("ASIO startup stage: open render stream");
     const auto result = device->open({}, outputs, engineSampleRate, static_cast<int>(requestedFrames));
     if (result.isNotEmpty()) { error = std::wstring(result.toWideCharPointer()); stop(); return false; }
     const auto actual = device->getCurrentBufferSizeSamples();
