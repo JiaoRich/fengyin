@@ -50,6 +50,17 @@ bool Asio4AllOutput::start(AudioEngineCore& engine, std::uint32_t requestedFrame
     }
     if (!configuration.configured)
         juce::Logger::writeToLog("Realtek auto-configuration unavailable; attempting unchanged driver route, validating actual channels after open");
+    // Enumeration can invalidate ASIO4ALL's internal streaming objects even
+    // when no property was written. Consume one reset before buffer creation.
+    if (configuration.enumerated)
+    {
+        juce::Logger::writeToLog("ASIO startup stage: reinitialize after private enumeration");
+        if (!device->requestFengYinAsioReinitialisation())
+        {
+            error = L"ASIO reinitialization is unavailable after enumeration; stream was not started.";
+            stop(); return false;
+        }
+    }
     juce::BigInteger outputs;
     outputs.setRange(0, 2, true);
     juce::Logger::writeToLog("ASIO startup stage: open render stream");

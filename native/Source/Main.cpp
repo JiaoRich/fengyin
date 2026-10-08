@@ -6,6 +6,7 @@
   #define NOMINMAX
  #endif
  #include <windows.h>
+ #include <dwmapi.h>
 #endif
 #include "CompactWindowGlow.h"
 
@@ -143,6 +144,21 @@ private:
             const int width = bounds.right - bounds.left, height = bounds.bottom - bounds.top;
             const int radius = juce::roundToInt(28.0 * peer->getPlatformScaleFactor());
             if (rounded == roundedApplied && width == roundedWidth && height == roundedHeight && radius == roundedRadius) return;
+            // A GDI window region is a binary mask: it cannot antialias the
+            // corners and also prevents Windows 11 DWM rounding. Prefer DWM's
+            // composited corners while keeping the WebView host opaque.
+            SetWindowRgn(hwnd, nullptr, TRUE);
+            const DWORD preference = rounded ? 2u : 1u; // DWMWCP_ROUND / DONOTROUND
+            smoothNativeCorners = SUCCEEDED(DwmSetWindowAttribute(hwnd, 33, &preference, sizeof(preference)));
+            if (smoothNativeCorners)
+            {
+                const COLORREF noBorder = 0xfffffffe; // DWMWA_COLOR_NONE
+                DwmSetWindowAttribute(hwnd, 34, &noBorder, sizeof(noBorder));
+                const MARGINS margins {rounded ? 1 : 0, rounded ? 1 : 0, rounded ? 1 : 0, rounded ? 1 : 0};
+                DwmExtendFrameIntoClientArea(hwnd, &margins);
+                roundedApplied = rounded; roundedWidth = width; roundedHeight = height; roundedRadius = radius;
+                return;
+            }
             auto region = rounded ? CreateRoundRectRgn(0, 0, width + 1, height + 1, radius * 2, radius * 2) : nullptr;
             if (rounded && region == nullptr) return;
             if (SetWindowRgn(hwnd, region, TRUE) == 0)
@@ -154,14 +170,15 @@ private:
            #endif
         }
         bool roundedApplied = false;
+        bool smoothNativeCorners = false;
         bool borderless = false;
         int roundedWidth = -1, roundedHeight = -1, roundedRadius = -1;
         void timerCallback() override
         {
             updateWindowGesture();
-            glow.update(*this, content->compactMode && !isFullScreen() && !isMinimised()
-                        && isVisible(), content->getWindowBreath());
             if (!isMinimised()) updateRoundedWindow(content->compactMode && !isFullScreen());
+            glow.update(*this, content->compactMode && !isFullScreen() && !isMinimised()
+                        && isVisible(), content->getWindowBreath(), smoothNativeCorners ? 8.0f : 28.0f);
             // Native OS restore gestures may bypass maximiseButtonPressed.
             if (! isMinimised() && ! isFullScreen() && ! content->compactMode)
             {

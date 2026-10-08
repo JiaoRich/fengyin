@@ -42,7 +42,7 @@ int main(int argc, char** argv)
         juce::Logger::writeToLog("configuration="+juce::String(result.configured?1:0));
         if(!result.rollbackOK) return 6;
     }
-    if(mode=="configure-reset" && !device->requestFengYinDiagnosticReset()) return 7;
+    if(mode=="configure-reset" && !device->requestFengYinAsioReinitialisation()) return 7;
     juce::BigInteger outputs;outputs.setRange(0,2,true);
     juce::Logger::writeToLog("OPEN 48000Hz 128 frames stereo");
     const auto error=device->open({},outputs,48000,128);

@@ -20,18 +20,27 @@ public:
         setInterceptsMouseClicks(false, false);
         setWantsKeyboardFocus(false);
     }
-    void update(juce::Component& owner, bool enabled, float breath)
+    void update(juce::Component& owner, bool enabled, float breath, float radius = 28.0f)
     {
         if (!enabled) { setVisible(false); last = 0; return; }
         if (getPeer() == nullptr)
+        {
             addToDesktop(juce::ComponentPeer::windowIsTemporary
                          | juce::ComponentPeer::windowIgnoresMouseClicks);
+           #if JUCE_WINDOWS
+            // Use the per-pixel layered-window software path, independent of
+            // WebView/Direct2D swap-chain composition on the opaque host.
+            if (auto* peer = getPeer()) peer->setCurrentRenderingEngine(0);
+           #endif
+        }
+        const bool shapeChanged = cornerRadius != radius;
+        cornerRadius = radius;
         const auto bounds = owner.getScreenBounds().expanded(padding);
-        if (getBounds() != bounds)
+        if (getBounds() != bounds || shapeChanged || frame.isNull())
         {
             const bool sizeChanged = getWidth() != bounds.getWidth() || getHeight() != bounds.getHeight();
             setBounds(bounds);
-            if (sizeChanged || frame.isNull()) rebuild();
+            if (sizeChanged || shapeChanged || frame.isNull()) rebuild();
         }
        #if JUCE_WINDOWS
         if (owner.getPeer() != nullptr && getPeer() != nullptr)
@@ -44,6 +53,9 @@ public:
             // transparent. Never take activation or push the app above others.
             SetWindowPos(halo, nullptr, 0, 0, 0, 0,
                          SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+            if (GetAncestor(GetForegroundWindow(), GA_ROOT) == host)
+                SetWindowPos(halo, HWND_TOP, 0, 0, 0, 0,
+                             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
         }
        #endif
         setVisible(true);
@@ -65,13 +77,14 @@ private:
     std::vector<Pixel> pixels;
     juce::Image frame;
     double energy = 0, phase = 0, last = 0;
+    float cornerRadius = 28.0f;
     void rebuild()
     {
         frame = juce::Image(juce::Image::ARGB, getWidth(), getHeight(), true);
         pixels.clear();
         const auto cx = getWidth() * .5f, cy = getHeight() * .5f;
         const auto hx = cx - padding, hy = cy - padding;
-        constexpr float radius = 28.0f;
+        const float radius = cornerRadius;
         for (int y = 0; y < getHeight(); ++y)
             for (int x = 0; x < getWidth(); ++x)
             {
@@ -79,7 +92,7 @@ private:
                 const auto qy = std::abs(y + .5f - cy) - (hy - radius);
                 const auto d = std::hypot(std::max(qx, 0.0f), std::max(qy, 0.0f))
                     + std::min(std::max(qx, qy), 0.0f) - radius;
-                if (d < 0 || d > padding) continue; // never tint content
+                if (d < -.5f || d > padding) continue; // subpixel edge coverage
                 auto angle = std::atan2(y + .5f - cy, x + .5f - cx)
                     / juce::MathConstants<float>::twoPi;
                 if (angle < 0) angle += 1;
@@ -121,7 +134,8 @@ private:
             position *= 6;
             const int index = juce::jlimit(0, 5, static_cast<int>(position));
             const auto colour = colours[index].interpolatedWith(colours[index+1], static_cast<float>(position-index));
-            data.setPixelColour(p.x, p.y, colour.withAlpha(alpha[juce::jlimit(0,192,juce::roundToInt(p.distance*4))]));
+            const auto coverage = juce::jlimit(0.0f, 1.0f, p.distance + .5f);
+            data.setPixelColour(p.x, p.y, colour.withAlpha(coverage * alpha[juce::jlimit(0,192,juce::roundToInt(p.distance*4))]));
         }
     }
 };

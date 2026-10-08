@@ -4,7 +4,7 @@
 
 namespace fengyin::audioengine
 {
-struct RealtekConfigurationResult { bool configured = false, rollbackOK = true; };
+struct RealtekConfigurationResult { bool configured = false, rollbackOK = true, enumerated = false; };
 
 // ASIO4ALL Private API 2.0. Do not use Windows endpoint topology or jack names.
 inline RealtekConfigurationResult configureRealtekOutputs(void* driver, bool readOnly = false)
@@ -148,6 +148,7 @@ inline RealtekConfigurationResult configureRealtekOutputs(void* driver, bool rea
     api->callback(&Context::run,&context);
     api->enumerate();
     api->callback(nullptr,nullptr);
+    context.result.enumerated = true;
     if (!context.attempted) juce::Logger::writeToLog("Realtek configuration: no enumeration callback");
     return context.result;
 }

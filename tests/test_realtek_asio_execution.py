@@ -81,7 +81,7 @@ int main(){using namespace fengyin::audioengine;
   for(int p=0;p<3;++p)initial.flags[{d,0,p}]=0x40000000u|(d?0:0x80000000u);}
  auto readOnly=initial;auto observed=configureRealtekOutputs(&readOnly,true);
  assert(readOnly.writes==0 && readOnly.flags==initial.flags && readOnly.enumeration==1 && readOnly.cb==nullptr);
- assert(!observed.configured && observed.rollbackOK);
+ assert(!observed.configured && observed.rollbackOK && observed.enumerated);
  for(int fail=-1;fail<10;++fail){auto api=initial;api.failWrite=fail;auto r=configureRealtekOutputs(&api);
   assert(api.cb==nullptr);assert(api.enumeration<=2);
   if(!r.configured){assert(r.rollbackOK);assert(api.flags==initial.flags);}

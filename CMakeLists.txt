@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.5 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.6 LANGUAGES C CXX)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
 set(CMAKE_CXX_STANDARD 20)
@@ -234,7 +234,7 @@ target_include_directories(FengYinLicenseGenerator PRIVATE native/Source)
 target_link_libraries(FengYinLicenseGenerator PRIVATE juce::juce_cryptography)
 
 if(WIN32)
-    target_link_libraries(FengYin PRIVATE setupapi advapi32 shell32 avrt)
+    target_link_libraries(FengYin PRIVATE setupapi advapi32 shell32 avrt dwmapi)
     target_compile_definitions(FengYin PRIVATE
         # ASIO 只供用户主动选择 KoordASIO 的 WASAPI 共享模式。默认和
         # 自动优化仍只使用 Windows 共享输出，不会打开独占驱动。
@@ -452,5 +452,10 @@ if(BUILD_TESTING)
     target_link_libraries(FengYinCompactGlowTests PRIVATE juce::juce_gui_basics
         juce::juce_recommended_config_flags)
     add_test(NAME compact_glow_rendering COMMAND FengYinCompactGlowTests)
+    if(WIN32)
+        target_compile_definitions(FengYinCompactGlowTests PRIVATE JUCE_MODAL_LOOPS_PERMITTED=1)
+        add_test(NAME compact_glow_windows_desktop COMMAND FengYinCompactGlowTests --desktop-smoke)
+        set_tests_properties(compact_glow_windows_desktop PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 30)
+    endif()
 
 endif()

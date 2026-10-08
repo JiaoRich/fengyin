@@ -119,14 +119,14 @@ replace_exact("${asio}"
         outputFormat.calloc (fengyinChannelCapacity);
        #endif]])
 
-# Explicit diagnostic trigger for the same reset path used by driver callbacks.
-# No production caller uses it; this avoids changing the automatic startup path.
+# Explicit trigger for the same reset path used by driver callbacks. Call after
+# private enumeration, before querying channels or allocating stream buffers.
 replace_exact("${JUCE_SOURCE_DIR}/modules/juce_audio_devices/audio_io/juce_AudioIODevice.h"
     "    virtual void* getFengYinAsioInterface() { return nullptr; }"
-    "    virtual bool requestFengYinDiagnosticReset() { return false; }\n    virtual void* getFengYinAsioInterface() { return nullptr; }")
+    "    virtual bool requestFengYinAsioReinitialisation() { return false; }\n    virtual void* getFengYinAsioInterface() { return nullptr; }")
 replace_exact("${asio}"
     "    void* getFengYinAsioInterface() override { return asioObject; }"
-[[    bool requestFengYinDiagnosticReset() override
+[[    bool requestFengYinAsioReinitialisation() override
     {
        #if FENGYIN_ASIO_RENDER_ONLY
         fengyinResetPending.store (true);

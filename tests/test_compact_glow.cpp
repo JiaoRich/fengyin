@@ -17,6 +17,44 @@ struct CompactWindowGlowTestAccess
 
 int main(int argc, char** argv)
 {
+   #if JUCE_WINDOWS
+    if (argc > 1 && juce::String(argv[1]) == "--desktop-smoke")
+    {
+        juce::ScopedJuceInitialiser_GUI gui;
+        struct Owner : juce::Component {
+            void paint(juce::Graphics& g) override { g.fillAll(juce::Colour(0xff214365)); }
+        } owner;
+        owner.setOpaque(true);
+        owner.addToDesktop(juce::ComponentPeer::windowIsTemporary);
+        owner.setBounds(160,160,320,360); owner.setVisible(true); owner.toFront(true);
+        CompactWindowGlow glow;
+        const auto pump = [&](float breath) {
+            for (int i=0;i<24;++i) {
+                glow.update(owner,true,breath);
+                juce::MessageManager::getInstance()->runDispatchLoopUntil(25);
+            }
+        };
+        pump(0);
+        const auto read = [](int x,int y) {
+            auto dc=GetDC(nullptr); if(!dc) return CLR_INVALID;
+            const auto colour=GetPixel(dc,x,y); ReleaseDC(nullptr,dc); return colour;
+        };
+        const auto scale=owner.getPeer()->getPlatformScaleFactor();
+        const auto screen=owner.getScreenBounds();
+        const int x=juce::roundToInt((screen.getX()+160)*scale);
+        const int y=juce::roundToInt(screen.getY()*scale)-2;
+        const auto centre=read(x,juce::roundToInt((screen.getY()+180)*scale));
+        if(centre!=RGB(0x21,0x43,0x65)) {
+            std::cout<<"SKIP: runner has no readable interactive desktop\n";return 77;
+        }
+        const auto idlePixel=read(x,y);pump(1);const auto strongPixel=read(x,y);
+        if(idlePixel==CLR_INVALID || strongPixel==CLR_INVALID || idlePixel==strongPixel) {
+            std::cerr<<"Layered halo did not change on the actual Windows desktop\n";return 1;
+        }
+        std::cout<<"Windows desktop halo changed with breath; software layered peer verified\n";
+        return 0;
+    }
+   #endif
     const auto idle = CompactWindowGlowTestAccess::frame(0, 0);
     const auto strong = CompactWindowGlowTestAccess::frame(1, 0);
     const auto moved = CompactWindowGlowTestAccess::frame(1, .25);
