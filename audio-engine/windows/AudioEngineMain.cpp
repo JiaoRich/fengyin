@@ -273,7 +273,6 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
             if (router.pollPhysicalDefaultChange(newPhysicalEndpoint, routeError)
                 && !newPhysicalEndpoint.empty())
             {
-                const auto previous = preferredEndpointId;
                 juce::Logger::writeToLog("Physical output topology changed; reopening ASIO4ALL");
                 lifecycle.beginRecovery();
                 publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::recovering, 0);
@@ -281,14 +280,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
                 discardQueuedAudio(*instrumentMapping.get());
                 discardQueuedAudio(*systemMapping.get());
                 core.reset();
-                bool outputRecovered = output.start(core,requestedFrames,newPhysicalEndpoint,routeError,true);
+                const bool outputRecovered = output.start(core,requestedFrames,newPhysicalEndpoint,routeError);
                 if (outputRecovered)
                     preferredEndpointId=newPhysicalEndpoint;
-                else
-                {
-                    juce::Logger::writeToLog("Exact endpoint switch unavailable; reopening driver selection: " + juce::String(routeError.c_str()));
-                    outputRecovered = output.start(core,requestedFrames,previous,routeError);
-                }
                 if (!outputRecovered || output.actualBufferFrames() != actualFrames)
                 {
                     juce::Logger::writeToLog("Physical output recovery failed: " + juce::String(routeError.c_str()));

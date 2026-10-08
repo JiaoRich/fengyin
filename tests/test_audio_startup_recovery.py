@@ -25,17 +25,19 @@ class AudioStartupRecovery(unittest.TestCase):
         source = (ROOT / 'audio-engine/windows/AudioEngineMain.cpp').read_text(encoding='utf-8')
         hotplug = source.split('Physical output topology changed; reopening ASIO4ALL', 1)[1].split('if (output.isRunning())', 1)[0]
         self.assertIn('StreamState::recovering, 0', hotplug)
-        self.assertIn('outputRecovered = output.start(core,requestedFrames,previous,routeError)', hotplug)
+        self.assertIn('outputRecovered = output.start(core,requestedFrames,newPhysicalEndpoint,routeError)', hotplug)
+        self.assertEqual(hotplug.count('output.start('), 1)
         self.assertIn('!outputRecovered || output.actualBufferFrames() != actualFrames', hotplug)
         self.assertIn('StreamState::fallback, 0', hotplug)
         self.assertIn('discardQueuedAudio(*instrumentMapping.get())', hotplug)
 
-    def test_ordinary_startup_preserves_driver_configuration(self):
+    def test_startup_configures_group_and_checks_actual_channels(self):
         source = (ROOT / 'audio-engine/windows/Asio4AllOutput.cpp').read_text(encoding='utf-8')
-        self.assertIn('matchPhysicalEndpoint = requireMatch || needsRouteRepair', source)
-        self.assertIn('selectedEndpoint = matchPhysicalEndpoint && !preferredEndpoint.empty()', source)
+        self.assertIn('configureRealtekOutputs(', source)
+        self.assertNotIn('selectAsioEndpoint(', source)
         self.assertNotIn('refreshAsioEndpoints(', source)
-        self.assertIn('ASIO endpoint matching skipped for ordinary startup', source)
+        self.assertLess(source.index('device->close()'), source.index('configureRealtekOutputs('))
+        self.assertLess(source.index('configureRealtekOutputs('), source.index('device->open('))
         self.assertIn('channelNames[index].containsIgnoreCase("cable")', source)
 
     def test_capture_must_be_ready_before_publishing_running(self):

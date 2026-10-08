@@ -366,6 +366,7 @@ juce::String AudioDeviceService::configureAsio4All()
     if (asioPanelOpen) return juce::String::fromUTF8("ASIO4ALL 设置面板已打开，关闭后将自动恢复声音。");
     beforeAsioPanel = manager.createStateXml();
     resumeIsolatedEngine = engineProcess.isRunning();
+    juce::Logger::writeToLog("ASIO panel opening: engineRunning=" + juce::String(resumeIsolatedEngine ? 1 : 0));
     if (auto* settings = properties.getUserSettings())
         resumeEngineBuffer = settings->getIntValue("audioEngineBuffer", 128);
     stopTimer();
@@ -390,11 +391,13 @@ juce::String AudioDeviceService::configureAsio4All()
 
 void AudioDeviceService::restoreAfterAsioPanel()
 {
+    juce::Logger::writeToLog("ASIO panel closed: restoring previous audio mode");
     asioPanelOpen = false;
     stopTimer();
     lastError = resumeIsolatedEngine ? startIsolatedAudioEngine(resumeEngineBuffer)
         : manager.initialise(0, 2, beforeAsioPanel.get(), false);
     beforeAsioPanel.reset();
+    juce::Logger::writeToLog("ASIO panel restore result: " + (lastError.isEmpty() ? juce::String("success") : lastError));
     if (lastError.isEmpty()) return;
     manager.closeAudioDevice();
     engineProcess.stop();

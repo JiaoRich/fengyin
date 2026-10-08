@@ -1,6 +1,6 @@
 #include "Asio4AllOutput.h"
 #include "NamedSharedAudioRegion.h"
-#include "AsioEndpointSelection.h"
+#include "RealtekAsioConfiguration.h"
 
 namespace fengyin::audioengine
 {
@@ -37,23 +37,19 @@ bool Asio4AllOutput::start(AudioEngineCore& engine, std::uint32_t requestedFrame
     device.reset(type->createDevice(selected, {}));
     if (! device) { error = L"Cannot create ASIO4ALL device"; stop(); return false; }
     device->close();
-    // Preserve a working physical configuration, but never preserve a known
-    // virtual/disconnected route. Repair once by endpoint identity while idle.
-    const bool needsRouteRepair = unsafeRenderChannels(device->getOutputChannelNames());
-    const bool matchPhysicalEndpoint = requireMatch || needsRouteRepair;
-    // Only explicit switches or known-invalid routes need private selection.
-    juce::Logger::writeToLog(matchPhysicalEndpoint ? "ASIO startup stage: match physical endpoint"
-        : "ASIO startup stage: preserve driver configuration (no private API)");
-    const bool selectedEndpoint = matchPhysicalEndpoint && !preferredEndpoint.empty()
-        && selectAsioEndpoint(device->getFengYinAsioInterface(), preferredEndpoint);
-    juce::Logger::writeToLog(selectedEndpoint ? "ASIO endpoint selected by KS identity"
-        : matchPhysicalEndpoint ? "ASIO endpoint identity unavailable"
-                       : "ASIO endpoint matching skipped for ordinary startup");
-    if (matchPhysicalEndpoint && !selectedEndpoint)
+    // Endpoint IDs remain protocol-compatible, but are NOT ASIO pin identities.
+    // Every idle start (including hotplug) refreshes the Realtek output group.
+    juce::ignoreUnused(preferredEndpoint, requireMatch);
+    juce::Logger::writeToLog("ASIO startup stage: configure Realtek output group while idle");
+    const auto configuration=configureRealtekOutputs(device->getFengYinAsioInterface());
+    const bool selectedEndpoint=configuration.configured;
+    if (!configuration.rollbackOK)
     {
-        error=L"Cannot match the requested physical output to an ASIO4ALL pin. Use Windows shared output or select the output in the ASIO4ALL panel.";
+        error=L"ASIO4ALL configuration verification or rollback failed; open the ASIO4ALL panel to inspect the output state.";
         stop(); return false;
     }
+    if (!configuration.configured)
+        juce::Logger::writeToLog("Realtek auto-configuration unavailable; attempting unchanged driver route, validating actual channels after open");
     juce::BigInteger outputs;
     outputs.setRange(0, 2, true);
     juce::Logger::writeToLog("ASIO startup stage: open render stream");

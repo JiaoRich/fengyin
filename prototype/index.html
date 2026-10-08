@@ -146,15 +146,23 @@ body.compact-mode .instrument-heading>div:first-child{min-width:0;flex:1}
 body.compact-mode .instrument-actions{margin:0;flex-shrink:0}
 body.compact-mode .compact-action-row{grid-template-columns:repeat(2,minmax(0,1fr))}
 body.compact-mode .compact-action-row>button{overflow:visible;text-overflow:clip}
-body.compact-mode .app-shell{border-radius:20px;padding:12px}
-body.compact-mode .app-shell:before,body.compact-mode .app-shell:after{display:block;background:conic-gradient(#ff547c,#ffb545,#fff072,#59efb2,#46dfff,#8174ff,#ef68eb,#ff547c) border-box;animation:none;transition:opacity .12s linear}
-body.compact-mode .app-shell:before{inset:5px;border:12px solid transparent;border-radius:20px;filter:blur(10px) saturate(1.3);opacity:calc(.04 + var(--breath-energy,0)*.96)}
-body.compact-mode .app-shell:after{inset:3px;border:3px solid transparent;border-radius:17px;filter:drop-shadow(0 0 5px #9b85ff);opacity:calc(.08 + var(--breath-energy,0)*.92)}
+/* The native transparent outer layer owns the glow; never restore an inner rim. */
+body.compact-mode .app-shell{border-radius:28px;padding:0}
+body.compact-mode main{padding:16px}
 .compact-window-controls{display:flex;gap:4px;align-items:center}
 .compact-window-controls button{padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--text);cursor:pointer}
 body.compact-mode .compact-window-controls{display:flex;gap:4px;align-items:center}
 body.compact-mode .compact-brand{cursor:move;user-select:none;flex:1;min-width:0}
-body.compact-mode .window-mode-bar{gap:6px}
+body.compact-mode .window-mode-bar{gap:6px;cursor:move;user-select:none}
+.compact-resize-handle{display:none}
+body.compact-mode .compact-resize-handle{display:block;position:fixed;z-index:900;touch-action:none}
+.resize-n,.resize-s{left:28px;right:28px;height:7px;cursor:ns-resize}
+.resize-n{top:0}.resize-s{bottom:0}
+.resize-e,.resize-w{top:28px;bottom:28px;width:7px;cursor:ew-resize}
+.resize-e{right:0}.resize-w{left:0}
+.resize-ne,.resize-nw,.resize-se,.resize-sw{width:24px;height:24px}
+.resize-ne{top:7px;right:7px;cursor:nesw-resize}.resize-sw{bottom:7px;left:7px;cursor:nesw-resize}
+.resize-nw{top:7px;left:7px;cursor:nwse-resize}.resize-se{bottom:7px;right:7px;cursor:nwse-resize}
 body.compact-mode .compact-window-controls button{padding:6px 9px;background:transparent;color:var(--text)}
 #quick-tones,#quick-tones.open{display:grid;grid-template-columns:1fr 1fr}
 #quick-tones{visibility:hidden;opacity:0;pointer-events:none;transform:translateX(-18px) scale(.94);transition:opacity .2s,transform .22s,visibility .22s}

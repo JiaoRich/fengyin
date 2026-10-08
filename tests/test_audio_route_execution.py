@@ -9,6 +9,19 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class RouteExecution(unittest.TestCase):
+    def test_endpoint_matching_records_each_pre_enumeration_failure(self):
+        source = (ROOT / 'audio-engine/windows/AsioEndpointSelection.h').read_text(encoding='utf-8')
+        for stage in ('null driver', 'empty requested endpoint',
+                      'CoCreateInstance(MMDeviceEnumerator)', 'GetDevice(requested endpoint)',
+                      'Activate(IDeviceTopology)', 'GetConnector(0)', 'GetConnectedTo(adapter)',
+                      'QueryInterface(IPart)', 'QueryInterface(ASIO4ALL private API)',
+                      'no interface path match', 'enumeration callback was not invoked',
+                      'getPin(flow)', 'getPin(channels)', 'getPin(flags)'):
+            self.assertIn(stage, source)
+        self.assertIn('ASIO requested endpoint=', source)
+        self.assertIn('ASIO resolved stream=', source)
+        self.assertIn('HRESULT=0x', source)
+
     def test_reported_virtual_devices_are_never_physical_restore_targets(self):
         compiler = shutil.which('clang++') or shutil.which('g++')
         if not compiler:

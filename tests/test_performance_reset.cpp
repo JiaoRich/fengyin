@@ -17,7 +17,17 @@ int main()
     // controllers, not Qin's audio engine; real-plugin sound still needs testing.
     require(fengyin::performanceBreath(0) == 0, "No breath must remain silent");
     require(fengyin::performanceBreath(1) == 1, "Full breath must retain full scale");
-    require(std::abs(fengyin::performanceBreath(0.3f) - .431f) < .001f, "Curve must match traced reference");
+    constexpr float inputs[] = {.1f, .3f, .5f, .7f, .9f};
+    constexpr float outputs[] = {.12f, .36f, .60f, .85f, .95f};
+    for (int k = 0; k < 5; ++k)
+    {
+        require(std::abs(fengyin::performanceBreath(inputs[k]) - outputs[k]) < .00001f,
+                "Curve must pass through every user-approved knot");
+        constexpr float h = .0001f;
+        const float left = (fengyin::performanceBreath(inputs[k]) - fengyin::performanceBreath(inputs[k]-h)) / h;
+        const float right = (fengyin::performanceBreath(inputs[k]+h) - fengyin::performanceBreath(inputs[k])) / h;
+        require(std::abs(left-right) < .01f, "Curve slope must be continuous at knots");
+    }
     require(fengyin::performanceBreath(0.8f) > 0.8f, "Strong breath must approach maximum more easily");
     for (int i = 0; i < 127; ++i)
         require(fengyin::performanceBreath(i / 127.0f) < fengyin::performanceBreath((i+1) / 127.0f),

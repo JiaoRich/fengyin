@@ -22,13 +22,14 @@ class Release112(unittest.TestCase):
         html=(ROOT/'prototype/index.html').read_text(encoding='utf-8')
         self.assertNotIn('<strong>低延迟组件</strong>',html)
 
-    def test_normal_start_does_not_require_private_api(self):
+    def test_normal_start_uses_realtek_group_not_endpoint_matching(self):
         source=(ROOT/'audio-engine/windows/AudioEngineMain.cpp').read_text(encoding='utf-8')
         self.assertIn('bool requireEndpointMatch = false',source)
         self.assertIn('error, requireEndpointMatch)',source)
         source=(ROOT/'audio-engine/windows/Asio4AllOutput.cpp').read_text(encoding='utf-8')
-        self.assertIn('matchPhysicalEndpoint = requireMatch || needsRouteRepair',source)
-        self.assertIn('if (matchPhysicalEndpoint && !selectedEndpoint)', source)
+        self.assertIn('configureRealtekOutputs(device->getFengYinAsioInterface())',source)
+        self.assertNotIn('selectAsioEndpoint(', source)
+        self.assertIn('!configuration.rollbackOK', source)
 
     def test_source_readers_have_explicit_encoding(self):
         for path in (ROOT/'tests').glob('test_*.py'):
@@ -42,7 +43,7 @@ class Release112(unittest.TestCase):
     def test_borderless_work_area(self):
         source=(ROOT/'native/Source/Main.cpp').read_text(encoding='utf-8')
         for text in ['setUsingNativeTitleBar(false)', 'setTitleBarHeight(0)',
-                     'area.reduced(48)', 'juce::BorderSize<int>(0)']:
+                     'area.reduced(12)', 'juce::BorderSize<int>(0)']:
             self.assertIn(text,source)
 
     def test_exact_endpoint_before_mutation(self):
@@ -75,7 +76,8 @@ class Release112(unittest.TestCase):
         self.assertEqual(html.count('id="configure-asio4all"'),1)
         self.assertNotIn('高级输出设备设置',html)
         self.assertIn("$('#audio-output-select').hidden = asioBridge",source)
-        self.assertIn("$('#configure-asio4all').hidden = !asioBridge",source)
+        self.assertIn("$('#configure-asio4all').hidden = false",source)
+        self.assertNotIn("$('#configure-asio4all').hidden = !asioBridge",source)
         self.assertIn("$('#configure-asio4all').disabled = busy",source)
 
 if __name__=='__main__': unittest.main()

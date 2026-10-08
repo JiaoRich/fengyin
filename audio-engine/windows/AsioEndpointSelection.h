@@ -42,21 +42,34 @@ inline bool refreshAsioEndpoints(void* driver)
 
 inline bool selectAsioEndpoint(void* driver, const std::wstring& endpoint)
 {
-    if (!driver || endpoint.empty()) return false;
+    const auto checked = [](const char* stage, HRESULT result)
+    {
+        if (SUCCEEDED(result)) return true;
+        juce::Logger::writeToLog(juce::String("ASIO endpoint failure: ") + stage
+            + " HRESULT=0x" + juce::String::toHexString(static_cast<int>(result)));
+        return false;
+    };
+    if (!driver || endpoint.empty())
+    {
+        juce::Logger::writeToLog(!driver ? "ASIO endpoint failure: null driver"
+                                       : "ASIO endpoint failure: empty requested endpoint");
+        return false;
+    }
+    juce::Logger::writeToLog("ASIO requested endpoint=" + juce::String(endpoint.c_str()));
     using Microsoft::WRL::ComPtr;
     ComPtr<IMMDeviceEnumerator> enumerator;
     ComPtr<IMMDevice> device;
     ComPtr<IDeviceTopology> topology;
     ComPtr<IConnector> connector, connected;
     ComPtr<IPart> part;
-    if (FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
+    if (!checked("CoCreateInstance(MMDeviceEnumerator)", CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
             IID_PPV_ARGS(&enumerator)))
-        || FAILED(enumerator->GetDevice(endpoint.c_str(), &device))
-        || FAILED(device->Activate(__uuidof(IDeviceTopology), CLSCTX_ALL, nullptr,
+        || !checked("GetDevice(requested endpoint)", enumerator->GetDevice(endpoint.c_str(), &device))
+        || !checked("Activate(IDeviceTopology)", device->Activate(__uuidof(IDeviceTopology), CLSCTX_ALL, nullptr,
             reinterpret_cast<void**>(topology.GetAddressOf())))
-        || FAILED(topology->GetConnector(0, &connector))
-        || FAILED(connector->GetConnectedTo(&connected))
-        || FAILED(connected.As(&part))) return false;
+        || !checked("GetConnector(0)", topology->GetConnector(0, &connector))
+        || !checked("GetConnectedTo(adapter)", connector->GetConnectedTo(&connected))
+        || !checked("QueryInterface(IPart)", connected.As(&part))) return false;
     // The endpoint's adjacent connector is usually a topology/jack pin, NOT
     // the wave filter's streaming pin. Follow the render path upstream to
     // Software_IO before comparing an interface/pin with ASIO4ALL.
@@ -125,9 +138,10 @@ inline bool selectAsioEndpoint(void* driver, const std::wstring& endpoint)
         return false;
     }
     const auto& stream = streams.front();
+    juce::Logger::writeToLog("ASIO resolved stream=" + stream.path + " pin=" + juce::String(stream.pin));
     const GUID iid {0xa26078c5,0x2840,0x4726,{0xb4,0x27,0xe6,0x0f,0xc8,0xfe,0xe4,0x03}};
     ComPtr<A4Private> api;
-    if (FAILED(static_cast<IUnknown*>(driver)->QueryInterface(iid,
+    if (!checked("QueryInterface(ASIO4ALL private API)", static_cast<IUnknown*>(driver)->QueryInterface(iid,
             reinterpret_cast<void**>(api.GetAddressOf())))) return false;
     struct Context
     {
@@ -137,6 +151,14 @@ inline bool selectAsioEndpoint(void* driver, const std::wstring& endpoint)
         bool attempted = false, matched = false;
         struct Flags { long d, i, p; DWORD oldValue; };
         std::vector<Flags> changed;
+        static bool propertyOK(const char* stage, DWORD result, bool endAllowed = false)
+        {
+            if (result == 0) return true;
+            if (!(endAllowed && result == 0xA4AE1001u))
+                juce::Logger::writeToLog(juce::String("ASIO private failure: ") + stage
+                    + " code=0x" + juce::String::toHexString(static_cast<int>(result)));
+            return false;
+        }
         static BOOL run(void* raw)
         {
             auto& c = *static_cast<Context*>(raw);
@@ -146,37 +168,50 @@ inline bool selectAsioEndpoint(void* driver, const std::wstring& endpoint)
             for (long d = 0; d < 128; ++d)
             {
                 DWORD flags = 0;
-                if (c.api->getDevice(0, d, &flags, 4) != 0) break;
+                if (!propertyOK("getDevice(flags)", c.api->getDevice(0, d, &flags, 4), true)) break;
                 for (long i = 0; i < 128; ++i)
                 {
                     const void* detail = nullptr;
-                    if (c.api->getInterface(2, d, i, &detail, sizeof(detail)) != 0) break;
+                    if (!propertyOK("getInterface(path)", c.api->getInterface(2, d, i, &detail, sizeof(detail)), true)) break;
                     if (!detail) continue;
                     const auto* bytes = static_cast<const char*>(detail) + sizeof(DWORD);
                     const auto candidate = bytes[1] == 0
                         ? juce::String(reinterpret_cast<const wchar_t*>(bytes))
                         : juce::String::fromUTF8(bytes);
+                    juce::Logger::writeToLog("ASIO candidate d=" + juce::String(d)
+                        + " i=" + juce::String(i) + " path=" + candidate);
                     if (candidate.equalsIgnoreCase(c.path)) { chosenD = d; chosenI = i; }
                 }
             }
             DWORD flow = 0, channels = 0, flags = 0;
-            if (chosenD < 0
-                || c.api->getPin(1, chosenD, chosenI, c.pin, &flow, 4) != 0 || flow != KSPIN_DATAFLOW_IN
-                || c.api->getPin(2, chosenD, chosenI, c.pin, &channels, 4) != 0 || channels < 2
-                || c.api->getPin(0, chosenD, chosenI, c.pin, &flags, 4) != 0
-                || (flags & 0x20000000u) != 0) return FALSE;
+            if (chosenD < 0)
+            {
+                juce::Logger::writeToLog("ASIO endpoint failure: no interface path match");
+                return FALSE;
+            }
+            if (!propertyOK("getPin(flow)", c.api->getPin(1, chosenD, chosenI, c.pin, &flow, 4))
+                || !propertyOK("getPin(channels)", c.api->getPin(2, chosenD, chosenI, c.pin, &channels, 4))
+                || !propertyOK("getPin(flags)", c.api->getPin(0, chosenD, chosenI, c.pin, &flags, 4))) return FALSE;
+            juce::Logger::writeToLog("ASIO matched pin flow=" + juce::String(static_cast<int>(flow))
+                + " channels=" + juce::String(static_cast<int>(channels))
+                + " flags=0x" + juce::String::toHexString(static_cast<int>(flags)));
+            if (flow != KSPIN_DATAFLOW_IN || channels < 2 || (flags & 0x20000000u) != 0)
+            {
+                juce::Logger::writeToLog("ASIO endpoint failure: matched pin is not usable stereo render");
+                return FALSE;
+            }
             // Match the KS interface AND pin before changing anything.
             auto change = [&](long d, long i, long p, bool enabled)
             {
                 DWORD old = 0;
                 const auto read = p >= 0 ? c.api->getPin(0,d,i,p,&old,4)
                     : i >= 0 ? c.api->getInterface(0,d,i,&old,4) : c.api->getDevice(0,d,&old,4);
-                if (read != 0) return false;
+                if (!propertyOK("read flags before change", read)) return false;
                 DWORD value = enabled ? old | 0x80000000u : old & ~0x80000000u;
                 if (old == value) return true;
                 c.changed.push_back({d,i,p,old});
-                return (p >= 0 ? c.api->setPin(0,d,i,p,&value,4)
-                    : i >= 0 ? c.api->setInterface(0,d,i,&value,4) : c.api->setDevice(0,d,&value,4)) == 0;
+                return propertyOK("write enabled flags", p >= 0 ? c.api->setPin(0,d,i,p,&value,4)
+                    : i >= 0 ? c.api->setInterface(0,d,i,&value,4) : c.api->setDevice(0,d,&value,4));
             };
             bool ok = change(chosenD,-1,-1,true) && change(chosenD,chosenI,-1,true);
             for (long d=0; ok && d<128; ++d)
@@ -205,6 +240,8 @@ inline bool selectAsioEndpoint(void* driver, const std::wstring& endpoint)
     api->callback(&Context::run,&context);
     api->enumerate();
     api->callback(nullptr,nullptr);
+    if (!context.attempted)
+        juce::Logger::writeToLog("ASIO endpoint failure: enumeration callback was not invoked");
     return context.matched;
 }
 }

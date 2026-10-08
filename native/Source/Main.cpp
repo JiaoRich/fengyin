@@ -60,15 +60,13 @@ private:
             {
                 if (action == "close") closeButtonPressed();
                 else if (action == "minimise") setMinimised(true);
-                else if (action == "drag")
+                else if (content->compactMode && (action == "drag" || action.startsWith("resize-")))
                 {
-                   #if JUCE_WINDOWS
-                    if (auto* peer = getPeer())
-                    {
-                        ReleaseCapture();
-                        PostMessage(static_cast<HWND>(peer->getNativeHandle()), WM_NCLBUTTONDOWN, HTCAPTION, 0);
-                    }
-                   #endif
+                    // WebView owns mouse capture. Track desktop coordinates rather
+                    // than starting a delayed non-client loop on a borderless HWND.
+                    windowGesture = action;
+                    gestureStart = juce::Desktop::getMousePosition();
+                    gestureBounds = getBounds();
                 }
             };
             setResizable(false, false);
@@ -100,7 +98,7 @@ private:
             const auto area = display != nullptr ? display->userBounds.toNearestInt() : juce::Rectangle<int>(0, 0, 1366, 768);
             setResizeLimits(480, 560, 960, 2160);
             setFullScreen(false);
-            const auto safeArea = area.reduced(48);
+            const auto safeArea = area.reduced(12);
             const int width = juce::jmin(safeArea.getWidth(), juce::jlimit(480, 680, area.getWidth() * 2 / 5));
             setBounds(safeArea.getRight() - width, safeArea.getY(), width, safeArea.getHeight());
             updateRoundedWindow(true);
@@ -114,6 +112,26 @@ private:
             juce::JUCEApplication::getInstance()->systemRequestedQuit();
         }
     private:
+        juce::String windowGesture;
+        juce::Point<int> gestureStart;
+        juce::Rectangle<int> gestureBounds;
+        void updateWindowGesture()
+        {
+            if (windowGesture.isEmpty()) return;
+            if (!content->compactMode || isFullScreen()
+                || !juce::ModifierKeys::getCurrentModifiersRealtime().isLeftButtonDown())
+            { windowGesture.clear(); return; }
+            const auto delta = juce::Desktop::getMousePosition() - gestureStart;
+            if (windowGesture == "drag")
+            { setBounds(gestureBounds.translated(delta.x, delta.y)); return; }
+            const auto edge = windowGesture.fromFirstOccurrenceOf("resize-", false, false);
+            auto bounds = gestureBounds;
+            if (edge.contains("e")) bounds.setWidth(juce::jlimit(480, 960, gestureBounds.getWidth() + delta.x));
+            if (edge.contains("s")) bounds.setHeight(juce::jlimit(560, 2160, gestureBounds.getHeight() + delta.y));
+            if (edge.contains("w")) bounds.setLeft(gestureBounds.getRight() - juce::jlimit(480, 960, gestureBounds.getWidth() - delta.x));
+            if (edge.contains("n")) bounds.setTop(gestureBounds.getBottom() - juce::jlimit(560, 2160, gestureBounds.getHeight() - delta.y));
+            setBounds(bounds);
+        }
         void updateRoundedWindow(bool rounded)
         {
            #if JUCE_WINDOWS
@@ -140,6 +158,7 @@ private:
         int roundedWidth = -1, roundedHeight = -1, roundedRadius = -1;
         void timerCallback() override
         {
+            updateWindowGesture();
             glow.update(*this, content->compactMode && !isFullScreen() && !isMinimised()
                         && isVisible(), content->getWindowBreath());
             if (!isMinimised()) updateRoundedWindow(content->compactMode && !isFullScreen());

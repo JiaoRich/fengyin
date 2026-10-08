@@ -8,8 +8,25 @@ const { pathToFileURL } = require('node:url');
     const page = await browser.newPage({viewport:{width:600,height:800}});
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.goto(pathToFileURL(path.resolve('prototype/index.html')).href);
-    await page.evaluate(()=>{document.querySelector('#license-lock').hidden=true;applyWindowMode(true);});
+    await page.evaluate(()=>{
+      document.querySelector('#license-lock').hidden=true;
+      publishedTones=Array.from({length:7},(_,i)=>({id:`test-${i}`,instrumentKey:`test-${i}`,styleId:'natural',kind:'swam',name:`测试音色${i}`}));
+      renderPresets();applyWindowMode(true);
+    });
     await page.waitForTimeout(300);
+    for (const pseudo of ['::before','::after'])
+      assert.equal(await page.locator('.app-shell').evaluate((e,p)=>getComputedStyle(e,p).display,pseudo),'none','legacy inner rim must stay disabled');
+    await page.evaluate(()=>{window.gestures=[];window.savedNativeEvent=nativeEvent;nativeEvent=(name,payload)=>window.gestures.push({name,...payload});});
+    for (const edge of ['n','s','e','w','ne','nw','se','sw']) {
+      const handle=page.locator(`.resize-${edge}`);
+      assert(await handle.isVisible());
+      await handle.dispatchEvent('pointerdown',{button:0});
+    }
+    await page.locator('.window-mode-bar').dispatchEvent('pointerdown',{button:0});
+    await page.locator('#window-mode-toggle').dispatchEvent('pointerdown',{button:0});
+    assert.deepEqual(await page.evaluate(()=>gestures.map(e=>e.action)),
+      ['resize-n','resize-s','resize-e','resize-w','resize-ne','resize-nw','resize-se','resize-sw','drag']);
+    await page.evaluate(()=>{nativeEvent=window.savedNativeEvent;});
     assert.equal(await page.locator('#compact-tones button').count(),7);
     assert.equal(await page.locator('#compact-tones [draggable=true]').count(),0);
     assert.equal(await page.locator('.video-card').isVisible(),false);
@@ -42,6 +59,6 @@ const { pathToFileURL } = require('node:url');
     assert.deepEqual(await page.locator('#compact-tones button span').allTextContents(),fullNames);
     assert.equal(await page.locator('.studio-names label').count(),1);
     assert.deepEqual(errors,[]);
-    console.log('Compact UI: layout, no dragging, 8 themes, viewport bounds, unified studio name, runtime checks passed');
+    console.log('Compact UI: eight resize handles, header drag, control exclusion, layout, themes and runtime checks passed');
   } finally {await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

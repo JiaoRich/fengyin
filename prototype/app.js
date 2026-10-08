@@ -10,9 +10,23 @@ windowControls.addEventListener('click', e => {
   const action = e.target.closest('[data-action]')?.dataset.action;
   if (action) nativeEvent('windowAction', {action});
 });
-$('.compact-brand').addEventListener('pointerdown', e => {
-  if (compactMode && e.button === 0) nativeEvent('windowAction', {action:'drag'});
+$('.window-mode-bar').addEventListener('pointerdown', e => {
+  if (!compactMode || e.button !== 0 || e.target.closest('button,input,select,a')) return;
+  e.preventDefault();
+  nativeEvent('windowAction', {action:'drag'});
 });
+// Capture resize gestures inside the WebView without recreating its native peer.
+for (const edge of ['n','s','e','w','ne','nw','se','sw']) {
+  const handle = document.createElement('div');
+  handle.className = `compact-resize-handle resize-${edge}`;
+  handle.setAttribute('aria-hidden', 'true');
+  handle.addEventListener('pointerdown', e => {
+    if (!compactMode || e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    nativeEvent('windowAction', {action:`resize-${edge}`});
+  });
+  document.body.appendChild(handle);
+}
 function applyWindowMode(compact) {
   compactMode = !!compact;
   document.body.classList.toggle('compact-mode', compactMode);
@@ -2137,11 +2151,14 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   const sharedAsioActive = state?.sharedAsioActive === true;
   const asioBridge = String(state?.type || '').includes('ASIO4ALL');
   $('#audio-output-select').hidden = asioBridge;
-  $('#configure-asio4all').hidden = !asioBridge;
+  // Keep the recovery entry available even after ASIO startup falls back.
+  $('#configure-asio4all').hidden = false;
+  $('#configure-asio4all').innerHTML = '打开 ASIO4ALL 面板（选择输出端点） <span aria-hidden="true">↗</span>';
+  $('#configure-asio4all').style.marginTop = asioBridge ? '0' : '10px';
   $('#audio-output-label').htmlFor = asioBridge ? 'configure-asio4all' : 'audio-output-select';
   $('#audio-output-help').textContent = asioBridge
-    ? '打开 ASIO4ALL 面板选择声卡输出；不要启用虚拟线缆或麦克风。关闭面板后自动恢复声音。'
-    : '请选择实际使用的耳机、音响或声卡';
+    ? '面板中选择实际声卡输出，不要启用虚拟线缆或麦克风；关闭后尝试恢复声音。'
+    : '可选择共享输出设备；测试 ASIO4ALL 时，先打开下方面板选择端点，再选择风吟低延迟模式。';
   $('#audio-driver-help').textContent = asioBridge
     ? '默认低延迟方案：ASIO4ALL 输出，VB-CABLE 接收网页声音；浏览器输出保持“默认”'
     : sharedAsioActive
