@@ -3,6 +3,10 @@ name: Windows 编译与安装包
 on:
   workflow_dispatch:
     inputs:
+      diagnostic_only:
+        description: Validate and package crash collector only (no engine, installer or drivers)
+        type: boolean
+        default: false
       vbcable_trial:
         description: Package opt-in VB-CABLE portable trial
         type: boolean
@@ -16,7 +20,33 @@ permissions:
   contents: read
 
 jobs:
+  audio-diagnostic:
+    if: ${{ inputs.diagnostic_only }}
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          lfs: false
+      - name: Validate and package crash collector
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($file in @('scripts/audio-crash-capture/Capture.ps1','scripts/read-only-audio-diagnostics/Collect-Audio.ps1')) {
+            $tokens=$null; $errors=$null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file),[ref]$tokens,[ref]$errors) | Out-Null
+            if ($errors.Count) { throw ($errors | Out-String) }
+          }
+          New-Item -ItemType Directory -Path diagnostic/collector -Force | Out-Null
+          Copy-Item scripts/audio-crash-capture/* diagnostic/collector/
+          Copy-Item scripts/read-only-audio-diagnostics diagnostic/collector/read-only -Recurse
+          Compress-Archive -Path diagnostic/collector/* -DestinationPath diagnostic/FengYin-Crash-Capture.zip
+      - uses: actions/upload-artifact@v5
+        with:
+          name: FengYin-Crash-Capture
+          path: diagnostic/FengYin-Crash-Capture.zip
   windows-release:
+    if: ${{ !inputs.diagnostic_only }}
     name: Windows x64 Release
     runs-on: windows-2022
     timeout-minutes: 45
