@@ -5,6 +5,34 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class AudioStartupRecovery(unittest.TestCase):
+    def test_blocked_hotplug_recovery_has_parent_deadline(self):
+        source = (ROOT / 'native/Source/AudioDeviceService.cpp').read_text(encoding='utf-8')
+        timer = source.split('void AudioDeviceService::timerCallback()', 1)[1].split('AudioDeviceStatus AudioDeviceService::getStatus()', 1)[0]
+        self.assertIn('engineProcess.isRecovering()', timer)
+        self.assertIn('now - engineRecoveryStartedAt < 15000.0', timer)
+        self.assertLess(timer.index('engineProcess.stop()'), timer.index('restorePhysicalSharedOutput()'))
+
+    def test_hotplug_recovery_publishes_failure_instead_of_stale_running(self):
+        source = (ROOT / 'audio-engine/windows/AudioEngineMain.cpp').read_text(encoding='utf-8')
+        hotplug = source.split('Physical output topology changed; reopening ASIO4ALL', 1)[1].split('if (output.isRunning())', 1)[0]
+        self.assertIn('StreamState::recovering, 0', hotplug)
+        self.assertIn('outputRecovered = output.start(core,requestedFrames,previous,routeError)', hotplug)
+        self.assertIn('!outputRecovered || output.actualBufferFrames() != actualFrames', hotplug)
+        self.assertIn('StreamState::fallback, 0', hotplug)
+        self.assertIn('discardQueuedAudio(*instrumentMapping.get())', hotplug)
+
+    def test_ordinary_startup_preserves_driver_configuration(self):
+        source = (ROOT / 'audio-engine/windows/Asio4AllOutput.cpp').read_text(encoding='utf-8')
+        self.assertIn('selectedEndpoint = requireMatch && !preferredEndpoint.empty()', source)
+        self.assertNotIn('refreshAsioEndpoints(', source)
+        self.assertIn('ASIO endpoint matching skipped for ordinary startup', source)
+        self.assertIn('channelNames[index].containsIgnoreCase("cable")', source)
+
+    def test_driver_start_and_callback_wait_are_distinguishable(self):
+        source = (ROOT / 'scripts/patch-juce-wasapi-raw.cmake').read_text(encoding='utf-8')
+        self.assertIn('driver start returned: code=', source)
+        self.assertIn('first callback wait finished: callbackSeen=', source)
+
     def test_both_driver_installers_require_restart(self):
         source = (ROOT / 'installer/FengYin.iss').read_text(encoding='utf-8')
         asio = next(line for line in source.splitlines()

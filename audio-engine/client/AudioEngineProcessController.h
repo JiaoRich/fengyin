@@ -21,6 +21,7 @@ public:
     [[nodiscard]] static bool isAvailable() noexcept;
     void stop() noexcept;
     [[nodiscard]] bool isRunning() const noexcept;
+    [[nodiscard]] bool isRecovering() const noexcept;
     [[nodiscard]] std::uint32_t actualBufferFrames() const noexcept;
     bool requestTestTone() noexcept
     {

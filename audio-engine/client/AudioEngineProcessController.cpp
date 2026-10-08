@@ -171,6 +171,7 @@ bool AudioEngineProcessController::start(std::uint32_t bufferFrames,
     (void) bufferFrames;
     (void) physicalEndpointId;
     (void) routeSystemAudio;
+    (void) requireEndpointMatch;
     error = "FengYin audio engine is only available on Windows";
     return false;
 #endif
@@ -199,16 +200,34 @@ bool AudioEngineProcessController::waitUntilRunning(int timeoutMilliseconds,
                 .getChildFile("FengYin").getChildFile("audio-engine.log");
             const auto lines = juce::StringArray::fromLines(log.loadFileAsString());
             for (int index = lines.size() - 1; index >= 0; --index)
+            {
+                if (lines[index].contains("Log started:")) break;
                 if (lines[index].contains("failed:"))
                 {
                     error += "\n" + lines[index];
                     break;
                 }
+            }
             return false;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     error = juce::String::fromUTF8("风吟音频引擎启动超时");
+    // Preserve the evidence before stop() terminates a blocked driver process.
+    // Use only the last logged session; never cross a session boundary.
+    // A process that failed before creating its logger may leave a stale file,
+    // so label this as log context rather than evidence of the current launch.
+    const auto log = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+        .getChildFile("FengYin").getChildFile("audio-engine.log");
+    const auto lines = juce::StringArray::fromLines(log.loadFileAsString());
+    juce::StringArray tail;
+    for (int index = lines.size() - 1; index >= 0 && tail.size() < 12; --index)
+    {
+        if (lines[index].contains("Log started:")) break;
+        if (lines[index].trim().isNotEmpty()) tail.insert(0, lines[index]);
+    }
+    juce::Logger::writeToLog("AUDIO START TIMEOUT: budgetMs=" + juce::String(timeoutMilliseconds)
+        + "\nLast logged session (may predate this process):\n" + tail.joinIntoString("\n"));
     return false;
 #else
     (void) timeoutMilliseconds;
@@ -258,5 +277,12 @@ std::uint32_t AudioEngineProcessController::actualBufferFrames() const noexcept
 {
     return statusMapping.get() != nullptr
         ? statusMapping.get()->activePeriodFrames.load(std::memory_order_acquire) : 0;
+}
+
+bool AudioEngineProcessController::isRecovering() const noexcept
+{
+    return isRunning() && statusMapping.get() != nullptr
+        && static_cast<StreamState>(statusMapping.get()->state.load(std::memory_order_acquire))
+            == StreamState::recovering;
 }
 }

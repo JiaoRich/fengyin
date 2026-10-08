@@ -103,6 +103,7 @@ private:
     bool asioPanelOpen = false;
     bool resumeIsolatedEngine = false;
     int resumeEngineBuffer = 128;
+    double engineRecoveryStartedAt = 0.0;
     std::unique_ptr<juce::XmlElement> beforeAsioPanel;
 
     juce::AudioDeviceManager manager;

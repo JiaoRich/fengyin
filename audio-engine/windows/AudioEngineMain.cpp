@@ -273,14 +273,31 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
             {
                 const auto previous = preferredEndpointId;
                 juce::Logger::writeToLog("Physical output topology changed; reopening ASIO4ALL");
+                lifecycle.beginRecovery();
+                publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::recovering, 0);
                 output.stop();
-                if (output.start(core,requestedFrames,newPhysicalEndpoint,routeError,true))
+                discardQueuedAudio(*instrumentMapping.get());
+                discardQueuedAudio(*systemMapping.get());
+                core.reset();
+                bool outputRecovered = output.start(core,requestedFrames,newPhysicalEndpoint,routeError,true);
+                if (outputRecovered)
                     preferredEndpointId=newPhysicalEndpoint;
                 else
                 {
                     juce::Logger::writeToLog("Exact endpoint switch unavailable; reopening driver selection: " + juce::String(routeError.c_str()));
-                    output.start(core,requestedFrames,previous,routeError);
+                    outputRecovered = output.start(core,requestedFrames,previous,routeError);
                 }
+                if (!outputRecovered || output.actualBufferFrames() != actualFrames)
+                {
+                    juce::Logger::writeToLog("Physical output recovery failed: " + juce::String(routeError.c_str()));
+                    unrecoverableOutputFailure = true;
+                    lifecycle.useFallback();
+                    publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::fallback, 0);
+                    break;
+                }
+                lifecycle.markRunning();
+                publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::running,
+                             output.actualBufferFrames());
             }
         }
         if (output.isRunning())

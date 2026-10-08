@@ -31,6 +31,31 @@ replace_exact("${asio}"
     "                outputFormat[i].clear (bufferInfos[outputBufferIndex + i].buffers[0], preferredBufferSize);\n                outputFormat[i].clear (bufferInfos[outputBufferIndex + i].buffers[1], preferredBufferSize);"
     "                if (auto* buffer = bufferInfos[outputBufferIndex + i].buffers[0])\n                    outputFormat[i].clear (buffer, preferredBufferSize);\n                if (auto* buffer = bufferInfos[outputBufferIndex + i].buffers[1])\n                    outputFormat[i].clear (buffer, preferredBufferSize);")
 
+# Keep driver-call time separate from JUCE's subsequent first-callback wait.
+# Do not log from the realtime callback itself.
+replace_exact("${asio}"
+[[            calledback = false;
+            err = asioObject->start();]]
+[[            calledback = false;
+            const auto fengyinStartTime = Time::getMillisecondCounterHiRes();
+            err = asioObject->start();
+            JUCE_ASIO_LOG ("driver start returned: code=" + String (err)
+                + " elapsedMs=" + String (Time::getMillisecondCounterHiRes() - fengyinStartTime, 1)
+                + " callbackSeen=" + String (calledback.load() ? 1 : 0));]])
+replace_exact("${asio}"
+[[                int count = 300;
+                while (--count > 0 && ! calledback)
+                    Thread::sleep (10);
+
+                isStarted = true;]]
+[[                JUCE_ASIO_LOG ("waiting for first driver callback");
+                int count = 300;
+                while (--count > 0 && ! calledback)
+                    Thread::sleep (10);
+                JUCE_ASIO_LOG ("first callback wait finished: callbackSeen=" + String (calledback.load() ? 1 : 0));
+
+                isStarted = true;]])
+
 set(header "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/juce_audio_devices.h")
 set(manager "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/audio_io/juce_AudioDeviceManager.cpp")
 set(wasapi "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp")

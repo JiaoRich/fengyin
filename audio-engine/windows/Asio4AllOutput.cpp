@@ -24,14 +24,16 @@ bool Asio4AllOutput::start(AudioEngineCore& engine, std::uint32_t requestedFrame
     device.reset(type->createDevice(selected, {}));
     if (! device) { error = L"Cannot create ASIO4ALL device"; stop(); return false; }
     device->close();
-    juce::Logger::writeToLog("ASIO startup stage: match physical endpoint");
-    // Also select the physical endpoint on first launch. Windows' default may
-    // already be the bridge's virtual cable; preserving that selection blindly
-    // cannot provide an out-of-box physical output. Only mutate an exact KS match.
-    const bool selectedEndpoint = !preferredEndpoint.empty()
+    // Ordinary startup must not enumerate or mutate the driver's private state.
+    // Keep the 1.1.3 startup path; only an explicit endpoint switch may use
+    // the private API. Physical-channel validation below still rejects cables.
+    juce::Logger::writeToLog(requireMatch ? "ASIO startup stage: match physical endpoint"
+        : "ASIO startup stage: preserve driver configuration (no private API)");
+    const bool selectedEndpoint = requireMatch && !preferredEndpoint.empty()
         && selectAsioEndpoint(device->getFengYinAsioInterface(), preferredEndpoint);
     juce::Logger::writeToLog(selectedEndpoint ? "ASIO endpoint selected by KS identity"
-        : "ASIO endpoint identity unavailable; preserving driver selection");
+        : requireMatch ? "ASIO endpoint identity unavailable"
+                       : "ASIO endpoint matching skipped for ordinary startup");
     if (requireMatch && !selectedEndpoint)
     {
         error=L"Cannot match the requested physical output to an ASIO4ALL pin. Use Windows shared output or select the output in the ASIO4ALL panel.";

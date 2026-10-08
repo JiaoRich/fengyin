@@ -224,6 +224,7 @@ juce::String AudioDeviceService::startIsolatedAudioEngine(int requestedFrames)
         engineProcess.stop();
         return result;
     }
+    engineRecoveryStartedAt = 0.0;
     startTimer(250);
     return {};
 #else
@@ -240,7 +241,20 @@ void AudioDeviceService::timerCallback()
         restoreAfterAsioPanel();
         return;
     }
-    if (engineProcess.isRunning()) return;
+    if (engineProcess.isRecovering())
+    {
+        const auto now = juce::Time::getMillisecondCounterHiRes();
+        if (engineRecoveryStartedAt == 0.0) engineRecoveryStartedAt = now;
+        // A driver can block inside start/stop. The isolated process must not
+        // leave the application silently waiting forever after a jack change.
+        if (now - engineRecoveryStartedAt < 15000.0) return;
+        juce::Logger::writeToLog("Audio recovery exceeded 15s; stopping isolated engine before physical fallback");
+    }
+    else
+    {
+        engineRecoveryStartedAt = 0.0;
+        if (engineProcess.isRunning()) return;
+    }
     stopTimer();
     manager.closeAudioDevice();
     engineProcess.stop();
@@ -264,6 +278,11 @@ AudioDeviceStatus AudioDeviceService::getStatus()
         {
             status.deviceType = engineModeName;
             status.deviceName = juce::String::fromUTF8("ASIO4ALL（输出由驱动控制面板选择）");
+            if (engineProcess.isRecovering())
+            {
+                status.ready = false;
+                status.error = juce::String::fromUTF8("正在恢复音频输出，请稍候");
+            }
         }
         status.sampleRate = device->getCurrentSampleRate();
         status.bufferSize = device->getCurrentBufferSizeSamples();
