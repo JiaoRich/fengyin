@@ -127,6 +127,8 @@ body.compact-mode .app-shell:before,body.compact-mode .app-shell:after{content:'
 body.compact-mode .app-shell:before{z-index:8999;inset:5px;border-width:10px;border-radius:17px;filter:blur(11px) saturate(1.35);opacity:calc(.22 + var(--breath-energy,0)*.62)}
 body.compact-mode .app-shell:after{z-index:9000;inset:2px;border-width:5px;border-radius:13px;filter:drop-shadow(0 0 7px var(--glow));opacity:calc(.34 + var(--breath-energy,0)*.64)}
 @property --rim-angle{syntax:'<angle>';initial-value:0deg;inherits:false}
+/* Native transparent exterior layer owns compact glow; no duplicate inner rim. */
+body.compact-mode .app-shell:before,body.compact-mode .app-shell:after{display:none}
 @keyframes compact-rim{to{--rim-angle:360deg}}
 @keyframes compact-tone-scroll{to{transform:translateX(calc(-1 * var(--tone-scroll-distance,0px)))}}
 @media(prefers-reduced-motion:reduce){body.compact-mode .app-shell:before,body.compact-mode .app-shell:after{animation:none}.tone-level i{transition:none}}

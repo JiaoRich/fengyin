@@ -447,5 +447,10 @@ if(BUILD_TESTING)
     target_link_libraries(FengYinPerformanceResetTests PRIVATE juce::juce_audio_basics
         juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
     add_test(NAME performance_reset_controllers COMMAND FengYinPerformanceResetTests)
+    add_executable(FengYinCompactGlowTests tests/test_compact_glow.cpp)
+    target_include_directories(FengYinCompactGlowTests PRIVATE native/Source)
+    target_link_libraries(FengYinCompactGlowTests PRIVATE juce::juce_gui_basics
+        juce::juce_recommended_config_flags)
+    add_test(NAME compact_glow_rendering COMMAND FengYinCompactGlowTests)
 
 endif()

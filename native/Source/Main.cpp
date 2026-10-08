@@ -7,6 +7,7 @@
  #endif
  #include <windows.h>
 #endif
+#include "CompactWindowGlow.h"
 
 class FengYinApplication final : public juce::JUCEApplication
 {
@@ -79,7 +80,7 @@ private:
                            juce::jmin(900, juce::jmax(700, available.getHeight() - 32)));
             setVisible(true);
             setFullScreen(true);
-            startTimer(250);
+            startTimerHz(30);
         }
 
         void maximiseButtonPressed() override { content->requestCompactMode(!content->compactMode); }
@@ -99,7 +100,7 @@ private:
             const auto area = display != nullptr ? display->userBounds.toNearestInt() : juce::Rectangle<int>(0, 0, 1366, 768);
             setResizeLimits(480, 560, 960, 2160);
             setFullScreen(false);
-            const auto safeArea = area.reduced(12);
+            const auto safeArea = area.reduced(48);
             const int width = juce::jmin(safeArea.getWidth(), juce::jlimit(480, 680, area.getWidth() * 2 / 5));
             setBounds(safeArea.getRight() - width, safeArea.getY(), width, safeArea.getHeight());
             updateRoundedWindow(true);
@@ -122,7 +123,7 @@ private:
             RECT bounds {};
             if (!GetWindowRect(hwnd, &bounds)) return;
             const int width = bounds.right - bounds.left, height = bounds.bottom - bounds.top;
-            const int radius = juce::roundToInt(20.0 * peer->getPlatformScaleFactor());
+            const int radius = juce::roundToInt(28.0 * peer->getPlatformScaleFactor());
             if (rounded == roundedApplied && width == roundedWidth && height == roundedHeight && radius == roundedRadius) return;
             auto region = rounded ? CreateRoundRectRgn(0, 0, width + 1, height + 1, radius * 2, radius * 2) : nullptr;
             if (rounded && region == nullptr) return;
@@ -139,6 +140,8 @@ private:
         int roundedWidth = -1, roundedHeight = -1, roundedRadius = -1;
         void timerCallback() override
         {
+            glow.update(*this, content->compactMode && !isFullScreen() && !isMinimised()
+                        && isVisible(), content->getWindowBreath());
             if (!isMinimised()) updateRoundedWindow(content->compactMode && !isFullScreen());
             // Native OS restore gestures may bypass maximiseButtonPressed.
             if (! isMinimised() && ! isFullScreen() && ! content->compactMode)
@@ -150,6 +153,7 @@ private:
                 content->requestCompactMode(false);
         }
         MainComponent* content = nullptr;
+        CompactWindowGlow glow;
     };
 
     std::unique_ptr<MainWindow> mainWindow;

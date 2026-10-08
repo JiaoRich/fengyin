@@ -33,6 +33,7 @@ public:
     std::function<void(bool)> onWindowModeChanged;
     std::function<void(juce::String)> onWindowAction;
     bool compactMode = false;
+    float getWindowBreath() const noexcept { return midi.getSnapshot().breath; }
 
 private:
     bool windowModePromptOpen = false;

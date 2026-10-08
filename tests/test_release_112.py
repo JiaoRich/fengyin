@@ -42,7 +42,7 @@ class Release112(unittest.TestCase):
     def test_borderless_work_area(self):
         source=(ROOT/'native/Source/Main.cpp').read_text(encoding='utf-8')
         for text in ['setUsingNativeTitleBar(false)', 'setTitleBarHeight(0)',
-                     'area.reduced(12)', 'juce::BorderSize<int>(0)']:
+                     'area.reduced(48)', 'juce::BorderSize<int>(0)']:
             self.assertIn(text,source)
 
     def test_exact_endpoint_before_mutation(self):
