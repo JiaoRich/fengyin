@@ -75,6 +75,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     std::uint32_t requestedFrames = 256;
     bool routeSystemAudio = false;
     bool configureAsio = false;
+    bool requireEndpointMatch = false;
     int argumentCount = 0;
     if (auto** arguments = CommandLineToArgvW(GetCommandLineW(), &argumentCount))
     {
@@ -96,6 +97,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
                 routeSystemAudio = true;
             else if (std::wstring(arguments[index]) == L"--configure-asio")
                 configureAsio = true;
+            else if (std::wstring(arguments[index]) == L"--require-endpoint-match")
+                requireEndpointMatch = true;
         LocalFree(arguments);
     }
     const bool manualPhysicalOutput = !preferredEndpointId.empty();
@@ -197,7 +200,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     }
     Asio4AllOutput output;
     // No WASAPI substitution or silent escalation to a larger period.
-    const auto outputStarted = output.start(core, requestedFrames, preferredEndpointId, error, manualPhysicalOutput);
+    const auto outputStarted = output.start(core, requestedFrames, preferredEndpointId, error, requireEndpointMatch);
     if (! outputStarted)
     {
         logAudioSessions();

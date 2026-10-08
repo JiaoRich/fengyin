@@ -259,7 +259,7 @@ void MainComponent::setupWebInterface()
         .withNativeIntegrationEnabled()
         .withEventListener("windowAction", [this](juce::var payload)
         {
-            if (compactMode && onWindowAction)
+            if (onWindowAction)
                 onWindowAction(payload.getProperty("action", "").toString());
         })
         .withEventListener("setCompactMode", [this](juce::var payload)

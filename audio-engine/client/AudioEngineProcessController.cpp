@@ -85,7 +85,7 @@ bool AudioEngineProcessController::isAvailable() noexcept
 bool AudioEngineProcessController::start(std::uint32_t bufferFrames,
                                          const juce::String& physicalEndpointId,
                                          bool routeSystemAudio,
-                                         juce::String& error)
+                                         juce::String& error, bool requireEndpointMatch)
 {
     stop();
 #if defined(_WIN32)
@@ -141,6 +141,7 @@ bool AudioEngineProcessController::start(std::uint32_t bufferFrames,
                  + L"\" --buffer " + std::to_wstring(bufferFrames);
     if (physicalEndpointId.isNotEmpty())
         command += L" --physical-endpoint \"" + std::wstring(physicalEndpointId.toWideCharPointer()) + L"\"";
+    if (requireEndpointMatch) command += L" --require-endpoint-match";
     if (routeSystemAudio)
         command += L" --route-system-audio";
     std::vector<wchar_t> mutableCommand(command.begin(), command.end());

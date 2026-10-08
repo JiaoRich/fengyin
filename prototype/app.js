@@ -18,11 +18,13 @@ function applyWindowMode(compact) {
   document.body.classList.toggle('compact-mode', compactMode);
   $('#window-mode-toggle').textContent = compactMode ? '全屏' : '精简模式';
   (compactMode ? $('.window-mode-bar') : $('.system-pills')).appendChild($('#window-mode-toggle'));
+  (compactMode ? $('.window-mode-bar') : $('.system-pills')).appendChild(windowControls);
   closeQuickTones();
   if (compactMode) showPage('play');
 }
 $('#window-mode-toggle').onclick = () => nativeEvent('setCompactMode', {compact:!compactMode});
 $('.system-pills').appendChild($('#window-mode-toggle'));
+$('.system-pills').appendChild(windowControls);
 window.__JUCE__?.backend?.addEventListener('windowModeChanged', applyWindowMode);
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !compactMode && !document.querySelector('[role="dialog"]:not([hidden])'))
@@ -1610,7 +1612,7 @@ function startFullTrial() {
     return;
   }
   const startedAt = Date.now();
-  localStorage.setItem('fengyin-prototype-trial-1.1.2-start', String(startedAt));
+  localStorage.setItem('fengyin-prototype-trial-1.1.3-start', String(startedAt));
   renderLicenseState({trialActive:true, trialRemainingSeconds:60*60});
   toast('1小时完整试用已开始');
 }
@@ -1740,7 +1742,8 @@ function applyInlineAudioSettings(driverChanged = false) {
 $('#audio-driver-select').addEventListener('change', () => applyInlineAudioSettings(true));
 $('#configure-asio4all').addEventListener('click', () => nativeEvent('configureAsio4All'));
 const soundCheckDialog = document.createElement('dialog');
-soundCheckDialog.style.cssText='max-width:480px;width:calc(100% - 48px);padding:24px;border:1px solid var(--line);border-radius:18px;background:var(--panel);color:var(--text)';
+soundCheckDialog.className='sound-check-dialog';
+soundCheckDialog.setAttribute('aria-label','声音检测');
 document.body.appendChild(soundCheckDialog);
 let soundCheckChoices=[], soundCheckIndex=0, soundCheckWaiting=false;
 function soundCheckClose(keep=false,sharedFallback=false) {
@@ -2236,7 +2239,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.2 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.3 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},
@@ -2268,7 +2271,7 @@ if (!window.__JUCE__?.backend?.emitEvent) {
   if(new URLSearchParams(location.search).has('review')) renderLicenseState({activated:true});
   else if(localStorage.getItem('fengyin-prototype-license') === 'active') renderLicenseState({activated:true});
   else {
-    const trialStartedAt = Number(localStorage.getItem('fengyin-prototype-trial-1.1.2-start') || 0);
+    const trialStartedAt = Number(localStorage.getItem('fengyin-prototype-trial-1.1.3-start') || 0);
     const trialRemaining = Math.max(0, 60*60 - Math.floor((Date.now() - trialStartedAt) / 1000));
     renderLicenseState(trialStartedAt > 0 && trialRemaining > 0
       ? {trialActive:true, trialRemainingSeconds:trialRemaining}

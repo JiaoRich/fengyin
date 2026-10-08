@@ -49,7 +49,9 @@ private:
         explicit MainWindow(juce::String name)
             : DocumentWindow(std::move(name), juce::Colour(0xff07101d), allButtons)
         {
-            setUsingNativeTitleBar(true);
+            // Keep the native peer stable for the lifetime of WebView2.
+            setUsingNativeTitleBar(false);
+            setTitleBarHeight(0);
             content = new MainComponent();
             setContentOwned(content, true);
             content->onWindowModeChanged = [this](bool compact) { applyMode(compact); };
@@ -68,7 +70,7 @@ private:
                    #endif
                 }
             };
-            setResizable(true, true);
+            setResizable(false, false);
             setResizeLimits(1120, 700, 2560, 1600);
             const auto display = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay();
             const auto available = display != nullptr ? display->userBounds.toNearestInt()
@@ -92,14 +94,11 @@ private:
         {
             borderless = compact;
             roundedWidth = -1;
-            if (! compact) { updateRoundedWindow(false); setUsingNativeTitleBar(true); setResizable(true, true); setResizeLimits(1120, 700, 7680, 4320); setFullScreen(true); return; }
+            if (! compact) { updateRoundedWindow(false); setResizeLimits(1120, 700, 7680, 4320); setFullScreen(true); return; }
             const auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect(getBounds());
             const auto area = display != nullptr ? display->userBounds.toNearestInt() : juce::Rectangle<int>(0, 0, 1366, 768);
             setResizeLimits(480, 560, 960, 2160);
             setFullScreen(false);
-            setUsingNativeTitleBar(false);
-            setTitleBarHeight(0);
-            setResizable(false, false);
             const auto safeArea = area.reduced(12);
             const int width = juce::jmin(safeArea.getWidth(), juce::jlimit(480, 680, area.getWidth() * 2 / 5));
             setBounds(safeArea.getRight() - width, safeArea.getY(), width, safeArea.getHeight());

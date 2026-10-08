@@ -152,7 +152,7 @@ juce::String AudioDeviceService::startIsolatedAudioEngine(int requestedFrames)
     juce::String engineError;
     if (! engineProcess.isRunning()
         && ! engineProcess.start(static_cast<std::uint32_t>(requestedFrames),
-            soundCheckActive ? soundCheckCandidate : properties.getUserSettings()->getValue("physicalEndpoint"), true, engineError))
+            soundCheckActive ? soundCheckCandidate : properties.getUserSettings()->getValue("physicalEndpoint"), true, engineError, soundCheckActive))
         return engineError;
     if (! engineDeviceTypeAdded)
     {

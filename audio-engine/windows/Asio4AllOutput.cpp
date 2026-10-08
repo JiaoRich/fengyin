@@ -23,7 +23,10 @@ bool Asio4AllOutput::start(AudioEngineCore& engine, std::uint32_t requestedFrame
     device.reset(type->createDevice(selected, {}));
     if (! device) { error = L"Cannot create ASIO4ALL device"; stop(); return false; }
     device->close();
-    const bool selectedEndpoint = selectAsioEndpoint(device->getFengYinAsioInterface(), preferredEndpoint);
+    // Do not change a working driver configuration during ordinary startup.
+    // Exact endpoint selection is restricted to explicit output diagnostics.
+    const bool selectedEndpoint = requireMatch
+        && selectAsioEndpoint(device->getFengYinAsioInterface(), preferredEndpoint);
     juce::Logger::writeToLog(selectedEndpoint ? "ASIO endpoint selected by KS identity"
         : "ASIO endpoint identity unavailable; preserving driver selection");
     if (requireMatch && !selectedEndpoint)
