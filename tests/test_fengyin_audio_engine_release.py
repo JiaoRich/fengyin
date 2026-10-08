@@ -167,6 +167,15 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         self.assertIn("Microsoft Corporation", release)
         self.assertNotIn("MicrosoftEdgeWebview2Setup.exe", installer)
 
+    def test_webview_download_is_retried_before_expensive_compile(self):
+        build = self.read("scripts/build-windows.ps1")
+        preflight = build.index('for ($attempt = 1; $attempt -le 4; $attempt++)')
+        self.assertLess(preflight, build.index('cmake --build'))
+        self.assertIn('if ($attempt -eq 4) { throw }', build)
+        self.assertIn('Remove-Item -LiteralPath $PreparedWebView', build)
+        self.assertIn('Get-AuthenticodeSignature -FilePath $PreparedWebView', build)
+        self.assertIn('Copy-Item -LiteralPath $PreparedWebView -Destination $WebViewOfflineInstallerPath', build)
+
     def test_release_tone_catalog_is_explicit_and_all_embedded_assets_exist(self):
         catalog = self.read("native/Source/PublishedToneCatalog.h")
         expected_names = [

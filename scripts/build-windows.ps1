@@ -14,6 +14,7 @@ $FfmpegPackageDir = Join-Path $PackageDir "tools\ffmpeg"
 $NugetPackageDir = Join-Path $ProjectRoot "third_party\nuget-packages"
 $WebViewOfflineInstallerPath = Join-Path $PackageDir "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
 $PreparedFfmpeg = Join-Path $env:TEMP ("fengyin-ffmpeg-" + [guid]::NewGuid().ToString("N"))
+$PreparedWebView = Join-Path $env:TEMP ("fengyin-webview-" + [guid]::NewGuid().ToString("N") + ".exe")
 
 function Invoke-Checked([string]$StepName, [scriptblock]$Command) {
     & $Command
@@ -35,6 +36,28 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
 }
 # Fail inexpensive source regressions before the native build, not after it.
 Invoke-Checked "发布源码预检" { python -m unittest discover -s (Join-Path $ProjectRoot "tests") -p "test_*.py" }
+# Download before compilation. Never package a partial or unsigned dependency.
+for ($attempt = 1; $attempt -le 4; $attempt++) {
+    try {
+        Write-Host "预检 WebView2 离线运行环境（$attempt/4）..."
+        Invoke-WebRequest -UseBasicParsing -TimeoutSec 300 `
+            -Uri "https://go.microsoft.com/fwlink/?linkid=2124701" -OutFile $PreparedWebView
+        if ((Get-Item $PreparedWebView).Length -lt 100MB) {
+            throw "WebView2 下载不完整，实际字节数：$((Get-Item $PreparedWebView).Length)"
+        }
+        $WebViewSignature = Get-AuthenticodeSignature -FilePath $PreparedWebView
+        if ($WebViewSignature.Status -ne 'Valid' -or
+            $WebViewSignature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
+            throw "WebView2 未通过微软数字签名验证。"
+        }
+        break
+    } catch {
+        Remove-Item -LiteralPath $PreparedWebView -Force -ErrorAction SilentlyContinue
+        if ($attempt -eq 4) { throw }
+        Write-Warning "WebView2 预检失败，将重新下载：$_"
+        Start-Sleep -Seconds (3 * $attempt)
+    }
+}
 if (-not (Test-Path $FfmpegPath)) {
     Write-Host "预检并校验 FFmpeg 发布依赖..." -ForegroundColor Cyan
     Invoke-Checked "FFmpeg 下载与校验" { python (Join-Path $PSScriptRoot "prepare_ffmpeg.py") $PreparedFfmpeg }
@@ -97,9 +120,7 @@ if (Test-Path $FfmpegPath) {
 }
 
 Write-Host "正在准备 Microsoft Edge WebView2 x64 离线运行环境..." -ForegroundColor Cyan
-Invoke-WebRequest -UseBasicParsing `
-    -Uri "https://go.microsoft.com/fwlink/?linkid=2124701" `
-    -OutFile $WebViewOfflineInstallerPath
+Copy-Item -LiteralPath $PreparedWebView -Destination $WebViewOfflineInstallerPath -Force
 if ((Get-Item $WebViewOfflineInstallerPath).Length -lt 100MB) {
     throw "WebView2 x64 离线运行环境下载不完整。"
 }
