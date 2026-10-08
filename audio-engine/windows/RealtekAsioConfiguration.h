@@ -7,7 +7,7 @@ namespace fengyin::audioengine
 struct RealtekConfigurationResult { bool configured = false, rollbackOK = true; };
 
 // ASIO4ALL Private API 2.0. Do not use Windows endpoint topology or jack names.
-inline RealtekConfigurationResult configureRealtekOutputs(void* driver)
+inline RealtekConfigurationResult configureRealtekOutputs(void* driver, bool readOnly = false)
 {
     if (!driver) return {};
     const GUID iid {0xa26078c5,0x2840,0x4726,{0xb4,0x27,0xe6,0x0f,0xc8,0xfe,0xe4,0x03}};
@@ -23,6 +23,7 @@ inline RealtekConfigurationResult configureRealtekOutputs(void* driver)
     struct Context
     {
         A4Private* api;
+        bool readOnly = false;
         bool attempted = false;
         bool verificationAttempted = false;
         RealtekConfigurationResult result;
@@ -109,6 +110,12 @@ inline RealtekConfigurationResult configureRealtekOutputs(void* driver)
                 juce::Logger::writeToLog("Realtek configuration: no complete usable route; unchanged");
                 return FALSE;
             }
+            if (c.readOnly)
+            {
+                c.result.configured = plan.empty();
+                juce::Logger::writeToLog("Realtek diagnostic: read-only enumeration; no property writes");
+                return FALSE;
+            }
             if (verifying)
             {
                 c.result.configured = plan.empty();
@@ -137,7 +144,7 @@ inline RealtekConfigurationResult configureRealtekOutputs(void* driver)
                 +" rollbackOK="+juce::String(c.result.rollbackOK?1:0));
             return c.result.configured && !plan.empty();
         }
-    } context {api.Get()};
+    } context {api.Get(), readOnly};
     api->callback(&Context::run,&context);
     api->enumerate();
     api->callback(nullptr,nullptr);

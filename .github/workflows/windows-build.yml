@@ -3,6 +3,10 @@ name: Windows 编译与安装包
 on:
   workflow_dispatch:
     inputs:
+      startup_comparison:
+        description: Build standalone ASIO startup comparison only
+        type: boolean
+        default: false
       diagnostic_only:
         description: Validate and package crash collector only (no engine, installer or drivers)
         type: boolean
@@ -20,6 +24,42 @@ permissions:
   contents: read
 
 jobs:
+  startup-comparison:
+    if: ${{ inputs.startup_comparison }}
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          lfs: false
+      - name: Build standalone comparison
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $tokens=$null; $errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path tools/asio-startup-comparison/Run.ps1),[ref]$tokens,[ref]$errors) | Out-Null
+          if($errors.Count){throw ($errors|Out-String)}
+          cmake -S tools/asio-startup-comparison -B build-comparison -G "Visual Studio 17 2022" -A x64
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          cmake -DJUCE_SOURCE_DIR="$pwd/build-comparison/_deps/juce-src" -P scripts/patch-juce-wasapi-raw.cmake
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          cmake --build build-comparison --config Release --parallel 4
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          New-Item -ItemType Directory -Path comparison -Force | Out-Null
+          Copy-Item build-comparison/Release/FengYinAsioComparison.exe comparison/
+          Copy-Item tools/asio-startup-comparison/Start.cmd,tools/asio-startup-comparison/Run.ps1 comparison/
+          Copy-Item tools/asio-startup-comparison/使用说明.txt comparison/
+          Get-FileHash comparison/FengYinAsioComparison.exe | Format-List | Out-File comparison/SHA256.txt
+      - uses: actions/upload-artifact@v5
+        with:
+          name: FengYin-ASIO-Startup-Comparison
+          path: comparison/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v5
+        with:
+          name: FengYin-ASIO-Startup-Symbols
+          path: build-comparison/Release/*.pdb
+          if-no-files-found: error
   audio-diagnostic:
     if: ${{ inputs.diagnostic_only }}
     runs-on: windows-2022
@@ -46,7 +86,7 @@ jobs:
           name: FengYin-Crash-Capture
           path: diagnostic/FengYin-Crash-Capture.zip
   windows-release:
-    if: ${{ !inputs.diagnostic_only }}
+    if: ${{ !inputs.diagnostic_only && !inputs.startup_comparison }}
     name: Windows x64 Release
     runs-on: windows-2022
     timeout-minutes: 45

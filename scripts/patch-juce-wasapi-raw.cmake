@@ -119,6 +119,25 @@ replace_exact("${asio}"
         outputFormat.calloc (fengyinChannelCapacity);
        #endif]])
 
+# Explicit diagnostic trigger for the same reset path used by driver callbacks.
+# No production caller uses it; this avoids changing the automatic startup path.
+replace_exact("${JUCE_SOURCE_DIR}/modules/juce_audio_devices/audio_io/juce_AudioIODevice.h"
+    "    virtual void* getFengYinAsioInterface() { return nullptr; }"
+    "    virtual bool requestFengYinDiagnosticReset() { return false; }\n    virtual void* getFengYinAsioInterface() { return nullptr; }")
+replace_exact("${asio}"
+    "    void* getFengYinAsioInterface() override { return asioObject; }"
+[[    bool requestFengYinDiagnosticReset() override
+    {
+       #if FENGYIN_ASIO_RENDER_ONLY
+        fengyinResetPending.store (true);
+        return true;
+       #else
+        return false;
+       #endif
+    }
+
+    void* getFengYinAsioInterface() override { return asioObject; }]])
+
 set(header "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/juce_audio_devices.h")
 set(manager "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/audio_io/juce_AudioDeviceManager.cpp")
 set(wasapi "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp")
