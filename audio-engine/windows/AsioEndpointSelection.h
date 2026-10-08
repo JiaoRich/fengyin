@@ -6,6 +6,8 @@
 #include <wrl/client.h>
 #include <juce_core/juce_core.h>
 #include <vector>
+#include <set>
+#include <functional>
 
 namespace fengyin::audioengine
 {
@@ -55,12 +57,74 @@ inline bool selectAsioEndpoint(void* driver, const std::wstring& endpoint)
         || FAILED(topology->GetConnector(0, &connector))
         || FAILED(connector->GetConnectedTo(&connected))
         || FAILED(connected.As(&part))) return false;
-    LPWSTR rawPath = nullptr;
-    UINT localId = 0;
-    if (FAILED(connector->GetDeviceIdConnectedTo(&rawPath))) return false;
-    const juce::String path(rawPath);
-    CoTaskMemFree(rawPath);
-    if (FAILED(part->GetLocalId(&localId))) return false;
+    // The endpoint's adjacent connector is usually a topology/jack pin, NOT
+    // the wave filter's streaming pin. Follow the render path upstream to
+    // Software_IO before comparing an interface/pin with ASIO4ALL.
+    struct StreamPin { juce::String path; long pin; };
+    std::vector<StreamPin> streams;
+    std::set<std::wstring> visited;
+    bool complete = true;
+    std::function<void(IPart*)> walk = [&](IPart* current)
+    {
+        if (!complete) return;
+        LPWSTR global = nullptr;
+        if (FAILED(current->GetGlobalId(&global))) { complete = false; return; }
+        const std::wstring key(global);
+        CoTaskMemFree(global);
+        if (!visited.insert(key).second) return;
+        if (visited.size() > 256) { complete = false; return; }
+        ComPtr<IConnector> edge;
+        if (SUCCEEDED(current->QueryInterface(IID_PPV_ARGS(&edge))))
+        {
+            ConnectorType kind;
+            DataFlow flow;
+            if (FAILED(edge->GetType(&kind)) || FAILED(edge->GetDataFlow(&flow)))
+                { complete = false; return; }
+            if (kind == Software_IO)
+            {
+                if (flow != In) return; // Render streams enter the adapter.
+                ComPtr<IDeviceTopology> owner;
+                LPWSTR rawPath = nullptr;
+                UINT localId = 0;
+                if (FAILED(current->GetTopologyObject(&owner))
+                    || FAILED(current->GetLocalId(&localId))
+                    || FAILED(owner->GetDeviceId(&rawPath)))
+                    { complete = false; return; }
+                streams.push_back({juce::String(rawPath), static_cast<long>(localId & 0xffff)});
+                CoTaskMemFree(rawPath);
+                return;
+            }
+            if (kind == Software_Fixed && flow == In)
+            {
+                ComPtr<IConnector> upstream;
+                ComPtr<IPart> upstreamPart;
+                if (FAILED(edge->GetConnectedTo(&upstream)) || FAILED(upstream.As(&upstreamPart)))
+                    { complete = false; return; }
+                walk(upstreamPart.Get());
+                return;
+            }
+        }
+        ComPtr<IPartsList> incoming;
+        UINT count = 0;
+        const auto hr = current->EnumPartsIncoming(&incoming);
+        if (hr == E_NOTFOUND) return;
+        if (FAILED(hr) || FAILED(incoming->GetCount(&count))) { complete = false; return; }
+        for (UINT i = 0; i < count; ++i)
+        {
+            ComPtr<IPart> next;
+            if (FAILED(incoming->GetPart(i, &next))) { complete = false; return; }
+            walk(next.Get());
+        }
+    };
+    walk(part.Get());
+    // An ambiguous/offload topology is not permission to guess another output.
+    if (!complete || streams.size() != 1)
+    {
+        juce::Logger::writeToLog("ASIO endpoint resolution: incomplete or ambiguous render topology, streams="
+            + juce::String(static_cast<int>(streams.size())));
+        return false;
+    }
+    const auto& stream = streams.front();
     const GUID iid {0xa26078c5,0x2840,0x4726,{0xb4,0x27,0xe6,0x0f,0xc8,0xfe,0xe4,0x03}};
     ComPtr<A4Private> api;
     if (FAILED(static_cast<IUnknown*>(driver)->QueryInterface(iid,
@@ -137,7 +201,7 @@ inline bool selectAsioEndpoint(void* driver, const std::wstring& endpoint)
             c.matched=ok;
             return !c.changed.empty(); // One bounded refresh, never recursive.
         }
-    } context {api.Get(),path,static_cast<long>(localId & 0xffff)};
+    } context {api.Get(),stream.path,stream.pin};
     api->callback(&Context::run,&context);
     api->enumerate();
     api->callback(nullptr,nullptr);
