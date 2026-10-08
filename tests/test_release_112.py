@@ -11,11 +11,14 @@ class Release112(unittest.TestCase):
         self.assertNotIn('setUsingNativeTitleBar',mode)
         self.assertNotIn('setResizable',mode)
 
-    def test_sound_check_opaque_and_themed(self):
-        source=(ROOT/'prototype/styles.css').read_text(encoding='utf-8')
-        self.assertIn('.sound-check-dialog::backdrop',source)
-        self.assertIn('background:var(--bg,#07101d)',source)
-        self.assertIn('.sound-check-dialog button',source)
+    def test_sound_check_removed(self):
+        for file in ['prototype/styles.css', 'prototype/app.js', 'prototype/index.html',
+                     'native/Source/MainComponent.cpp', 'native/Source/AudioDeviceService.cpp',
+                     'native/Source/AudioDeviceService.h']:
+            source=(ROOT/file).read_text(encoding='utf-8')
+            self.assertNotIn('sound-check',source)
+            self.assertNotIn('SoundCheck',source)
+            self.assertNotIn('soundCheck',source)
         html=(ROOT/'prototype/index.html').read_text(encoding='utf-8')
         self.assertNotIn('<strong>低延迟组件</strong>',html)
 
@@ -48,14 +51,30 @@ class Release112(unittest.TestCase):
         self.assertIn('api->callback(nullptr,nullptr)',source)
         self.assertIn('c.changed.rbegin()',source)
 
-    def test_sound_check_cancel_and_failure(self):
-        source=(ROOT/'prototype/app.js').read_text(encoding='utf-8')
-        self.assertIn("soundCheckDialog.addEventListener('cancel'",source)
-        self.assertIn("disabled=!String(message).startsWith('正在播放')",source)
-        self.assertIn('soundCheckIndex >= soundCheckChoices.length',source)
-
-    def test_manual_output_not_overwritten(self):
+    def test_hotplug_reopens_even_when_default_is_unchanged(self):
         source=(ROOT/'audio-engine/windows/AudioEngineMain.cpp').read_text(encoding='utf-8')
-        self.assertIn('!manualPhysicalOutput',source)
+        self.assertNotIn('!manualPhysicalOutput',source)
+        self.assertNotIn('newPhysicalEndpoint != preferredEndpointId',source)
+        router=(ROOT/'audio-engine/windows/DefaultEndpointRouter.cpp').read_text(encoding='utf-8')
+        self.assertIn('stableEndpointPolls < 3',router)
+        self.assertIn('now + 500',router)
+        self.assertIn('readPhysicalEndpoints',router)
+
+    def test_fresh_air_bundle_and_retry(self):
+        source=(ROOT/'installer/FengYin.iss').read_text(encoding='utf-8')
+        self.assertIn(r'\Contents\x86_64-win\Fresh Air.vst3',source)
+        verify=source.split('procedure VerifyFreshAirInstalled();',1)[1].split('function NeedRestart',1)[0]
+        self.assertNotIn('RaiseException',verify)
+        self.assertIn('install-retry.log',verify)
+        self.assertIn('ewWaitUntilTerminated',verify)
+
+    def test_asio_output_has_action_instead_of_placeholder(self):
+        html=(ROOT/'prototype/index.html').read_text(encoding='utf-8')
+        source=(ROOT/'prototype/app.js').read_text(encoding='utf-8')
+        self.assertEqual(html.count('id="configure-asio4all"'),1)
+        self.assertNotIn('高级输出设备设置',html)
+        self.assertIn("$('#audio-output-select').hidden = asioBridge",source)
+        self.assertIn("$('#configure-asio4all').hidden = !asioBridge",source)
+        self.assertIn("$('#configure-asio4all').disabled = busy",source)
 
 if __name__=='__main__': unittest.main()

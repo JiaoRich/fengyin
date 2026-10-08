@@ -227,6 +227,29 @@ bool isActiveEndpoint(IMMDeviceEnumerator& enumerator, const std::wstring& id)
     return ! id.empty() && SUCCEEDED(enumerator.GetDevice(id.c_str(), &device)) && device
         && SUCCEEDED(device->GetState(&state)) && (state & DEVICE_STATE_ACTIVE) != 0;
 }
+
+bool readPhysicalEndpoints(IMMDeviceEnumerator& enumerator, std::vector<std::wstring>& ids)
+{
+    Microsoft::WRL::ComPtr<IMMDeviceCollection> collection;
+    if (FAILED(enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &collection)) || !collection)
+        return false;
+    UINT count = 0;
+    if (FAILED(collection->GetCount(&count))) return false;
+    for (UINT index = 0; index < count; ++index)
+    {
+        Microsoft::WRL::ComPtr<IMMDevice> device;
+        std::wstring id, name;
+        if (FAILED(collection->Item(index, &device)) || !device || !readDevice(*device.Get(), id, name))
+            return false;
+        const auto combined = lower(id + L" " + name);
+        if (!isVirtual(id, name) && combined.find(L"vb-audio") == std::wstring::npos
+            && combined.find(L"cable input") == std::wstring::npos
+            && combined.find(L"cable in ") == std::wstring::npos)
+            ids.push_back(id);
+    }
+    std::sort(ids.begin(), ids.end());
+    return true;
+}
 }
 #endif
 
@@ -290,6 +313,7 @@ bool DefaultEndpointRouter::routeSystemAudioToFengYin(std::wstring& physicalEndp
         return false;
     }
     active = true;
+    (void) readPhysicalEndpoints(*enumerator.Get(), physicalEndpoints);
     std::array<std::wstring, 3> virtualEndpoints { virtualId, virtualId, virtualId };
     if (! setEndpoints(virtualEndpoints))
     {
@@ -311,6 +335,9 @@ bool DefaultEndpointRouter::pollPhysicalDefaultChange(std::wstring& physicalEndp
     physicalEndpointId.clear();
 #if defined(_WIN32)
     if (! active) return false;
+    const auto now = GetTickCount64();
+    if (now < nextEndpointPoll) return false;
+    nextEndpointPoll = now + 500;
     Microsoft::WRL::ComPtr<IMMDeviceEnumerator> enumerator;
     if (FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
                                 IID_PPV_ARGS(&enumerator))) || ! enumerator)
@@ -325,24 +352,51 @@ bool DefaultEndpointRouter::pollPhysicalDefaultChange(std::wstring& physicalEndp
         return false;
     }
 
+    std::vector<std::wstring> observed;
+    if (!readPhysicalEndpoints(*enumerator.Get(), observed)) return false;
     std::array<std::wstring, 3> current;
     bool hasPhysicalDefault = false;
     for (std::size_t index = 0; index < roles.size(); ++index)
     {
         current[index] = getId(*enumerator.Get(), roles[index]);
-        if (! current[index].empty() && current[index] != virtualId)
+        if (std::binary_search(observed.begin(), observed.end(), current[index]))
         {
             hasPhysicalDefault = true;
             if (physicalEndpointId.empty() || roles[index] == eMultimedia)
                 physicalEndpointId = current[index];
         }
     }
-    if (! hasPhysicalDefault) return false;
+    bool topologyChanged = false;
+    if (observed != physicalEndpoints)
+    {
+        if (observed != pendingEndpoints)
+        {
+            pendingEndpoints = observed;
+            stableEndpointPolls = 1;
+            return false;
+        }
+        if (++stableEndpointPolls < 3) return false;
+        topologyChanged = true;
+        // Jack insertion can activate an unnamed endpoint without changing
+        // Windows' default (which is deliberately our virtual cable).
+        if (!hasPhysicalDefault)
+        {
+            for (const auto& id : observed)
+                if (!std::binary_search(physicalEndpoints.begin(), physicalEndpoints.end(), id))
+                { physicalEndpointId = id; break; }
+            if (physicalEndpointId.empty())
+                physicalEndpointId = isActiveEndpoint(*enumerator.Get(), previousEndpointIds[1])
+                    ? previousEndpointIds[1] : (observed.empty() ? std::wstring{} : observed.front());
+        }
+        physicalEndpoints = observed;
+    }
+    else stableEndpointPolls = 0;
+    if ((!hasPhysicalDefault && !topologyChanged) || physicalEndpointId.empty()) return false;
 
     // Preserve every new physical role for normal Windows use after FengYin
     // exits. Roles that remain virtual inherit the chosen multimedia device.
     for (std::size_t index = 0; index < current.size(); ++index)
-        previousEndpointIds[index] = ! current[index].empty() && current[index] != virtualId
+        previousEndpointIds[index] = std::binary_search(observed.begin(), observed.end(), current[index])
             ? current[index] : physicalEndpointId;
     if (! writeJournal(previousEndpointIds))
     {
@@ -374,6 +428,10 @@ void DefaultEndpointRouter::restore() noexcept
 #endif
     active = false;
     previousEndpointIds = {};
+    physicalEndpoints.clear();
+    pendingEndpoints.clear();
+    nextEndpointPoll = 0;
+    stableEndpointPolls = 0;
 #if defined(_WIN32)
     if (comInitialised) CoUninitialize();
 #endif

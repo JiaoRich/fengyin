@@ -152,7 +152,7 @@ juce::String AudioDeviceService::startIsolatedAudioEngine(int requestedFrames)
     juce::String engineError;
     if (! engineProcess.isRunning()
         && ! engineProcess.start(static_cast<std::uint32_t>(requestedFrames),
-            soundCheckActive ? soundCheckCandidate : properties.getUserSettings()->getValue("physicalEndpoint"), true, engineError, soundCheckActive))
+            properties.getUserSettings()->getValue("physicalEndpoint"), true, engineError))
         return engineError;
     if (! engineDeviceTypeAdded)
     {
@@ -314,76 +314,6 @@ juce::String AudioDeviceService::configureAsio4All()
    #endif
 }
 
-juce::var AudioDeviceService::beginSoundCheck()
-{
-    juce::Array<juce::var> choices;
-    if (asioPanelOpen || soundCheckActive) return choices;
-   #if JUCE_WINDOWS
-    using Microsoft::WRL::ComPtr;
-    ComPtr<IMMDeviceEnumerator> enumerator;
-    ComPtr<IMMDeviceCollection> collection;
-    if (FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
-        IID_PPV_ARGS(&enumerator))) || FAILED(enumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &collection))) return choices;
-    UINT count=0; collection->GetCount(&count);
-    soundCheckCandidates.clear();
-    for (UINT i=0;i<count;++i)
-    {
-        ComPtr<IMMDevice> device; ComPtr<IPropertyStore> store;
-        LPWSTR id=nullptr;
-        if (FAILED(collection->Item(i,&device)) || FAILED(device->GetId(&id))) continue;
-        juce::String identity(id); CoTaskMemFree(id);
-        juce::String name;
-        if (SUCCEEDED(device->OpenPropertyStore(STGM_READ,&store)))
-        {
-            PROPVARIANT value; PropVariantInit(&value);
-            if (SUCCEEDED(store->GetValue(PKEY_Device_FriendlyName,&value)) && value.vt==VT_LPWSTR) name=value.pwszVal;
-            PropVariantClear(&value);
-        }
-        const auto lower=name.toLowerCase();
-        if (lower.contains("vb-audio") || lower.contains("cable") || lower.contains("fengyin") || lower.contains(juce::String::fromUTF8("风吟"))) continue;
-        auto* choice=new juce::DynamicObject(); choice->setProperty("id",identity); choice->setProperty("name",name);
-        choices.add(juce::var(choice)); soundCheckCandidates.add(identity);
-    }
-    if (!choices.isEmpty())
-    {
-        soundCheckSetup=manager.createStateXml();
-        soundCheckWasEngine=engineProcess.isRunning();
-        soundCheckPrevious=properties.getUserSettings()->getValue("physicalEndpoint");
-        soundCheckCandidate.clear(); soundCheckActive=true;
-        stopTimer(); tuningActive=false;
-    }
-   #endif
-    return choices;
-}
-
-juce::String AudioDeviceService::trySoundCheck(const juce::String& endpoint)
-{
-    if (!soundCheckActive || !soundCheckCandidates.contains(endpoint)) return juce::String::fromUTF8("检测已结束或设备已不可用。");
-    manager.closeAudioDevice(); engineProcess.stop(); soundCheckCandidate=endpoint;
-    const auto error=startIsolatedAudioEngine(properties.getUserSettings()->getIntValue("audioEngineBuffer",128));
-    if (error.isNotEmpty()) return error;
-    return requestEngineTestTone();
-}
-
-juce::String AudioDeviceService::finishSoundCheck(bool keep)
-{
-    if (!soundCheckActive) return {};
-    keep = keep && soundCheckCandidate.isNotEmpty() && engineProcess.isRunning();
-    soundCheckActive=false;
-    if (keep)
-    {
-        properties.getUserSettings()->setValue("physicalEndpoint",soundCheckCandidate);
-        properties.getUserSettings()->setValue("audioEngineEnabled",true);
-        properties.getUserSettings()->setValue("audioModeExplicitChoice",true);
-        saveSettings(); properties.saveIfNeeded(); soundCheckSetup.reset();
-        return juce::String::fromUTF8("已记住这个输出设备。");
-    }
-    manager.closeAudioDevice(); engineProcess.stop();
-    const auto error=soundCheckWasEngine ? startIsolatedAudioEngine(properties.getUserSettings()->getIntValue("audioEngineBuffer",128))
-        : manager.initialise(0,2,soundCheckSetup.get(),false);
-    soundCheckSetup.reset();
-    return error.isEmpty() ? juce::String::fromUTF8("已恢复检测前的声音设置。") : error;
-}
 
 void AudioDeviceService::restoreAfterAsioPanel()
 {

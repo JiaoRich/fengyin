@@ -101,7 +101,6 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
                 requireEndpointMatch = true;
         LocalFree(arguments);
     }
-    const bool manualPhysicalOutput = !preferredEndpointId.empty();
     HANDLE singleton = CreateMutexW(nullptr, TRUE, engineSingletonName);
     if (singleton == nullptr || GetLastError() == ERROR_ALREADY_EXISTS)
     {
@@ -270,15 +269,16 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         {
             std::wstring newPhysicalEndpoint, routeError;
             if (router.pollPhysicalDefaultChange(newPhysicalEndpoint, routeError)
-                && !manualPhysicalOutput && ! newPhysicalEndpoint.empty() && newPhysicalEndpoint != preferredEndpointId)
+                && !newPhysicalEndpoint.empty())
             {
                 const auto previous = preferredEndpointId;
+                juce::Logger::writeToLog("Physical output topology changed; reopening ASIO4ALL");
                 output.stop();
                 if (output.start(core,requestedFrames,newPhysicalEndpoint,routeError,true))
                     preferredEndpointId=newPhysicalEndpoint;
                 else
                 {
-                    juce::Logger::writeToLog("Endpoint switch failed; restoring previous output: " + juce::String(routeError.c_str()));
+                    juce::Logger::writeToLog("Exact endpoint switch unavailable; reopening driver selection: " + juce::String(routeError.c_str()));
                     output.start(core,requestedFrames,previous,routeError);
                 }
             }

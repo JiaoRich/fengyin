@@ -5,7 +5,7 @@
   #define OutputDir "."
 #endif
 #ifndef AppVersion
-  #define AppVersion "1.1.3"
+  #define AppVersion "1.1.4"
 #endif
 #ifndef ChineseMessages
   #define ChineseMessages "compiler:Languages\ChineseSimplified.isl"
@@ -57,7 +57,7 @@ Name: "{autodesktop}\风吟"; Filename: "{app}\FengYin.exe"; Tasks: desktopicon
 Filename: "{app}\components\ASIO4ALL\ASIO4ALL_2_22.exe"; Tasks: asio4all; Check: NeedsASIO4ALL; StatusMsg: "请完成 ASIO4ALL 原厂安装向导"; Flags: waituntilterminated
 Filename: "{tmp}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; Parameters: "/silent /install"; StatusMsg: "正在安装视频与精美界面离线运行组件…"; Flags: waituntilterminated
 Filename: "{app}\components\VB-CABLE\VBCABLE_Setup_x64.exe"; WorkingDir: "{app}\components\VB-CABLE"; Check: NeedsVBCable; BeforeInstall: ExplainVBCableInstall; AfterInstall: VerifyVBCableInstalled; StatusMsg: "正在安装 VB-CABLE 网页声音组件…"; Flags: waituntilterminated
-Filename: "{app}\components\Fresh Air\Setup Fresh Air v1.0.8.exe"; Parameters: "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-"; Tasks: freshair; Check: NeedsFreshAir; AfterInstall: VerifyFreshAirInstalled; StatusMsg: "正在安装 Fresh Air 1.0.8 音色效果器…"; Flags: waituntilterminated
+Filename: "{app}\components\Fresh Air\Setup Fresh Air v1.0.8.exe"; Parameters: "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /LOG=""{app}\components\Fresh Air\install.log"""; Tasks: freshair; Check: NeedsFreshAir; AfterInstall: VerifyFreshAirInstalled; StatusMsg: "正在安装 Fresh Air 1.0.8 音色效果器…"; Flags: waituntilterminated
 Filename: "{app}\FengYin.exe"; Description: "启动风吟"; Check: CanLaunchNow; Flags: nowait postinstall skipifsilent
 
 [Code]
@@ -117,10 +117,18 @@ begin
   VBCableInstalledThisRun := True;
 end;
 
+function HasFreshAirBinary(Path: String): Boolean;
+begin
+  { VST3 can be a flat DLL or a bundle. A directory alone is not proof of
+    installation: require the Windows x64 module inside it. }
+  Result := FileExists(Path)
+    or FileExists(Path + '\Contents\x86_64-win\Fresh Air.vst3');
+end;
+
 function HasFreshAir(): Boolean;
 begin
-  Result := FileExists(ExpandConstant('{commoncf64}\VST3\Fresh Air.vst3'))
-    or FileExists(ExpandConstant('{commoncf64}\VST3\Slate Digital\Fresh Air.vst3'));
+  Result := HasFreshAirBinary(ExpandConstant('{commoncf64}\VST3\Fresh Air.vst3'))
+    or HasFreshAirBinary(ExpandConstant('{commoncf64}\VST3\Slate Digital\Fresh Air.vst3'));
 end;
 
 function NeedsFreshAir(): Boolean;
@@ -129,9 +137,22 @@ begin
 end;
 
 procedure VerifyFreshAirInstalled();
+var
+  ResultCode: Integer;
 begin
   if NeedsFreshAir() then
-    RaiseException('Fresh Air 1.0.8 安装未完成：未找到 Slate Digital\Fresh Air.vst3。');
+  begin
+    Log('Fresh Air silent install did not produce a discoverable x64 VST3; opening original installer.');
+    MsgBox('Fresh Air 自动安装未完成。接下来将打开原厂安装向导，请勾选 64 位 VST3 组件并使用默认安装位置。风吟的其他功能不受影响。', mbInformation, MB_OK);
+    if not Exec(ExpandConstant('{app}\components\Fresh Air\Setup Fresh Air v1.0.8.exe'),
+      ExpandConstant('/NORESTART /LOG="{app}\components\Fresh Air\install-retry.log"'),
+      '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode) then
+      Log('Fresh Air installer could not start: ' + IntToStr(ResultCode));
+    if NeedsFreshAir() then
+      MsgBox('Fresh Air 尚未安装成功，次中萨-气包音的效果链暂不可用。可从开始菜单运行“安装 Fresh Air 音色效果器”重试。安装日志保存在风吟安装目录的 components\Fresh Air 文件夹。', mbError, MB_OK)
+    else
+      Log('Fresh Air x64 VST3 verified after interactive installation.');
+  end;
 end;
 
 function NeedRestart(): Boolean;

@@ -31,6 +31,19 @@ jobs:
         shell: powershell
         run: choco install innosetup --yes --no-progress
 
+      - name: 验证 Fresh Air 全新安装
+        shell: powershell
+        run: ./scripts/test-fresh-air-install.ps1
+
+      - name: 保存 Fresh Air 安装验证日志
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: Fresh-Air-install-test
+          path: fresh-air-install-test/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: 编译、测试并生成安装包
         shell: powershell
         env:

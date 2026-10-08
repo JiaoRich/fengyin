@@ -2,6 +2,8 @@
 
 #include <array>
 #include <string>
+#include <vector>
+#include <cstdint>
 
 namespace fengyin::audioengine
 {
@@ -26,6 +28,9 @@ public:
 
 private:
     std::array<std::wstring, 3> previousEndpointIds;
+    std::vector<std::wstring> physicalEndpoints, pendingEndpoints;
+    std::uint64_t nextEndpointPoll = 0;
+    unsigned stableEndpointPolls = 0;
     bool comInitialised = false;
     bool active = false;
 };

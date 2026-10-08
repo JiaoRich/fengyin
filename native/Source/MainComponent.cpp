@@ -720,24 +720,6 @@ void MainComponent::setupWebInterface()
             const auto message = audio.configureAsio4All();
             if (webInterface) webInterface->emitEventIfBrowserIsVisible("editorResult", message);
         })
-        .withEventListener("beginSoundCheck", [this](juce::var)
-        { if (webInterface) webInterface->emitEventIfBrowserIsVisible("soundCheckChoices", audio.beginSoundCheck()); })
-        .withEventListener("trySoundCheck", [this](juce::var payload)
-        {
-            const auto result=audio.trySoundCheck(payload.getProperty("id", "").toString());
-            if (webInterface) webInterface->emitEventIfBrowserIsVisible("soundCheckResult",result);
-        })
-        .withEventListener("finishSoundCheck", [this](juce::var payload)
-        {
-            auto result=audio.finishSoundCheck(static_cast<bool>(payload.getProperty("keep",false)));
-            if (static_cast<bool>(payload.getProperty("sharedFallback",false)))
-            {
-                const auto error=audio.selectDeviceType("Windows Audio");
-                result=error.isEmpty() ? utf8("已切换到 Windows 共享兼容输出。") : error;
-            }
-            if (webInterface) webInterface->emitEventIfBrowserIsVisible("editorResult",result);
-            emitAudioSettingsState(true,result);
-        })
         .withEventListener("downloadAsio4All", [](juce::var) { juce::URL("https://asio4all.org/download/").launchInDefaultBrowser(); })
         .withEventListener("downloadVBCable", [](juce::var) { juce::URL("https://vb-audio.com/Cable/").launchInDefaultBrowser(); })
         .withEventListener("testEngineOutput", [this](juce::var)

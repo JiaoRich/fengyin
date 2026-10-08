@@ -1612,7 +1612,7 @@ function startFullTrial() {
     return;
   }
   const startedAt = Date.now();
-  localStorage.setItem('fengyin-prototype-trial-1.1.3-start', String(startedAt));
+  localStorage.setItem('fengyin-prototype-trial-1.1.4-start', String(startedAt));
   renderLicenseState({trialActive:true, trialRemainingSeconds:60*60});
   toast('1小时完整试用已开始');
 }
@@ -1722,6 +1722,7 @@ function setAudioOptions(select, values, selected, label) {
 function setAudioControlsBusy(busy) {
   audioSettingsApplying = busy;
   audioControls.forEach(control => { control.disabled = busy; });
+  $('#configure-asio4all').disabled = busy;
   $('#audio-auto-optimize').disabled = busy;
   $('#audio-apply-status').classList.toggle('audio-saving', busy);
   if (busy) $('#audio-apply-status').textContent = '正在应用并保存声音设置…';
@@ -1741,48 +1742,6 @@ function applyInlineAudioSettings(driverChanged = false) {
 
 $('#audio-driver-select').addEventListener('change', () => applyInlineAudioSettings(true));
 $('#configure-asio4all').addEventListener('click', () => nativeEvent('configureAsio4All'));
-const soundCheckDialog = document.createElement('dialog');
-soundCheckDialog.className='sound-check-dialog';
-soundCheckDialog.setAttribute('aria-label','声音检测');
-document.body.appendChild(soundCheckDialog);
-let soundCheckChoices=[], soundCheckIndex=0, soundCheckWaiting=false;
-function soundCheckClose(keep=false,sharedFallback=false) {
-  nativeEvent('finishSoundCheck',{keep,sharedFallback}); soundCheckDialog.close(); soundCheckWaiting=false;
-}
-function soundCheckNext() {
-  if (soundCheckIndex >= soundCheckChoices.length) {
-    soundCheckDialog.innerHTML='<h2>未找到正确输出</h2><p>此电脑的 ASIO4ALL 端点可能需要手动设置。可先切换到 Windows 共享兼容输出，再在输出设备中选择耳机或音响。</p><button data-check="fallback">使用共享兼容输出</button><button data-check="cancel">恢复原设置并关闭</button>';
-    return;
-  }
-  soundCheckWaiting=true;
-  soundCheckDialog.innerHTML='<h2>请听测试声音</h2><p id="sound-check-device"></p><p id="sound-check-message">正在切换，请稍候…</p><div id="sound-check-feedback" hidden><button data-check="correct">声音位置正确</button><button data-check="next">仍从电脑扬声器发出</button><button data-check="next">没有声音</button><button data-check="next">两边都有声音</button></div><button data-check="cancel">取消并恢复</button>';
-  soundCheckDialog.querySelector('#sound-check-device').textContent=soundCheckChoices[soundCheckIndex].name;
-  nativeEvent('trySoundCheck',{id:soundCheckChoices[soundCheckIndex++].id});
-}
-$('#sound-check').onclick=()=>{
-  soundCheckDialog.innerHTML='<h2>您的电脑接了耳机或音响吗？</h2><p>请先检查连接线已插好，并调低耳机或音响的音量。检测会短暂暂停演奏。</p><button data-check="start">已连接耳机／音响，开始检测</button><button data-check="start">使用电脑扬声器</button><button data-check="cancel">取消</button>';
-  soundCheckDialog.showModal();
-};
-soundCheckDialog.addEventListener('cancel',e=>{e.preventDefault();soundCheckClose();});
-soundCheckDialog.addEventListener('click',e=>{
-  const action=e.target.closest('[data-check]')?.dataset.check;
-  if(action==='cancel') soundCheckClose();
-  if(action==='fallback') soundCheckClose(false,true);
-  if(action==='start') { e.target.disabled=true;nativeEvent('beginSoundCheck'); }
-  if(action==='correct'&&!soundCheckWaiting) soundCheckClose(true);
-  if(action==='next'&&!soundCheckWaiting) soundCheckNext();
-});
-window.__JUCE__?.backend?.addEventListener('soundCheckChoices',choices=>{
-  if(!soundCheckDialog.open) {nativeEvent('finishSoundCheck',{keep:false});return;}
-  soundCheckChoices=Array.isArray(choices)?choices:[];soundCheckIndex=0;soundCheckNext();
-});
-window.__JUCE__?.backend?.addEventListener('soundCheckResult',message=>{
-  if(!soundCheckDialog.open)return;
-  soundCheckWaiting=false;
-  soundCheckDialog.querySelector('#sound-check-message').textContent=String(message);
-  soundCheckDialog.querySelector('#sound-check-feedback').hidden=false;
-  soundCheckDialog.querySelector('[data-check="correct"]').disabled=!String(message).startsWith('正在播放');
-});
 
 
 ['#audio-output-select','#audio-rate-select','#audio-buffer-select'].forEach(id => $(id).addEventListener('change', () => applyInlineAudioSettings(false)));
@@ -2177,6 +2136,12 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   const rawTest = /RAW Test Mode/i.test(String(state?.type || ''));
   const sharedAsioActive = state?.sharedAsioActive === true;
   const asioBridge = String(state?.type || '').includes('ASIO4ALL');
+  $('#audio-output-select').hidden = asioBridge;
+  $('#configure-asio4all').hidden = !asioBridge;
+  $('#audio-output-label').htmlFor = asioBridge ? 'configure-asio4all' : 'audio-output-select';
+  $('#audio-output-help').textContent = asioBridge
+    ? '打开 ASIO4ALL 面板选择声卡输出；不要启用虚拟线缆或麦克风。关闭面板后自动恢复声音。'
+    : '请选择实际使用的耳机、音响或声卡';
   $('#audio-driver-help').textContent = asioBridge
     ? '默认低延迟方案：ASIO4ALL 输出，VB-CABLE 接收网页声音；浏览器输出保持“默认”'
     : sharedAsioActive
@@ -2239,7 +2204,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.3 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.4 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},
@@ -2271,7 +2236,7 @@ if (!window.__JUCE__?.backend?.emitEvent) {
   if(new URLSearchParams(location.search).has('review')) renderLicenseState({activated:true});
   else if(localStorage.getItem('fengyin-prototype-license') === 'active') renderLicenseState({activated:true});
   else {
-    const trialStartedAt = Number(localStorage.getItem('fengyin-prototype-trial-1.1.3-start') || 0);
+    const trialStartedAt = Number(localStorage.getItem('fengyin-prototype-trial-1.1.4-start') || 0);
     const trialRemaining = Math.max(0, 60*60 - Math.floor((Date.now() - trialStartedAt) / 1000));
     renderLicenseState(trialStartedAt > 0 && trialRemaining > 0
       ? {trialActive:true, trialRemainingSeconds:trialRemaining}

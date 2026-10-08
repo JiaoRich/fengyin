@@ -24,6 +24,20 @@ struct A4Private : IUnknown
     virtual DWORD setPin(int, long, long, long, void*, long) = 0;
 };
 
+// Re-enumeration is also needed when endpoint identity matching is unavailable.
+// Call only after closing buffers and before opening the stream, never from an
+// audio callback. This refreshes jack state without displaying a control panel.
+inline bool refreshAsioEndpoints(void* driver)
+{
+    if (!driver) return false;
+    const GUID iid {0xa26078c5,0x2840,0x4726,{0xb4,0x27,0xe6,0x0f,0xc8,0xfe,0xe4,0x03}};
+    Microsoft::WRL::ComPtr<A4Private> api;
+    if (FAILED(static_cast<IUnknown*>(driver)->QueryInterface(iid,
+            reinterpret_cast<void**>(api.GetAddressOf())))) return false;
+    api->enumerate();
+    return true;
+}
+
 inline bool selectAsioEndpoint(void* driver, const std::wstring& endpoint)
 {
     if (!driver || endpoint.empty()) return false;
