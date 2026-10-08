@@ -5,6 +5,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class AudioStartupRecovery(unittest.TestCase):
+    def test_constructor_reset_survives_timer_cancellation(self):
+        source = (ROOT / 'scripts/patch-juce-wasapi-raw.cmake').read_text(encoding='utf-8')
+        self.assertIn('std::atomic<bool> fengyinResetPending', source)
+        self.assertIn('fengyinResetPending.store (true)', source)
+        self.assertIn('fengyinResetPending.exchange (false)', source)
+        handling = source.split('if (fengyinResetPending.exchange (false))', 1)[1]
+        self.assertLess(handling.index('initDriver()'), handling.index('asioObject->getChannels'))
+        self.assertLess(handling.index('reloadChannelNames()'), handling.index('asioObject->getChannels'))
+
     def test_blocked_hotplug_recovery_has_parent_deadline(self):
         source = (ROOT / 'native/Source/AudioDeviceService.cpp').read_text(encoding='utf-8')
         timer = source.split('void AudioDeviceService::timerCallback()', 1)[1].split('AudioDeviceStatus AudioDeviceService::getStatus()', 1)[0]

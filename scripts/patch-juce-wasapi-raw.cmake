@@ -56,6 +56,69 @@ replace_exact("${asio}"
 
                 isStarted = true;]])
 
+# A reset requested during the constructor probe used to exist only as a
+# pending Timer. openDevice()/close() stop that Timer, losing the request.
+# Latch it independently, then honour it BEFORE querying channel counts and
+# allocating buffers. Keep the change confined to our isolated render engine.
+replace_exact("${asio}"
+[[    std::atomic<bool> calledback { false };]]
+[[    std::atomic<bool> calledback { false };
+   #if FENGYIN_ASIO_RENDER_ONLY
+    std::atomic<bool> fengyinResetPending { false };
+   #endif]])
+replace_exact("${asio}"
+[[    void resetRequest() noexcept
+    {
+        startTimer (500);
+    }]]
+[[    void resetRequest() noexcept
+    {
+       #if FENGYIN_ASIO_RENDER_ONLY
+        fengyinResetPending.store (true);
+       #endif
+        startTimer (500);
+    }]])
+replace_exact("${asio}"
+[[        isStarted = false;
+
+        auto err = asioObject->getChannels (&totalNumInputChans, &totalNumOutputChans);]]
+[[        isStarted = false;
+
+       #if FENGYIN_ASIO_RENDER_ONLY
+        if (fengyinResetPending.exchange (false))
+        {
+            stopTimer();
+            JUCE_ASIO_LOG ("honouring pending driver reset before channel discovery");
+            if (! removeCurrentDriver())
+                return "Driver failed to close for pending reset";
+            if (! loadDriver())
+                return "Driver failed to reload for pending reset";
+            if (const auto initError = initDriver(); initError.isNotEmpty())
+                return initError;
+            needToReset = false;
+            reloadChannelNames();
+        }
+       #endif
+
+        auto err = asioObject->getChannels (&totalNumInputChans, &totalNumOutputChans);]])
+
+replace_exact("${asio}"
+[[        auto err = asioObject->getChannels (&totalNumInputChans, &totalNumOutputChans);
+        jassert (err == ASE_OK);]]
+[[        auto err = asioObject->getChannels (&totalNumInputChans, &totalNumOutputChans);
+        jassert (err == ASE_OK);
+       #if FENGYIN_ASIO_RENDER_ONLY
+        if (err != ASE_OK || totalNumInputChans < 0 || totalNumOutputChans < 0
+            || totalNumInputChans > 4096 || totalNumOutputChans > 4096)
+            return "Invalid channel layout after driver initialization";
+        // A new jack/driver configuration can have more channels than the
+        // constructor probe. Do not reuse arrays sized for the old layout.
+        const auto fengyinChannelCapacity = totalNumInputChans + totalNumOutputChans + 4;
+        bufferInfos.calloc (fengyinChannelCapacity);
+        inputFormat.calloc (fengyinChannelCapacity);
+        outputFormat.calloc (fengyinChannelCapacity);
+       #endif]])
+
 set(header "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/juce_audio_devices.h")
 set(manager "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/audio_io/juce_AudioDeviceManager.cpp")
 set(wasapi "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp")
