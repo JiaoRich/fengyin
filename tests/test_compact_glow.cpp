@@ -35,7 +35,7 @@ int main(int argc, char** argv)
             }
         };
         pump(0);
-        const auto read = [](int x,int y) {
+        const auto read = [](int x,int y) -> COLORREF {
             auto dc=GetDC(nullptr); if(!dc) return CLR_INVALID;
             const auto colour=GetPixel(dc,x,y); ReleaseDC(nullptr,dc); return colour;
         };
