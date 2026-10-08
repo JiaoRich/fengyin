@@ -48,7 +48,7 @@ jobs:
           New-Item -ItemType Directory -Path comparison -Force | Out-Null
           Copy-Item build-comparison/Release/FengYinAsioComparison.exe comparison/
           Copy-Item tools/asio-startup-comparison/Start.cmd,tools/asio-startup-comparison/Run.ps1 comparison/
-          Copy-Item tools/asio-startup-comparison/使用说明.txt comparison/
+          Copy-Item tools/asio-startup-comparison/*.txt comparison/ -Exclude CMakeLists.txt
           Get-FileHash comparison/FengYinAsioComparison.exe | Format-List | Out-File comparison/SHA256.txt
       - uses: actions/upload-artifact@v5
         with:
