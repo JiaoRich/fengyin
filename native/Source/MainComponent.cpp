@@ -3724,8 +3724,9 @@ void MainComponent::emitAudioSettingsState(bool success, const juce::String& mes
 
     const auto status = audio.getStatus();
     auto result = std::make_unique<juce::DynamicObject>();
-    result->setProperty("success", success);
-    result->setProperty("message", message);
+    result->setProperty("success", success && status.ready);
+    result->setProperty("message", message.isNotEmpty() ? message : status.error.isNotEmpty()
+        ? status.error : !status.ready ? utf8("音频尚未启动，请检查启动诊断信息") : juce::String());
     result->setProperty("type", status.deviceType);
     result->setProperty("output", status.deviceName);
     result->setProperty("sampleRate", status.sampleRate);

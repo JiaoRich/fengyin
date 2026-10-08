@@ -209,7 +209,12 @@ void WasapiLoopbackInput::run(SharedAudioRegion* destination) noexcept
     if (SUCCEEDED(hr)) hr = client->Start();
     if (FAILED(hr))
     {
-        const auto message = std::wstring(vbCableTrial() ? L"Cannot start VB-CABLE capture (check Windows microphone access for desktop apps)." : L"Cannot start FengYin virtual speaker capture")
+        const auto reason = hr == AUDCLNT_E_DEVICE_IN_USE
+            ? L" Audio endpoint is already in use; check exclusive/ASIO ownership."
+            : hr == E_ACCESSDENIED ? L" Access denied; check Windows microphone access for desktop apps."
+                                  : L"";
+        const auto message = std::wstring(vbCableTrial() ? L"Cannot start VB-CABLE capture." : L"Cannot start FengYin virtual speaker capture")
+            + reason
             + L" HRESULT=" + std::to_wstring(static_cast<unsigned long>(hr));
         fail(message.c_str());
         finish();

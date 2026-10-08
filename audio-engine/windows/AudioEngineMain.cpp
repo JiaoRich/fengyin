@@ -213,11 +213,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         return 6;
     }
 
-    lifecycle.markRunning();
     const auto actualFrames = output.actualBufferFrames();
     requestedFrames = actualFrames;
     instrumentMapping.get()->physicalOutputLatencyFrames.store(output.outputLatencyFrames());
-    publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::running, actualFrames);
     WasapiLoopbackInput loopback;
     std::wstring loopbackError;
     // The engineering fast path remains usable before the signed virtual
@@ -226,6 +224,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     if (routeSystemAudio && ! loopbackStarted)
     {
         juce::Logger::writeToLog("System capture failed: " + juce::String(loopbackError.c_str()));
+        lifecycle.useFallback();
+        publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::fallback, 0);
         output.stop();
         router.restore();
         CloseHandle(stopEvent);
@@ -233,6 +233,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         CloseHandle(singleton);
         return 7;
     }
+    lifecycle.markRunning();
+    publishState(*instrumentMapping.get(), *systemMapping.get(), StreamState::running, actualFrames);
     // Device removal, sleep and driver resets invalidate an exclusive stream.
     // Recover inside the engine process without rebuilding the VST graph. The
     // existing fast-path client remains valid when the physical period is the

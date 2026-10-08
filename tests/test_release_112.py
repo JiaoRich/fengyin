@@ -27,8 +27,8 @@ class Release112(unittest.TestCase):
         self.assertIn('bool requireEndpointMatch = false',source)
         self.assertIn('error, requireEndpointMatch)',source)
         source=(ROOT/'audio-engine/windows/Asio4AllOutput.cpp').read_text(encoding='utf-8')
-        self.assertIn('selectedEndpoint = requireMatch && !preferredEndpoint.empty()',source)
-        self.assertIn('if (requireMatch && !selectedEndpoint)', source)
+        self.assertIn('matchPhysicalEndpoint = requireMatch || needsRouteRepair',source)
+        self.assertIn('if (matchPhysicalEndpoint && !selectedEndpoint)', source)
 
     def test_source_readers_have_explicit_encoding(self):
         for path in (ROOT/'tests').glob('test_*.py'):

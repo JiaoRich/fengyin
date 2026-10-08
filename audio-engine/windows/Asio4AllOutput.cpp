@@ -4,6 +4,19 @@
 
 namespace fengyin::audioengine
 {
+namespace
+{
+bool unsafeRenderChannels(const juce::StringArray& names)
+{
+    if (names.size() < 2) return true;
+    for (int i = 0; i < 2; ++i)
+        if (names[i].trim().isEmpty() || names[i].containsIgnoreCase("Not Connected")
+            || names[i].containsIgnoreCase("vb-audio") || names[i].containsIgnoreCase("cable")
+            || names[i].containsIgnoreCase("fengyin") || names[i].contains(juce::String::fromUTF8("风吟")))
+            return true;
+    return false;
+}
+}
 bool Asio4AllOutput::start(AudioEngineCore& engine, std::uint32_t requestedFrames,
                          const std::wstring& preferredEndpoint, std::wstring& error, bool requireMatch)
 {
@@ -24,17 +37,19 @@ bool Asio4AllOutput::start(AudioEngineCore& engine, std::uint32_t requestedFrame
     device.reset(type->createDevice(selected, {}));
     if (! device) { error = L"Cannot create ASIO4ALL device"; stop(); return false; }
     device->close();
-    // Ordinary startup must not enumerate or mutate the driver's private state.
-    // Keep the 1.1.3 startup path; only an explicit endpoint switch may use
-    // the private API. Physical-channel validation below still rejects cables.
-    juce::Logger::writeToLog(requireMatch ? "ASIO startup stage: match physical endpoint"
+    // Preserve a working physical configuration, but never preserve a known
+    // virtual/disconnected route. Repair once by endpoint identity while idle.
+    const bool needsRouteRepair = unsafeRenderChannels(device->getOutputChannelNames());
+    const bool matchPhysicalEndpoint = requireMatch || needsRouteRepair;
+    // Only explicit switches or known-invalid routes need private selection.
+    juce::Logger::writeToLog(matchPhysicalEndpoint ? "ASIO startup stage: match physical endpoint"
         : "ASIO startup stage: preserve driver configuration (no private API)");
-    const bool selectedEndpoint = requireMatch && !preferredEndpoint.empty()
+    const bool selectedEndpoint = matchPhysicalEndpoint && !preferredEndpoint.empty()
         && selectAsioEndpoint(device->getFengYinAsioInterface(), preferredEndpoint);
     juce::Logger::writeToLog(selectedEndpoint ? "ASIO endpoint selected by KS identity"
-        : requireMatch ? "ASIO endpoint identity unavailable"
+        : matchPhysicalEndpoint ? "ASIO endpoint identity unavailable"
                        : "ASIO endpoint matching skipped for ordinary startup");
-    if (requireMatch && !selectedEndpoint)
+    if (matchPhysicalEndpoint && !selectedEndpoint)
     {
         error=L"Cannot match the requested physical output to an ASIO4ALL pin. Use Windows shared output or select the output in the ASIO4ALL panel.";
         stop(); return false;
@@ -54,6 +69,15 @@ bool Asio4AllOutput::start(AudioEngineCore& engine, std::uint32_t requestedFrame
     }
     const auto channelNames = device->getOutputChannelNames();
     juce::Logger::writeToLog("ASIO4ALL opened channels=" + channelNames.joinIntoString(", "));
+    // Driver callbacks and a successful private-API call are not proof of a
+    // physical route. Validate the actual channels after open in every case.
+    if (unsafeRenderChannels(channelNames))
+    {
+        error = L"ASIO4ALL did not open physical stereo output; virtual or disconnected channels: "
+            + std::wstring(channelNames.joinIntoString(", ").toWideCharPointer());
+        stop();
+        return false;
+    }
     if (!selectedEndpoint && (channelNames.size() < 2
         || channelNames[0].containsIgnoreCase("Not Connected")
         || channelNames[1].containsIgnoreCase("Not Connected")

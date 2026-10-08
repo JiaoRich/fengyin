@@ -172,6 +172,10 @@ bool isVirtual(const std::wstring& id, const std::wstring& name)
 {
     const auto combined = lower(id + L" " + name);
     return combined.find(L"fengyin") != std::wstring::npos
+        || combined.find(L"vb-audio") != std::wstring::npos
+        || combined.find(L"cable input") != std::wstring::npos
+        || combined.find(L"cable in ") != std::wstring::npos
+        || combined.find(L"cable in16") != std::wstring::npos
         || combined.find(L"风吟共享扬声器") != std::wstring::npos;
 }
 
@@ -224,8 +228,10 @@ bool isActiveEndpoint(IMMDeviceEnumerator& enumerator, const std::wstring& id)
 {
     Microsoft::WRL::ComPtr<IMMDevice> device;
     DWORD state = 0;
+    std::wstring actualId, name;
     return ! id.empty() && SUCCEEDED(enumerator.GetDevice(id.c_str(), &device)) && device
-        && SUCCEEDED(device->GetState(&state)) && (state & DEVICE_STATE_ACTIVE) != 0;
+        && SUCCEEDED(device->GetState(&state)) && (state & DEVICE_STATE_ACTIVE) != 0
+        && readDevice(*device.Get(), actualId, name) && !isVirtual(actualId, name);
 }
 
 bool readPhysicalEndpoints(IMMDeviceEnumerator& enumerator, std::vector<std::wstring>& ids)
@@ -291,13 +297,13 @@ bool DefaultEndpointRouter::routeSystemAudioToFengYin(std::wstring& physicalEndp
         previousEndpointIds[index] = getId(*enumerator.Get(), roles[index]);
     physicalEndpointId = previousEndpointIds[1].empty() ? previousEndpointIds[0]
                                                         : previousEndpointIds[1];
-    if (physicalEndpointId.empty() || physicalEndpointId == virtualId)
+    if (!isActiveEndpoint(*enumerator.Get(), physicalEndpointId))
     {
         physicalEndpointId = findFirstPhysical(*enumerator.Get());
         // A user may have manually selected the virtual endpoint before
         // launching. Recovery must restore a usable physical output.
         for (auto& id : previousEndpointIds)
-            if (id.empty() || id == virtualId) id = physicalEndpointId;
+            if (!isActiveEndpoint(*enumerator.Get(), id)) id = physicalEndpointId;
     }
     if (physicalEndpointId.empty() || physicalEndpointId == virtualId)
     {
@@ -305,6 +311,11 @@ bool DefaultEndpointRouter::routeSystemAudioToFengYin(std::wstring& physicalEndp
         restore();
         return false;
     }
+
+    // Each Windows role can have a different default. Sanitize all three,
+    // even when the multimedia role already points to a physical endpoint.
+    for (auto& id : previousEndpointIds)
+        if (!isActiveEndpoint(*enumerator.Get(), id)) id = physicalEndpointId;
 
     if (! writeJournal(previousEndpointIds))
     {
@@ -423,7 +434,10 @@ void DefaultEndpointRouter::restore() noexcept
 #if defined(_WIN32)
     if (active)
     {
-        if (setEndpoints(previousEndpointIds)) deleteJournal();
+        // Re-resolve the persisted physical targets: a headphone may have
+        // disappeared since routing began. Keep the journal on failure.
+        std::wstring restoreError;
+        (void) restorePendingRoute(restoreError);
     }
 #endif
     active = false;

@@ -32,10 +32,23 @@ class AudioStartupRecovery(unittest.TestCase):
 
     def test_ordinary_startup_preserves_driver_configuration(self):
         source = (ROOT / 'audio-engine/windows/Asio4AllOutput.cpp').read_text(encoding='utf-8')
-        self.assertIn('selectedEndpoint = requireMatch && !preferredEndpoint.empty()', source)
+        self.assertIn('matchPhysicalEndpoint = requireMatch || needsRouteRepair', source)
+        self.assertIn('selectedEndpoint = matchPhysicalEndpoint && !preferredEndpoint.empty()', source)
         self.assertNotIn('refreshAsioEndpoints(', source)
         self.assertIn('ASIO endpoint matching skipped for ordinary startup', source)
         self.assertIn('channelNames[index].containsIgnoreCase("cable")', source)
+
+    def test_capture_must_be_ready_before_publishing_running(self):
+        source = (ROOT / 'audio-engine/windows/AudioEngineMain.cpp').read_text(encoding='utf-8')
+        startup = source.split('Asio4AllOutput output;', 1)[1].split('bool unrecoverableOutputFailure', 1)[0]
+        self.assertLess(startup.index('loopback.start('), startup.index('lifecycle.markRunning()'))
+        self.assertLess(startup.index('return 7;'), startup.index('StreamState::running'))
+
+    def test_actual_route_is_checked_even_after_private_selection(self):
+        source = (ROOT / 'audio-engine/windows/Asio4AllOutput.cpp').read_text(encoding='utf-8')
+        self.assertIn('containsIgnoreCase("vb-audio")', source)
+        self.assertIn('if (unsafeRenderChannels(channelNames))', source)
+        self.assertLess(source.index('if (unsafeRenderChannels(channelNames))'), source.index('device->start(this)'))
 
     def test_driver_start_and_callback_wait_are_distinguishable(self):
         source = (ROOT / 'scripts/patch-juce-wasapi-raw.cmake').read_text(encoding='utf-8')
