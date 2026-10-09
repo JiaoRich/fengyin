@@ -135,6 +135,7 @@ public:
     int applySwamToneProfile(const SwamToneProfile& profile, bool restoreModel = true);
     [[nodiscard]] juce::var getSwamToneAudit() const { return swamToneAudit; }
     bool applyStandardSwamExpressionCurve();
+    bool applyExpressionAttackControl();
     bool setBendRange(int semitones);
     void configureKongTechniqueProfile(const juce::String& instrumentKey) noexcept;
     void flushOnsetTrace() { player.flushOnsetTrace(); }

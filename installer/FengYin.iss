@@ -5,7 +5,7 @@
   #define OutputDir "."
 #endif
 #ifndef AppVersion
-  #define AppVersion "1.1.6"
+  #define AppVersion "1.1.7"
 #endif
 #ifndef ChineseMessages
   #define ChineseMessages "compiler:Languages\ChineseSimplified.isl"
@@ -32,6 +32,7 @@ SetupLogging=yes
 InfoBeforeFile={#SourceDir}\AudioComponents.txt
 CloseApplications=yes
 RestartApplications=no
+AlwaysRestart=yes
 UninstallDisplayName=风吟
 
 [Languages]
@@ -41,9 +42,7 @@ Name: "chinesesimp"; MessagesFile: "{#ChineseMessages}"
 FinishedRestartMessage=风吟已安装完成。音频驱动需要重启电脑后才能正常使用。请保存其他工作，然后重启；重启后再打开风吟。
 
 [Tasks]
-Name: "asio4all"; Description: "安装 ASIO4ALL 64位低延迟组件（请完成原厂安装向导）"; GroupDescription: "低延迟组件："; Check: NeedsASIO4ALL
 Name: "desktopicon"; Description: "在桌面创建快捷方式"; GroupDescription: "快捷方式："; Flags: unchecked
-Name: "freshair"; Description: "安装 Fresh Air 1.0.8 音色效果器（次中萨-气包音必需）"; GroupDescription: "音色组件："; Check: NeedsFreshAir
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -57,11 +56,10 @@ Name: "{group}\安装 Fresh Air 音色效果器"; Filename: "{app}\components\Fr
 Name: "{autodesktop}\风吟"; Filename: "{app}\FengYin.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\components\ASIO4ALL\ASIO4ALL_2_22.exe"; Tasks: asio4all; Check: NeedsASIO4ALL; AfterInstall: MarkAudioDriverRestart; StatusMsg: "请完成 ASIO4ALL 原厂安装向导"; Flags: waituntilterminated
 Filename: "{tmp}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; Parameters: "/silent /install"; StatusMsg: "正在安装视频与精美界面离线运行组件…"; Flags: waituntilterminated
-Filename: "{app}\components\VB-CABLE\VBCABLE_Setup_x64.exe"; WorkingDir: "{app}\components\VB-CABLE"; Check: NeedsVBCable; BeforeInstall: ExplainVBCableInstall; AfterInstall: VerifyVBCableInstalled; StatusMsg: "正在安装 VB-CABLE 网页声音组件…"; Flags: waituntilterminated
-Filename: "{app}\components\Fresh Air\Setup Fresh Air v1.0.8.exe"; Parameters: "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /TYPE=full /LOG=""{app}\components\Fresh Air\install.log"""; Tasks: freshair; Check: NeedsFreshAir; AfterInstall: VerifyFreshAirInstalled; StatusMsg: "正在安装 Fresh Air 1.0.8 音色效果器…"; Flags: waituntilterminated
-Filename: "{app}\FengYin.exe"; Description: "启动风吟"; Check: CanLaunchNow; Flags: nowait postinstall skipifsilent
+
+[Registry]
+Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "FengYinAudioRecovery"; ValueData: """{app}\FengYinAudioWatchdog.exe"" --login-recovery"; Flags: uninsdeletevalue
 
 [Code]
 
@@ -116,7 +114,7 @@ end;
 
 procedure ExplainVBCableInstall();
 begin
-  MsgBox('风吟低延迟模式需要 VB-CABLE。接下来的原厂窗口中请点击 Install Driver，等待安装完成后再关闭窗口。', mbInformation, MB_OK);
+  MsgBox('接下来安装随包 VB-CABLE。新安装请点击 Install Driver；若原厂窗口只有 Remove Driver，表示需要先移除旧版，再按后续提示重新安装。若要求重启，请保存工作后重启，再运行本安装包完成安装。不要仅关闭窗口。', mbInformation, MB_OK);
 end;
 
 procedure VerifyVBCableInstalled();
@@ -166,7 +164,49 @@ end;
 
 function NeedRestart(): Boolean;
 begin
-  Result := VBCableInstalledThisRun or AudioDriverRestartRequired;
+  Result := True;
+end;
+
+procedure RunRequiredComponent(FileName, Arguments, WorkingDirectory: String);
+var
+  ResultCode: Integer;
+begin
+  if not Exec(ExpandConstant(FileName), ExpandConstant(Arguments), ExpandConstant(WorkingDirectory),
+      SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode) then
+    RaiseException('依赖安装程序无法启动：' + FileName);
+  Log('Required component ' + FileName + ' exit=' + IntToStr(ResultCode));
+  if (ResultCode <> 0) and (ResultCode <> 3010) then
+    RaiseException('依赖安装未完成或已取消：' + FileName + '，返回码 ' + IntToStr(ResultCode));
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
+begin
+  if CurStep <> ssPostInstall then Exit;
+  { Capture the interactive user's defaults, not the elevated administrator's. }
+  if not ExecAsOriginalUser(ExpandConstant('{app}\FengYinAudioWatchdog.exe'), '--snapshot-install', '',
+      SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    RaiseException('无法保存安装前的声音输出，请关闭风吟后重试。');
+  if ResultCode <> 0 then RaiseException('声音输出仍被占用或无法保存，请关闭风吟后重试。');
+  MarkAudioDriverRestart();
+  RunRequiredComponent('{app}\components\ASIO4ALL\ASIO4ALL_2_22.exe', '', '');
+  if NeedsASIO4ALL() then RaiseException('ASIO4ALL 安装未完成，请完成原厂安装向导。');
+  ExplainVBCableInstall();
+  RunRequiredComponent('{app}\components\VB-CABLE\VBCABLE_Setup_x64.exe', '', '{app}\components\VB-CABLE');
+  if NeedsVBCable() then
+  begin
+    MsgBox('尚未检测到可用的 VB-CABLE。如果刚才原厂程序执行了 Remove Driver，必须重新完成 Install Driver。接下来再次打开安装器；若提示必须先重启，请重启后重新运行风吟安装包。', mbInformation, MB_OK);
+    RunRequiredComponent('{app}\components\VB-CABLE\VBCABLE_Setup_x64.exe', '', '{app}\components\VB-CABLE');
+  end;
+  VerifyVBCableInstalled();
+  RunRequiredComponent('{app}\components\Fresh Air\Setup Fresh Air v1.0.8.exe',
+    '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /TYPE=full /LOG="{app}\components\Fresh Air\install.log"', '');
+  VerifyFreshAirInstalled();
+  if NeedsFreshAir() then RaiseException('Fresh Air 安装未完成，不能完成风吟依赖安装。');
+  if not SaveStringToFile(ExpandConstant('{app}\dependencies-generation.txt'),
+      GetDateTimeString('yyyymmddhhnnss', '', ''), False) then
+    RaiseException('无法记录依赖安装结果。');
 end;
 
 function CanLaunchNow(): Boolean;

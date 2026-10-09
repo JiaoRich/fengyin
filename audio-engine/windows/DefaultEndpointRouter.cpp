@@ -1,5 +1,6 @@
 #include "DefaultEndpointRouter.h"
 #include "../common/VirtualEndpointChoice.h"
+#include "../common/RouteRecoveryPolicy.h"
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -48,7 +49,7 @@ const CLSID policyConfigClient =
 
 constexpr std::array<ERole, 3> roles { eConsole, eMultimedia, eCommunications };
 constexpr std::uint32_t journalMagic = 0x46594152; // FYAR
-constexpr std::uint32_t journalVersion = 1;
+constexpr std::uint32_t journalVersion = 2;
 
 struct JournalHeader
 {
@@ -70,7 +71,7 @@ std::wstring journalPath()
     return folder + L"\\audio-route-recovery.bin";
 }
 
-bool writeJournal(const std::array<std::wstring, 3>& endpointIds)
+bool writeJournal(const std::array<std::wstring, 3>& endpointIds, const std::wstring& virtualId)
 {
     const auto path = journalPath();
     if (path.empty()) return false;
@@ -80,7 +81,8 @@ bool writeJournal(const std::array<std::wstring, 3>& endpointIds)
         if (endpointIds[index].empty() || endpointIds[index].size() > 32768) return false;
         header.lengths[index] = static_cast<std::uint32_t>(endpointIds[index].size());
     }
-    const auto file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+    const auto temporary = path + L".tmp";
+    const auto file = CreateFileW(temporary.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
                                   FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_NOT_CONTENT_INDEXED, nullptr);
     if (file == INVALID_HANDLE_VALUE) return false;
     DWORD written = 0;
@@ -90,13 +92,19 @@ bool writeJournal(const std::array<std::wstring, 3>& endpointIds)
         const auto bytes = header.lengths[index] * static_cast<DWORD>(sizeof(wchar_t));
         ok = WriteFile(file, endpointIds[index].data(), bytes, &written, nullptr) && written == bytes;
     }
+    const auto length = static_cast<DWORD>(virtualId.size());
+    if (ok) ok = length > 0 && length <= 32768
+        && WriteFile(file, &length, sizeof(length), &written, nullptr) && written == sizeof(length);
+    if (ok) ok = WriteFile(file, virtualId.data(), length * sizeof(wchar_t), &written, nullptr)
+        && written == length * sizeof(wchar_t);
     if (ok) ok = FlushFileBuffers(file) != FALSE;
     CloseHandle(file);
-    if (! ok) (void) DeleteFileW(path.c_str());
+    if (ok) ok = MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != FALSE;
+    if (! ok) (void) DeleteFileW(temporary.c_str());
     return ok;
 }
 
-bool readJournal(std::array<std::wstring, 3>& endpointIds)
+bool readJournal(std::array<std::wstring, 3>& endpointIds, std::wstring& virtualId)
 {
     endpointIds = {};
     const auto path = journalPath();
@@ -107,13 +115,24 @@ bool readJournal(std::array<std::wstring, 3>& endpointIds)
     JournalHeader header;
     DWORD read = 0;
     auto ok = ReadFile(file, &header, sizeof(header), &read, nullptr) && read == sizeof(header)
-           && header.magic == journalMagic && header.version == journalVersion;
+           && header.magic == journalMagic && (header.version == 1 || header.version == journalVersion);
     for (std::size_t index = 0; ok && index < endpointIds.size(); ++index)
     {
         if (header.lengths[index] == 0 || header.lengths[index] > 32768) { ok = false; break; }
         endpointIds[index].resize(header.lengths[index]);
         const auto bytes = header.lengths[index] * static_cast<DWORD>(sizeof(wchar_t));
         ok = ReadFile(file, endpointIds[index].data(), bytes, &read, nullptr) && read == bytes;
+    }
+    if (ok && header.version == journalVersion)
+    {
+        DWORD length = 0;
+        ok = ReadFile(file, &length, sizeof(length), &read, nullptr) && read == sizeof(length)
+            && length > 0 && length <= 32768;
+        if (ok) {
+            virtualId.resize(length);
+            ok = ReadFile(file, virtualId.data(), length * sizeof(wchar_t), &read, nullptr)
+                && read == length * sizeof(wchar_t);
+        }
     }
     CloseHandle(file);
     return ok;
@@ -269,6 +288,8 @@ bool DefaultEndpointRouter::routeSystemAudioToFengYin(std::wstring& physicalEndp
 {
     restore();
 #if defined(_WIN32)
+    ownership = std::make_unique<RouteOwnership>();
+    if (!ownership->acquired()) { ownership.reset(); error = L"Audio route recovery is busy"; return false; }
     if (! restorePendingRoute(error)) return false;
     const auto com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     if (FAILED(com) && com != RPC_E_CHANGED_MODE)
@@ -317,7 +338,7 @@ bool DefaultEndpointRouter::routeSystemAudioToFengYin(std::wstring& physicalEndp
     for (auto& id : previousEndpointIds)
         if (!isActiveEndpoint(*enumerator.Get(), id)) id = physicalEndpointId;
 
-    if (! writeJournal(previousEndpointIds))
+    if (! writeJournal(previousEndpointIds, virtualId))
     {
         error = L"Cannot create the audio endpoint recovery journal";
         restore();
@@ -409,7 +430,7 @@ bool DefaultEndpointRouter::pollPhysicalDefaultChange(std::wstring& physicalEndp
     for (std::size_t index = 0; index < current.size(); ++index)
         previousEndpointIds[index] = std::binary_search(observed.begin(), observed.end(), current[index])
             ? current[index] : physicalEndpointId;
-    if (! writeJournal(previousEndpointIds))
+    if (! writeJournal(previousEndpointIds, virtualId))
     {
         error = L"Cannot update the audio endpoint recovery journal";
         physicalEndpointId.clear();
@@ -448,15 +469,52 @@ void DefaultEndpointRouter::restore() noexcept
     stableEndpointPolls = 0;
 #if defined(_WIN32)
     if (comInitialised) CoUninitialize();
+    ownership.reset();
 #endif
     comInitialised = false;
+}
+
+bool DefaultEndpointRouter::snapshotBeforeDependencyInstall(std::wstring& error) noexcept
+{
+#if defined(_WIN32)
+    RouteOwnership lock;
+    if (!lock.acquired()) { error = L"Close FengYin before installing dependencies"; return false; }
+    if (!restorePendingRoute(error)) return false;
+    const auto com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    if (FAILED(com) && com != RPC_E_CHANGED_MODE) return false;
+    Microsoft::WRL::ComPtr<IMMDeviceEnumerator> enumerator;
+    bool ok = SUCCEEDED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
+                                        IID_PPV_ARGS(&enumerator))) && enumerator;
+    std::array<std::wstring, 3> saved;
+    if (ok) {
+        for (std::size_t i = 0; i < roles.size(); ++i) {
+            const auto current = getId(*enumerator.Get(), roles[i]);
+            // Do not claim a user-selected virtual output as our own.
+            saved[i] = isActiveEndpoint(*enumerator.Get(), current) ? current : L"@preserve";
+        }
+        ok = writeJournal(saved, L"@installation");
+    }
+    if (SUCCEEDED(com)) CoUninitialize();
+    if (!ok) error = L"Cannot save pre-install physical outputs";
+    return ok;
+#else
+    (void) error; return true;
+#endif
 }
 
 bool DefaultEndpointRouter::restorePendingRoute(std::wstring& error) noexcept
 {
 #if defined(_WIN32)
     std::array<std::wstring, 3> endpointIds;
-    if (! readJournal(endpointIds)) return true;
+    RouteOwnership lock;
+    if (!lock.acquired()) { error = L"Audio route is owned by a running engine"; return false; }
+    std::wstring virtualId;
+    if (! readJournal(endpointIds, virtualId)) {
+        if (GetFileAttributesW(journalPath().c_str()) != INVALID_FILE_ATTRIBUTES) {
+            error = L"Audio recovery journal is unreadable; retained"; return false;
+        }
+        return true;
+    }
     const auto com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     if (FAILED(com) && com != RPC_E_CHANGED_MODE)
     {
@@ -468,14 +526,24 @@ bool DefaultEndpointRouter::restorePendingRoute(std::wstring& error) noexcept
                                                IID_PPV_ARGS(&enumerator))) && enumerator;
     if (restored)
     {
-        const auto fallback = findFirstPhysical(*enumerator.Get());
-        if (fallback.empty())
-            restored = false;
-        else
-            for (auto& id : endpointIds)
-                if (! isActiveEndpoint(*enumerator.Get(), id)) id = fallback;
+        // Version 1 journals predate the recorded virtual endpoint. Only a
+        // matching bridge plus the existing journal authorises migration.
+        if (virtualId.empty() || virtualId == L"@installation") virtualId = findVirtual(*enumerator.Get());
+        Microsoft::WRL::ComPtr<IPolicyConfig> policy;
+        restored = SUCCEEDED(CoCreateInstance(policyConfigClient, nullptr, CLSCTX_ALL,
+            __uuidof(IPolicyConfig), reinterpret_cast<void**>(policy.GetAddressOf()))) && policy;
+        for (std::size_t index = 0; restored && index < roles.size(); ++index) {
+            const auto current = getId(*enumerator.Get(), roles[index]);
+            const auto action = recoveryRoleAction(endpointIds[index], current, virtualId);
+            if (action == RecoveryRoleAction::preserve) continue;
+            if (action == RecoveryRoleAction::retry) { restored = false; break; }
+            auto target = endpointIds[index];
+            if (!isActiveEndpoint(*enumerator.Get(), target)) target = findFirstPhysical(*enumerator.Get());
+            if (target.empty()) { restored = false; break; }
+            restored = SUCCEEDED(policy->SetDefaultEndpoint(target.c_str(), roles[index]))
+                && getId(*enumerator.Get(), roles[index]) == target;
+        }
     }
-    if (restored) restored = setEndpoints(endpointIds);
     if (restored) deleteJournal();
     if (SUCCEEDED(com)) CoUninitialize();
     if (! restored) error = L"Cannot restore the previous Windows audio endpoint";

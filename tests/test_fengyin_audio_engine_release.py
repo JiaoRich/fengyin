@@ -131,7 +131,8 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         self.assertIn("HKLM64", installer)
         self.assertIn("InprocServer32", installer)
         self.assertIn("FileExists(RemoveQuotes(Server))", installer)
-        self.assertIn("Tasks: asio4all; Check: NeedsASIO4ALL", installer)
+        self.assertIn("RunRequiredComponent('{app}\\components\\ASIO4ALL", installer)
+        self.assertNotIn("Tasks: asio4all; Check: NeedsASIO4ALL", installer)
         self.assertNotIn("FengYinDriverSetup.exe", self.read("scripts/build-windows.ps1"))
 
     def test_public_package_bundles_and_installs_fresh_air(self):
@@ -144,12 +145,12 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         self.assertIn("prepare-fresh-air.ps1", build)
         self.assertIn(expected_hash, prepare)
         self.assertIn(expected_hash, release)
-        self.assertIn('Name: "freshair"', installer)
+        self.assertNotIn('Name: "freshair"', installer)
         self.assertIn("NeedsFreshAir", installer)
         self.assertIn(r"VST3\Fresh Air.vst3", installer)
         self.assertIn(r"VST3\Slate Digital\Fresh Air.vst3", installer)
         self.assertIn("/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-", installer)
-        self.assertIn("AfterInstall: VerifyFreshAirInstalled", installer)
+        self.assertIn("  VerifyFreshAirInstalled();", installer)
         self.assertIn("RaiseException", installer)
 
     def test_public_package_uses_verified_offline_webview_runtime(self):
@@ -199,7 +200,7 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
             self.assertTrue(asset.is_file() and asset.stat().st_size > 300, asset)
         self.assertEqual(
             hashlib.sha256((ROOT / "assets/tone-packages/soprano-kenny.fytonepack").read_bytes()).hexdigest(),
-            "361379611f09669f11b3bde791e7afcc9f36188a5259140723b35a57495352a9",
+            "1180d6798ba5884f9ee1d7326a3de1c4b52cdc16aa6b7b97c91235532afafd48",
         )
 
     def test_kong_release_routes_multichannel_techniques(self):
@@ -244,7 +245,7 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
     def test_endpoint_route_has_crash_and_hotplug_recovery(self):
         router = self.read("audio-engine/windows/DefaultEndpointRouter.cpp")
         engine = self.read("audio-engine/windows/AudioEngineMain.cpp")
-        self.assertIn("writeJournal(previousEndpointIds)", router)
+        self.assertIn("writeJournal(previousEndpointIds, virtualId)", router)
         self.assertIn("restorePendingRoute", router)
         self.assertIn("pollPhysicalDefaultChange", engine)
 

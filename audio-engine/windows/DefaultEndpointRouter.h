@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <memory>
+#include "RouteOwnership.h"
 
 namespace fengyin::audioengine
 {
@@ -24,9 +26,13 @@ public:
                                    std::wstring& error) noexcept;
     void restore() noexcept;
     static bool restorePendingRoute(std::wstring& error) noexcept;
+    static bool snapshotBeforeDependencyInstall(std::wstring& error) noexcept;
     [[nodiscard]] bool isActive() const noexcept { return active; }
 
 private:
+#if defined(_WIN32)
+    std::unique_ptr<RouteOwnership> ownership;
+#endif
     std::array<std::wstring, 3> previousEndpointIds;
     std::vector<std::wstring> physicalEndpoints, pendingEndpoints;
     std::uint64_t nextEndpointPoll = 0;

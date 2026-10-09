@@ -59,10 +59,9 @@ class AudioStartupRecovery(unittest.TestCase):
 
     def test_both_driver_installers_require_restart(self):
         source = (ROOT / 'installer/FengYin.iss').read_text(encoding='utf-8')
-        asio = next(line for line in source.splitlines()
-                    if line.startswith('Filename:') and 'AfterInstall: MarkAudioDriverRestart' in line)
-        self.assertIn('ASIO4ALL_2_22.exe', asio)
-        self.assertIn('VBCableInstalledThisRun or AudioDriverRestartRequired', source)
+        self.assertIn("RunRequiredComponent('{app}\\components\\ASIO4ALL\\ASIO4ALL_2_22.exe'", source)
+        self.assertIn('AlwaysRestart=yes', source)
+        self.assertNotIn('postinstall skipifsilent', source)
         self.assertIn('not NeedRestart()', source)
         self.assertIn('FinishedRestartMessage=', source)
 

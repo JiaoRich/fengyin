@@ -32,7 +32,12 @@ public:
             juce::Thread::sleep(40);
         }
         auto xml = juce::XmlDocument::parse(report.getFile());
-        if (child.getExitCode() != 0 || xml == nullptr || ! xml->hasTagName("PLUGIN_SCAN")) return false;
+        if (child.getExitCode() != 0 || xml == nullptr || ! xml->hasTagName("PLUGIN_SCAN")) {
+            juce::Logger::writeToLog("Plugin scan/instance validation failed: " + path
+                + "; exit=" + juce::String(child.getExitCode())
+                + (xml != nullptr ? "; error=" + xml->getStringAttribute("error") : "; no scan report"));
+            return false;
+        }
         for (const auto* element : xml->getChildIterator())
         {
             auto description = std::make_unique<juce::PluginDescription>();
@@ -74,6 +79,8 @@ PluginCatalogService::~PluginCatalogService()
 void PluginCatalogService::startScan(juce::FileSearchPath paths, bool rescanExisting)
 {
     stopScan();
+    dependencyGeneration = juce::File::getSpecialLocation(juce::File::currentExecutableFile)
+        .getSiblingFile("dependencies-generation.txt").loadFileAsString().trim();
     juce::AudioPluginFormat* vst3 = nullptr;
     for (auto* format : formatManager.getFormats())
         if (format->getName() == "VST3")
@@ -91,6 +98,14 @@ void PluginCatalogService::startScan(juce::FileSearchPath paths, bool rescanExis
         progress.pluginCount = knownPlugins.getNumTypes();
     }
     startThread(juce::Thread::Priority::low);
+}
+
+bool PluginCatalogService::needsDependencyRefresh() const
+{
+    const auto generation = juce::File::getSpecialLocation(juce::File::currentExecutableFile)
+        .getSiblingFile("dependencies-generation.txt").loadFileAsString().trim();
+    return generation.isNotEmpty() && generation != getCatalogFile()
+        .getSiblingFile("dependencies-scanned.txt").loadFileAsString().trim();
 }
 
 void PluginCatalogService::stopScan()
@@ -205,6 +220,9 @@ void PluginCatalogService::run()
 
     saveCatalog();
     const juce::ScopedLock lock(stateLock);
+    if (!threadShouldExit() && scanner != nullptr && scanner->getFailedFiles().isEmpty()
+        && dependencyGeneration.isNotEmpty())
+        getCatalogFile().getSiblingFile("dependencies-scanned.txt").replaceWithText(dependencyGeneration);
     progress.scanning = false;
     progress.fraction = 1.0f;
     progress.pluginCount = knownPlugins.getNumTypes();

@@ -226,7 +226,7 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
     showPage(Page::play);
     setupWebInterface();
     // Discover dependencies on a fresh installation, without creating tones.
-    if (pluginCatalog.getPlugins().isEmpty()) startPluginScan();
+    if (pluginCatalog.getPlugins().isEmpty() || pluginCatalog.needsDependencyRefresh()) startPluginScan();
     startTimerHz(30);
     // 网页主界面本身包含完整引导，不再启动会遮挡演奏页面的原生模态窗口。
     autoGuideShown = true;
@@ -545,6 +545,7 @@ void MainComponent::setupWebInterface()
             masterOutput.setToneStyle(style.settings);
             currentSwamToneParameterCount = currentPluginBrand == "swam"
                 ? pluginHost.applySwamToneProfile(style.swam) : 0;
+            if (currentPluginBrand == "swam") pluginHost.applyExpressionAttackControl();
         })
         .withEventListener("setInstrumentModel", [this](juce::var payload)
         {
@@ -2838,6 +2839,7 @@ void MainComponent::deleteSelectedPreset()
                     safe->masterOutput.setToneStyle(fallback.settings);
                     safe->currentSwamToneParameterCount = safe->currentPluginBrand == "swam"
                         ? safe->pluginHost.applySwamToneProfile(fallback.swam) : 0;
+                    if (safe->currentPluginBrand == "swam") safe->pluginHost.applyExpressionAttackControl();
                 }
                 safe->refreshPresetChoices();
                 safe->pluginStatus.setText(utf8("音色方案已删除"), juce::dontSendNotification);
@@ -3128,6 +3130,7 @@ void MainComponent::loadPreset(fengyin::SoundPreset preset,
         juce::PluginDescription required;
         auto xml = juce::parseXML(effect.descriptionXml);
         bool matched = false;
+        juce::String availableVersion;
         if (xml && required.loadFromXml(*xml))
             for (const auto& candidate : cachedEffectPlugins)
                 if (candidate.pluginFormatName == required.pluginFormatName
@@ -3135,6 +3138,7 @@ void MainComponent::loadPreset(fengyin::SoundPreset preset,
                     && candidate.manufacturerName == required.manufacturerName
                     && candidate.name == required.name)
                 {
+                    availableVersion = candidate.version;
                     // Different versions may interpret opaque state differently.
                     if (candidate.version != required.version) continue;
                     effect.descriptionXml = candidate.createXml()->toString();
@@ -3143,7 +3147,10 @@ void MainComponent::loadPreset(fengyin::SoundPreset preset,
                 }
         if (! matched)
         {
-            const auto message = utf8("缺少方案所需的效果器或版本不一致：") + required.name + " " + required.version;
+            const auto message = availableVersion.isNotEmpty()
+                ? utf8("效果器版本不匹配：") + required.name + utf8("，需要 ") + required.version + utf8("，已扫描到 ") + availableVersion
+                : utf8("插件扫描列表中未找到所需效果器：") + required.name + " " + required.version
+                    + utf8("。请完成依赖安装并重启，再扫描插件；若扫描失败请提供日志。");
             pluginStatus.setText(message, juce::dontSendNotification);
             if (completion) completion(false, message);
             return;
@@ -3493,6 +3500,9 @@ juce::String MainComponent::bendPreferenceKey() const
 
 void MainComponent::applyInstrumentBendRange()
 {
+    // Called after preset/state restoration and style/model changes, including
+    // old user presets. Never apply this SWAM-only policy to Kong or effects.
+    if (currentPluginBrand == "swam") pluginHost.applyExpressionAttackControl();
     bendRangeApplied = false;
     bendRangeRemembered = false;
     bendRange = currentPluginBrand == "kong" ? 3 : 1;

@@ -506,6 +506,40 @@ int PluginHostEngine::restoreToneParameters(const juce::Array<ToneParameterValue
     return restored;
 }
 
+bool PluginHostEngine::applyExpressionAttackControl()
+{
+    const ScopedGraphPause pause(graph.get());
+    auto* plugin = getPlugin();
+    if (plugin == nullptr) return false;
+    for (auto* parameter : plugin->getParameters())
+    {
+        if (parameter == nullptr || normalisedParameterName(*parameter) != "attackcontrol") continue;
+        const auto previous = parameter->getValue();
+        if (parameter->getText(previous, 128).trim().equalsIgnoreCase("Expression")) return true;
+        // Resolve the displayed enum, not a saxophone-specific parameter index.
+        for (int step = 0; step <= 1000; ++step)
+        {
+            const auto value = static_cast<float>(step) / 1000.0f;
+            if (! parameter->getText(value, 128).trim().equalsIgnoreCase("Expression")) continue;
+            parameter->beginChangeGesture();
+            parameter->setValueNotifyingHost(value);
+            parameter->endChangeGesture();
+            const auto verified = parameter->getText(parameter->getValue(), 128).trim().equalsIgnoreCase("Expression");
+            if (! verified)
+            {
+                parameter->beginChangeGesture();
+                parameter->setValueNotifyingHost(previous);
+                parameter->endChangeGesture();
+            }
+            juce::Logger::writeToLog(verified ? "SWAM Attack Control verified: Expression"
+                                            : "SWAM Attack Control verification failed");
+            return verified;
+        }
+    }
+    juce::Logger::writeToLog("SWAM Attack Control unavailable: no verified Expression option; unchanged");
+    return false;
+}
+
 bool PluginHostEngine::applyStandardSwamExpressionCurve()
 {
     // The player may still be attached after replacing an instrument. Never

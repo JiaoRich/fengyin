@@ -21,6 +21,36 @@ using namespace fengyin::audioengine;
 #if defined(_WIN32)
 namespace
 {
+class SessionEndRecovery
+{
+public:
+    explicit SessionEndRecovery(DefaultEndpointRouter& router) {
+        WNDCLASSW wc {};
+        wc.lpfnWndProc = procedure;
+        wc.hInstance = GetModuleHandleW(nullptr);
+        wc.lpszClassName = L"FengYinSessionEndRecovery";
+        RegisterClassW(&wc);
+        // A hidden top-level window receives session messages; HWND_MESSAGE does not.
+        window = CreateWindowExW(0, wc.lpszClassName, L"", 0, 0, 0, 0, 0,
+                                 nullptr, nullptr, wc.hInstance, &router);
+    }
+    ~SessionEndRecovery() { if (window) DestroyWindow(window); }
+private:
+    static LRESULT CALLBACK procedure(HWND window, UINT message, WPARAM w, LPARAM l) {
+        if (message == WM_NCCREATE)
+            SetWindowLongPtrW(window, GWLP_USERDATA,
+                reinterpret_cast<LONG_PTR>(reinterpret_cast<CREATESTRUCTW*>(l)->lpCreateParams));
+        if (message == WM_QUERYENDSESSION) return TRUE; // No mutation: shutdown may be cancelled.
+        if (message == WM_ENDSESSION && w) {
+            if (auto* router = reinterpret_cast<DefaultEndpointRouter*>(GetWindowLongPtrW(window, GWLP_USERDATA)))
+                router->restore();
+            return 0;
+        }
+        return DefWindowProcW(window, message, w, l);
+    }
+    HWND window = nullptr;
+};
+
 bool launchRecoveryWatchdog()
 {
     std::wstring executable(32768, L'\0');
@@ -173,6 +203,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     lifecycle.beginStart();
     AudioEngineCore core(*instrumentMapping.get(), *systemMapping.get());
     DefaultEndpointRouter router;
+    SessionEndRecovery sessionRecovery(router);
     if (routeSystemAudio)
     {
         // Start recovery before changing any Windows endpoint. If this process

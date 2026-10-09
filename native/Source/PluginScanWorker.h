@@ -25,11 +25,21 @@ private:
         while (position < types.size())
         {
             const auto description = *types[position++];
+            const auto freshAir = description.name.containsIgnoreCase("Fresh Air");
             if (fengyin::SupportedInstrumentClassifier::classify(description.name, description.manufacturerName, description.fileOrIdentifier)
-                != fengyin::SupportedInstrumentClassifier::Brand::kong) continue;
+                != fengyin::SupportedInstrumentClassifier::Brand::kong && !freshAir) continue;
             manager.createPluginInstanceAsync(description, 48000.0, 128,
                 [this, description](std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error)
                 {
+                    if (description.name.containsIgnoreCase("Fresh Air") && instance == nullptr)
+                    {
+                        juce::Logger::writeToLog("Fresh Air instance validation failed: " + error);
+                        document.setAttribute("error", error);
+                        document.writeTo(output);
+                        juce::JUCEApplication::getInstance()->setApplicationReturnValue(4);
+                        juce::JUCEApplication::getInstance()->quit();
+                        return;
+                    }
                     auto* bank = document.createNewChildElement("PROGRAMS");
                     bank->setAttribute("pluginId", description.createIdentifierString());
                     bank->setAttribute("pluginName", description.name);

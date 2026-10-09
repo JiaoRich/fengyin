@@ -26,6 +26,7 @@ public:
 
     void startScan(juce::FileSearchPath paths, bool rescanExisting);
     void stopScan();
+    bool needsDependencyRefresh() const;
     [[nodiscard]] Progress getProgress() const;
     [[nodiscard]] juce::Array<juce::PluginDescription> getPlugins() const;
     [[nodiscard]] juce::Array<juce::PluginDescription> getSwamPlugins() const;
@@ -44,6 +45,7 @@ private:
     void loadCatalog();
     void saveCatalog();
     void refreshKongLibrary();
+    juce::String dependencyGeneration;
 
     juce::AudioPluginFormatManager formatManager;
     juce::KnownPluginList knownPlugins;
