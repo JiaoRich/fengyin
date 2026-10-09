@@ -36,7 +36,6 @@ public:
     void setWarmth(float value) noexcept { warmth.store(juce::jlimit(0.0f, 1.0f, value)); }
     void setReverbMix(float value) noexcept { reverbMix.store(juce::jlimit(0.0f, 0.6f, value)); }
     void setLimiterCeiling(float value) noexcept { limiterCeiling.store(juce::jlimit(0.6f, 1.0f, value)); }
-    void setSmartOptimisationEnabled(bool enabled) noexcept { smartOptimisation.store(enabled); }
     void setInstrumentProfile(InstrumentMixProfile value) noexcept { instrumentProfile.store(static_cast<int>(value)); }
     void setToneStyle(const ToneStyleSettings& settings) noexcept;
 
@@ -44,7 +43,6 @@ public:
     [[nodiscard]] float getEqTone() const noexcept { return eqTone.load(); }
     [[nodiscard]] float getReverbMix() const noexcept { return reverbMix.load(); }
     [[nodiscard]] float getLimiterCeiling() const noexcept { return limiterCeiling.load(); }
-    [[nodiscard]] bool isSmartOptimisationEnabled() const noexcept { return smartOptimisation.load(); }
     [[nodiscard]] float getWarmth() const noexcept { return warmth.load(); }
     [[nodiscard]] ToneStyleSettings getToneStyle() const noexcept;
     [[nodiscard]] float getLeftPeak() const noexcept { return leftPeak.load(); }
@@ -92,7 +90,6 @@ private:
     float smoothedBassGain = 1.0f;
     float smoothedOutputGain = 1.0f;
     std::array<float, 2> bassLowPass {};
-    std::atomic<bool> smartOptimisation { true };
     std::atomic<int> instrumentProfile { static_cast<int>(InstrumentMixProfile::generic) };
     std::atomic<double> sampleRate { 48000.0 };
 
@@ -102,7 +99,6 @@ private:
     int lastInstrumentProfile = -1;
     float instrumentEnvelope = 0.0f;
     float compressorGain = 1.0f;
-    float automaticTrim = 1.0f;
     std::array<float, 2> toneLowPass {};
     std::array<float, 2> rumbleLowPass {};
 

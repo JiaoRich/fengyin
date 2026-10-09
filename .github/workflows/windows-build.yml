@@ -105,6 +105,10 @@ jobs:
         shell: powershell
         run: ./scripts/test-fresh-air-install.ps1
 
+      - name: 实际执行安装末尾时间标记表达式
+        shell: powershell
+        run: ./scripts/test-installer-marker.ps1
+
       - name: 保存 Fresh Air 安装验证日志
         if: always()
         uses: actions/upload-artifact@v5

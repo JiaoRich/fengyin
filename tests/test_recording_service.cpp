@@ -12,7 +12,6 @@ int main()
     fengyin::MasterOutputService master;
     master.setGain(0.5f);
     master.setSampleRate(48000.0);
-    master.setSmartOptimisationEnabled(false);
     juce::AudioBuffer<float> analysisAudio(2, 4096);
     for (int i = 0; i < analysisAudio.getNumSamples(); ++i)
         analysisAudio.setSample(0, i, std::sin(static_cast<float>(i) * 0.13f));
@@ -33,7 +32,6 @@ int main()
     master.setGain(1.0f);
     master.setLimiterCeiling(1.0f);
     master.setReverbMix(0.0f);
-    master.setSmartOptimisationEnabled(true);
     master.setInstrumentProfile(fengyin::InstrumentMixProfile::saxophone);
     juce::AudioBuffer<float> performance(2, 8192);
     performance.clear();

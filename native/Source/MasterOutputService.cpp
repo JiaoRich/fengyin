@@ -77,15 +77,13 @@ void MasterOutputService::updateInstrumentReverb(float mix, const ProfileSetting
 void MasterOutputService::processInstrument(float* const* outputs, int channels, int samples) noexcept
 {
     if (outputs == nullptr || channels <= 0 || samples <= 0) return;
-    const auto smart = smartOptimisation.load(std::memory_order_relaxed);
     const auto settings = currentProfileSettings();
     const auto requestedTone = eqTone.load(std::memory_order_relaxed);
-    const auto tone = juce::jlimit(-1.0f, 1.0f, requestedTone + (smart ? settings.toneBias : 0.0f));
+    const auto tone = juce::jlimit(-1.0f, 1.0f, requestedTone);
     const auto rate = static_cast<float>(sampleRate.load(std::memory_order_relaxed));
     const auto envelopeAttack = 1.0f - std::exp(-1.0f / (0.012f * rate));
     const auto envelopeRelease = 1.0f - std::exp(-1.0f / (0.24f * rate));
     const auto gainRelease = 1.0f - std::exp(-1.0f / (0.18f * rate));
-    const auto trimSpeed = 1.0f - std::exp(-1.0f / (2.8f * rate));
     // Snapshot UI-controlled atomics once per block. Loading them for every
     // sample unnecessarily lengthens the real-time callback on older laptops.
     const auto threshold = styleCompressionThreshold.load(std::memory_order_relaxed);
@@ -121,13 +119,6 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
         compressorGain += (desiredCompressorGain - compressorGain)
                         * (desiredCompressorGain < compressorGain ? 0.18f : gainRelease);
 
-        if (smart && instrumentEnvelope > 0.04f)
-        {
-            const auto desiredTrim = juce::jlimit(0.84f, 1.18f, 0.32f / instrumentEnvelope);
-            automaticTrim += (desiredTrim - automaticTrim) * trimSpeed;
-        }
-        else if (! smart)
-            automaticTrim += (1.0f - automaticTrim) * trimSpeed;
 
         const auto activity = juce::jlimit(0.0f, 1.0f, (instrumentEnvelope - 0.025f) / 0.22f);
         for (int channel = 0; channel < channels; ++channel)
@@ -152,7 +143,7 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
                 const auto saturated = std::tanh(value * saturationDrive) * saturationNormaliser;
                 value += (saturated - value) * saturationMix;
             }
-            data[sample] = value * compressorGain * automaticTrim * smoothedOutputGain;
+            data[sample] = value * compressorGain * smoothedOutputGain;
         }
     }
     airProcessor.process(outputs, channels, samples, airAmount.load(std::memory_order_relaxed));

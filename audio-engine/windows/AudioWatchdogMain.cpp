@@ -84,7 +84,15 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         logRecovery(error);
         return 2; // Preserve journal for the next launch/login.
     }
-    return DefaultEndpointRouter::restorePendingRoute(error) ? 0 : 2;
+    for (int attempt = 0; attempt < 10; ++attempt) {
+        if (engineRunning()) { logRecovery(L"Exit recovery deferred to new engine"); return 0; }
+        if (DefaultEndpointRouter::restorePendingRoute(error)) {
+            logRecovery(L"Exit recovery verified (or no owned route)"); return 0;
+        }
+        Sleep(300);
+    }
+    logRecovery(error);
+    return 2;
 }
 #else
 int main() { return 0; }

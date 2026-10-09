@@ -51,10 +51,9 @@ int main()
 {
     // An identical sustained signal must not remain quieter for an entire first
     // note after silence. Run the actual FengYin instrument and master DSP.
-    for(bool smart : {false,true}) {
+    {
         fengyin::MasterOutputService chain;
         chain.setSampleRate(48000);
-        chain.setSmartOptimisationEnabled(smart);
         float samples[128]{}; float* channels[]{samples};
         const auto render=[&](bool sounding) {
             double power=0;int count=0;
@@ -68,7 +67,7 @@ int main()
         };
         render(false);const double first=render(true),second=render(true);
         const double ratio=first/second;
-        std::cout<<"DSP smart="<<smart<<" first RMS="<<first<<" second RMS="<<second<<" ratio="<<ratio<<"\n";
+        std::cout<<"DSP first RMS="<<first<<" second RMS="<<second<<" ratio="<<ratio<<"\n";
         assert(std::isfinite(ratio) && ratio>.8 && ratio<1.25);
     }
     static_assert(fengyin::publishedToneCatalog.size() == 37);
@@ -85,7 +84,6 @@ int main()
         auto settings = chain->getToneStyle();
         settings.reverbMix = settings.saturation = settings.harshControl = settings.warmth = 0;
         chain->setToneStyle(settings);
-        chain->setSmartOptimisationEnabled(false);
         chain->setSampleRate(48000);
     }
     float a[128]{}, b[128]{};

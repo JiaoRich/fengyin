@@ -16,6 +16,9 @@ public:
             if (format->getName() == "VST3") format->findAllTypesForFile(types, path);
         for (const auto* type : types)
             document.addChildElement(type->createXml().release());
+        // Discovery survives optional instance validation failure or timeout.
+        document.setAttribute("validation", "pending");
+        document.writeTo(output);
         next();
     }
 
@@ -36,8 +39,8 @@ private:
                         juce::Logger::writeToLog("Fresh Air instance validation failed: " + error);
                         document.setAttribute("error", error);
                         document.writeTo(output);
-                        juce::JUCEApplication::getInstance()->setApplicationReturnValue(4);
-                        juce::JUCEApplication::getInstance()->quit();
+                        document.setAttribute("validation", "failed");
+                        juce::MessageManager::callAsync([this] { next(); });
                         return;
                     }
                     auto* bank = document.createNewChildElement("PROGRAMS");
@@ -78,6 +81,7 @@ private:
             return;
         }
         stopTimer();
+        if (!document.hasAttribute("error")) document.setAttribute("validation", "complete");
         const auto success = document.writeTo(output);
         juce::JUCEApplication::getInstance()->setApplicationReturnValue(success ? 0 : 2);
         juce::JUCEApplication::getInstance()->quit();

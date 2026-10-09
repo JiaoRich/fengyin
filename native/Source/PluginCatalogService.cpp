@@ -27,12 +27,13 @@ public:
                 || juce::Time::getMillisecondCounterHiRes() >= deadline)
             {
                 child.kill();
-                return false;
+                if (shouldExit() || juce::Thread::currentThreadShouldExit()) return false;
+                break; // Preserve descriptions already reported before validation.
             }
             juce::Thread::sleep(40);
         }
         auto xml = juce::XmlDocument::parse(report.getFile());
-        if (child.getExitCode() != 0 || xml == nullptr || ! xml->hasTagName("PLUGIN_SCAN")) {
+        if (xml == nullptr || ! xml->hasTagName("PLUGIN_SCAN")) {
             juce::Logger::writeToLog("Plugin scan/instance validation failed: " + path
                 + "; exit=" + juce::String(child.getExitCode())
                 + (xml != nullptr ? "; error=" + xml->getStringAttribute("error") : "; no scan report"));
@@ -44,7 +45,10 @@ public:
             if (description->loadFromXml(*element)) result.add(description.release());
         }
         onScanned(*xml);
-        return true;
+        if (xml->getStringAttribute("validation") != "complete")
+            juce::Logger::writeToLog("Plugin discovered; instance validation incomplete: " + path
+                + "; " + xml->getStringAttribute("error"));
+        return !result.isEmpty();
     }
 private:
     std::function<void(const juce::XmlElement&)> onScanned;
@@ -90,6 +94,15 @@ void PluginCatalogService::startScan(juce::FileSearchPath paths, bool rescanExis
 
     scanner = std::make_unique<juce::PluginDirectoryScanner>(knownPlugins, *vst3, std::move(paths),
                                                               true, getDeadMansPedalFile(), false);
+    // The scanner constructor imports the previous dead-man blacklist first.
+    // Retry core dependencies once per explicit/startup scan, in isolation.
+    // An old validation failure must not permanently exclude a required engine.
+    const auto blocked = knownPlugins.getBlacklistedFiles();
+    for (const auto& path : blocked)
+        if (rescanExisting || path.containsIgnoreCase("SWAM") || path.containsIgnoreCase("Fresh Air")
+            || path.containsIgnoreCase("Qin") || path.containsIgnoreCase("Kong"))
+            knownPlugins.removeFromBlacklist(path);
+
     shouldRescanExisting = rescanExisting;
     {
         const juce::ScopedLock lock(stateLock);

@@ -184,10 +184,17 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertIn("映射一次，切换乐器继续使用", HTML)
         self.assertIn("technique.roles.v2.", (ROOT / "native" / "Source" / "MidiInputService.cpp").read_text(encoding="utf-8"))
 
-    def test_smart_audio_optimisation_is_user_controllable(self):
-        self.assertIn('id="smart-audio"', HTML)
-        self.assertIn("nativeEvent('setSmartOptimisation'", JS)
-        self.assertIn('class="smart-badge"', HTML)
+    def test_smart_audio_optimisation_is_removed(self):
+        self.assertNotIn('smart-audio', HTML + JS)
+        self.assertNotIn('smart-badge', HTML + JS)
+        self.assertNotIn('setSmartOptimisation', JS)
+        dsp = (ROOT / 'native/Source/MasterOutputService.cpp').read_text(encoding='utf-8')
+        header = (ROOT / 'native/Source/MasterOutputService.h').read_text(encoding='utf-8')
+        main = (ROOT / 'native/Source/MainComponent.cpp').read_text(encoding='utf-8')
+        self.assertNotIn('automaticTrim', dsp + header)
+        self.assertNotIn('SmartOptimisation', main + header)
+        self.assertNotIn('settings.toneBias', dsp)
+        self.assertIn('value * compressorGain * smoothedOutputGain', dsp)
 
     def test_instrument_art_uses_independent_images_without_distortion(self):
         self.assertIn('object-fit:contain', HTML)

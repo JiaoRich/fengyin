@@ -1580,11 +1580,6 @@ $('#low-performance').addEventListener('change', event => {
   document.body.classList.toggle('low-performance', event.target.checked);
   toast(event.target.checked ? '已开启流畅模式' : '已恢复精美动画');
 });
-$('#smart-audio').addEventListener('change', event => {
-  nativeEvent('setSmartOptimisation', {enabled:event.target.checked});
-  document.querySelector('.smart-badge')?.classList.toggle('off', !event.target.checked);
-  toast(event.target.checked ? '智能音频优化已开启' : '智能音频优化已关闭');
-});
 
 function trialTimeText(seconds) {
   const safe = Math.max(0, Number(seconds) || 0);
@@ -1882,9 +1877,6 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
     $('#limiter-ceiling').value = String(backendLimiter);
     $('#limiter-label').textContent = `上限 ${backendLimiter}%`;
   }
-  const smartEnabled = state.smartOptimisation !== false;
-  if (document.activeElement !== $('#smart-audio')) $('#smart-audio').checked = smartEnabled;
-  document.querySelector('.smart-badge')?.classList.toggle('off', !smartEnabled);
   techniqueMappings = Array.isArray(state.techniqueMappings) ? state.techniqueMappings : [];
   window.fengyinTechniqueLearning = Number(state.techniqueLearning ?? -1);
   if (!techniqueDialog.hidden) renderTechniqueMappings();
@@ -2221,7 +2213,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.7 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.8 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

@@ -5,7 +5,7 @@
   #define OutputDir "."
 #endif
 #ifndef AppVersion
-  #define AppVersion "1.1.7"
+  #define AppVersion "1.1.8"
 #endif
 #ifndef ChineseMessages
   #define ChineseMessages "compiler:Languages\ChineseSimplified.isl"
@@ -204,9 +204,11 @@ begin
     '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /TYPE=full /LOG="{app}\components\Fresh Air\install.log"', '');
   VerifyFreshAirInstalled();
   if NeedsFreshAir() then RaiseException('Fresh Air 安装未完成，不能完成风吟依赖安装。');
+  Log('Writing dependency generation marker');
   if not SaveStringToFile(ExpandConstant('{app}\dependencies-generation.txt'),
-      GetDateTimeString('yyyymmddhhnnss', '', ''), False) then
+      GetDateTimeString('yyyymmddhhnnss', #0, #0), False) then
     RaiseException('无法记录依赖安装结果。');
+  Log('Dependency generation marker written');
 end;
 
 function CanLaunchNow(): Boolean;

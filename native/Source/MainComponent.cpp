@@ -226,7 +226,9 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
     showPage(Page::play);
     setupWebInterface();
     // Discover dependencies on a fresh installation, without creating tones.
-    if (pluginCatalog.getPlugins().isEmpty() || pluginCatalog.needsDependencyRefresh()) startPluginScan();
+    // Discover later-installed plugins too; existing unchanged plugins use cache.
+    pluginChoicesLoaded = false;
+    pluginCatalog.startScan(pluginCatalog.getRecommendedVst3Paths(), pluginCatalog.needsDependencyRefresh());
     startTimerHz(30);
     // 网页主界面本身包含完整引导，不再启动会遮挡演奏页面的原生模态窗口。
     autoGuideShown = true;
@@ -586,12 +588,6 @@ void MainComponent::setupWebInterface()
             for (const auto& existing : cachedPresets)
                 if (existing.id == overwriteId && existing.customTone) editingPresetId = overwriteId;
             commitCustomPreset(name, baseStyleId, static_cast<bool>(payload.getProperty("publish", false)));
-        })
-        .withEventListener("setSmartOptimisation", [this](juce::var payload)
-        {
-            const auto enabled = static_cast<bool>(payload.getProperty("enabled", true));
-            masterOutput.setSmartOptimisationEnabled(enabled);
-            // Tone assistance never reconfigures the output device.
         })
         .withEventListener("requestAudioSettings", [this](juce::var) { emitAudioSettingsState(); })
         .withEventListener("applyAudioSettings", [this](juce::var payload) { applyAudioSettingsFromWeb(payload); })
@@ -1426,8 +1422,7 @@ void MainComponent::timerCallback()
         pluginHost.flushOnsetTrace();
         lowLatencyMonitorTicks = 0;
         // 运行中只告警，绝不在演奏背后改缓冲或重启音频设备。
-        if (masterOutput.isSmartOptimisationEnabled()
-            && audio.hasSustainedRuntimeInstability() && webInterface != nullptr)
+        if (audio.hasSustainedRuntimeInstability() && webInterface != nullptr)
         {
             // Keep performance diagnostics without interrupting the player with a toast.
             juce::Logger::writeToLog("Sustained audio load and xrun increments; inspect audio diagnostics");
@@ -1523,7 +1518,6 @@ void MainComponent::timerCallback()
         toneObject->setProperty("output", (toneSettings.outputGain - 0.5f) / 0.75f * 100.0f);
         state->setProperty("toneSettings", juce::var(toneObject.release()));
         state->setProperty("limiterCeiling", masterOutput.getLimiterCeiling());
-        state->setProperty("smartOptimisation", masterOutput.isSmartOptimisationEnabled());
         const auto currentPluginName = pluginHost.hasPlugin() ? pluginHost.getPluginName() : juce::String();
         state->setProperty("pluginName", pluginHost.hasPlugin() ? currentPluginName : utf8("安全测试音源"));
         state->setProperty("pluginLoaded", pluginHost.hasPlugin());
@@ -3135,8 +3129,7 @@ void MainComponent::loadPreset(fengyin::SoundPreset preset,
             for (const auto& candidate : cachedEffectPlugins)
                 if (candidate.pluginFormatName == required.pluginFormatName
                     && candidate.uniqueId == required.uniqueId
-                    && candidate.manufacturerName == required.manufacturerName
-                    && candidate.name == required.name)
+                    && candidate.manufacturerName.trim().equalsIgnoreCase(required.manufacturerName.trim()))
                 {
                     availableVersion = candidate.version;
                     // Different versions may interpret opaque state differently.
@@ -3147,10 +3140,11 @@ void MainComponent::loadPreset(fengyin::SoundPreset preset,
                 }
         if (! matched)
         {
+            if (!pluginCatalog.getProgress().scanning) startPluginScan();
             const auto message = availableVersion.isNotEmpty()
                 ? utf8("效果器版本不匹配：") + required.name + utf8("，需要 ") + required.version + utf8("，已扫描到 ") + availableVersion
                 : utf8("插件扫描列表中未找到所需效果器：") + required.name + " " + required.version
-                    + utf8("。请完成依赖安装并重启，再扫描插件；若扫描失败请提供日志。");
+                    + utf8("。已启动重新扫描，扫描完成后请重选音色；若仍失败请导出日志。");
             pluginStatus.setText(message, juce::dontSendNotification);
             if (completion) completion(false, message);
             return;
@@ -3178,8 +3172,7 @@ void MainComponent::loadPreset(fengyin::SoundPreset preset,
         const bool portableMatch = savedXml && savedDescription.loadFromXml(*savedXml)
             && candidate.uniqueId == savedDescription.uniqueId
             && candidate.pluginFormatName == savedDescription.pluginFormatName
-            && candidate.manufacturerName == savedDescription.manufacturerName
-            && candidate.name == savedDescription.name;
+            && candidate.manufacturerName.trim().equalsIgnoreCase(savedDescription.manufacturerName.trim());
         if (candidate.createIdentifierString() == preset.pluginIdentifier || portableMatch)
         {
             chosen = candidate;
@@ -3189,7 +3182,8 @@ void MainComponent::loadPreset(fengyin::SoundPreset preset,
     }
     if (! found)
     {
-        const auto message = utf8("找不到此方案需要的音源，请重新扫描");
+        if (!pluginCatalog.getProgress().scanning) startPluginScan();
+        const auto message = utf8("找不到此方案需要的音源，已启动扫描，完成后请重选音色");
         pluginStatus.setText(message, juce::dontSendNotification);
         if (completion) completion(false, message);
         return;

@@ -458,7 +458,14 @@ void DefaultEndpointRouter::restore() noexcept
         // Re-resolve the persisted physical targets: a headphone may have
         // disappeared since routing began. Keep the journal on failure.
         std::wstring restoreError;
-        (void) restorePendingRoute(restoreError);
+        // Bounded retries for endpoint-service races during application exit.
+        // The journal remains the recovery authority if every attempt fails.
+        for (int attempt = 0; attempt < 3; ++attempt)
+        {
+            if (restorePendingRoute(restoreError)) break;
+            OutputDebugStringW((L"FengYin route restore: " + restoreError + L"\n").c_str());
+            if (attempt < 2) Sleep(100);
+        }
     }
 #endif
     active = false;
