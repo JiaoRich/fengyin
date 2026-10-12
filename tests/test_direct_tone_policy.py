@@ -7,6 +7,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class DirectTonePolicy(unittest.TestCase):
+    def test_activation_is_read_only_and_editor_close_does_not_capture_state(self):
+        host = (ROOT / 'native/Source/PluginHostEngine.cpp').read_text(encoding='utf-8')
+        body = host.split('bool PluginHostEngine::applyStandardSwamExpressionCurve()', 1)[1].split('\nvoid ', 1)[0]
+        self.assertNotIn('setStateInformation(', body)
+        close = host.split('void PluginHostEngine::closePluginEditor', 1)[1].split('\nbool ', 1)[0]
+        self.assertNotIn('applyStandardSwamExpressionCurve', close)
+        self.assertNotIn('getStateInformation(', close)
+        self.assertNotIn('window->onClose', host)
+
     def test_both_save_paths_capture_complete_state(self):
         main = (ROOT / 'native/Source/MainComponent.cpp').read_text(encoding='utf-8')
         for method in ('commitCurrentPreset', 'commitCustomPreset'):

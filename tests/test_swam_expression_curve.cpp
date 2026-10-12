@@ -1,8 +1,12 @@
 #include "SwamExpressionCurve.h"
+#include "TechniqueMidiDeduplication.h"
 
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#if JUCE_MAC
+#include <CoreFoundation/CoreFoundation.h>
+#endif
 
 namespace
 {
@@ -102,17 +106,54 @@ int main(int argc, char** argv)
         assert(!native.routes.empty());
     }
     // Optional installed-plugin verification: no audio device, no saved settings.
-    if (argc == 2)
+    if (argc >= 2)
     {
+        if (juce::String(argv[1]) == "--inspect-json" && argc >= 3)
+        {
+            const auto diagnostic = juce::JSON::parse(juce::File(juce::String::fromUTF8(argv[2])));
+            juce::MemoryOutputStream decoded;
+            if (!juce::Base64::convertFromBase64(decoded, diagnostic["stateBase64"].toString())) return 7;
+            auto state = decoded.getMemoryBlock();
+            const auto result = fengyin::SwamExpressionCurve::applyToState(state);
+            std::cout << "Expression found=" << result.found << " changed=" << result.changed << '\n';
+            for (const auto& route : result.routes)
+                std::cout << route.parameter << " channel=" << route.channel << " CC=" << route.controller << '\n';
+            return result.found ? 0 : 8;
+        }
         juce::AudioPluginFormatManager formats;
         formats.addFormat(std::make_unique<juce::VST3PluginFormat>());
         juce::OwnedArray<juce::PluginDescription> descriptions;
         formats.getFormat(0)->findAllTypesForFile(descriptions, juce::String::fromUTF8(argv[1]));
         if (descriptions.isEmpty()) return 2;
+        std::cout << "PROBE plugin=" << descriptions[0]->name << " version=" << descriptions[0]->version << std::endl;
+        if (argc >= 4)
+        {
+            const auto diagnostic = juce::JSON::parse(juce::File(juce::String::fromUTF8(argv[3])));
+            if (diagnostic["pluginName"].toString() != descriptions[0]->name
+                || diagnostic["pluginVersion"].toString() != descriptions[0]->version)
+            {
+                std::cerr << "Exact-state reproduction unavailable: diagnostic plugin/version differs from installed plugin\n";
+                return 9;
+            }
+        }
         juce::String error;
         auto plugin = formats.createPluginInstance(*descriptions[0], 48000, 256, error);
         if (!plugin) { std::cerr << error << '\n'; return 3; }
+        plugin->setNonRealtime(true);
+        if (argc >= 4)
+        {
+            const auto diagnostic = juce::JSON::parse(juce::File(juce::String::fromUTF8(argv[3])));
+            juce::MemoryOutputStream decoded;
+            if (!juce::Base64::convertFromBase64(decoded, diagnostic["stateBase64"].toString())) return 7;
+            const auto started = juce::Time::getMillisecondCounterHiRes();
+            plugin->setStateInformation(decoded.getData(), static_cast<int>(decoded.getDataSize()));
+            std::cout << "PERF imported-state-ms=" << juce::Time::getMillisecondCounterHiRes()-started << '\n';
+        }
         plugin->prepareToPlay(48000, 256);
+#if JUCE_MAC
+        // Optional real-plugin probe must service asynchronous native startup.
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1.0, false);
+#endif
         juce::MemoryBlock state;
         plugin->getStateInformation(state);
         const auto before = state;
@@ -162,6 +203,92 @@ int main(int argc, char** argv)
             }
             largest = std::max(largest, energy);
             std::cout << "native CC=" << cc << " energy=" << energy << '\n';
+        }
+        if (argc >= 3 && juce::String(argv[2]) == "--benchmark")
+        {
+            const auto now = [] { return juce::Time::getMillisecondCounterHiRes(); };
+            const auto start = now();
+            for (int n = 0; n < 50; ++n)
+            {
+                juce::MemoryBlock snapshot;
+                plugin->getStateInformation(snapshot);
+                fengyin::SwamExpressionCurve::applyToState(snapshot);
+            }
+            std::cout << "PERF state-read-and-parse-ms=" << (now()-start)/50 << '\n';
+            std::vector<fengyin::SwamExpressionCurve::Result::Route> techniques;
+            for (const auto& route : mapping.routes)
+            {
+                std::cout << "ROUTE " << route.parameter << " cc=" << route.controller << '\n';
+                if (route.parameter == "growl" || route.parameter == "vibratoDepth"
+                    || route.parameter == "portamento") techniques.push_back(route);
+            }
+            juce::AudioProcessorParameter* legacyVibrato = nullptr;
+            for (auto* parameter : plugin->getParameters())
+                if (parameter->getName(128).toLowerCase().removeCharacters(" ._-") == "vibratodepth")
+                    legacyVibrato = parameter;
+            for (int pass = 0; pass < 3; ++pass)
+              for (int density : {-1, 0, 1, 8, 9})
+              {
+                double elapsed = 0;
+                std::atomic<int> dedupCache {0};
+                for (int block = 0; block < 2000; ++block)
+                {
+                    audio.clear(); juce::MidiBuffer midi;
+                    midi.addEvent(juce::MidiMessage::controllerEvent(1, mapping.controller, 80), 0);
+                    if (block == 0) midi.addEvent(juce::MidiMessage::noteOn(1,60,(juce::uint8)80),0);
+                    for (int event = 0; event < (density == 9 ? 8 : density); ++event)
+                        for (const auto& route : techniques)
+                        {
+                            auto send = [&] {
+                                midi.addEvent(juce::MidiMessage::controllerEvent(route.channel, route.controller, 0), event*16);
+                                return true;
+                            };
+                            if (density == 9)
+                                fengyin::sendTechniqueController(dedupCache,(route.channel << 8) | (route.controller+1),0,true,send);
+                            else send();
+                        }
+                    const auto begin = now();
+                    if (density == -1 && legacyVibrato != nullptr)
+                        legacyVibrato->setValueNotifyingHost(0.0f);
+                    plugin->processBlock(audio, midi);
+                    elapsed += now()-begin;
+                }
+                std::cout << "PERF pass=" << pass << " mode=" << (density == 9 ? "deduplicated-8" : density == -1 ? "legacy-parameter" : "raw-midi")
+                          << " input-events-per-block=" << (density == 9 ? 8 : density)*static_cast<int>(techniques.size())
+                          << " callback-us=" << elapsed*1000/2000 << '\n';
+                juce::MidiBuffer off;
+                off.addEvent(juce::MidiMessage::allNotesOff(1),0);
+                plugin->processBlock(audio,off);
+              }
+            for (const auto& name : {"growl", "flutter", "vibratodepth"})
+            {
+                juce::AudioProcessorParameter* target = nullptr;
+                for (auto* parameter : plugin->getParameters())
+                    if (parameter->getName(128).toLowerCase().removeCharacters(" ._-") == name)
+                        target = parameter;
+                if (!target) continue;
+                for (float value : {0.0f, 0.85f, 0.0f})
+                {
+                    target->setValueNotifyingHost(value);
+                    double elapsed = 0;
+                    for (int block = 0; block < 1000; ++block)
+                    {
+                        audio.clear(); juce::MidiBuffer midi;
+                        if (block == 0)
+                        {
+                            midi.addEvent(juce::MidiMessage::controllerEvent(1, mapping.controller, 100), 0);
+                            midi.addEvent(juce::MidiMessage::noteOn(1,60,(juce::uint8)80), 0);
+                        }
+                        const auto begin = now();
+                        plugin->processBlock(audio,midi);
+                        elapsed += now()-begin;
+                    }
+                    std::cout << "PERF technique=" << name << " value=" << value << " callback-us=" << elapsed << '\n';
+                    juce::MidiBuffer off;
+                    off.addEvent(juce::MidiMessage::allNotesOff(1),0);
+                    plugin->processBlock(audio,off);
+                }
+            }
         }
         plugin->releaseResources();
         if (largest <= 1e-9) return 6;

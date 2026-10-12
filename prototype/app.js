@@ -1117,9 +1117,8 @@ function toggleVideo() {
   });
 }
 $('#play-button').addEventListener('click', toggleVideo);
-$('#main-play').addEventListener('click', toggleVideo);
-video.addEventListener('playing', () => { if (videoLoading || !videoWantsPlaying) { video.pause(); return; } document.body.classList.add('video-playing'); nativeEvent('setVideoPlaybackState',{generation:videoGeneration,playing:true,position:video.currentTime}); $('#play-button').textContent='Ⅱ'; $('#main-play').textContent='Ⅱ 暂停视频'; });
-video.addEventListener('pause', () => { document.body.classList.remove('video-playing'); if (!videoLoading) nativeEvent('setVideoPlaybackState',{generation:videoGeneration,playing:false,position:video.currentTime}); $('#play-button').textContent='▶'; $('#main-play').textContent='▶ 播放视频'; });
+video.addEventListener('playing', () => { if (videoLoading || !videoWantsPlaying) { video.pause(); return; } document.body.classList.add('video-playing'); nativeEvent('setVideoPlaybackState',{generation:videoGeneration,playing:true,position:video.currentTime}); $('#play-button').textContent='Ⅱ'; });
+video.addEventListener('pause', () => { document.body.classList.remove('video-playing'); if (!videoLoading) nativeEvent('setVideoPlaybackState',{generation:videoGeneration,playing:false,position:video.currentTime}); $('#play-button').textContent='▶'; });
 video.addEventListener('ended', () => { videoWantsPlaying = false; document.body.classList.remove('video-playing'); nativeEvent('setVideoPlaybackState',{generation:videoGeneration,playing:false,position:video.currentTime}); });
 video.addEventListener('timeupdate', () => {
   $('#current-time').textContent = formatTime(video.currentTime);
@@ -1172,14 +1171,15 @@ $('#master-volume').addEventListener('input', event => {
 });
 function updateTransposeDisplay(targetKey) {
   selectedTargetKey = Math.max(-12, Math.min(12, Math.round(Number(targetKey) || 0)));
-  $('#transpose-key-name').textContent = selectedTargetKey > 0 ? `+${selectedTargetKey}` : `${selectedTargetKey}`;
+  $('#transpose-key-name').textContent = `移调${selectedTargetKey > 0 ? '+' : ''}${selectedTargetKey}`;
   $('#transpose-minus').disabled = selectedTargetKey === -12;
   $('#transpose-plus').disabled = selectedTargetKey === 12;
 }
 function changeTranspose(delta) {
   updateTransposeDisplay(selectedTargetKey + delta);
   nativeEvent('setKeyTranspose', {targetKey:selectedTargetKey});
-  const text = selectedTargetKey === 0 ? '跟随电吹管，不额外移调' : `移调${selectedTargetKey > 0 ? '升高' : '降低'}${Math.abs(selectedTargetKey)}个半音`;
+  const numbers = ['零','一','二','三','四','五','六','七','八','九','十','十一','十二'];
+  const text = selectedTargetKey === 0 ? '关闭移调' : `${selectedTargetKey > 0 ? '加' : '减'}${numbers[Math.abs(selectedTargetKey)]}个半音`;
   window.fengyinVoice?.speakText(text);
 }
 $('#transpose-minus').addEventListener('click', () => changeTranspose(-1));
@@ -2191,7 +2191,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.9 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.10 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

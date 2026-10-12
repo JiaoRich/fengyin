@@ -187,7 +187,7 @@ class HostRegressionTests(unittest.TestCase):
         html = (ROOT / "prototype" / "index.html").read_text(encoding="utf-8")
         self.assertNotIn('id="transpose-dialog"', html)
         self.assertIn('id="transpose-minus"', html)
-        self.assertIn('0跟随电吹管', html)
+        self.assertIn('移调，0为跟随电吹管', html)
         self.assertNotIn("beginKeyCalibration", MAIN)
         self.assertIn("copyMachineCode", MAIN)
 
@@ -403,7 +403,7 @@ class HostRegressionTests(unittest.TestCase):
         self.assertNotIn("controlQueue", HOST)
         self.assertNotIn("controlQueue", header)
         self.assertIn("ensureStorageAllocated", HOST)
-        queue_body = HOST.split("void PluginHostEngine::queue", 1)[1]
+        queue_body = HOST.split("bool PluginHostEngine::queue", 1)[1]
         self.assertNotIn("getMidiMessageCollector().addMessageToQueue", queue_body)
 
     def test_transpose_is_global_and_not_part_of_sound_presets(self):

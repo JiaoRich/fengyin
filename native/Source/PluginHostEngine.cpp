@@ -1,4 +1,5 @@
 #include "PluginHostEngine.h"
+#include "TechniqueMidiDeduplication.h"
 #include "BreathResponse.h"
 #include "SerialEffectRouting.h"
 #include "ScopedGraphPause.h"
@@ -187,8 +188,7 @@ public:
         toFront(true);
         grabKeyboardFocus();
     }
-    std::function<void()> onClose;
-    void closeButtonPressed() override { setVisible(false); if (onClose) onClose(); }
+    void closeButtonPressed() override { setVisible(false); }
 };
 
 void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float* const* inputs, int numInputs,
@@ -410,6 +410,7 @@ void PluginHostEngine::unload()
     swamExpressionChannel.store(1, std::memory_order_relaxed);
     for (auto& route : nativeTechniqueRoutes) route.store(0, std::memory_order_relaxed);
     juce::Logger::writeToLog("Plugin unload complete");
+    for (auto& value : lastNativeTechniqueMessages) value.store(0, std::memory_order_relaxed);
 }
 
 bool PluginHostEngine::hasPlugin() const noexcept
@@ -549,6 +550,7 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve()
     // restore opaque plugin state concurrently with its audio callback.
     const ScopedGraphPause pause(graph.get());
     juce::Logger::writeToLog("SWAM expression state update begin");
+    for (auto& value : lastNativeTechniqueMessages) value.store(0, std::memory_order_relaxed);
     swamExpressionController.store(11, std::memory_order_relaxed);
     swamExpressionChannel.store(1, std::memory_order_relaxed);
     for (auto& route : nativeTechniqueRoutes) route.store(0, std::memory_order_relaxed);
@@ -587,13 +589,8 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve()
     if (result.controller >= 0 && result.controller <= 127)
         swamExpressionController.store(result.controller, std::memory_order_relaxed);
     lastBreathMidiValue.store(-1, std::memory_order_relaxed);
-    if (result.changed)
-    {
-        plugin->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
-        resolveTechniqueParameters();
-        resolveInstrumentModelParameter();
-        resetPerformance();
-    }
+    // Activation only discovers routing. Saved/native curves remain authoritative;
+    // never write a synthetic curve back into the live instrument here.
     juce::Logger::writeToLog("SWAM expression state update complete");
     return true;
 }
@@ -863,7 +860,6 @@ bool PluginHostEngine::showPluginEditor(bool effect)
     window = std::make_unique<PluginEditorWindow>((effect ? juce::String::fromUTF8("效果器 · ")
                                                          : juce::String::fromUTF8("音源 · ")) + processor->getName(),
                                                    std::move(editor));
-    if (!effect) window->onClose = [this] { applyStandardSwamExpressionCurve(); };
     return true;
 }
 
@@ -873,7 +869,6 @@ void PluginHostEngine::closePluginEditor(bool effect)
     // Destroying the editor gives container plug-ins a chance to commit the
     // selection made in their native UI before getStateInformation is called.
     window.reset();
-    if (!effect && hasPlugin()) applyStandardSwamExpressionCurve();
 }
 
 bool PluginHostEngine::rebuildConnections()
@@ -1022,8 +1017,13 @@ void PluginHostEngine::techniqueChanged(PerformanceTechnique technique, float va
     techniqueValues[index].store(safeValue, std::memory_order_relaxed);
     if (const int route = nativeTechniqueRoutes[index].load(std::memory_order_relaxed))
     {
-        queue(juce::MidiMessage::controllerEvent(route >> 8, (route & 255) - 1,
-              juce::roundToInt(safeValue * 127.0f)), 0.0);
+        bool unique = route != ((swamExpressionChannel.load() << 8) | (swamExpressionController.load() + 1));
+        for (size_t other = 0; other < nativeTechniqueRoutes.size(); ++other)
+            if (other != index && nativeTechniqueRoutes[other].load() == route) unique = false;
+        const auto value = juce::roundToInt(safeValue * 127.0f);
+        sendTechniqueController(lastNativeTechniqueMessages[index], route, value, unique, [&] {
+            return queue(juce::MidiMessage::controllerEvent(route >> 8, (route & 255) - 1, value), 0.0);
+        });
         return;
     }
     techniqueDirty[index].store(true, std::memory_order_release);
@@ -1080,6 +1080,7 @@ void PluginHostEngine::configureKongTechniqueProfile(const juce::String& key) no
 
 void PluginHostEngine::resetPerformance() noexcept
 {
+    for (auto& value : lastNativeTechniqueMessages) value.store(0, std::memory_order_relaxed);
     lastBreathMidiValue.store(-1, std::memory_order_relaxed);
     player.requestPerformanceReset();
     performanceChannel.store(1, std::memory_order_relaxed);
@@ -1441,8 +1442,17 @@ void PluginHostEngine::resolveInstrumentModelParameter()
     }
 }
 
-void PluginHostEngine::queue(juce::MidiMessage message, double timestampSeconds) noexcept
+bool PluginHostEngine::queue(juce::MidiMessage message, double timestampSeconds) noexcept
 {
-    (void) player.enqueueMidi(message, timestampSeconds);
+    // Hardware CCs and other senders can change the same destination. Forget
+    // its cached technique value before enqueueing so the next mapped value
+    // is delivered even if it equals the value sent before the hardware CC.
+    if (message.isController())
+        invalidateTechniqueController(nativeTechniqueRoutes, lastNativeTechniqueMessages,
+            (message.getChannel() << 8) | (message.getControllerNumber() + 1));
+    const bool accepted = player.enqueueMidi(message, timestampSeconds);
+    if (!accepted)
+        for (auto& value : lastNativeTechniqueMessages) value.store(0, std::memory_order_relaxed);
+    return accepted;
 }
 }

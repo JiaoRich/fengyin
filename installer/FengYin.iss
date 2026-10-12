@@ -5,7 +5,7 @@
   #define OutputDir "."
 #endif
 #ifndef AppVersion
-  #define AppVersion "1.1.9"
+  #define AppVersion "1.1.10"
 #endif
 #ifndef ChineseMessages
   #define ChineseMessages "compiler:Languages\ChineseSimplified.isl"

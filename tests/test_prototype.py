@@ -155,7 +155,7 @@ class PrototypeStructureTests(unittest.TestCase):
     def test_performance_transpose_reverb_and_technique_controls_are_live(self):
         for control_id in ("transpose-key", "transpose-minus", "transpose-plus", "performance-reverb", "technique-settings", "technique-dialog"):
             self.assertIn(f'id="{control_id}"', HTML)
-        self.assertIn('0跟随电吹管', HTML)
+        self.assertIn('移调，0为跟随电吹管', HTML)
         self.assertIn("nativeEvent('setKeyTranspose'", JS)
         self.assertNotIn("请先将电吹管上的调值设置为 C 调", HTML)
         self.assertNotIn("beginKeyCalibration", JS)

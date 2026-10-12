@@ -157,7 +157,7 @@ public:
 
 private:
     juce::var swamToneAudit;
-    void queue(juce::MidiMessage message, double timestampSeconds) noexcept;
+    bool queue(juce::MidiMessage message, double timestampSeconds) noexcept;
     bool rebuildConnections();
     void resolveTechniqueParameters();
     void resolveInstrumentModelParameter();
@@ -194,6 +194,7 @@ private:
     std::atomic<int> swamExpressionController { 11 };
     std::atomic<int> swamExpressionChannel { 1 };
     std::array<std::atomic<int>, static_cast<size_t>(PerformanceTechnique::count)> nativeTechniqueRoutes {};
+    std::array<std::atomic<int>, static_cast<size_t>(PerformanceTechnique::count)> lastNativeTechniqueMessages {};
     std::atomic<int> lastBreathMidiValue { -1 };
     struct KongTechniqueRoute { int channel = 0; int keyswitch = -1; int normalKey = -1; };
     std::array<KongTechniqueRoute, static_cast<size_t>(PerformanceTechnique::count)> kongTechniqueRoutes {};

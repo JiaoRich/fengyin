@@ -75,7 +75,7 @@
     ['硬件映射','G006','#adapter-technique-grid','wind','hardware'],
     ['取消映射','G007','#adapter-technique-grid','wind','hardware'],
     ['视频伴奏','V035','#choose-video','play'],
-    ['播放与暂停','G008','#main-play','play'],
+    ['播放与暂停','G008','#play-button','play'],
     ['伴奏音量','G009','#video-volume','play'],
     ['开始录音','V040','#record','play'],
     ['停止并保存','G010','#record','play'],
