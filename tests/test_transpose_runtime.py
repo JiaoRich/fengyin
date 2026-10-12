@@ -1,12 +1,18 @@
 import subprocess
 import unittest
+import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-NODE = Path('/Users/mengyang.jmy/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node')
+NODE = shutil.which('node')
+if NODE is None:
+    bundled = Path('/Users/mengyang.jmy/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node')
+    if bundled.is_file():
+        NODE = str(bundled)
 
 class TransposeRuntimeTests(unittest.TestCase):
     def test_buttons_labels_limits_and_announcements(self):
+        self.assertIsNotNone(NODE, 'Node.js is required to execute the production transpose test')
         source = (ROOT/'prototype/app.js').read_text(encoding="utf-8")
         start = source.index('function updateTransposeDisplay(')
         end = source.index("$('#transpose-minus').addEventListener", start)
@@ -27,5 +33,5 @@ assert.equal(nodes['#transpose-key-name'].textContent,'移调+12');
 updateTransposeDisplay(-12); assert.equal(nodes['#transpose-minus'].disabled,true);
 updateTransposeDisplay(99); assert.equal(selectedTargetKey,12);
 """
-        result = subprocess.run([str(NODE),'-e',harness],capture_output=True,text=True)
+        result = subprocess.run([str(NODE),'-e',harness],capture_output=True,text=True,encoding='utf-8')
         self.assertEqual(result.returncode,0,result.stderr)
