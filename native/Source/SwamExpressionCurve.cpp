@@ -4,87 +4,86 @@ namespace fengyin
 {
 namespace
 {
-SwamExpressionCurve::Result findAndApply(juce::XmlElement& element)
+void inspect(juce::XmlElement& element, SwamExpressionCurve::Result& result, bool editable)
 {
-    if (element.hasTagName("MIDIRemappingEntry")
-        && element.getStringAttribute("parameterId").equalsIgnoreCase("expression"))
+    if (element.hasTagName("MIDIRemappingEntry"))
     {
-        SwamExpressionCurve::Result result;
-        result.found = true;
-        result.controller = element.getIntAttribute("msb", -1);
-        if (auto* curve = element.getChildByName("MIDIRemappingCurve"))
+        const auto parameter = element.getStringAttribute("parameterId");
+        const int cc = element.getIntAttribute("msb", -1);
+        const int channel = element.getIntAttribute("channel", 17);
+        if (element.getIntAttribute("enabled", 0) == 1
+            && element.getIntAttribute("messageType", -1) == 1
+            && element.getIntAttribute("lsb", -1) <= 0 && cc >= 0 && cc <= 127
+            && channel >= 1 && channel <= 17)
         {
-            const auto set = [&result, curve](const char* name, double value)
+            result.routes.push_back({parameter, cc, channel == 17 ? 1 : channel});
+            if (parameter.equalsIgnoreCase("expression"))
             {
-                if (! juce::approximatelyEqual(curve->getDoubleAttribute(name), value))
+                result.found = true;
+                result.controller = cc;
+                if (editable && element.getChildByName("MIDIRemappingCurve") == nullptr)
                 {
-                    curve->setAttribute(name, value);
+                    auto* curve = element.createNewChildElement("MIDIRemappingCurve");
+                    curve->setAttribute("input_min", 0); curve->setAttribute("input_max", 127);
+                    curve->setAttribute("out_min", 0); curve->setAttribute("out_max", 127);
+                    curve->setAttribute("shape", 0.0); curve->setAttribute("symmetry", 0.5);
+                    curve->setAttribute("bypass", 0); curve->setAttribute("bipolar", 0);
                     result.changed = true;
                 }
-            };
-            set("input_min", SwamExpressionCurve::inputMinimum);
-            set("input_max", SwamExpressionCurve::inputMaximum);
-            set("out_min", SwamExpressionCurve::outputMinimum);
-            set("out_max", SwamExpressionCurve::outputMaximum);
-            set("shape", SwamExpressionCurve::shape);
-            set("symmetry", SwamExpressionCurve::symmetry);
-            if (curve->getIntAttribute("bypass", 0) != 1)
-            {
-                curve->setAttribute("bypass", 1);
-                result.changed = true;
-            }
-            if (curve->getIntAttribute("bipolar", 0) != 0)
-            {
-                curve->setAttribute("bipolar", 0);
-                result.changed = true;
             }
         }
-        return result;
     }
+    for (auto* child = element.getFirstChildElement(); child; child = child->getNextElement())
+        inspect(*child, result, editable);
+}
 
-    for (auto* child = element.getFirstChildElement(); child != nullptr; child = child->getNextElement())
-    {
-        auto result = findAndApply(*child);
-        if (result.found) return result;
-    }
-    return {};
+// Vendor binary envelopes are read-only. Never guess their size/checksum fields.
+void inspectComponent(const juce::MemoryBlock& block, SwamExpressionCurve::Result& result)
+{
+    const std::string bytes(static_cast<const char*>(block.getData()), block.getSize());
+    const auto begin = bytes.find("<MIDIRemappingTable");
+    const auto end = bytes.find("</MIDIRemappingTable>", begin);
+    if (begin == std::string::npos || end == std::string::npos) return;
+    const auto text = bytes.substr(begin, end + std::string("</MIDIRemappingTable>").size() - begin);
+    if (auto table = juce::parseXML(juce::String::fromUTF8(text.data(), static_cast<int>(text.size()))))
+        inspect(*table, result, false);
 }
 }
 
 SwamExpressionCurve::Result SwamExpressionCurve::applyToXml(juce::XmlElement& root)
 {
-    return findAndApply(root);
+    Result result;
+    inspect(root, result, true);
+    return result;
 }
 
 SwamExpressionCurve::Result SwamExpressionCurve::applyToState(juce::MemoryBlock& state)
 {
     if (state.isEmpty()) return {};
-
-    bool binaryXml = false;
     auto xml = juce::AudioProcessor::getXmlFromBinary(state.getData(), static_cast<int>(state.getSize()));
-    if (xml != nullptr)
+    const bool binary = xml != nullptr;
+    if (!xml) xml = juce::parseXML(juce::String::fromUTF8(static_cast<const char*>(state.getData()), static_cast<int>(state.getSize())));
+    Result result;
+    if (!xml) { inspectComponent(state, result); return result; }
+    if (xml->hasTagName("VST3PluginState"))
     {
-        binaryXml = true;
+        if (auto* component = xml->getChildByName("IComponent"))
+        {
+            const auto encoded = component->getAllSubText().trim();
+            const int bytes = encoded.upToFirstOccurrenceOf(".", false, false).getIntValue();
+            if (bytes > 0 && bytes <= 32 * 1024 * 1024)
+            {
+                juce::MemoryBlock payload;
+                if (payload.fromBase64Encoding(encoded)) inspectComponent(payload, result);
+            }
+        }
+        return result;
     }
-    else
+    result = applyToXml(*xml);
+    if (result.changed)
     {
-        const auto text = juce::String::fromUTF8(static_cast<const char*>(state.getData()),
-                                                 static_cast<int>(state.getSize()));
-        xml = juce::parseXML(text);
-    }
-    if (xml == nullptr) return {};
-
-    auto result = applyToXml(*xml);
-    if (! result.found || ! result.changed) return result;
-
-    if (binaryXml)
-    {
-        juce::AudioProcessor::copyXmlToBinary(*xml, state);
-    }
-    else
-    {
-        const auto text = xml->toString();
-        state.replaceAll(text.toRawUTF8(), static_cast<size_t>(text.getNumBytesAsUTF8()));
+        if (binary) juce::AudioProcessor::copyXmlToBinary(*xml, state);
+        else { const auto text = xml->toString(); state.replaceAll(text.toRawUTF8(), static_cast<size_t>(text.getNumBytesAsUTF8())); }
     }
     return result;
 }

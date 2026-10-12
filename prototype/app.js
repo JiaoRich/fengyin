@@ -320,7 +320,7 @@ function instrumentFamily(key = '') {
 
 function buildTechniquePlan(key = '') {
   return (techniqueLibrary[instrumentFamily(key)] || []).map(([id,name,icon,description,mode,recommendation,strength,featured], index) => ({
-    id,name,icon,description,mode,recommendation,strength,featured,index
+    id,name,icon,description:'由用户映射控制，曲线和深度随音源方案保存',mode,recommendation,strength,featured,index
   }));
 }
 
@@ -364,7 +364,7 @@ function mergeBackendTechniquePlan(key, state, mappings) {
   const modes = ['breath','breath','hardware','hardware','breath'];
   return roles.map(item => {
     const backend = mappings.find(entry => entry.id === item.id);
-    if (!backend) return {...item,mode:'breath',featured:true};
+    if (!backend) return {...item,mode:'off',featured:true};
     return {
       ...item,
       index:Number(backend.technique ?? item.index),
@@ -1170,32 +1170,20 @@ $('#master-volume').addEventListener('input', event => {
   $('#master-volume-value').textContent = `${event.target.value}%`;
   nativeEvent('setMasterVolume', {value:Number(event.target.value)/100});
 });
-const transposeNames = new Map([[0,'C调'],[1,'降D调'],[2,'D调'],[3,'降E调'],[4,'E调'],[5,'F调'],[6,'升F调'],[7,'G调'],[8,'降A调'],[9,'A调'],[10,'降B调'],[11,'B调']]);
-const transposeDialog = $('#transpose-dialog');
 function updateTransposeDisplay(targetKey) {
-  selectedTargetKey = Number(targetKey) || 0;
-  const name = transposeNames.get(selectedTargetKey) || 'C调';
-  $('#transpose-key-name').textContent = name;
-  $('#transpose-current-name').textContent = name;
-  $$('#transpose-grid button').forEach(button => button.classList.toggle('active', Number(button.dataset.key) === selectedTargetKey));
+  selectedTargetKey = Math.max(-12, Math.min(12, Math.round(Number(targetKey) || 0)));
+  $('#transpose-key-name').textContent = selectedTargetKey > 0 ? `+${selectedTargetKey}` : `${selectedTargetKey}`;
+  $('#transpose-minus').disabled = selectedTargetKey === -12;
+  $('#transpose-plus').disabled = selectedTargetKey === 12;
 }
-function openTransposeDialog() {
-  updateTransposeDisplay(selectedTargetKey);
-  transposeDialog.hidden = false;
+function changeTranspose(delta) {
+  updateTransposeDisplay(selectedTargetKey + delta);
+  nativeEvent('setKeyTranspose', {targetKey:selectedTargetKey});
+  const text = selectedTargetKey === 0 ? '跟随电吹管，不额外移调' : `移调${selectedTargetKey > 0 ? '升高' : '降低'}${Math.abs(selectedTargetKey)}个半音`;
+  window.fengyinVoice?.speakText(text);
 }
-$('#transpose-key').addEventListener('click', openTransposeDialog);
-$('#transpose-grid').addEventListener('click', event => {
-  const button = event.target.closest('[data-key]');
-  if (!button) return;
-  const targetKey = Number(button.dataset.key);
-  updateTransposeDisplay(targetKey);
-  nativeEvent('setKeyTranspose', {targetKey});
-  transposeDialog.hidden = true;
-  toast(`演奏调已设为${transposeNames.get(targetKey)}`);
-  window.fengyinVoice?.speakText(`演奏调已设为${transposeNames.get(targetKey)}。`);
-});
-$('#cancel-transpose').addEventListener('click', () => { transposeDialog.hidden = true; });
-transposeDialog.addEventListener('click', event => { if (event.target === transposeDialog) transposeDialog.hidden = true; });
+$('#transpose-minus').addEventListener('click', () => changeTranspose(-1));
+$('#transpose-plus').addEventListener('click', () => changeTranspose(1));
 updateTransposeDisplay(0);
 function renderBendRange(state) {
   bendState = state;
@@ -1291,7 +1279,7 @@ function sourceDescription(mapping) {
 }
 function renderTechniqueMappings(force = false) {
   if (!techniquePlan.length && currentInstrument) techniquePlan = buildAdaptiveTechniquePlan(currentInstrument.instrumentKey, latestBackendState);
-  techniquePlan.forEach(item => { item.mode = item.mode === 'hardware' ? 'hardware' : 'breath'; });
+  techniquePlan.forEach(item => { if (!['off','hardware','breath'].includes(item.mode)) item.mode = 'breath'; });
   const list = $('#technique-list');
   const signature = JSON.stringify([techniquePlan, techniqueSensitivity, window.fengyinTechniqueLearning]);
   if (!force && signature === techniqueRenderSignature) return;
@@ -1305,13 +1293,11 @@ function renderTechniqueMappings(force = false) {
   list.innerHTML = techniquePlan.map(item => {
     const hardware = item.mode === 'hardware';
     const mapped = sourceDescription(item) !== '未设置';
-    const modeLabels = {breath:'气息控制',hardware:'硬件控制'};
+    const modeLabels = {off:'关闭',breath:'气息控制',hardware:'硬件控制'};
     return `<article class="technique-card ${item.featured ? '' : 'secondary'}" data-technique-id="${item.id}">
-      <div class="technique-card-head"><div class="technique-card-title"><span class="technique-card-icon">${item.icon}</span><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.description)}</p></div></div><span class="technique-card-state">${hardware ? (mapped ? '✓ 已映射' : '待映射') : '✓ 已配置'}</span></div>
-      <div class="technique-control"><select aria-label="${escapeHtml(item.name)}控制方式">${Object.entries(modeLabels).map(([value,label]) => `<option value="${value}" ${(hardware ? 'hardware' : 'breath') === value ? 'selected' : ''}>${label}</option>`).join('')}</select><button class="learn-source" ${hardware ? '' : 'hidden'}>${Number(window.fengyinTechniqueLearning) === item.index ? '等待操作…' : '点击映射'}</button></div>
-      <div class="technique-strength" ${hardware ? 'hidden' : ''}><span>效果强度</span><input type="range" min="0" max="100" value="${item.strength}" aria-label="${escapeHtml(item.name)}效果强度"><b>${item.strength < 40 ? '自然' : item.strength < 70 ? '适中' : '明显'}</b></div>
-      ${item.id === 'growl' && !hardware ? `<label class="technique-threshold">气息触发灵敏度<select class="growl-sensitivity"><option value="easy" ${techniqueSensitivity === 'easy' ? 'selected' : ''}>容易 · 82%</option><option value="standard" ${techniqueSensitivity === 'standard' ? 'selected' : ''}>标准 · 89%</option><option value="hard" ${techniqueSensitivity === 'hard' ? 'selected' : ''}>较难 · 94%</option></select></label>` : ''}
-      <p class="recommendation">${hardware ? escapeHtml(sourceDescription(item)) : '气息控制技巧深浅'}</p>
+      <div class="technique-card-head"><div class="technique-card-title"><span class="technique-card-icon">${item.icon}</span><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.description)}</p></div></div><span class="technique-card-state">${item.mode === 'off' ? '已关闭' : hardware ? (mapped ? '✓ 已映射' : '待映射') : '✓ 已配置'}</span></div>
+      <div class="technique-control"><select aria-label="${escapeHtml(item.name)}控制方式">${Object.entries(modeLabels).map(([value,label]) => `<option value="${value}" ${item.mode === value ? 'selected' : ''}>${label}</option>`).join('')}</select><button class="learn-source" ${hardware ? '' : 'hidden'}>${Number(window.fengyinTechniqueLearning) === item.index ? '等待操作…' : '点击映射'}</button></div>
+      <p class="recommendation">${hardware ? escapeHtml(sourceDescription(item)) : '气息原值控制；曲线与深度在音源插件中设置，并随方案保存'}</p>
     </article>`;
   }).join('');
   $$('#technique-list .learn-source').forEach(button => button.addEventListener('click', event => {
@@ -1357,7 +1343,7 @@ function adapterTechniqueItems() {
     .filter(item => continuous.has(item.id))
     .map(item => {
       const saved = techniqueMappings.find(mapping => mapping.id === item.id);
-      const mode = Number(saved?.mode) === 4 ? 'off' : 'breath';
+      const mode = saved && [0,1,3].includes(Number(saved.mode)) ? 'breath' : 'off';
       return {...item,mode,enabled:mode !== 'off',
         strength:Number.isFinite(Number(saved?.strength)) ? Math.round(Number(saved.strength) * 100) : item.strength};
     });
@@ -1390,7 +1376,7 @@ function renderAdapterTechniqueGrid() {
       <header><span>${item.icon}</span><div><h3>${escapeHtml(item.name)}</h3><small>${escapeHtml(item.description)}</small></div></header>
       ${hardware
         ? `<div class="adapter-map-actions"><button class="adapter-map-source ${learning ? 'learning' : ''}" type="button">${learning ? '等待操作…' : mapped ? `✓ ${escapeHtml(sourceDescription(item))}` : '点击映射'}</button>${mapped?'<button class="adapter-clear-source" type="button">清除</button>':''}</div>`
-        : `<div class="adapter-breath-controls"><label class="adapter-technique-toggle"><input type="checkbox" ${item.enabled === false ? '' : 'checked'}><span>${item.enabled === false ? '已关闭' : '已开启'}</span></label><label class="adapter-technique-strength"><span>效果强度</span><input type="range" min="0" max="100" value="${Number(item.strength || 50)}" ${item.enabled === false ? 'disabled' : ''}><b>${Number(item.strength || 50)}%</b></label></div>`}
+        : `<div class="adapter-breath-controls"><label class="adapter-technique-toggle"><input type="checkbox" ${item.enabled === false ? '' : 'checked'}><span>${item.enabled === false ? '已关闭' : '已开启'}</span></label><small>曲线与深度由音源方案决定</small></div>`}
     </article>`;
   }).join('');
   $$('.adapter-map-source').forEach(button => button.addEventListener('click', event => {
@@ -1484,7 +1470,7 @@ $$('[data-adapter-mode]').forEach(button => button.addEventListener('click', () 
   globalTechniqueMode = adapterMode;
   $('#adapter-inline-hint').textContent = adapterMode === 'hardware'
     ? '映射一次即可用于所有音源；请选择一项技巧后操作对应按键、摇杆或吹嘴。'
-    : '气息控制会按当前乐器转换成对应技巧，可分别调整效果强度。';
+    : '选择需要由气息控制的技巧；曲线与深度在音源插件中调整并保存到方案。';
   renderAdapterTechniqueGrid();
 }));
 function openTechniqueDialog() {
@@ -1494,7 +1480,7 @@ function openTechniqueDialog() {
   $('#technique-dialog-subtitle').textContent = `${latestBackendState.deviceName || '当前电吹管'} · 映射一次，切换乐器继续使用`;
   $('#technique-ready').textContent = `已自动配置 ${techniquePlan.filter(item => item.mode !== 'off').length} 项`;
   techniqueDialog.hidden = false;
-  techniqueHint.textContent = '气息控制可调效果强度；硬件控制请点击“点击映射”。';
+  techniqueHint.textContent = '保留音源方案的技巧曲线；硬件控制请点击“点击映射”。';
   renderTechniqueMappings();
 }
 $('#technique-settings').addEventListener('click', openTechniqueDialog);
@@ -1531,7 +1517,7 @@ $('#technique-list').addEventListener('change', event => {
   }
   if (event.target.matches('.technique-control select')) {
     item.mode = event.target.value;
-    const wording = {breath:'已改用气息控制',hardware:'请点击“点击映射”'};
+    const wording = {off:'已关闭此技巧映射',breath:'已改用气息控制，使用音源方案中的曲线',hardware:'请点击“点击映射”'};
     techniqueHint.textContent = wording[item.mode];
     nativeEvent('setTechniqueConfiguration', {techniqueId:item.id,mode:item.mode,strength:item.strength/100});
     renderTechniqueMappings(true);
@@ -1702,17 +1688,14 @@ $('#open-effect').addEventListener('click', () => { toast('正在打开效果器
 function updateBuiltinEffects() {
   const eq = Number($('#eq-tone').value);
   const reverb = Number($('#reverb-mix').value);
-  const limiter = Number($('#limiter-ceiling').value);
   const warmth = Number($('#tone-warmth')?.value || 20);
   $('#eq-label').textContent = eq === 0 ? '自然' : `${eq > 0 ? '明亮度 +' : '温暖度 +'}${Math.abs(eq)}`;
   $('#reverb-label').textContent = `强度 ${reverb}%`;
   performanceReverb.value = String(reverb);
   $('#performance-reverb-value').textContent = `${reverb}%`;
-  $('#limiter-label').textContent = `上限 ${limiter}%`;
-  nativeEvent('setBuiltinEffects', {eq:eq/100,warmth:warmth/100,reverb:reverb/100,limiter:limiter/100});
+  nativeEvent('setBuiltinEffects', {eq:eq/100,warmth:warmth/100,reverb:reverb/100});
 }
-['#eq-tone','#reverb-mix','#limiter-ceiling'].forEach(id => $(id).addEventListener('input', updateBuiltinEffects));
-updateBuiltinEffects();
+['#eq-tone','#reverb-mix'].forEach(id => $(id).addEventListener('input', updateBuiltinEffects));
 $('#wind-status-pill')?.addEventListener('click', () => showPage('wind'));
 const audioControls = ['#audio-driver-select','#audio-output-select','#audio-rate-select','#audio-buffer-select'].map(id => $(id));
 let audioSettingsApplying = false;
@@ -1871,11 +1854,6 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   if (document.activeElement !== $('#eq-tone')) {
     $('#eq-tone').value = String(backendEq);
     $('#eq-label').textContent = backendEq === 0 ? '自然' : `${backendEq > 0 ? '明亮度 +' : '温暖度 +'}${Math.abs(backendEq)}`;
-  }
-  const backendLimiter = Math.round(Math.max(.6,Math.min(1,Number(state.limiterCeiling ?? .95)))*100);
-  if (document.activeElement !== $('#limiter-ceiling')) {
-    $('#limiter-ceiling').value = String(backendLimiter);
-    $('#limiter-label').textContent = `上限 ${backendLimiter}%`;
   }
   techniqueMappings = Array.isArray(state.techniqueMappings) ? state.techniqueMappings : [];
   window.fengyinTechniqueLearning = Number(state.techniqueLearning ?? -1);
@@ -2213,7 +2191,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.8 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.9 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

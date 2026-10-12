@@ -62,11 +62,11 @@
   const steps=[
     ['欢迎使用风吟','V001','.nav-item[data-page="play"]','play'],
     ['连接电吹管','V002','.sidebar-status','play'],
-    ['电吹管调性','V004','.sidebar-status','play'],
+    ['电吹管调性','T001','.sidebar-status','play'],
     ['检测气息','V005','#adapter-match','wind'],
     ['选择音色','V011','#preset-grid','sounds'],
     ['试着吹奏','G002','#sound-name','play'],
-    ['演奏调','G003','#transpose-key','play'],
+    ['移调','T001','#transpose-key','play'],
     ['弯音范围','G004','#bend-range-button','play'],
     ['演奏音量','V028','#master-volume','play'],
     ['混响','V029','#performance-reverb','play'],
@@ -108,7 +108,8 @@
     showPage(page);
     if(page==='wind'){document.querySelector(`[data-adapter-mode="${mode||'breath'}"]`)?.click();}
     panel.innerHTML=`<small>${step+1} / ${steps.length}</small><h3></h3><p></p><button data-guide="back">上一步</button><button data-guide="repeat">重听</button><button data-guide="next">${step===steps.length-1?'完成':'下一步'}</button><button data-guide="skip">跳过</button><button data-guide="end">结束引导</button>`;
-    panel.querySelector('h3').textContent=title;panel.querySelector('p').textContent=clips.get(id)?.text || '';
+    panel.querySelector('h3').textContent=title;panel.querySelector('p').textContent=id==='T001' ? '0表示跟随电吹管，不需要将电吹管设为C调。点击减号或加号，每次降低或升高一个半音。电吹管自身的快速换调仍然有效。' : clips.get(id)?.text || '';
+    panel.querySelector('[data-guide=repeat]').disabled=!clips.has(id);
     panel.querySelector('[data-guide=back]').disabled=step===0;panel.hidden=false;
     document.querySelector(selector)?.scrollIntoView({block:'nearest'});place();say(id);
   }

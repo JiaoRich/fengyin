@@ -7,11 +7,10 @@ inline juce::MidiMessage kongBreathExpression(int channel, int value)
 {
     return juce::MidiMessage::controllerEvent(channel, 11, juce::jlimit(0, 127, value));
 }
-// Wind attacks arrive before breath settles. Do not latch that transient low
-// velocity into Qin's sample gain; dynamics continue through its breath CC.
-inline float performanceVelocity(bool kong, float input) noexcept
+// Preserve the player's velocity; sample dynamics belong to the sound source.
+inline float performanceVelocity(bool, float input) noexcept
 {
-    return kong ? 96.0f / 127.0f : juce::jlimit(0.0f, 1.0f, input);
+    return juce::jlimit(0.0f, 1.0f, input);
 }
 
 template <typename Held, typename Send>

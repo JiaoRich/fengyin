@@ -17,20 +17,18 @@ int main()
         analysisAudio.setSample(0, i, std::sin(static_cast<float>(i) * 0.13f));
     analysisAudio.copyFrom(1, 0, analysisAudio, 0, 0, analysisAudio.getNumSamples());
     master.process(analysisAudio.getArrayOfWritePointers(), 2, analysisAudio.getNumSamples());
-    assert(master.getLeftPeak() > 0.49f && master.getLeftPeak() <= 0.5f);
+    assert(master.getLeftPeak() > 0.99f && master.getLeftPeak() <= 1.0f);
     std::array<float, fengyin::MasterOutputService::spectrumBands> spectrum {};
     assert(master.getSpectrum(spectrum));
     assert(*std::max_element(spectrum.begin(), spectrum.end()) > 0.2f);
-    master.setLimiterCeiling(0.7f);
     juce::AudioBuffer<float> limited(2, 64);
     limited.clear();
     limited.setSample(0, 0, 2.0f);
     limited.setSample(1, 0, -2.0f);
     master.process(limited.getArrayOfWritePointers(), 2, limited.getNumSamples());
-    assert(limited.getSample(0, 0) <= 1.0f && limited.getSample(1, 0) >= -1.0f);
+    assert(limited.getSample(0, 0) == 2.0f && limited.getSample(1, 0) == -2.0f);
 
     master.setGain(1.0f);
-    master.setLimiterCeiling(1.0f);
     master.setReverbMix(0.0f);
     master.setInstrumentProfile(fengyin::InstrumentMixProfile::saxophone);
     juce::AudioBuffer<float> performance(2, 8192);

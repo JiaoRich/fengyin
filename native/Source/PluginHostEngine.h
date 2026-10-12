@@ -192,6 +192,8 @@ private:
     std::vector<float> instrumentModelValues;
     std::atomic<bool> kongExpressionMode { false };
     std::atomic<int> swamExpressionController { 11 };
+    std::atomic<int> swamExpressionChannel { 1 };
+    std::array<std::atomic<int>, static_cast<size_t>(PerformanceTechnique::count)> nativeTechniqueRoutes {};
     std::atomic<int> lastBreathMidiValue { -1 };
     struct KongTechniqueRoute { int channel = 0; int keyswitch = -1; int normalKey = -1; };
     std::array<KongTechniqueRoute, static_cast<size_t>(PerformanceTechnique::count)> kongTechniqueRoutes {};

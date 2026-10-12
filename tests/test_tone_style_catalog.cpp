@@ -49,6 +49,24 @@ void checkSaxophoneSwamProfiles(const juce::String& key)
 
 int main()
 {
+    // Neutral effects are sample-transparent. Fader only changes the instrument;
+    // accompaniment and overloaded mixed output are never silently attenuated.
+    {
+        fengyin::MasterOutputService chain;
+        auto neutral = chain.getToneStyle();
+        neutral.tone = neutral.bass = neutral.air = neutral.warmth = neutral.reverbMix = 0;
+        neutral.saturation = neutral.harshControl = 0;
+        neutral.compressionRatio = neutral.outputGain = 1;
+        chain.setToneStyle(neutral); chain.setSampleRate(48000); chain.setGain(.5f);
+        float samples[]{.2f, -.4f, 0.f, 2.f}; float* channels[]{samples};
+        chain.processInstrument(channels, 1, 4);
+        assert(std::abs(samples[0] - .1f) < 1e-6f);
+        assert(std::abs(samples[1] + .2f) < 1e-6f);
+        for (auto& value : samples) value += .3f; // Independent accompaniment.
+        chain.processMaster(channels, 1, 4);
+        assert(std::abs(samples[0] - .4f) < 1e-6f);
+        assert(std::abs(samples[3] - 1.3f) < 1e-6f);
+    }
     // An identical sustained signal must not remain quieter for an entire first
     // note after silence. Run the actual FengYin instrument and master DSP.
     {

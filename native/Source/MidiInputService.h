@@ -65,7 +65,7 @@ public:
     void beginBreathDetection() noexcept;
     [[nodiscard]] int finishBreathDetection(bool markCompleted = false) noexcept;
     void setTargetKey(int pitchClass);
-    void setTransposeSemitones(int semitones); // 兼容旧设置：视为以 C 调为来源的目标偏移。
+    void setTransposeSemitones(int semitones); // 相对收到的音符偏移；0 跟随电吹管。
     [[nodiscard]] int getTargetKey() const noexcept { return targetKey.load(std::memory_order_relaxed); }
     [[nodiscard]] int getTransposeSemitones() const noexcept { return transposeSemitones.load(std::memory_order_relaxed); }
     void setGrowlSensitivity(int level);

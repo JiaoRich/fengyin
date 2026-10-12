@@ -191,7 +191,7 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
     masterVolume.setTextValueSuffix(utf8(" 倍"));
     masterVolume.onValueChange = [this] { masterOutput.setGain(static_cast<float>(masterVolume.getValue())); };
     addAndMakeVisible(masterVolume);
-    masterVolumeLabel.setText(utf8("总音量"), juce::dontSendNotification);
+    masterVolumeLabel.setText(utf8("吹奏音量"), juce::dontSendNotification);
     masterVolumeLabel.setColour(juce::Label::textColourId, juce::Colours::white);
     addAndMakeVisible(masterVolumeLabel);
     recordingManagerButton.setButtonText(utf8("录音文件"));
@@ -582,8 +582,7 @@ void MainComponent::setupWebInterface()
                 return;
             }
             const auto baseStyleId = payload.getProperty("baseStyleId", currentToneStyleId).toString();
-            const auto settings = payload.getProperty("settings", juce::var());
-            masterOutput.setToneStyle(customToneSettingsFromPayload(settings));
+            // Save the settings actually auditioned, not a potentially stale UI snapshot.
             const auto overwriteId = payload.getProperty("overwriteId", juce::String()).toString();
             for (const auto& existing : cachedPresets)
                 if (existing.id == overwriteId && existing.customTone) editingPresetId = overwriteId;
@@ -707,7 +706,6 @@ void MainComponent::setupWebInterface()
             masterOutput.setEqTone(static_cast<float>(static_cast<double>(payload.getProperty("eq", 0.2))));
             masterOutput.setWarmth(static_cast<float>(static_cast<double>(payload.getProperty("warmth", masterOutput.getWarmth()))));
             masterOutput.setReverbMix(static_cast<float>(static_cast<double>(payload.getProperty("reverb", 0.28))));
-            masterOutput.setLimiterCeiling(static_cast<float>(static_cast<double>(payload.getProperty("limiter", 0.95))));
         })
         .withEventListener("showMidiSetup", [this](juce::var) { showMidiSetup(); })
         .withEventListener("showExpressionSettings", [this](juce::var) { showExpressionSettings(); })
@@ -1517,7 +1515,6 @@ void MainComponent::timerCallback()
         toneObject->setProperty("room", toneSettings.reverbRoomSize * 100.0f);
         toneObject->setProperty("output", (toneSettings.outputGain - 0.5f) / 0.75f * 100.0f);
         state->setProperty("toneSettings", juce::var(toneObject.release()));
-        state->setProperty("limiterCeiling", masterOutput.getLimiterCeiling());
         const auto currentPluginName = pluginHost.hasPlugin() ? pluginHost.getPluginName() : juce::String();
         state->setProperty("pluginName", pluginHost.hasPlugin() ? currentPluginName : utf8("安全测试音源"));
         state->setProperty("pluginLoaded", pluginHost.hasPlugin());
@@ -2548,6 +2545,9 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
     preset.id = editingPresetId.isNotEmpty() ? editingPresetId : juce::Uuid().toString();
     preset.name = name;
     preset.pluginIdentifier = pluginHost.getPluginIdentifier();
+    preset.instrumentDescriptionXml = pluginHost.getInstrumentDescriptionXml();
+    preset.instrumentState = currentPluginBrand == "kong" ? juce::MemoryBlock() : pluginHost.captureInstrumentState();
+    preset.effects = pluginHost.captureEffectChain();
     preset.toneParameters = pluginHost.captureToneParameters();
     preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureContainerState() : juce::MemoryBlock();
     if (currentPluginBrand == "kong")
@@ -2559,6 +2559,17 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
     preset.eqTone = masterOutput.getEqTone();
     preset.warmth = masterOutput.getWarmth();
     preset.reverbMix = masterOutput.getReverbMix();
+    const auto settings = masterOutput.getToneStyle();
+    preset.compressionThreshold = settings.compressionThreshold;
+    preset.compressionRatio = settings.compressionRatio;
+    preset.saturation = settings.saturation;
+    preset.harshControl = settings.harshControl;
+    preset.reverbRoomSize = settings.reverbRoomSize;
+    preset.reverbDamping = settings.reverbDamping;
+    preset.reverbWidth = settings.reverbWidth;
+    preset.outputGain = settings.outputGain;
+    preset.bass = settings.bass;
+    preset.air = settings.air;
     preset.toneStyleId = currentToneStyleId;
     preset.baseToneStyleId = currentToneStyleId;
     preset.pluginBrand = currentPluginBrand;
@@ -3282,15 +3293,16 @@ void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
         style.settings.air = preset.air;
     }
     juce::String restoreWarning;
-    if (preset.instrumentModelName.isNotEmpty())
+    const bool hasFullState = preset.instrumentState.getSize() > 0 || preset.samplerState.getSize() > 0;
+    if (! hasFullState && preset.instrumentModelName.isNotEmpty())
     {
         const auto index = pluginHost.getInstrumentModelNames().indexOf(preset.instrumentModelName);
         if (index < 0 || ! pluginHost.selectInstrumentModel(index))
             restoreWarning = utf8("乐器型号未匹配，请在原厂界面确认。");
     }
-    else if (preset.instrumentModelIndex >= 0)
+    else if (! hasFullState && preset.instrumentModelIndex >= 0)
         pluginHost.selectInstrumentModel(preset.instrumentModelIndex);
-    if ((! preset.containerInstrument && preset.pluginBrand != "kong") || preset.samplerState.getSize() == 0)
+    if (! hasFullState)
     {
         const auto restored = pluginHost.restoreToneParameters(preset.toneParameters);
         if (restored != preset.toneParameters.size())
@@ -3560,8 +3572,8 @@ void MainComponent::configureTechniqueDefaults()
     {
         fengyin::TechniqueMapping mapping;
         mapping.technique = role;
-        mapping.mode = role == fengyin::PerformanceTechnique::mute
-            ? fengyin::TechniqueControlMode::hardware : fengyin::TechniqueControlMode::breath;
+        // Only the user's explicit mappings should add playing techniques.
+        mapping.mode = fengyin::TechniqueControlMode::off;
         mapping.strength = strength;
         defaults.add(mapping);
     }

@@ -16,7 +16,8 @@ MidiInputService::MidiInputService(bool persistSettings)
     options.osxLibrarySubFolder = "Application Support";
     properties.setStorageParameters(options);
     if (auto* settingsFile = properties.getUserSettings())
-        targetKey.store(PitchKey::normalise(settingsFile->getIntValue("targetPerformanceKey", 0)));
+        targetKey.store(juce::jlimit(-12, 12, settingsFile->getIntValue("transposeOffsetV2", 0)));
+    updateEffectiveTranspose();
 }
 
 MidiInputService::~MidiInputService()
@@ -217,7 +218,7 @@ void MidiInputService::savePreferences()
         settingsFile->setValue(controllerSettingKey(), breathController.load());
         settingsFile->setValue(controllerSettingKey() + ".pitch", pitchSensitivity.load(std::memory_order_relaxed));
         settingsFile->setValue(controllerSettingKey() + ".growlSensitivity", growlSensitivity.load(std::memory_order_relaxed));
-        settingsFile->setValue("targetPerformanceKey", targetKey.load(std::memory_order_relaxed));
+        settingsFile->setValue("transposeOffsetV2", targetKey.load(std::memory_order_relaxed));
         settingsFile->saveIfNeeded();
     }
 }
@@ -268,11 +269,11 @@ int MidiInputService::finishBreathDetection(bool markCompleted) noexcept
 
 void MidiInputService::setTargetKey(int pitchClass)
 {
-    targetKey.store(PitchKey::normalise(pitchClass), std::memory_order_relaxed);
+    targetKey.store(juce::jlimit(-12, 12, pitchClass), std::memory_order_relaxed);
     updateEffectiveTranspose();
     if (auto* settingsFile = properties.getUserSettings())
     {
-        settingsFile->setValue("targetPerformanceKey", targetKey.load(std::memory_order_relaxed));
+        settingsFile->setValue("transposeOffsetV2", targetKey.load(std::memory_order_relaxed));
         settingsFile->saveIfNeeded();
     }
 }
@@ -284,21 +285,9 @@ void MidiInputService::setTransposeSemitones(int semitones)
 
 void MidiInputService::updateEffectiveTranspose()
 {
-    // 风吟统一要求电吹管本机设为 C 调，软件只负责从 C 调换算到目标演奏调。
-    const auto next = PitchKey::transposeFromTo(0, targetKey.load(std::memory_order_relaxed));
-    if (transposeSemitones.exchange(next, std::memory_order_relaxed) == next)
-        return;
-
-    const juce::SpinLock::ScopedLockType lock(noteMapLock);
-    if (auto* sink = performanceSink.load(std::memory_order_acquire))
-        for (auto& outputNote : activeOutputNotes)
-            if (outputNote >= 0)
-            {
-                sink->noteOff(outputNote);
-                outputNote = -1;
-            }
-    lastNote.store(-1, std::memory_order_relaxed);
-    velocity.store(0.0f, std::memory_order_relaxed);
+    // Offset applies to future Note On only. Keep the original note-off map
+    // intact so held notes end at their original pitch, without a forced cut.
+    transposeSemitones.store(targetKey.load(std::memory_order_relaxed), std::memory_order_relaxed);
 }
 
 void MidiInputService::setGrowlSensitivity(int level)
@@ -313,6 +302,7 @@ void MidiInputService::setGrowlSensitivity(int level)
 
 void MidiInputService::setTechniqueMappings(const juce::Array<TechniqueMapping>& mappings)
 {
+    const auto previous = getTechniqueMappings();
     {
         const juce::SpinLock::ScopedLockType lock(techniqueLock);
         techniqueMappings = mappings;
@@ -322,8 +312,9 @@ void MidiInputService::setTechniqueMappings(const juce::Array<TechniqueMapping>&
         techniqueBreathInput.fill(0.0f);
     }
     if (auto* sink = performanceSink.load(std::memory_order_acquire))
-        for (int technique = 0; technique < static_cast<int>(PerformanceTechnique::count); ++technique)
-            sink->techniqueChanged(static_cast<PerformanceTechnique>(technique), 0.0f);
+        for (const auto& mapping : previous)
+            if (mapping.mode != TechniqueControlMode::off)
+                sink->techniqueChanged(targetForRole(mapping.technique), 0.0f);
     saveTechniqueMappings();
 }
 
@@ -422,8 +413,9 @@ void MidiInputService::loadTechniqueMappings()
         techniqueBreathInput.fill(0.0f);
     }
     if (auto* sink = performanceSink.load(std::memory_order_acquire))
-        for (int technique = 0; technique < static_cast<int>(PerformanceTechnique::count); ++technique)
-            sink->techniqueChanged(static_cast<PerformanceTechnique>(technique), 0.0f);
+        for (const auto& mapping : loaded)
+            if (mapping.mode != TechniqueControlMode::off)
+                sink->techniqueChanged(targetForRole(mapping.technique), 0.0f);
 }
 
 void MidiInputService::beginTechniqueLearn(PerformanceTechnique technique) noexcept
@@ -525,7 +517,7 @@ bool MidiInputService::handleTechniqueMessage(const juce::MidiMessage& message, 
         techniqueHardwareInput[index] = outputValue;
         if (sink != nullptr && mapping.mode != TechniqueControlMode::off && mapping.mode != TechniqueControlMode::breath)
         {
-            const auto scaled = outputValue * juce::jlimit(0.0f, 1.0f, mapping.strength * 1.35f);
+            const auto scaled = outputValue;
             sink->techniqueChanged(targetForRole(mapping.technique),
                 mapping.mode == TechniqueControlMode::hybrid ? scaled * techniqueBreathInput[index] : scaled);
         }
@@ -534,7 +526,7 @@ bool MidiInputService::handleTechniqueMessage(const juce::MidiMessage& message, 
     return consumedMessage || capturedByLearn;
 }
 
-void MidiInputService::updateBreathDrivenTechniques(float mappedBreath, MidiPerformanceSink* sink, double nowMs)
+void MidiInputService::updateBreathDrivenTechniques(float mappedBreath, MidiPerformanceSink* sink, double)
 {
     if (sink == nullptr) return;
     const juce::SpinLock::ScopedTryLockType lock(techniqueLock);
@@ -545,7 +537,7 @@ void MidiInputService::updateBreathDrivenTechniques(float mappedBreath, MidiPerf
             continue;
         if (! IntelligentTechniqueProcessor::canUseBreath(mapping.technique)) continue;
         const auto index = static_cast<size_t>(mapping.technique);
-        const auto value = intelligentTechniques.process(mapping.technique, mappedBreath, mapping.strength, nowMs);
+        const auto value = juce::jlimit(0.0f, 1.0f, mappedBreath);
         techniqueBreathInput[index] = value;
         sink->techniqueChanged(targetForRole(mapping.technique),
             mapping.mode == TechniqueControlMode::hybrid ? value * techniqueHardwareInput[index] : value);
@@ -562,7 +554,8 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
     const auto timestampSeconds = message.getTimeStamp() > 0.0
         ? message.getTimeStamp() : juce::Time::getMillisecondCounterHiRes() * 0.001;
     onsetTrace.record(message, timestampSeconds);
-    if (handleTechniqueMessage(message, sink))
+    const bool techniqueConsumed = handleTechniqueMessage(message, sink);
+    if (techniqueConsumed && !(message.isController() && message.getControllerNumber() == breathController.load()))
         return;
 
     if (message.isNoteOn())

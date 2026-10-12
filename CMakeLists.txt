@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.8 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.9 LANGUAGES C CXX)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
 set(CMAKE_CXX_STANDARD 20)
@@ -418,6 +418,7 @@ if(BUILD_TESTING)
         native/Source/SwamExpressionCurve.cpp
     )
     target_include_directories(FengYinSwamExpressionCurveTests PRIVATE native/Source)
+    target_compile_definitions(FengYinSwamExpressionCurveTests PRIVATE JUCE_PLUGINHOST_VST3=1)
     target_link_libraries(FengYinSwamExpressionCurveTests PRIVATE
         juce::juce_audio_processors
         juce::juce_recommended_config_flags

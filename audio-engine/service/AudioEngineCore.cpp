@@ -158,11 +158,7 @@ void AudioEngineCore::render(float* const* outputs, std::uint32_t outputChannels
         }
         if (std::abs(left) > 1.0f || std::abs(right) > 1.0f)
         {
-            // Preserve the original system and instrument levels throughout
-            // their valid range. Only impossible output values are clamped;
-            // there is no hidden compressor or accompaniment ducking here.
-            left = std::clamp(left, -1.0f, 1.0f);
-            right = std::clamp(right, -1.0f, 1.0f);
+            // Observe only: volume choices belong to the user.
             ++clipped;
         }
         if (outputs[0] != nullptr)

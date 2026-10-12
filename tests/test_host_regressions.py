@@ -161,30 +161,33 @@ class HostRegressionTests(unittest.TestCase):
     def test_swam_main_expression_curve_preserves_controller_mapping(self):
         curve = (ROOT / "native" / "Source" / "SwamExpressionCurve.cpp").read_text(encoding="utf-8")
         header = (ROOT / "native" / "Source" / "SwamExpressionCurve.h").read_text(encoding="utf-8")
-        self.assertIn('parameterId").equalsIgnoreCase("expression")', curve)
-        self.assertIn('result.controller = element.getIntAttribute("msb", -1)', curve)
+        self.assertIn('parameter.equalsIgnoreCase("expression")', curve)
+        self.assertIn('result.controller = cc', curve)
+        self.assertIn('getChildByName("MIDIRemappingCurve") == nullptr', curve)
         self.assertNotIn('setAttribute("msb"', curve)
         self.assertNotIn('setAttribute("channel"', curve)
         self.assertIn("outputMaximum = 127.0", header)
         self.assertIn("shape = 0.0", header)
 
-    def test_transpose_releases_active_notes_and_uses_note_map(self):
+    def test_transpose_preserves_active_notes_and_uses_note_map(self):
         self.assertIn("void MidiInputService::setTransposeSemitones", MIDI)
         self.assertIn("transposeFromTo", PITCH_KEY)
-        self.assertIn("PitchKey::transposeFromTo", MIDI)
-        self.assertIn("PitchKey::transposeFromTo(0", MIDI)
+        self.assertNotIn("PitchKey::transposeFromTo", MIDI)
+        update = MIDI.split('void MidiInputService::updateEffectiveTranspose()', 1)[1].split('\n}', 1)[0]
+        self.assertNotIn('noteOff', update)
         self.assertNotIn("keyCalibrationPending", MIDI)
         self.assertNotIn("sourceKey", MIDI)
         self.assertIn("activeOutputNotes", MIDI)
         self.assertIn("sourceNote + transposeSemitones.load", MIDI)
-        self.assertIn("sink->noteOff(outputNote)", MIDI)
+        self.assertIn("sink->noteOff(outputNote, timestampSeconds)", MIDI)
 
     def test_machine_code_copy_and_c_key_transpose_warning_exist(self):
         self.assertIn('id="copy-machine-code"', (ROOT / "prototype" / "index.html").read_text(encoding="utf-8"))
         self.assertIn("nativeEvent('copyMachineCode')", JS)
         html = (ROOT / "prototype" / "index.html").read_text(encoding="utf-8")
-        self.assertIn('id="transpose-dialog"', html)
-        self.assertIn("请先将电吹管上的调值设置为 C 调", html)
+        self.assertNotIn('id="transpose-dialog"', html)
+        self.assertIn('id="transpose-minus"', html)
+        self.assertIn('0跟随电吹管', html)
         self.assertNotIn("beginKeyCalibration", MAIN)
         self.assertIn("copyMachineCode", MAIN)
 
@@ -380,7 +383,9 @@ class HostRegressionTests(unittest.TestCase):
         self.assertLess(accompaniment, master)
         self.assertIn("instrumentReverb.processStereo", MASTER)
         self.assertNotIn("glueReverb", MASTER)
-        self.assertIn("不得修改伴奏原声", MASTER)
+        master_body = MASTER.split('void MasterOutputService::processMaster', 1)[1].split('void MasterOutputService::', 1)[0]
+        self.assertNotIn('gain.load', master_body)
+        self.assertNotIn('safetyGain', master_body)
 
     def test_realtime_midi_preserves_timestamps_and_avoids_cross_thread_collector_writes(self):
         header = (ROOT / "native" / "Source" / "PluginHostEngine.h").read_text(encoding="utf-8")

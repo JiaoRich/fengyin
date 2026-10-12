@@ -23,10 +23,10 @@ class Release118(unittest.TestCase):
         self.assertIn('knownPlugins.removeFromBlacklist(path)', scanner)
         self.assertIn('return !result.isEmpty()', scanner)
 
-    def test_breath_changes_are_deferred(self):
+    def test_deferred_three_mode_breath_changes_are_not_reintroduced(self):
         self.assertNotIn('setBreathResponseMode', self.read('native/Source/MainComponent.cpp'))
         self.assertNotIn('breath-response-mode', self.read('prototype/app.js'))
-        self.assertIn('.85f, .95f', self.read('native/Source/BreathResponse.h'))
+        self.assertIn('std::clamp(input, 0.0f, 1.0f)', self.read('native/Source/BreathResponse.h'))
 
     def test_exit_recovery_is_bounded(self):
         router = self.read('audio-engine/windows/DefaultEndpointRouter.cpp')

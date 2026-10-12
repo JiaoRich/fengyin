@@ -53,8 +53,8 @@ int main()
     core.render(outputs, 2, 128);
     for (std::size_t i = 0; i < left.size(); ++i)
     {
-        assert(std::abs(left[i] - 1.0f) < 0.000001f);
-        assert(std::abs(right[i] - 1.0f) < 0.000001f);
+        assert(std::abs(left[i] - 1.6f) < 0.000001f);
+        assert(std::abs(right[i] - 1.2f) < 0.000001f);
     }
     assert(core.getCounters().clippedFrames == 128);
 

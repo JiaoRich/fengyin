@@ -46,14 +46,7 @@ void MasterOutputService::setSampleRate(double value) noexcept
 
 MasterOutputService::ProfileSettings MasterOutputService::currentProfileSettings() const noexcept
 {
-    switch (static_cast<InstrumentMixProfile>(instrumentProfile.load(std::memory_order_relaxed)))
-    {
-        case InstrumentMixProfile::saxophone: return { -0.08f, 0.56f, 1.65f, 0.46f, 0.56f, 1.0f };
-        case InstrumentMixProfile::brass:     return { -0.12f, 0.52f, 1.85f, 0.38f, 0.62f, 0.82f };
-        case InstrumentMixProfile::woodwind:  return { -0.03f, 0.60f, 1.55f, 0.50f, 0.58f, 1.08f };
-        case InstrumentMixProfile::strings:   return {  0.02f, 0.62f, 1.50f, 0.56f, 0.52f, 1.14f };
-        case InstrumentMixProfile::generic:   break;
-    }
+    // Instrument identity must not add a second, hidden mix preset.
     return {};
 }
 
@@ -67,7 +60,8 @@ void MasterOutputService::updateInstrumentReverb(float mix, const ProfileSetting
     parameters.roomSize = styleRoomSize.load(std::memory_order_relaxed);
     parameters.damping = styleDamping.load(std::memory_order_relaxed);
     parameters.wetLevel = juce::jlimit(0.0f, 0.48f, mix * settings.reverbScale);
-    parameters.dryLevel = 1.0f - parameters.wetLevel * 0.32f;
+    // JUCE multiplies dryLevel by two internally; 0.5 means unity, not 1.0.
+    parameters.dryLevel = 0.5f * (1.0f - parameters.wetLevel * 0.32f);
     parameters.width = styleWidth.load(std::memory_order_relaxed);
     instrumentReverb.setParameters(parameters);
     lastInstrumentReverbMix = mix;
@@ -129,8 +123,6 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
             auto value = data[sample];
             bassLowPass[lane] += bassCoefficient * (value - bassLowPass[lane]);
             value += bassLowPass[lane] * (smoothedBassGain - 1.0f);
-            rumbleLowPass[lane] += 0.004f * (value - rumbleLowPass[lane]);
-            value -= rumbleLowPass[lane];
             toneLowPass[lane] += 0.075f * (value - toneLowPass[lane]);
             const auto highBand = value - toneLowPass[lane];
             value += tone >= 0.0f ? tone * 0.52f * highBand
@@ -149,28 +141,29 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
     airProcessor.process(outputs, channels, samples, airAmount.load(std::memory_order_relaxed));
     const auto wetMix = reverbMix.load(std::memory_order_relaxed);
     updateInstrumentReverb(wetMix, settings);
-    if (channels > 1 && outputs[0] != nullptr && outputs[1] != nullptr)
-        instrumentReverb.processStereo(outputs[0], outputs[1], samples);
-    else if (outputs[0] != nullptr)
-        instrumentReverb.processMono(outputs[0], samples);
+    if (wetMix > 0.0f)
+    {
+        if (channels > 1 && outputs[0] != nullptr && outputs[1] != nullptr)
+            instrumentReverb.processStereo(outputs[0], outputs[1], samples);
+        else if (outputs[0] != nullptr)
+            instrumentReverb.processMono(outputs[0], samples);
+    }
+    else instrumentReverb.reset();
 
-    // 用户设置的“安全上限”只约束乐器总线，不得修改伴奏原声。
-    const auto instrumentCeiling = limiterCeiling.load(std::memory_order_relaxed);
+    // The visible performance fader owns only the instrument bus. No limiter,
+    // fixed makeup gain or master gain is applied to the accompaniment.
+    const auto performanceVolume = gain.load(std::memory_order_relaxed);
     float blockPeak = 0.0f;
     for (int channel = 0; channel < channels; ++channel)
         if (outputs[channel] != nullptr)
-            juce::FloatVectorOperations::multiply(outputs[channel], audioengine::performanceGain, samples);
+            juce::FloatVectorOperations::multiply(outputs[channel], performanceVolume, samples);
     for (int sample = 0; sample < samples; ++sample)
     {
         float linkedPeak = 0.0f;
         for (int channel = 0; channel < channels; ++channel)
             if (outputs[channel] != nullptr)
                 linkedPeak = juce::jmax(linkedPeak, std::abs(outputs[channel][sample]));
-        const auto safety = linkedPeak > instrumentCeiling ? instrumentCeiling / linkedPeak : 1.0f;
-        blockPeak = juce::jmax(blockPeak, linkedPeak * safety);
-        for (int channel = 0; channel < channels; ++channel)
-            if (outputs[channel] != nullptr)
-                outputs[channel][sample] *= safety;
+        blockPeak = juce::jmax(blockPeak, linkedPeak);
     }
     instrumentPeak.store(blockPeak, std::memory_order_relaxed);
 }
@@ -178,7 +171,6 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
 void MasterOutputService::processMaster(float* const* outputs, int channels, int samples) noexcept
 {
     if (outputs == nullptr || channels <= 0 || samples <= 0) return;
-    const auto currentGain = gain.load(std::memory_order_relaxed);
     constexpr auto digitalCeiling = 1.0f;
     uint64_t overloaded = 0;
     for (int sample = 0; sample < samples; ++sample)
@@ -186,14 +178,10 @@ void MasterOutputService::processMaster(float* const* outputs, int channels, int
         float linkedPeak = 0.0f;
         for (int channel = 0; channel < channels; ++channel)
             if (outputs[channel] != nullptr)
-                linkedPeak = juce::jmax(linkedPeak, std::abs(outputs[channel][sample] * currentGain));
-        // 仅在两路相加真正越界时做逐样本安全衰减，不使用带释放时间的
-        // 总线压缩，避免乐器峰值让伴奏产生“呼吸/抽动”。
-        const auto safetyGain = linkedPeak > digitalCeiling ? digitalCeiling / linkedPeak : 1.0f;
+                linkedPeak = juce::jmax(linkedPeak, std::abs(outputs[channel][sample]));
+        // Meter overloads without changing samples. Final PCM conversion may
+        // clip values outside its representable range; that is not gain control.
         if (linkedPeak > digitalCeiling) ++overloaded;
-        for (int channel = 0; channel < channels; ++channel)
-            if (outputs[channel] != nullptr)
-                outputs[channel][sample] *= currentGain * safetyGain;
     }
     updateSpectrumAndPeaks(outputs, channels, samples);
     if (overloaded != 0) overloadSamples.fetch_add(overloaded, std::memory_order_relaxed);

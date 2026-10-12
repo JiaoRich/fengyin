@@ -23,8 +23,9 @@ struct MidiInputServiceTestAccess {
 struct Sink : fengyin::MidiPerformanceSink {
     struct Event { char type; float value; double time; };
     std::vector<Event> events;
-    void noteOn(int, float v, double t) noexcept override { events.push_back({'N',v,t}); }
-    void noteOff(int, double t) noexcept override { events.push_back({'O',0,t}); }
+    std::vector<int> onNotes, offNotes;
+    void noteOn(int n, float v, double t) noexcept override { onNotes.push_back(n); events.push_back({'N',v,t}); }
+    void noteOff(int n, double t) noexcept override { offNotes.push_back(n); events.push_back({'O',0,t}); }
     void breathChanged(float v, double t) noexcept override { events.push_back({'B',v,t}); }
     void pitchBendChanged(float v, double t) noexcept override { events.push_back({'P',v,t}); }
     void techniqueChanged(fengyin::PerformanceTechnique, float v) noexcept override { events.push_back({'T',v,0}); }
@@ -75,6 +76,24 @@ int main() {
         assert(counts[0]==1000 && counts[1]==1000 && ordered.droppedCount()==0);
     }
     Sink sink;
+    {
+        Sink pitchSink;
+        fengyin::MidiInputService pitch(false);
+        pitch.setPerformanceSink(&pitchSink);
+        const auto sendPitch = [&](juce::MidiMessage m) { fengyin::MidiInputServiceTestAccess::send(pitch, m, 1); };
+        sendPitch(juce::MidiMessage::noteOn(1, 63, (juce::uint8)80));
+        pitch.setTargetKey(3);
+        assert(pitchSink.offNotes.empty()); // Switching doesn't cut the held note.
+        sendPitch(juce::MidiMessage::noteOff(1, 63));
+        sendPitch(juce::MidiMessage::noteOn(1, 65, (juce::uint8)80));
+        assert(pitchSink.onNotes == std::vector<int>({63, 68}));
+        assert(pitchSink.offNotes == std::vector<int>({63}));
+        pitch.setTargetKey(-2);
+        sendPitch(juce::MidiMessage::noteOff(1, 65));
+        assert(pitchSink.offNotes.back() == 68);
+        sendPitch(juce::MidiMessage::noteOn(1, 65, (juce::uint8)80));
+        assert(pitchSink.onNotes.back() == 63);
+    }
     fengyin::MidiInputService service(false); // No user preferences read/written.
     service.setPerformanceSink(&sink);
     service.setTechniqueContext("kong-erhu");

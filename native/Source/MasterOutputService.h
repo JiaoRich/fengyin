@@ -35,14 +35,12 @@ public:
     void setEqTone(float value) noexcept { eqTone.store(juce::jlimit(-1.0f, 1.0f, value)); }
     void setWarmth(float value) noexcept { warmth.store(juce::jlimit(0.0f, 1.0f, value)); }
     void setReverbMix(float value) noexcept { reverbMix.store(juce::jlimit(0.0f, 0.6f, value)); }
-    void setLimiterCeiling(float value) noexcept { limiterCeiling.store(juce::jlimit(0.6f, 1.0f, value)); }
     void setInstrumentProfile(InstrumentMixProfile value) noexcept { instrumentProfile.store(static_cast<int>(value)); }
     void setToneStyle(const ToneStyleSettings& settings) noexcept;
 
     [[nodiscard]] float getGain() const noexcept { return gain.load(); }
     [[nodiscard]] float getEqTone() const noexcept { return eqTone.load(); }
     [[nodiscard]] float getReverbMix() const noexcept { return reverbMix.load(); }
-    [[nodiscard]] float getLimiterCeiling() const noexcept { return limiterCeiling.load(); }
     [[nodiscard]] float getWarmth() const noexcept { return warmth.load(); }
     [[nodiscard]] ToneStyleSettings getToneStyle() const noexcept;
     [[nodiscard]] float getLeftPeak() const noexcept { return leftPeak.load(); }
@@ -78,7 +76,7 @@ private:
     std::array<float, fifoSize> fifo {};
     std::atomic<std::size_t> writeIndex { 0 }, readIndex { 0 };
     std::atomic<float> gain { 0.8f }, leftPeak { 0.0f }, rightPeak { 0.0f };
-    std::atomic<float> eqTone { 0.0f }, reverbMix { 0.0f }, limiterCeiling { 1.0f };
+    std::atomic<float> eqTone { 0.0f }, reverbMix { 0.0f };
     std::atomic<float> warmth { 0.2f }, styleCompressionThreshold { 0.58f }, styleCompressionRatio { 1.7f };
     std::atomic<float> styleSaturation { 0.04f }, styleHarshControl { 0.10f };
     std::atomic<float> styleRoomSize { 0.42f }, styleDamping { 0.54f }, styleWidth { 0.88f };
@@ -100,7 +98,6 @@ private:
     float instrumentEnvelope = 0.0f;
     float compressorGain = 1.0f;
     std::array<float, 2> toneLowPass {};
-    std::array<float, 2> rumbleLowPass {};
 
     juce::dsp::FFT fft { fftOrder };
     juce::dsp::WindowingFunction<float> window { fftSize, juce::dsp::WindowingFunction<float>::hann };

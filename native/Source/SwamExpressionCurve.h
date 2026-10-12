@@ -6,8 +6,7 @@ namespace fengyin
 {
 struct SwamExpressionCurve
 {
-    // The host applies the shared breath response once. Bypass SWAM's local
-    // remapping curve to prevent a second nonlinear transformation.
+    // Preserve existing native curves. Missing curves receive an identity default.
     static constexpr double inputMinimum = 0.0;
     static constexpr double inputMaximum = 127.0;
     static constexpr double outputMinimum = 0.0;
@@ -20,14 +19,14 @@ struct SwamExpressionCurve
         bool found = false;
         bool changed = false;
         int controller = -1;
+        struct Route { juce::String parameter; int controller; int channel; };
+        std::vector<Route> routes;
     };
 
-    // Updates only the curve belonging to the existing expression mapping.
-    // Controller number, channel, message type and every other MIDI mapping
-    // remain untouched.
+    // Preserve all existing curves and mappings; initialise only an absent curve.
     static Result applyToXml(juce::XmlElement& root);
 
-    // Supports both plain .swam XML and JUCE binary XML plugin states.
+    // Supports plain/binary XML and read-only wrapped VST3 component mappings.
     static Result applyToState(juce::MemoryBlock& state);
 };
 }
