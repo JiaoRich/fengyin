@@ -6,13 +6,13 @@ namespace fengyin {
 // Standard Steinberg VstW/CcnK/FBCh envelope (VST3 SDK vst2persistence.cpp),
 // containing a verified JUCE XML chunk. No guessed vendor checksum fields.
 struct SwamTechniqueRouting {
-    struct Result { bool supported=false, changed=false; int vibrato=-1, growl=-1, flutter=-1; int stage=0; };
+    struct Result { bool supported=false, changed=false; int vibrato=-1, growl=-1, flutter=-1, volume=-1; int stage=0; };
     static juce::XmlElement* findTable(juce::XmlElement& root) {
         if(root.hasTagName("MIDIRemappingTable"))return &root;
         for(auto* child:root.getChildIterator())if(auto* found=findTable(*child))return found;
         return nullptr;
     }
-    static Result prepare(juce::MemoryBlock& state,bool wantVibrato,bool wantGrowl,bool wantFlutter=false) {
+    static Result prepare(juce::MemoryBlock& state,bool wantVibrato,bool wantGrowl,bool wantFlutter=false,bool shareVolume=false) {
         Result result;
         auto outer=juce::AudioProcessor::getXmlFromBinary(state.getData(),static_cast<int>(state.getSize()));
         if(!outer||!outer->hasTagName("VST3PluginState"))return result;
@@ -28,13 +28,21 @@ struct SwamTechniqueRouting {
         auto xml=juce::AudioProcessor::getXmlFromBinary(bytes+176,static_cast<int>(chunkSize));
         if(!xml||!xml->hasTagName("swam"))return result;
         auto* table=findTable(*xml);if(!table)return result;
+        juce::XmlElement* expression=nullptr;
+        if(shareVolume){
+            for(auto* entry:table->getChildIterator())if(entry->getStringAttribute("parameterId").equalsIgnoreCase("expression")){
+                if(expression)return result;expression=entry;
+            }
+            if(!expression || expression->getIntAttribute("enabled")!=1 || expression->getIntAttribute("messageType",-1)!=1
+                || expression->getIntAttribute("msb",-1)<0 || expression->getIntAttribute("msb",-1)>119)return result;
+        }
         std::set<int> used;
         for(auto* entry:table->getChildIterator()){
             const auto id=entry->getStringAttribute("parameterId");
             if((wantVibrato&&id.equalsIgnoreCase("vibratoDepth"))||(wantGrowl&&id.equalsIgnoreCase("growl"))||(wantFlutter&&id.equalsIgnoreCase("flutter")))continue;
             if(entry->getIntAttribute("enabled")==1&&entry->getIntAttribute("messageType",-1)==1)used.insert(entry->getIntAttribute("msb",-1));
         }
-        const auto configure=[&](const char* id,int preferred,bool wanted,int& selected)->bool {
+        const auto configure=[&](const char* id,int preferred,bool wanted,int& selected,bool shared=false)->bool {
             if(!wanted)return true;
             juce::XmlElement* target=nullptr;
             for(auto* entry:table->getChildIterator())if(entry->getStringAttribute("parameterId").equalsIgnoreCase(id)){
@@ -50,16 +58,17 @@ struct SwamTechniqueRouting {
                 result.changed=true;
             }
             const auto free=[&](int cc){return cc>=1&&cc<120&&!used.count(cc);};
-            selected=target->getIntAttribute("msb",-1);
-            if(!free(selected)){selected=free(preferred)?preferred:-1;for(int i=1;selected<0&&i<120;++i)if(free(i))selected=i;}
+            selected=shared?expression->getIntAttribute("msb"):target->getIntAttribute("msb",-1);
+            if(!shared && !free(selected)){selected=free(preferred)?preferred:-1;for(int i=1;selected<0&&i<120;++i)if(free(i))selected=i;}
             if(selected<0)return false;
             const auto set=[&](const char* name,int value){if(target->getIntAttribute(name,-999)!=value){target->setAttribute(name,value);result.changed=true;}};
             set("enabled",1);set("messageType",1);set("msb",selected);
             if(target->getIntAttribute("lsb",-1)>0)set("lsb",-1);
             const int channel=target->getIntAttribute("channel",-1);if(channel<1||channel>17)set("channel",17);
+            if(shared){set("channel",expression->getIntAttribute("channel",17));set("lsb",expression->getIntAttribute("lsb",-1));}
             used.insert(selected);return true;
         };
-        if(!configure("vibratoDepth",1,wantVibrato,result.vibrato)||!configure("growl",21,wantGrowl,result.growl)||!configure("flutter",22,wantFlutter,result.flutter))return Result{};
+        if(!configure("vibratoDepth",1,wantVibrato,result.vibrato)||!configure("growl",21,wantGrowl,result.growl)||!configure("flutter",22,wantFlutter,result.flutter)||!configure("mainVolume",0,shareVolume,result.volume,true))return Result{};
         result.supported=true;if(!result.changed)return result;
         juce::MemoryBlock chunk;juce::AudioProcessor::copyXmlToBinary(*xml,chunk);
         const auto oldXmlSize=juce::ByteOrder::littleEndianInt(bytes+180);

@@ -123,12 +123,19 @@ int main(int argc, char** argv)
         const auto flutterOnce=flutterState;
         assert(!fengyin::SwamTechniqueRouting::prepare(flutterState,false,false,true).changed);
         assert(flutterOnce==flutterState);
+        auto volumeState=before;
+        const auto volumeRouting=fengyin::SwamTechniqueRouting::prepare(volumeState,true,growl,false,true);
+        assert(volumeRouting.supported && volumeRouting.volume==native.controller);
+        assert(volumeRouting.vibrato!=volumeRouting.volume);
+        const auto volumeOnce=volumeState;
+        assert(!fengyin::SwamTechniqueRouting::prepare(volumeState,true,growl,false,true).changed);
+        assert(volumeOnce==volumeState);
         const auto decode=[](const juce::MemoryBlock& s){
             auto outer=juce::AudioProcessor::getXmlFromBinary(s.getData(),static_cast<int>(s.getSize()));juce::MemoryBlock b;
             b.fromBase64Encoding(outer->getChildByName("IComponent")->getAllSubText());
             return juce::AudioProcessor::getXmlFromBinary(static_cast<const char*>(b.getData())+176,static_cast<int>(b.getSize()-176));
         };
-        auto oldXml=decode(before),newXml=decode(prepared);
+        auto oldXml=decode(before),newXml=decode(volumeState);
         auto* oldTable=fengyin::SwamTechniqueRouting::findTable(*oldXml);
         auto* newTable=fengyin::SwamTechniqueRouting::findTable(*newXml);
         for(auto* oldEntry:oldTable->getChildIterator()){
@@ -198,12 +205,19 @@ int main(int argc, char** argv)
             std::vector<float> values;for(auto* p:plugin->getParameters())values.push_back(p->getValue());
             auto routed=state;
             const bool needsGrowl=fengyin::simpleGrowl(fengyin::SwamPluginClassifier::instrumentKey(plugin->getName().toStdString()));
-            const auto plan=fengyin::SwamTechniqueRouting::prepare(routed,true,needsGrowl);
+            const auto plan=fengyin::SwamTechniqueRouting::prepare(routed,true,needsGrowl,false,true);
             if(!plan.supported)return 20;
             if(plan.changed)plugin->setStateInformation(routed.getData(),static_cast<int>(routed.getSize()));
             juce::MemoryBlock restored;plugin->getStateInformation(restored);
-            auto inspect=restored;const auto checked=fengyin::SwamTechniqueRouting::prepare(inspect,true,needsGrowl);
-            if(!checked.supported||checked.changed||checked.vibrato!=plan.vibrato||checked.growl!=plan.growl)return 21;
+            auto inspect=restored;const auto checked=fengyin::SwamTechniqueRouting::prepare(inspect,true,needsGrowl,false,true);
+            if(!checked.supported||checked.changed||checked.vibrato!=plan.vibrato||checked.growl!=plan.growl||checked.volume!=plan.volume){
+                std::cerr<<"Routing readback: changed="<<checked.changed<<" volume="<<checked.volume<<" expected="<<plan.volume<<std::endl;
+                auto outer=juce::AudioProcessor::getXmlFromBinary(restored.getData(),static_cast<int>(restored.getSize()));juce::MemoryBlock body;
+                body.fromBase64Encoding(outer->getChildByName("IComponent")->getAllSubText());
+                auto xml=juce::AudioProcessor::getXmlFromBinary(static_cast<const char*>(body.getData())+176,static_cast<int>(body.getSize()-176));
+                if(auto* table=fengyin::SwamTechniqueRouting::findTable(*xml))for(auto* e:table->getChildIterator())std::cerr<<e->getStringAttribute("parameterId")<<" CC="<<e->getIntAttribute("msb")<<" enabled="<<e->getIntAttribute("enabled")<<std::endl;
+                return 21;
+            }
             int index=0;for(auto* p:plugin->getParameters())if(std::abs(p->getValue()-values[static_cast<size_t>(index++)])>.00001f)return 22;
             auto routes=fengyin::SwamExpressionCurve::applyToState(restored);
             {

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.11 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.12 LANGUAGES C CXX)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
 set(CMAKE_CXX_STANDARD 20)
@@ -52,6 +52,21 @@ juce_add_binary_data(FengYinWebAssets SOURCES
     assets/fengyin-app-icon.png
     assets/tone-packages/soprano-kenny.fytonepack
     assets/tone-packages/tenor-air-pocket.fytonepack
+    assets/tone-packages/alto-jazz.fytonepack
+    assets/tone-packages/alto-deep.fytonepack
+    assets/tone-packages/alto-pop.fytonepack
+    assets/tone-packages/tenor-mellow.fytonepack
+    assets/tone-packages/tenor-warm.fytonepack
+    assets/tone-packages/trumpet.fytonepack
+    assets/tone-packages/piccolo-trumpet.fytonepack
+    assets/tone-packages/alto-trombone.fytonepack
+    assets/tone-packages/bass-trombone.fytonepack
+    assets/tone-packages/flute.fytonepack
+    assets/tone-packages/piccolo.fytonepack
+    assets/tone-packages/clarinet.fytonepack
+    assets/tone-packages/oboe.fytonepack
+    assets/tone-packages/violin.fytonepack
+    assets/tone-packages/cello.fytonepack
     assets/tone-packages/kong/erhu.kam
     assets/tone-packages/kong/guzheng.kam
     assets/tone-packages/kong/hulusi.kam

@@ -96,7 +96,12 @@ struct TonePackage
             if (! effectXml || ! description.loadFromXml(*effectXml) || description.pluginFormatName != "VST3")
                 return fail("效果器依赖信息不完整");
         }
-        if (preset.pluginBrand == "kong" || preset.containerInstrument)
+        if (preset.pluginBrand == "kontakt" && preset.containerInstrument)
+        {
+            if(preset.containerAdapter!="kontakt" || preset.samplerState.getSize()==0)
+                return fail("Kontakt方案缺少完整原厂状态");
+        }
+        else if (preset.pluginBrand == "kong" || preset.containerInstrument)
         {
             if (preset.samplerState.getSize() == 0 || kamBytes.getSize() == 0
                 || kamBytes != preset.containerProjectState) return fail("空音状态或 KAM 不完整、不一致");

@@ -19,6 +19,13 @@ const auto licensePublicKey = juce::String("5,d47f8d2272ed935eb504695cc78aa24a67
 struct EmbeddedToneAsset { const void* data = nullptr; int size = 0; };
 EmbeddedToneAsset embeddedToneAsset(std::string_view name)
 {
+    for (int i=0;i<BinaryData::namedResourceListSize;++i)
+        if (name==BinaryData::originalFilenames[i])
+        {
+            int size=0;
+            const auto* data=BinaryData::getNamedResource(BinaryData::namedResourceList[i],size);
+            return {data,size};
+        }
     if (name == "soprano-kenny.fytonepack") return { BinaryData::sopranokenny_fytonepack, BinaryData::sopranokenny_fytonepackSize };
     if (name == "tenor-air-pocket.fytonepack") return { BinaryData::tenorairpocket_fytonepack, BinaryData::tenorairpocket_fytonepackSize };
     if (name == "erhu.kam") return { BinaryData::erhu_kam, BinaryData::erhu_kamSize };
@@ -638,7 +645,7 @@ void MainComponent::setupWebInterface()
                                                                          static_cast<int>(payload.getProperty("technique", 0))))
                 : fengyin::techniqueFromId(requestedId);
             if (requestedTechnique == fengyin::PerformanceTechnique::count) return;
-            if (!fengyin::simpleRoleSupported(currentInstrumentKey.toStdString(),requestedTechnique)) return;
+            if (requestedTechnique!=fengyin::PerformanceTechnique::vibrato && requestedTechnique!=fengyin::PerformanceTechnique::growl && requestedTechnique!=fengyin::PerformanceTechnique::mute) return;
             const auto technique = static_cast<int>(requestedTechnique);
             if (! midi.getSnapshot().deviceConnected)
             {
@@ -660,7 +667,7 @@ void MainComponent::setupWebInterface()
         {
             const auto target = fengyin::techniqueFromId(payload.getProperty("techniqueId", {}).toString().toStdString());
             if (target == fengyin::PerformanceTechnique::count) return;
-            if (!fengyin::simpleRoleSupported(currentInstrumentKey.toStdString(),target)) return;
+            if (target!=fengyin::PerformanceTechnique::vibrato && target!=fengyin::PerformanceTechnique::growl && target!=fengyin::PerformanceTechnique::mute) return;
             const auto modeText = payload.getProperty("mode", "auto").toString();
             auto mode = fengyin::TechniqueControlMode::automatic;
             if (modeText == "breath") mode = fengyin::TechniqueControlMode::breath;
@@ -669,7 +676,17 @@ void MainComponent::setupWebInterface()
             else if (modeText == "off") mode = fengyin::TechniqueControlMode::off;
             const auto actualTarget=target==fengyin::PerformanceTechnique::mute
                 ? fengyin::simpleOther(currentInstrumentKey.toStdString()) : target;
-            if(mode!=fengyin::TechniqueControlMode::off && !pluginHost.hasIndependentTechniqueRoute(actualTarget))return;
+            if(mode!=fengyin::TechniqueControlMode::off && fengyin::simpleRoleSupported(currentInstrumentKey.toStdString(),target)
+                && pluginHost.hasPlugin() && !pluginHost.hasIndependentTechniqueRoute(actualTarget))
+            {
+                if(webInterface){
+                    auto result=std::make_unique<juce::DynamicObject>();
+                    result->setProperty("success",false);
+                    result->setProperty("message",utf8("当前音色技巧路由未通过验证，未开启；请导出音色诊断供排查"));
+                    webInterface->emitEventIfBrowserIsVisible("techniqueConfigurationResult",juce::var(result.release()));
+                }
+                return;
+            }
             if (target == fengyin::PerformanceTechnique::mute && mode != fengyin::TechniqueControlMode::off)
                 mode = fengyin::TechniqueControlMode::hardware;
             auto mappings = midi.getTechniqueMappings();
@@ -1635,21 +1652,22 @@ void MainComponent::timerCallback()
             const auto brand = fengyin::SupportedInstrumentClassifier::classify(plugin.name, plugin.manufacturerName, plugin.fileOrIdentifier);
             const auto isSwam = brand == fengyin::SupportedInstrumentClassifier::Brand::swam;
             const auto isKong = brand == fengyin::SupportedInstrumentClassifier::Brand::kong;
+            const auto isKontakt = brand == fengyin::SupportedInstrumentClassifier::Brand::kontakt;
             auto item = std::make_unique<juce::DynamicObject>();
             item->setProperty("name", plugin.name);
             item->setProperty("pluginId", plugin.createIdentifierString());
             item->setProperty("isSwam", isSwam);
-            item->setProperty("brand", isKong ? "kong" : isSwam ? "swam" : "unsupported");
-            item->setProperty("supported", isSwam || isKong);
+            item->setProperty("brand", isKong ? "kong" : isSwam ? "swam" : isKontakt ? "kontakt" : "unsupported");
+            item->setProperty("supported", isSwam || isKong || isKontakt);
             item->setProperty("chineseName", isSwam
                 ? utf8(fengyin::SwamPluginClassifier::instrumentChineseName(plugin.name.toStdString()))
                 : isKong ? utf8("空音 Qin Engine") : plugin.name);
             item->setProperty("instrumentKey", isSwam
                 ? utf8(fengyin::SwamPluginClassifier::instrumentKey(plugin.name.toStdString()))
-                : isKong ? "kong-engine" : juce::String());
+                : isKong ? "kong-engine" : isKontakt ? "kontakt-engine" : juce::String());
             item->setProperty("label", isSwam
                 ? utf8(fengyin::SwamPluginClassifier::instrumentChineseName(plugin.name.toStdString())) + utf8(" · ") + plugin.name
-                : isKong ? utf8("中国民乐 · ") + plugin.name : plugin.name + utf8("（暂未支持）"));
+                : isKong ? utf8("中国民乐 · ") + plugin.name : isKontakt ? plugin.name : plugin.name + utf8("（暂未支持）"));
             instruments.add(juce::var(item.release()));
         }
         juce::Array<juce::var> effects;
@@ -1925,6 +1943,8 @@ void MainComponent::refreshPluginChoices()
                 isSwam = true;
         const auto isKong = fengyin::SupportedInstrumentClassifier::classify(plugin.name, plugin.manufacturerName, plugin.fileOrIdentifier)
                           == fengyin::SupportedInstrumentClassifier::Brand::kong;
+        const auto isKontakt = fengyin::SupportedInstrumentClassifier::classify(plugin.name, plugin.manufacturerName, plugin.fileOrIdentifier)
+                          == fengyin::SupportedInstrumentClassifier::Brand::kontakt;
         if (! isSwam && (plugin.isInstrument || isKong))
         {
             if (isKong && ! kongHeadingAdded)
@@ -1939,7 +1959,7 @@ void MainComponent::refreshPluginChoices()
             }
             cachedInstrumentPlugins.add(plugin);
             pluginSelector.addItem(isKong ? utf8("空音 Qin Engine · ") + plugin.name
-                                          : plugin.name + utf8("（当前版本暂未支持）"), itemId++);
+                                          : isKontakt ? plugin.name : plugin.name + utf8("（当前版本暂未支持）"), itemId++);
         }
         if (! plugin.isInstrument && ! isKong)
         {
@@ -1965,7 +1985,7 @@ void MainComponent::loadSelectedPlugin()
     const auto chosen = cachedInstrumentPlugins.getReference(selectedIndex);
     if (! fengyin::SupportedInstrumentClassifier::isSupported(chosen.name, chosen.manufacturerName, chosen.fileOrIdentifier))
     {
-        const auto message = utf8("当前版本尚未支持 Kontakt、三体等其他音源，请关注后续版本升级。");
+        const auto message = utf8("当前版本尚未支持所选音源，请关注后续版本升级。");
         pluginStatus.setText(message, juce::dontSendNotification);
         if (webInterface != nullptr)
         {
@@ -1981,7 +2001,8 @@ void MainComponent::loadSelectedPlugin()
     currentPresetDisplayName.clear();
     currentPresetId.clear();
     currentPresetIsCustom = false;
-    currentPluginBrand = brand == fengyin::SupportedInstrumentClassifier::Brand::kong ? "kong" : "swam";
+    currentPluginBrand = brand == fengyin::SupportedInstrumentClassifier::Brand::kong ? "kong"
+        : brand == fengyin::SupportedInstrumentClassifier::Brand::kontakt ? "kontakt" : "swam";
     if (currentPluginBrand == "swam")
     {
         currentInstrumentKey = utf8(fengyin::SwamPluginClassifier::instrumentKey(chosen.name.toStdString()));
@@ -2271,7 +2292,7 @@ void MainComponent::beginContainerInstrument(const juce::String& adapter)
     for (const auto& candidate : cachedInstrumentPlugins)
         if (fengyin::SupportedInstrumentClassifier::classify(candidate.name, candidate.manufacturerName,
                                                               candidate.fileOrIdentifier)
-            == fengyin::SupportedInstrumentClassifier::Brand::kong)
+            == (adapter == "kontakt" ? fengyin::SupportedInstrumentClassifier::Brand::kontakt : fengyin::SupportedInstrumentClassifier::Brand::kong))
         {
             chosen = candidate;
             found = true;
@@ -2279,28 +2300,28 @@ void MainComponent::beginContainerInstrument(const juce::String& adapter)
         }
     if (! found)
     {
-        emit(false, "error", utf8("没有找到 QinEngineV3，请先扫描音源"));
+        emit(false, "error", adapter=="kontakt" ? utf8("没有找到Kontakt，请先安装并扫描音源") : utf8("没有找到 QinEngineV3，请先扫描音源"));
         return;
     }
 
     captureToneBeforePresetEdit();
-    const auto ready = [this, emit]()
+    const auto ready = [this, emit, adapter]()
     {
-        currentPluginBrand = "kong";
+        currentPluginBrand = adapter=="kontakt" ? "kontakt" : "kong";
         currentInstrumentKey = "container-draft";
-        currentInstrumentChineseName = utf8("正在添加空音乐器");
+        currentInstrumentChineseName = adapter=="kontakt" ? utf8("正在添加Kontakt音色") : utf8("正在添加空音乐器");
         currentPresetDisplayName.clear();
         currentPresetId.clear();
         currentPresetIsCustom = false;
         containerInstrumentDraftActive = true;
-        containerInstrumentDraftAdapter = "kong-v3";
+        containerInstrumentDraftAdapter = adapter;
         containerInstrumentStateBeforeSelection = pluginHost.captureContainerState();
         containerInstrumentPendingState.reset();
         containerInstrumentPendingProject.reset();
         activatePluginOutput(pluginHost.getPluginName());
         const auto opened = pluginHost.showPluginEditor(false);
         emit(opened, opened ? "ready" : "error", opened
-            ? utf8("请在空音窗口点击“＋”并选择乐器，完成后返回风吟")
+            ? (adapter=="kontakt" ? utf8("请在Kontakt原厂窗口选择音色库，确认能发声后返回风吟") : utf8("请在空音窗口点击“＋”并选择乐器，完成后返回风吟"))
             : utf8("无法打开空音原厂界面"));
     };
 
@@ -2341,7 +2362,8 @@ void MainComponent::commitContainerInstrument(const juce::String& name)
         emit(false, "error", utf8("添加流程已失效，请重新点击“添加空音乐器”"));
         return;
     }
-    if (containerInstrumentPendingProject.getSize() == 0)
+    const bool isKontakt=containerInstrumentDraftAdapter=="kontakt";
+    if (isKontakt ? containerInstrumentPendingState.getSize()==0 : containerInstrumentPendingProject.getSize() == 0)
     {
         const auto state = pluginHost.captureContainerState();
         if (state.getSize() == 0)
@@ -2357,8 +2379,8 @@ void MainComponent::commitContainerInstrument(const juce::String& name)
             emit(false, "error", utf8("尚未检测到新乐器，请先在空音窗口点击“＋”选择乐器和奏法"));
             return;
         }
-        const auto project = fengyin::KongProjectFile::fromPluginState(state);
-        if (project.getSize() == 0)
+        const auto project = isKontakt ? juce::MemoryBlock() : fengyin::KongProjectFile::fromPluginState(state);
+        if (!isKontakt && project.getSize() == 0)
         {
             emit(false, "error", utf8("未读取到已选的乐器和奏法，请在空音里完成选择后重试"));
             return;
@@ -2381,17 +2403,18 @@ void MainComponent::commitContainerInstrument(const juce::String& name)
     const auto state = containerInstrumentPendingState;
     const auto project = containerInstrumentPendingProject;
     const auto description = fengyin::KongProjectFile::describe(project);
-    if (! description.has_value()) { emit(false, "error", utf8("空音 KAM 状态无效，请重新选择")); return; }
-    const auto* instrument = fengyin::KongInstrumentCatalog::matchProgram(description->kai);
+    if (!isKontakt && ! description.has_value()) { emit(false, "error", utf8("空音 KAM 状态无效，请重新选择")); return; }
+    const auto* instrument = isKontakt ? nullptr : fengyin::KongInstrumentCatalog::matchProgram(description->kai);
 
     fengyin::SoundPreset preset;
     preset.id = juce::Uuid().toString();
     preset.name = name;
     preset.pluginIdentifier = pluginHost.getPluginIdentifier();
-    preset.pluginBrand = "kong";
+    preset.pluginBrand = isKontakt ? "kontakt" : "kong";
+    preset.instrumentDescriptionXml=pluginHost.getInstrumentDescriptionXml();
     preset.containerInstrument = true;
     preset.containerAdapter = containerInstrumentDraftAdapter;
-    preset.instrumentKey = instrument != nullptr ? juce::String(instrument->key)
+    preset.instrumentKey = isKontakt ? "container:kontakt:"+preset.id : instrument != nullptr ? juce::String(instrument->key)
         : "container:" + containerInstrumentDraftAdapter + ":" + description->kai.toLowerCase();
     preset.instrumentChineseName = instrument != nullptr ? utf8(instrument->chineseName) : name;
     preset.samplerState = state;
@@ -2423,7 +2446,7 @@ void MainComponent::commitContainerInstrument(const juce::String& name)
     // The editor can be closed only after both VST and KAM state are retained.
     pluginHost.closePluginEditor(false);
 
-    currentPluginBrand = "kong";
+    currentPluginBrand = preset.pluginBrand;
     currentInstrumentKey = preset.instrumentKey;
     currentInstrumentChineseName = preset.instrumentChineseName;
     currentPresetDisplayName = preset.name;
@@ -2562,7 +2585,8 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
     preset.instrumentState = currentPluginBrand == "kong" ? juce::MemoryBlock() : pluginHost.captureInstrumentState();
     preset.effects = pluginHost.captureEffectChain();
     preset.toneParameters = pluginHost.captureToneParameters();
-    preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureContainerState() : juce::MemoryBlock();
+    preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureContainerState()
+        : currentPluginBrand=="kontakt" ? preset.instrumentState : juce::MemoryBlock();
     if (currentPluginBrand == "kong")
     {
         preset.containerProjectState = fengyin::KongProjectFile::fromPluginState(preset.samplerState);
@@ -2593,7 +2617,8 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
     if (preset.containerAdapter.isEmpty() && currentInstrumentKey.startsWith("container:"))
     {
         preset.containerInstrument = true;
-        preset.containerAdapter = "kong-v3";
+        preset.containerAdapter = currentPluginBrand=="kontakt" ? "kontakt" : "kong-v3";
+        if(currentPluginBrand=="kontakt") preset.samplerState=preset.instrumentState;
     }
 
     if (presetStore.save(preset))
@@ -2663,7 +2688,8 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
     preset.instrumentState = currentPluginBrand == "kong" ? juce::MemoryBlock() : pluginHost.captureInstrumentState();
     preset.effects = pluginHost.captureEffectChain();
     preset.toneParameters = pluginHost.captureToneParameters();
-    preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureContainerState() : juce::MemoryBlock();
+    preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureContainerState()
+        : currentPluginBrand=="kontakt" ? preset.instrumentState : juce::MemoryBlock();
     if (currentPluginBrand == "kong")
     {
         preset.containerProjectState = fengyin::KongProjectFile::fromPluginState(preset.samplerState);
@@ -2704,7 +2730,8 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
     if (preset.containerAdapter.isEmpty() && currentInstrumentKey.startsWith("container:"))
     {
         preset.containerInstrument = true;
-        preset.containerAdapter = "kong-v3";
+        preset.containerAdapter = currentPluginBrand=="kontakt" ? "kontakt" : "kong-v3";
+        if(currentPluginBrand=="kontakt") preset.samplerState=preset.instrumentState;
     }
     preset.baseToneStyleId = baseStyleId;
     preset.toneStyleId = baseStyleId;
@@ -3214,7 +3241,7 @@ void MainComponent::loadPreset(fengyin::SoundPreset preset,
     }
     if (! fengyin::SupportedInstrumentClassifier::isSupported(chosen.name, chosen.manufacturerName, chosen.fileOrIdentifier))
     {
-        const auto message = utf8("当前版本尚未支持 Kontakt、三体等其他音源，请关注后续版本升级。");
+        const auto message = utf8("当前版本尚未支持所选音源，请关注后续版本升级。");
         pluginStatus.setText(message, juce::dontSendNotification);
         if (completion) completion(false, message);
         return;
@@ -3278,7 +3305,7 @@ void MainComponent::loadPreset(fengyin::SoundPreset preset,
                                  if (completion) completion(false, utf8("方案载入失败：") + message);
                                  return;
                              }
-                             activatePluginOutput(message, preset.instrumentState.getSize() == 0 && preset.samplerState.getSize() == 0);
+                             activatePluginOutput(message, preset.instrumentState.getSize() == 0 && preset.samplerState.getSize() == 0, false);
                              pluginLoading = false;
                              completeLoadedPreset(preset, completion);
                          });
@@ -3330,6 +3357,9 @@ void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
     currentPresetId = preset.id;
     currentPresetIsCustom = preset.customTone;
     applyInstrumentBendRange();
+    // Final controls must follow all preset/model/parameter restoration, for
+    // built-in and user-created packages alike. Full states are not flattened.
+    if(currentPluginBrand=="swam") pluginHost.applyStandardSwamExpressionCurve();
     pluginStatus.setText(utf8("已恢复音色：") + preset.name, juce::dontSendNotification);
     juce::Logger::writeToLog("Preset parameters restored; restoring effect chain");
     pluginLoading = true;
@@ -3346,7 +3376,7 @@ void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
         });
 }
 
-void MainComponent::activatePluginOutput(const juce::String& pluginName, bool applyDefaults)
+void MainComponent::activatePluginOutput(const juce::String& pluginName, bool applyDefaults, bool configureRoutes)
 {
     juce::Logger::writeToLog("Plugin output activation begin; defaults=" + juce::String(applyDefaults ? 1 : 0));
     audio.getDeviceManager().removeAudioCallback(&testSynth);
@@ -3355,11 +3385,16 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName, bool ap
         ? fengyin::SwamPluginClassifier::classify(pluginName.toStdString(), {}) : fengyin::SwamFamily::notSwam;
     if (brand == fengyin::SupportedInstrumentClassifier::Brand::kong) currentPluginBrand = "kong";
     else if (brand == fengyin::SupportedInstrumentClassifier::Brand::swam) currentPluginBrand = "swam";
+    else if (brand == fengyin::SupportedInstrumentClassifier::Brand::kontakt) currentPluginBrand = "kontakt";
     else if (currentPluginBrand.isEmpty()) currentPluginBrand = "swam";
     const auto hasContainerInstrumentIdentity = currentInstrumentKey.startsWith("container:");
-    if (currentPluginBrand == "swam" || currentInstrumentKey.isEmpty()
+    if (currentPluginBrand == "kontakt") {
+        if (!currentInstrumentKey.startsWith("kontakt") && !currentInstrumentKey.startsWith("container:kontakt:")) currentInstrumentKey="kontakt-engine";
+        currentInstrumentChineseName=utf8("Kontakt音源");
+    }
+    if (currentPluginBrand != "kontakt" && (currentPluginBrand == "swam" || currentInstrumentKey.isEmpty()
         || (! currentInstrumentKey.startsWith("kong-") && ! hasContainerInstrumentIdentity
-            && currentInstrumentKey != "container-draft"))
+            && currentInstrumentKey != "container-draft")))
     {
         currentInstrumentKey = currentPluginBrand == "swam"
             ? utf8(fengyin::SwamPluginClassifier::instrumentKey(pluginName.toStdString())) : "kong-engine";
@@ -3368,7 +3403,7 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName, bool ap
     }
     pluginHost.setKongExpressionMode(currentPluginBrand == "kong");
     pluginHost.configureKongTechniqueProfile(currentPluginBrand == "kong" ? currentInstrumentKey : juce::String());
-    if (currentPluginBrand == "swam")
+    if (currentPluginBrand == "swam" && configureRoutes)
         pluginHost.applyStandardSwamExpressionCurve();
     // Complete all plugin-state changes before the real-time callback begins.
     pluginHost.attachTo(audio.getDeviceManager());

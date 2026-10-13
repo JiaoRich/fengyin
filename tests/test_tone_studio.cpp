@@ -152,6 +152,13 @@ int main()
     assert(kongZip.getNumEntries()==3);
     std::unique_ptr<juce::InputStream> kam(kongZip.createStreamForEntry(kongZip.getIndexOfFileName("instrument.KAM")));
     assert(kam&&kam->readEntireStreamAsString()=="KAM bytes");
+    preset.pluginBrand="kontakt";preset.containerAdapter="kontakt";
+    preset.containerProjectState.reset();preset.samplerState=juce::MemoryBlock("native kontakt state",20);
+    const auto kontaktFile=directory.getChildFile("kontakt.fytonepack");
+    assert(fengyin::TonePackage::write(preset,kontaktFile));
+    const auto importedKontakt=fengyin::TonePackage::read(kontaktFile,importError);
+    assert(importedKontakt && importedKontakt->samplerState==preset.samplerState && importedKontakt->containerProjectState.getSize()==0);
+    assert(juce::ZipFile(kontaktFile).getNumEntries()==2);
     // Corrupted contents with an intact old manifest are refused.
     const auto badFile=directory.getChildFile("bad.fytonepack");
     const auto makeBad=[&](const juce::String& path,const juce::String& content)
@@ -170,5 +177,9 @@ int main()
     makeBad("manifest.json",xml);
     assert(!fengyin::TonePackage::read(badFile,importError));
     }
+    const auto bundled=juce::File(juce::String::fromUTF8(__FILE__)).getParentDirectory().getParentDirectory().getChildFile("assets/tone-packages");
+    const auto files=bundled.findChildFiles(juce::File::findFiles,false,"*.fytonepack");
+    assert(files.size()==17);
+    for(const auto& file:files){juce::String error;const auto imported=fengyin::TonePackage::read(file,error);assert(imported && error.isEmpty());}
     assert(directory.deleteRecursively());
 }

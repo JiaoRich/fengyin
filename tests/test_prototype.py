@@ -53,7 +53,7 @@ class PrototypeStructureTests(unittest.TestCase):
     def test_sound_libraries_follow_scanned_plugins(self):
         self.assertIn('id="library-tabs"', HTML)
         self.assertIn("for (const tone of publishedTones)", JS)
-        self.assertIn('std::array<PublishedToneDefinition, 37>', (ROOT / "native" / "Source" / "PublishedToneCatalog.h").read_text(encoding="utf-8"))
+        self.assertIn('std::array<PublishedToneDefinition, 30>', (ROOT / "native" / "Source" / "PublishedToneCatalog.h").read_text(encoding="utf-8"))
         self.assertIn("if(p.studioDraft || !p.published) return", JS)
         self.assertIn("$('#library-tabs').hidden=true", JS)
         self.assertIn("key.startsWith('kong-suona')", JS)
@@ -153,11 +153,12 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertIn("document.body.classList.remove('video-playing')", JS)
 
     def test_performance_transpose_reverb_and_technique_controls_are_live(self):
-        for control_id in ("transpose-key", "performance-key", "performance-reverb", "technique-settings", "technique-dialog"):
+        for control_id in ("transpose-key", "performance-key", "performance-reverb", "technique-dialog"):
             self.assertIn(f'id="{control_id}"', HTML)
+        self.assertNotIn('id="technique-settings"',HTML)
         self.assertIn('电吹管需设C调', HTML)
         self.assertIn("nativeEvent('setKeyTranspose'", JS)
-        self.assertNotIn("请先将电吹管上的调值设置为 C 调", HTML)
+        self.assertIn("请先将电吹管上的调值设置为 C 调", HTML)
         self.assertNotIn("beginKeyCalibration", JS)
         self.assertIn("nativeEvent('setPerformanceReverb'", JS)
         self.assertIn("nativeEvent('beginTechniqueLearn'", JS)

@@ -85,7 +85,7 @@ private:
     void showRecordingManager();
     void showSetupGuide(bool automatic = false);
     static juce::File getOnboardingMarkerFile();
-    void activatePluginOutput(const juce::String& pluginName, bool applyDefaults = true);
+    void activatePluginOutput(const juce::String& pluginName, bool applyDefaults = true, bool configureRoutes = true);
     void applyCurrentSwamToneStyle();
     void applyInstrumentBendRange();
     void changeInstrumentBendRange(const juce::var& payload);

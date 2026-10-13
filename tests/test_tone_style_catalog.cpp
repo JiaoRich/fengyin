@@ -88,7 +88,7 @@ int main()
         std::cout<<"DSP first RMS="<<first<<" second RMS="<<second<<" ratio="<<ratio<<"\n";
         assert(std::isfinite(ratio) && ratio>.8 && ratio<1.25);
     }
-    static_assert(fengyin::publishedToneCatalog.size() == 37);
+    static_assert(fengyin::publishedToneCatalog.size() == 30);
     for (size_t i = 0; i < fengyin::publishedToneCatalog.size(); ++i)
     {
         const auto& tone = fengyin::publishedToneCatalog[i];

@@ -23,7 +23,7 @@ public:
     {
         static const std::array<ContainerPluginAdapterDefinition, 4> adapters {{
             { "kong-v3", "kong", "QinEngineV3", true },
-            { "kontakt", "kontakt", "Kontakt", false },
+            { "kontakt", "kontakt", "Kontakt", true },
             { "falcon", "falcon", "Falcon", false },
             { "three-body", "three-body", "三体音源", false }
         }};

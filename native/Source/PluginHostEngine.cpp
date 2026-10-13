@@ -565,15 +565,15 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve()
     const auto original=state;
     const auto key=SwamPluginClassifier::instrumentKey(plugin->getName().toStdString());
     const bool wantFlutter=simpleOther(key)==PerformanceTechnique::flutter;
-    const auto configured=SwamTechniqueRouting::prepare(state,simpleVibrato(key),simpleGrowl(key),wantFlutter);
+    const auto configured=SwamTechniqueRouting::prepare(state,simpleVibrato(key),simpleGrowl(key),wantFlutter,true);
     if(configured.supported && configured.changed)
     {
         // Once per activation, while the graph is paused, never on each CC or mode switch.
         plugin->setStateInformation(state.getData(),static_cast<int>(state.getSize()));
         juce::MemoryBlock verified;plugin->getStateInformation(verified);
         auto check=verified;
-        const auto routing=SwamTechniqueRouting::prepare(check,simpleVibrato(key),simpleGrowl(key),wantFlutter);
-        if(!routing.supported || routing.changed || routing.vibrato!=configured.vibrato || routing.growl!=configured.growl || routing.flutter!=configured.flutter)
+        const auto routing=SwamTechniqueRouting::prepare(check,simpleVibrato(key),simpleGrowl(key),wantFlutter,true);
+        if(!routing.supported || routing.changed || routing.vibrato!=configured.vibrato || routing.growl!=configured.growl || routing.flutter!=configured.flutter || routing.volume!=configured.volume)
         {
             plugin->setStateInformation(original.getData(),static_cast<int>(original.getSize()));
             state=original;

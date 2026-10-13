@@ -50,7 +50,7 @@ class DirectTonePolicy(unittest.TestCase):
     def test_no_stale_volume_or_transpose_controls(self):
         html = (ROOT / 'prototype/index.html').read_text(encoding='utf-8')
         self.assertNotIn('id="limiter-ceiling"', html)
-        self.assertNotIn('id="transpose-dialog"', html)
+        self.assertIn('id="transpose-dialog"', html)
         self.assertIn('吹奏音量', html)
         guide = (ROOT / 'prototype/voice-guide.js').read_text(encoding='utf-8')
         self.assertNotIn("['演奏调','G003'", guide)

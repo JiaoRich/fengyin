@@ -1,0 +1,146 @@
+[
+  {
+    "id": "tenor-mellow",
+    "sourceName": "次中萨-醇厚-调整后",
+    "instrumentKey": "tenor-sax",
+    "attackExpression": 1.0,
+    "attackChangedWithApproval": false,
+    "opaqueStateUnchanged": true,
+    "toneXmlSha256": "e458e59fe9e4ab82f0addc31883df16a844fa778cc580322e30f0e6d4851c49d"
+  },
+  {
+    "id": "tenor-air-pocket",
+    "sourceName": "次中萨-气包音-已调",
+    "instrumentKey": "tenor-sax",
+    "attackExpression": 1.0,
+    "attackChangedWithApproval": true,
+    "opaqueStateUnchanged": true,
+    "toneXmlSha256": "fe5d975bde887890cd54f1dadb9f38e756014f9454cb805f40dc1e70ffcaa310"
+  },
+  {
+    "id": "tenor-warm",
+    "sourceName": "次中萨-温暖-已调整",
+    "instrumentKey": "tenor-sax",
+    "attackExpression": 1.0,
+    "attackChangedWithApproval": false,
+    "opaqueStateUnchanged": true,
+    "toneXmlSha256": "af264ecb27bc6edc25953c16ee7f0286fb9a26a9e8d2c79a8ea637b0cf25ff09"
+  },
+  {
+    "id": "cello",
+    "sourceName": "大提琴独奏",
+    "instrumentKey": "cello",
+    "attackExpression": 0.666666686534882,
+    "attackChangedWithApproval": false,
+    "opaqueStateUnchanged": true,
+    "toneXmlSha256": "fe83d5f98459848116d4f4bdb4c429b78426f6a52af7d422a017df5a41447a13"
+  },
+  {
+    "id": "clarinet",
+    "sourceName": "单簧管-调整后",
+    "instrumentKey": "clarinet",
+    "attackExpression": 1.0,
+    "attackChangedWithApproval": false,
+    "opaqueStateUnchanged": true,
+    "toneXmlSha256": "a9cd991481ba80d031342dd449c158acf327bb29bc525d406eeb07777373d4d3"
+  },
+  {
+    "id": "bass-trombone",
+    "sourceName": "低音长号-调整后",
+    "instrumentKey": "bass-trombone",
+    "attackExpression": 1.0,
+    "attackChangedWithApproval": false,
+    "opaqueStateUnchanged": true,
+    "toneXmlSha256": "9509d381cb8e85355faee40401959781722d839a4c10630a9309999d508ae306"
+  },
+  {
+    "id": "piccolo",
+    "sourceName": "短笛-调整后",
+    "instrumentKey": "piccolo",
+    "attackExpression": 1.0,
+    "attackChangedWithApproval": false,
+    "opaqueStateUnchanged": true,
+    "toneXmlSha256": "6514f87c3cefbdd561dadf66653b30418a2237893b09738eb94926ba9e435d38"
+  },
+  {
+    "id": "piccolo-trumpet",
+    "sourceName": "高音小号-调整后",
+    "instrumentKey": "piccolo-trumpet",
+    "attackExpression": 1.0,
+    "attackChangedWithApproval": false,
+    "opaqueStateUnchanged": true,
+    "toneXmlSha256": "d67fbe9a8fdb417840b1ebef076b1d00f3819356986b40e5a5269d9a9650cd48"
+  },
+  {
+    "id": "oboe",
+    "sourceName": "双簧管",
+    "instrumentKey": "oboe",
+    "attackExpression": 1.0,
+    "attackChangedWithApproval": false,
+    "opaqueStateUnchanged": true,
+    "toneXmlSha256": "544a86beae12551c44984c88fb0f3b1effc1ca86087d735f5f49590b2db89e32"
+  },
+  {
+    "id": "trumpet",
+    "sourceName": "小号-调整后",
+    "instrumentKey": "trumpet",
+    "attackExpression": 1.0,
+    "attackChangedWithApproval": false,
+    "opaqueStateUnchanged": true,
+    "toneXmlSha256": "a93380e7137c534a5251c599e963fa810377b9b6ed006963312232d9e4586c33"
+  },
+  {
+    "id": "violin",
+    "sourceName": "小提琴独奏-调整后",
+    "instrumentKey": "violin",
+    "attackExpression": 0.666666686534882,
+    "attackChangedWithApproval": false,
+    "opaqueStateUnchanged": true,
+    "toneXmlSha256": "4308c0baa6d1221ba745b47cd5e9c308a6434bf194c0c2e27842bff6a9e725d7"
+  },
+  {
+    "id": "flute",
+    "sourceName": "长笛-调整后",
+    "instrumentKey": "flute",
+    "attackExpression": 1.0,
+    "attackChangedWithApproval": false,
+    "opaqueStateUnchanged": true,
+    "toneXmlSha256": "eabbe4945806b99adc57e7cd3818979512cc21aaeedc2f654c7f7fab630dad15"
+  },
+  {
+    "id": "alto-jazz",
+    "sourceName": "中萨-爵士-调整后",
+    "instrumentKey": "alto-sax",
+    "attackExpression": 1.0,
+    "attackChangedWithApproval": false,
+    "opaqueStateUnchanged": true,
+    "toneXmlSha256": "14bc332c64aff787af2c221889987b657242e239a270565b9d93e8ae4abc1a94"
+  },
+  {
+    "id": "alto-pop",
+    "sourceName": "中萨-流行-调整后",
+    "instrumentKey": "alto-sax",
+    "attackExpression": 1.0,
+    "attackChangedWithApproval": false,
+    "opaqueStateUnchanged": true,
+    "toneXmlSha256": "3438ae5f48f093ccb184f3d3aaddae930203c0f9156304dd0bf5b58e655c9849"
+  },
+  {
+    "id": "alto-deep",
+    "sourceName": "中萨-深情-调整后",
+    "instrumentKey": "alto-sax",
+    "attackExpression": 1.0,
+    "attackChangedWithApproval": false,
+    "opaqueStateUnchanged": true,
+    "toneXmlSha256": "745783dbb78e64adbcc76dd9a2a058edc1988d48b82650f9d68f2842daa69d11"
+  },
+  {
+    "id": "alto-trombone",
+    "sourceName": "中音长号-调整后",
+    "instrumentKey": "alto-trombone",
+    "attackExpression": 1.0,
+    "attackChangedWithApproval": false,
+    "opaqueStateUnchanged": true,
+    "toneXmlSha256": "cc41123740749d049b44d09c790ce66e1f33bb027f07856fc0a6bad17eceb7f1"
+  }
+]

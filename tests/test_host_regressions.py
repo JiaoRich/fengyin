@@ -185,7 +185,7 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('id="copy-machine-code"', (ROOT / "prototype" / "index.html").read_text(encoding="utf-8"))
         self.assertIn("nativeEvent('copyMachineCode')", JS)
         html = (ROOT / "prototype" / "index.html").read_text(encoding="utf-8")
-        self.assertNotIn('id="transpose-dialog"', html)
+        self.assertIn('id="transpose-dialog"', html)
         self.assertIn('id="performance-key"', html)
         self.assertIn('电吹管需设C调', html)
         self.assertNotIn("beginKeyCalibration", MAIN)
@@ -316,10 +316,10 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("targetForRole", MIDI)
 
     def test_kong_and_swam_are_supported_while_other_plugins_are_blocked(self):
-        self.assertIn('item->setProperty("supported", isSwam || isKong)', MAIN)
+        self.assertIn('item->setProperty("supported", isSwam || isKong || isKontakt)', MAIN)
         self.assertIn('withEventListener("loadKongInstrument"', MAIN)
         self.assertIn('pluginHost.selectProgramByAliases', MAIN)
-        self.assertIn("当前版本尚未支持 Kontakt、三体等其他音源", MAIN)
+        self.assertIn("当前版本尚未支持所选音源", MAIN)
         self.assertIn("SwamFamily::notSwam", MAIN)
         self.assertIn('return "technique.roles.v2."', MIDI)
         self.assertIn('name.contains("portamento")', HOST)

@@ -406,7 +406,7 @@ function inferInstrumentKey(name = '') {
 
 function isSupportedInstrument(item = {}) {
   if (item.supported === false) return false;
-  return /swam|kong|qin/i.test(`${item.name || ''} ${item.label || ''} ${item.brand || ''}`)
+  return /swam|kong|qin|kontakt/i.test(`${item.name || ''} ${item.label || ''} ${item.brand || ''}`)
     || item.isSwam === true || item.brand === 'kong';
 }
 
@@ -442,7 +442,6 @@ function showInstrumentArtwork(key, chineseName = '') {
     $('#instrument-empty').querySelector('strong').textContent = chineseName;
     $('#instrument-empty').querySelector('small').textContent = '空音 Qin Engine V3 · 气息与技巧已适配';
     $('.breath-track').classList.remove('inactive');
-    $('#technique-settings').disabled = false;
     return;
   }
   const artwork = instrumentArtwork[key] || instrumentArtwork['alto-sax'];
@@ -454,7 +453,6 @@ function showInstrumentArtwork(key, chineseName = '') {
   picture.hidden = false;
   $('#instrument-art').classList.remove('empty');
   $('.breath-track').classList.remove('inactive');
-  $('#technique-settings').disabled = false;
   if (currentArtworkKey === key) return;
   currentArtworkKey = key;
   picture.classList.add('changing');
@@ -471,7 +469,6 @@ function clearInstrumentArtwork() {
   $('#instrument-art').classList.remove('folk');
   $('.breath-track').classList.add('inactive');
   $('#breath-value').textContent = '—';
-  $('#technique-settings').disabled = true;
 }
 
 function applyPrototypeInstrument(key, chineseName, pluginName) {
@@ -1173,6 +1170,9 @@ $('#master-volume').addEventListener('input', event => {
 function updateTransposeDisplay(targetKey) {
   selectedTargetKey = ((Math.round(Number(targetKey) || 0) % 12) + 12) % 12;
   $('#performance-key').value = String(selectedTargetKey);
+  $('#performance-key').hidden=true;
+  const label=$('#transpose-key > span');
+  if(label)label.textContent=`演奏调：${['C','降D','D','降E','E','F','升F','G','降A','A','降B','B'][selectedTargetKey]}`;
 }
 function changePerformanceKey(value) {
   updateTransposeDisplay(value);
@@ -1180,6 +1180,17 @@ function changePerformanceKey(value) {
   window.fengyinVoice?.say(`V026_${String(selectedTargetKey + 1).padStart(2,'0')}`);
 }
 $('#performance-key').addEventListener('change', event => changePerformanceKey(event.target.value));
+$('#transpose-key').addEventListener('click',()=>{
+  $('#transpose-current-name').textContent=['C调','降D调','D调','降E调','E调','F调','升F调','G调','降A调','A调','降B调','B调'][selectedTargetKey];
+  $$('#transpose-grid [data-key]').forEach(b=>b.classList.toggle('active',Number(b.dataset.key)===selectedTargetKey));
+  $('#transpose-dialog').hidden=false;
+});
+$('#transpose-grid').addEventListener('click',event=>{
+  const button=event.target.closest('[data-key]');if(!button)return;
+  changePerformanceKey(button.dataset.key);$('#transpose-dialog').hidden=true;
+});
+$('#cancel-transpose').addEventListener('click',()=>{$('#transpose-dialog').hidden=true;});
+$('#transpose-dialog').addEventListener('click',event=>{if(event.target===$('#transpose-dialog'))$('#transpose-dialog').hidden=true;});
 updateTransposeDisplay(0);
 function renderBendRange(state) {
   bendState = state;
@@ -1292,8 +1303,8 @@ function renderTechniqueMappings(force = false) {
     const modeLabels = item.id === 'mute' ? {off:'关闭',hardware:'按键触发'} : item.id === 'vibrato' ? {off:'关闭',hardware:'咬嘴控制',breath:'自动颤音'} : {off:'关闭',hardware:'按键触发',breath:'自动嘶吼'};
     return `<article class="technique-card ${item.featured ? '' : 'secondary'}" data-technique-id="${item.id}">
       <div class="technique-card-head"><div class="technique-card-title"><span class="technique-card-icon">${item.icon}</span><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.description)}</p></div></div><span class="technique-card-state">${item.mode === 'off' ? '已关闭' : hardware ? (mapped ? '✓ 已映射' : '待映射') : '✓ 已配置'}</span></div>
-      <div class="technique-control"><select ${item.pluginSupported ? '' : 'disabled'} aria-label="${escapeHtml(item.name)}控制方式">${Object.entries(modeLabels).map(([value,label]) => `<option value="${value}" ${item.mode === value ? 'selected' : ''}>${label}</option>`).join('')}</select><button class="learn-source" ${hardware && item.pluginSupported ? '' : 'hidden'}>${Number(window.fengyinTechniqueLearning) === item.index ? '等待操作…' : mapped ? '重新映射' : '点击映射'}</button></div>
-      <p class="recommendation">${item.routeMissing ? '风吟未能验证此音源的自动技巧映射，请导出诊断供排查；不会绕过曲线写深度参数。' : !item.pluginSupported ? '当前乐器不支持此项' : hardware ? escapeHtml(sourceDescription(item)) : '曲线与深度使用音源方案预设'}</p>
+      <div class="technique-control"><div class="technique-mode-buttons">${Object.entries(modeLabels).map(([value,label]) => `<button type="button" data-technique-mode="${value}" aria-pressed="${item.mode === value}" ${!item.routeMissing ? '' : 'disabled'}>${label}</button>`).join('')}</div><button class="learn-source" ${hardware && !item.routeMissing ? '' : 'hidden'}>${Number(window.fengyinTechniqueLearning) === item.index ? '等待操作…' : mapped ? '重新映射' : '点击映射'}</button></div>
+      <p class="recommendation">${item.routeMissing ? '风吟未能验证此音源的自动技巧映射，请导出诊断供排查；不会绕过曲线写深度参数。' : !item.pluginSupported ? '全局映射会保留；当前音色不使用此项' : hardware ? escapeHtml(sourceDescription(item)) : '曲线与深度使用音源方案预设'}</p>
     </article>`;
   }).join('');
   $$('#technique-list .learn-source').forEach(button => button.addEventListener('click', event => {
@@ -1362,8 +1373,9 @@ function renderAdapterTechniqueGrid() {
   const grid = $('#adapter-technique-grid');
   if (!grid) return;
   techniquePlan = adapterTechniqueItems();
-  grid.innerHTML = '<button type="button" id="simple-techniques-open">设置颤音、嘶吼与其他技巧</button><p>选择音色后设置；弯音信号始终保留给弯音。</p>';
-  $('#simple-techniques-open').onclick = openTechniqueDialog;
+  const list=$('#technique-list');
+  if (list.parentElement !== grid) { grid.replaceChildren(list); }
+  renderTechniqueMappings();
   return;
   const hardware = adapterMode === 'hardware';
   const items = adapterTechniqueItems();
@@ -1485,7 +1497,6 @@ function openTechniqueDialog() {
   techniqueHint.textContent = '保留音源方案的技巧曲线；硬件控制请点击“点击映射”。';
   renderTechniqueMappings();
 }
-$('#technique-settings').addEventListener('click', openTechniqueDialog);
 $('#close-technique-dialog').addEventListener('click', () => {
   nativeEvent('cancelTechniqueLearn');
   techniqueDialog.hidden = true;
@@ -1505,6 +1516,19 @@ techniqueDialog.addEventListener('click', event => {
     nativeEvent('cancelTechniqueLearn');
     techniqueDialog.hidden = true;
   }
+});
+$('#technique-list').addEventListener('click',event=>{
+  const button=event.target.closest('[data-technique-mode]');
+  if(!button || button.disabled)return;
+  const item=techniquePlan.find(entry=>entry.id===button.closest('.technique-card')?.dataset.techniqueId);
+  if(!item)return;
+  item.mode=button.dataset.techniqueMode;
+  nativeEvent('setTechniqueConfiguration',{techniqueId:item.id,mode:item.mode,strength:item.strength/100});
+  if(item.mode==='hardware' && sourceDescription(item)==='未设置')startTechniqueLearning(item,false);
+  renderTechniqueMappings(true);
+});
+window.__JUCE__?.backend?.addEventListener('techniqueConfigurationResult',result=>{
+  if(result?.success===false)toast(result.message || '技巧配置未生效');
 });
 $('#technique-list').addEventListener('change', event => {
   const card = event.target.closest('.technique-card');
@@ -1658,7 +1682,7 @@ $('#scan-swam').addEventListener('click', () => {
 $('#load-instrument').addEventListener('click', () => {
   const index = Number($('#instrument-select').value);
   if (!Number.isInteger(index) || index < 0) return toast('请先扫描并选择一个乐器音源');
-  if (!isSupportedInstrument(availableInstruments[index])) return toast('当前版本尚未支持 Kontakt、三体等其他音源，请关注后续版本升级。');
+  if (!isSupportedInstrument(availableInstruments[index])) return toast('当前版本尚未支持所选音源，请关注后续版本升级。');
   nativeEvent('loadPlugin', {index}); toast('正在加载所选音源…');
 });
 $('#instrument-select').addEventListener('change', () => {
@@ -2205,7 +2229,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.11 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.12 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

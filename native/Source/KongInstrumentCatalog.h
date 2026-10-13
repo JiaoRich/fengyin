@@ -85,12 +85,13 @@ public:
 class SupportedInstrumentClassifier
 {
 public:
-    enum class Brand { unsupported, swam, kong };
+    enum class Brand { unsupported, swam, kong, kontakt };
 
     static Brand classify(const juce::String& name, const juce::String& manufacturer = {},
                           const juce::String& fileOrIdentifier = {})
     {
         const auto text = (name + " " + manufacturer).toLowerCase().removeCharacters(" ._-()");
+        if (text.contains("kontakt") && (text.contains("nativeinstruments") || name.startsWithIgnoreCase("Kontakt"))) return Brand::kontakt;
         if (text.contains("swam") || text.contains("audiomodeling")) return Brand::swam;
         if (text.contains("kongaudio") || text.contains("qinengine") || text.contains("qin3")
             || text.contains(juce::String::fromUTF8("空音"))) return Brand::kong;

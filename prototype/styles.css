@@ -65,3 +65,10 @@ body{background-size:cover;background-position:center;background-attachment:fixe
 #transpose-key button { min-width: 40px; min-height: 40px; padding: 4px 10px; font-size: 22px; }
 #transpose-key b { min-width: 30px; text-align: center; font-variant-numeric: tabular-nums; }
 #transpose-key small { font-size: 11px; color: var(--muted); }
+/* Global technique controls stay expanded on the adapter page. */
+#adapter-technique-grid { display:block; }
+#adapter-technique-grid #technique-list { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px; }
+.technique-mode-buttons { display:flex;flex-wrap:wrap;gap:6px; }
+.technique-mode-buttons button[aria-pressed="true"] { border-color:var(--accent);background:var(--accent-soft);color:var(--accent); }
+#technique-settings { display:none!important; }
+@media(max-width:900px){#adapter-technique-grid #technique-list{grid-template-columns:1fr;}}
