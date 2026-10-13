@@ -211,6 +211,7 @@ private:
     std::array<KongTechniqueRoute, static_cast<size_t>(PerformanceTechnique::count)> kongTechniqueRoutes {};
     std::array<std::atomic<float>, static_cast<size_t>(PerformanceTechnique::count)> kongTechniqueInputs {};
     std::array<std::atomic<bool>, 128> activeNotes {};
+    juce::SpinLock performanceEventLock;
     std::array<std::atomic<float>, 128> activeVelocities {};
     std::atomic<int> performanceChannel { 1 };
     std::atomic<int> lastPitchWheel { 8192 };

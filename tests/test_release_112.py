@@ -76,8 +76,7 @@ class Release112(unittest.TestCase):
         self.assertEqual(html.count('id="configure-asio4all"'),1)
         self.assertNotIn('高级输出设备设置',html)
         self.assertIn("$('#audio-output-select').hidden = asioBridge",source)
-        self.assertIn("$('#configure-asio4all').hidden = false",source)
-        self.assertNotIn("$('#configure-asio4all').hidden = !asioBridge",source)
+        self.assertIn("$('#configure-asio4all').hidden = !asioBridge",source)
         self.assertIn("$('#configure-asio4all').disabled = busy",source)
 
 if __name__=='__main__': unittest.main()

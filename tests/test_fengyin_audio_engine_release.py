@@ -30,7 +30,7 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
     def test_public_activation_requires_installed_virtual_endpoint(self):
         service = self.read("native/Source/AudioDeviceService.cpp")
         self.assertIn("AudioEngineProcessController::isAvailable()", service)
-        self.assertIn('getBoolValue("audioEngineEnabled", true)', service)
+        self.assertIn('getBoolValue("audioEngineEnabled", false)', service)
         self.assertIn("startIsolatedAudioEngine(requestedFrames)", service)
 
     def test_engine_uses_asio4all_without_silent_backend_or_period_fallback(self):
@@ -180,7 +180,7 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
     def test_release_tone_catalog_is_explicit_and_all_embedded_assets_exist(self):
         catalog = self.read("native/Source/PublishedToneCatalog.h")
         expected_names = [
-            "高萨-肯尼基", "高萨-流行", "中萨-爵士", "中萨-深情", "中萨-流行",
+            "高萨-原声", "高萨-流行", "中萨-爵士", "中萨-深情", "中萨-流行",
             "次中萨-醇厚", "次中萨-温暖", "次中萨-气包音",
             "小号", "高音小号", "中音长号", "低音长号", "长笛", "短笛", "单簧管", "双簧管",
             "小提琴", "大提琴",
@@ -200,7 +200,7 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
             self.assertTrue(asset.is_file() and asset.stat().st_size > 300, asset)
         self.assertEqual(
             hashlib.sha256((ROOT / "assets/tone-packages/soprano-kenny.fytonepack").read_bytes()).hexdigest(),
-            "1180d6798ba5884f9ee1d7326a3de1c4b52cdc16aa6b7b97c91235532afafd48",
+            "61f86611c894c8b91697ffdab94bf6e1dccca9063eed0adc4bb55aa6fefea4d7",
         )
 
     def test_kong_release_routes_multichannel_techniques(self):

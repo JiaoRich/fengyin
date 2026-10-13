@@ -7,6 +7,10 @@
 #include "KongReleaseStates.h"
 #include <algorithm>
 #include <cstring>
+#if JUCE_WINDOWS
+#include <windows.h>
+#include <shellapi.h>
+#endif
 
 namespace
 {
@@ -2452,6 +2456,8 @@ void MainComponent::commitContainerInstrument(const juce::String& name)
     currentPresetDisplayName = preset.name;
     currentPresetId = preset.id;
     currentPresetIsCustom = true;
+    pluginHost.configureKongTechniqueProfile(currentPluginBrand == "kong" ? currentInstrumentKey : juce::String());
+    midi.setTechniqueContext(currentInstrumentKey);
     containerInstrumentDraftActive = false;
     containerInstrumentDraftAdapter.clear();
     containerInstrumentStateBeforeSelection.reset();
@@ -3839,6 +3845,47 @@ void MainComponent::applyAudioSettingsFromWeb(const juce::var& payload)
     const auto requestedOutput = payload.getProperty("output", previous.deviceName).toString();
     const auto requestedRate = static_cast<double>(payload.getProperty("sampleRate", previous.sampleRate));
     const auto requestedBuffer = static_cast<int>(payload.getProperty("bufferSize", previous.bufferSize));
+
+   #if JUCE_WINDOWS
+    if (requestedType.containsIgnoreCase("ASIO4ALL") && !fengyin::AudioDeviceService::bridgeDependenciesAvailable())
+    {
+        juce::AlertWindow::showAsync(juce::MessageBoxOptions().withIconType(juce::MessageBoxIconType::QuestionIcon)
+            .withTitle(utf8("安装可选低延迟组件"))
+            .withMessage(utf8("此模式需要ASIO4ALL和VB-CABLE。现在打开随包安装向导？安装过程中可能要求管理员确认和重启。安装完成前保持Windows共享输出。"))
+            .withButton(utf8("安装")).withButton(utf8("取消")),
+            [safe=juce::Component::SafePointer<MainComponent>(this)](int result)
+            {
+                if (!safe || result != 1) return;
+                const auto folder=juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory().getChildFile("components");
+                juce::Thread::launch([safe,folder]
+                {
+                    bool success=true;
+                    for (const auto& relative : {"ASIO4ALL/ASIO4ALL_2_22.exe","VB-CABLE/VBCABLE_Setup_x64.exe"})
+                    {
+                        const auto file=folder.getChildFile(relative);
+                        if (!file.existsAsFile()) {success=false;break;}
+                        const auto path=file.getFullPathName();
+                        const auto directory=file.getParentDirectory().getFullPathName();
+                        SHELLEXECUTEINFOW info{};info.cbSize=sizeof(info);info.fMask=SEE_MASK_NOCLOSEPROCESS;
+                        info.lpVerb=L"runas";info.lpFile=path.toWideCharPointer();info.lpDirectory=directory.toWideCharPointer();info.nShow=SW_SHOWNORMAL;
+                        if (!ShellExecuteExW(&info) || !info.hProcess) {success=false;break;}
+                        // Bound the worker without killing a vendor installer.
+                        const auto waited=WaitForSingleObject(info.hProcess,20 * 60 * 1000);
+                        DWORD code=1;const bool exited=GetExitCodeProcess(info.hProcess,&code)!=0;CloseHandle(info.hProcess);
+                        if(waited!=WAIT_OBJECT_0 || !exited || (code!=0 && code!=3010)) {success=false;break;}
+                    }
+                    juce::MessageManager::callAsync([safe,success]
+                    {
+                        if(!safe)return;
+                        safe->pluginStatus.setText(success ? utf8("组件安装向导已结束，请重启电脑后再选择风吟低延迟模式；重启后会重新检测组件是否可用。")
+                            : utf8("组件安装未完成或已取消，继续使用Windows共享输出。"),juce::dontSendNotification);
+                    });
+                });
+            });
+        emitAudioSettingsState();
+        return;
+    }
+   #endif
 
     auto error = requestedType == previous.deviceType ? juce::String() : audio.selectDeviceType(requestedType);
     if (error.isEmpty())

@@ -87,12 +87,24 @@ juce::String stableParameterIdentifier(juce::AudioProcessorParameter& parameter,
 class TechniqueProcessingGraph final : public juce::AudioProcessorGraph
 {
 public:
+    TechniqueProcessingGraph() { filteredMidi.ensureSize(256 * 1024); }
     std::function<void()> applyTechniqueValues;
+    std::function<bool(const juce::MidiMessage&)> suppressTechniqueMidi;
     void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& messages) override
     {
         if (applyTechniqueValues) applyTechniqueValues();
+        if (suppressTechniqueMidi)
+        {
+            filteredMidi.clear();
+            for (const auto metadata : messages)
+                if (!suppressTechniqueMidi(metadata.getMessage()))
+                    filteredMidi.addEvent(metadata.data,metadata.numBytes,metadata.samplePosition);
+            messages.swapWith(filteredMidi);
+        }
         juce::AudioProcessorGraph::processBlock(buffer, messages);
     }
+private:
+    juce::MidiBuffer filteredMidi;
 };
 bool RecordingAudioProcessorPlayer::enqueueMidi(const juce::MidiMessage& message,
                                                 double timestampSeconds) noexcept
@@ -346,6 +358,18 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
             }
             auto processingGraph = std::make_unique<TechniqueProcessingGraph>();
             processingGraph->applyTechniqueValues = [this] { flushTechniqueValues(); };
+            processingGraph->suppressTechniqueMidi = [this](const juce::MidiMessage& message)
+            {
+                if (kongExpressionMode.load() || !message.isController()) return false;
+                const int route=(message.getChannel()<<8)|(message.getControllerNumber()+1);
+                if (route==((swamExpressionChannel.load()<<8)|(swamExpressionController.load()+1))) return false;
+                for (const auto technique : {PerformanceTechnique::vibrato,PerformanceTechnique::growl,PerformanceTechnique::flutter})
+                {
+                    const auto index=static_cast<size_t>(technique);
+                    if (nativeTechniqueRoutes[index].load()==route && techniqueValues[index].load()==0.0f) return true;
+                }
+                return false;
+            };
             graph = std::move(processingGraph);
             // Configure the graph's output buses before adding the IO node. Without this,
             // the output node initially has zero input channels and silently rejects every
@@ -611,6 +635,8 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve()
     if (result.controller >= 0 && result.controller <= 127)
         swamExpressionController.store(result.controller, std::memory_order_relaxed);
     lastBreathMidiValue.store(-1, std::memory_order_relaxed);
+    for (const auto technique : {PerformanceTechnique::vibrato, PerformanceTechnique::growl, PerformanceTechnique::flutter})
+        techniqueChanged(technique, 0.0f);
     // Activation only discovers routing. Saved/native curves remain authoritative;
     // never write a synthetic curve back into the live instrument here.
     juce::Logger::writeToLog("SWAM expression state update complete");
@@ -909,6 +935,7 @@ bool PluginHostEngine::rebuildConnections()
 
 void PluginHostEngine::noteOn(int noteNumber, float velocity, double timestampSeconds) noexcept
 {
+    const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
     const auto note = juce::jlimit(0, 127, noteNumber);
     const auto kong = kongExpressionMode.load(std::memory_order_relaxed);
     velocity = performanceVelocity(kong, velocity);
@@ -943,6 +970,7 @@ void PluginHostEngine::noteOn(int noteNumber, float velocity, double timestampSe
 
 void PluginHostEngine::noteOff(int noteNumber, double timestampSeconds) noexcept
 {
+    const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
     const auto note = juce::jlimit(0, 127, noteNumber);
     activeNotes[static_cast<size_t>(note)].store(false, std::memory_order_relaxed);
     queue(juce::MidiMessage::noteOff(performanceChannel.load(std::memory_order_relaxed), note), timestampSeconds);
@@ -989,6 +1017,7 @@ void PluginHostEngine::pitchBendChanged(float bipolarValue, double timestampSeco
 
 void PluginHostEngine::techniqueChanged(PerformanceTechnique technique, float value) noexcept
 {
+    const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
     const auto index = static_cast<size_t>(technique);
     if (index >= techniqueValues.size()) return;
     const auto safeValue = juce::jlimit(0.0f, 1.0f, value);
@@ -1021,7 +1050,8 @@ void PluginHostEngine::techniqueChanged(PerformanceTechnique technique, float va
                 changeKongArticulation(route.channel, selected,
                     [this, &route](int note) { return performanceChannel.load(std::memory_order_relaxed) == route.channel
                         && activeNotes[static_cast<size_t>(note)].load(std::memory_order_relaxed); },
-                    [this](const auto& message) { queue(message, 0.0); });
+                    [this](const auto& message) { queue(message, 0.0); },
+                    [this](int note) { return activeVelocities[static_cast<size_t>(note)].load(std::memory_order_relaxed); });
             }
         }
         if (route.channel > 1)
@@ -1037,6 +1067,15 @@ void PluginHostEngine::techniqueChanged(PerformanceTechnique technique, float va
         return;
     }
     techniqueValues[index].store(safeValue, std::memory_order_relaxed);
+    // OFF/wait is an explicit gate, not CC0 through a potentially non-zero
+    // minimum curve. Active values still travel through the original curve.
+    if (safeValue == 0.0f && (technique == PerformanceTechnique::vibrato
+        || technique == PerformanceTechnique::growl || technique == PerformanceTechnique::flutter))
+    {
+        lastNativeTechniqueMessages[index].store(0, std::memory_order_relaxed);
+        techniqueDirty[index].store(true, std::memory_order_release);
+        return;
+    }
     // A direct depth parameter write bypasses SWAM's mapping curve. Never
     // advertise the simplified SWAM modes without an independent MIDI route.
     if ((technique == PerformanceTechnique::vibrato || technique == PerformanceTechnique::growl)
@@ -1083,22 +1122,20 @@ void PluginHostEngine::configureKongTechniqueProfile(const juce::String& key) no
     player.beginOnsetTrace();
     juce::Logger::writeToLog("ONSET begin 30s bounded capture: " + key);
     const auto state = captureContainerState();
-    if (state.getSize() < 9) return;
-    const auto* bytes = static_cast<const char*>(state.getData());
-    const auto length = juce::ByteOrder::littleEndianInt(bytes + 4);
-    if (length > state.getSize() - 8) return;
-    auto wrapper = juce::parseXML(juce::String::fromUTF8(bytes + 8, static_cast<int>(length)));
-    if (!wrapper) return;
-    auto* component = wrapper->getChildByName("IComponent");
-    juce::MemoryBlock payload;
-    if (!component || !payload.fromBase64Encoding(component->getAllSubText())) return;
-    auto tree = juce::ValueTree::readFromData(payload.getData(), payload.getSize());
+    auto tree = KongProjectFile::readPluginComponentState(state);
+    if (!tree.isValid())
+    {
+        juce::Logger::writeToLog("Kong technique binding failed: unsupported state; instrument=" + key);
+        return;
+    }
     const auto bind = [this, &tree](PerformanceTechnique technique, const juce::StringArray& names)
     {
         const auto binding = findKongTechnique(tree, names);
         kongTechniqueRoutes[static_cast<size_t>(technique)] = {binding.channel, binding.keyswitch, binding.normalKey};
     };
-    bind(PerformanceTechnique::vibrato, {"Vib_Main", "Vib_Layers", "Vib_Mellow", "Vib_Bright"});
+    bind(PerformanceTechnique::vibrato, key == "kong-xun"
+        ? juce::StringArray{"Vib_Mellow", "Vib_Main", "Vib_Layers", "Vib_Bright"}
+        : juce::StringArray{"Vib_Main", "Vib_Layers", "Vib_Mellow", "Vib_Bright"});
     bind(PerformanceTechnique::flutter, {"Flutter", "Flutter2"});
     bind(PerformanceTechnique::tremolo, {"Main_Shake_Mellow", "Roll", "Sus_Main_Roll", "Tremolo"});
     bind(PerformanceTechnique::pizzicato, {"Pizz"});
@@ -1346,7 +1383,10 @@ void PluginHostEngine::flushTechniqueValues()
 {
     for (size_t index = 0; index < techniqueParameters.size(); ++index)
         if (techniqueDirty[index].exchange(false, std::memory_order_acq_rel))
-            if (nativeTechniqueRoutes[index].load() == 0)
+            if (nativeTechniqueRoutes[index].load() == 0
+                || (techniqueValues[index].load() == 0.0f && (index == static_cast<size_t>(PerformanceTechnique::vibrato)
+                    || index == static_cast<size_t>(PerformanceTechnique::growl)
+                    || index == static_cast<size_t>(PerformanceTechnique::flutter))))
               if (auto* parameter = techniqueParameters[index].load(std::memory_order_acquire))
                 parameter->setValueNotifyingHost(techniqueValues[index].load(std::memory_order_relaxed));
 }

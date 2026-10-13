@@ -43,10 +43,15 @@ struct SwamTechniqueRouting {
             if(entry->getIntAttribute("enabled")==1&&entry->getIntAttribute("messageType",-1)==1)used.insert(entry->getIntAttribute("msb",-1));
         }
         const auto configure=[&](const char* id,int preferred,bool wanted,int& selected,bool shared=false)->bool {
-            if(!wanted)return true;
             juce::XmlElement* target=nullptr;
             for(auto* entry:table->getChildIterator())if(entry->getStringAttribute("parameterId").equalsIgnoreCase(id)){
                 if(target)return false;target=entry;
+            }
+            if (!wanted) {
+                if (target && target->getIntAttribute("enabled") != 0) {
+                    target->setAttribute("enabled",0); result.changed=true;
+                }
+                return true;
             }
             if(!target){
                 target=table->createNewChildElement("MIDIRemappingEntry");target->setAttribute("parameterId",id);

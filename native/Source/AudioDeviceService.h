@@ -52,6 +52,7 @@ public:
     bool followSystemDefaultOutput();
     // 对当前输出设备应用适合实时演奏的设置：关闭输入、优先 48 kHz，并选用设备可稳定支持的低延迟缓冲。
     juce::String optimiseForLivePerformance();
+    [[nodiscard]] static bool bridgeDependenciesAvailable();
     // 只监测持续丢音，不在演奏中偷偷重启设备或放大缓冲。
     bool hasSustainedRuntimeInstability();
     // 首次启动或检测到新输出设备时，在后台依次试跑可用的低延迟方案。

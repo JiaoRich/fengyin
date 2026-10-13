@@ -249,11 +249,18 @@ int main(int argc, char** argv)
             }
             // VST3 parameter getters report the saved base values, not always
             // the live MIDI modulation. Verify the rendered signal instead.
-            const auto render=[&](int v,int g){
+            const auto render=[&](int v,int g,bool explicitOff=false){
                 std::vector<float> samples;
                 for(int block=0;block<600;++block){
                     audio.clear();midi.clear();
-                    if(block==0){midi.addEvent(juce::MidiMessage::controllerEvent(vibratoChannel,plan.vibrato,v),0);if(needsGrowl)midi.addEvent(juce::MidiMessage::controllerEvent(growlChannel,plan.growl,g),0);}
+                    if(block==0){
+                        if(explicitOff) {
+                            for(auto* p:plugin->getParameters())
+                                if(p->getName(80)=="Vibrato Depth" || p->getName(80)=="Growl") p->setValueNotifyingHost(0.0f);
+                        } else {
+                            midi.addEvent(juce::MidiMessage::controllerEvent(vibratoChannel,plan.vibrato,v),0);if(needsGrowl)midi.addEvent(juce::MidiMessage::controllerEvent(growlChannel,plan.growl,g),0);
+                        }
+                    }
                     plugin->processBlock(audio,midi);
                     if(block>=200)samples.insert(samples.end(),audio.getReadPointer(0),audio.getReadPointer(0)+256);
                 }
@@ -279,6 +286,9 @@ int main(int argc, char** argv)
             std::cout<<"Rendered pitch spread off="<<off[0]<<" on="<<on[0]<<" correlation off="<<off[1]<<" growl="<<growled[1]<<" power="<<off[2]<<"\n";
             if(off[2]<=1e-9 || on[0]<=off[0]+2.0)return 23;
             if(needsGrowl && std::abs(growled[1]-off[1])<.005)return 24;
+            const auto gated=analyse(render(0,0,true));
+            std::cout<<"Explicit OFF pitch spread="<<gated[0]<<" correlation="<<gated[1]<<" power="<<gated[2]<<"\n";
+            if(gated[2]<=1e-9 || gated[0]>off[0]+5.0)return 25;
             plugin->releaseResources();std::cout<<"PASS native routing readback, preserved parameters, CC drives both techniques\n";return 0;
         }
         const auto mapping = fengyin::SwamExpressionCurve::applyToState(state);

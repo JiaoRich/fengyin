@@ -23,6 +23,8 @@ int main()
         juce::MemoryBlock component;
         assert(component.fromBase64Encoding(wrapper->getChildByName("IComponent")->getAllSubText()));
         const auto tree = juce::ValueTree::readFromData(component.getData(), component.getSize());
+        assert(fengyin::KongProjectFile::readPluginComponentState(state).isEquivalentTo(tree));
+        assert(fengyin::KongProjectFile::readPluginComponentState(component).isEquivalentTo(tree));
         struct Expected { const char* asset; const char* technique; int note; };
         for (const auto& expected : {Expected{"erhu.kam","Vib_Main",26}, {"guzheng.kam","Main_Shake_Mellow",28},
             {"hulusi.kam","Vib_Main",26}, {"liuqin.kam","Roll",30}, {"matouqin.kam","Pizz",32},

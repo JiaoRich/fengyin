@@ -5,7 +5,7 @@
   #define OutputDir "."
 #endif
 #ifndef AppVersion
-  #define AppVersion "1.1.12"
+  #define AppVersion "1.1.13"
 #endif
 #ifndef ChineseMessages
   #define ChineseMessages "compiler:Languages\ChineseSimplified.isl"
@@ -43,6 +43,7 @@ FinishedRestartMessage=风吟已安装完成。音频驱动需要重启电脑后
 
 [Tasks]
 Name: "desktopicon"; Description: "在桌面创建快捷方式"; GroupDescription: "快捷方式："; Flags: unchecked
+Name: "asiobridge"; Description: "安装 ASIO4ALL 和 VB-CABLE（仅风吟低延迟模式需要）"; GroupDescription: "可选音频组件："; Flags: unchecked
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -189,6 +190,8 @@ begin
       SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     RaiseException('无法保存安装前的声音输出，请关闭风吟后重试。');
   if ResultCode <> 0 then RaiseException('声音输出仍被占用或无法保存，请关闭风吟后重试。');
+  if WizardIsTaskSelected('asiobridge') then
+  begin
   MarkAudioDriverRestart();
   RunRequiredComponent('{app}\components\ASIO4ALL\ASIO4ALL_2_22.exe', '', '');
   if NeedsASIO4ALL() then RaiseException('ASIO4ALL 安装未完成，请完成原厂安装向导。');
@@ -200,6 +203,7 @@ begin
     RunRequiredComponent('{app}\components\VB-CABLE\VBCABLE_Setup_x64.exe', '', '{app}\components\VB-CABLE');
   end;
   VerifyVBCableInstalled();
+  end;
   RunRequiredComponent('{app}\components\Fresh Air\Setup Fresh Air v1.0.8.exe',
     '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /TYPE=full /LOG="{app}\components\Fresh Air\install.log"', '');
   VerifyFreshAirInstalled();

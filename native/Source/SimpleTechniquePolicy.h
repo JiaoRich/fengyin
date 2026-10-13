@@ -12,6 +12,11 @@ inline bool simpleGrowl(std::string_view key) {
     return key == "alto-sax" || key == "tenor-sax" || key == "baritone-sax";
 }
 inline PerformanceTechnique simpleOther(std::string_view key) {
+    if (key == "kong-erhu-2") key = "kong-erhu";
+    if (key == "kong-guzheng-2") key = "kong-guzheng";
+    if (key == "kong-dizi-2") key = "kong-dizi";
+    if (key == "kong-hulusi-2") key = "kong-hulusi";
+    if (key == "kong-suona-2") key = "kong-suona";
     if (key == "flute" || key == "piccolo" || key == "kong-dizi" || key == "kong-suona" || key == "kong-sheng") return PerformanceTechnique::flutter;
     if (key == "kong-guzheng" || key == "kong-liuqin" || key == "kong-pipa" || key == "kong-sanxian") return PerformanceTechnique::tremolo;
     if (key == "kong-erhu" || key == "kong-matouqin" || key == "kong-hulusi" || key == "kong-xun" || key == "kong-nanxiao") return PerformanceTechnique::vibrato;

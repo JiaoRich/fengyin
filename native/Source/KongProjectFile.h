@@ -161,7 +161,7 @@ public:
         return wrapVst3ComponentState(serialise(state));
     }
 
-private:
+public:
     static juce::ValueTree readPluginComponentState(const juce::MemoryBlock& data)
     {
         // JUCE's VST3 host wraps the plug-in's IComponent state in a
@@ -186,6 +186,7 @@ private:
         return juce::ValueTree::readFromData(componentState.getData(), componentState.getSize());
     }
 
+private:
     static juce::MemoryBlock wrapVst3ComponentState(const juce::MemoryBlock& componentState)
     {
         if (componentState.getSize() == 0) return {};

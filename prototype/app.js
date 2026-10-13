@@ -162,7 +162,7 @@ const toneStyleLibrary = {
   "soprano-sax": [
     {
       "id": "kenny",
-      "name": "肯尼基",
+      "name": "原声",
       "description": "",
       "eq": 0.0,
       "reverb": 34.4393998384476,
@@ -1961,8 +1961,17 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
         .filter(({item}) => isSupportedInstrument(item));
       const swam = supported.filter(({item}) => item.brand === 'swam' || item.isSwam === true);
       const kong = supported.filter(({item}) => item.brand === 'kong');
+      const kontakt = supported.filter(({item}) => item.brand === 'kontakt' || /kontakt/i.test(item.name || item.label || ''));
       const unsupported = availableInstruments.map((item,index) => ({item,index})).filter(({item}) => !isSupportedInstrument(item));
       $('#instrument-select').innerHTML = `<option value="">请选择音源</option>${swam.length ? `<optgroup label="西洋乐器 · SWAM">${swam.map(({item,index}) => `<option value="${index}">${escapeHtml(item.label || item.name)}</option>`).join('')}</optgroup>` : ''}${kong.length ? `<optgroup label="中国民乐 · 空音">${kong.map(({item,index}) => `<option value="${index}">${escapeHtml(item.label || item.name)}</option>`).join('')}</optgroup>` : ''}${unsupported.length ? `<optgroup label="暂未支持">${unsupported.map(({item,index}) => `<option class="unsupported-plugin" value="${index}">${escapeHtml(item.label || item.name)}（暂未支持）</option>`).join('')}</optgroup>` : ''}`;
+      if (kontakt.length) {
+        const group = document.createElement('optgroup'); group.label = '采样音源 · Kontakt';
+        for (const {item,index} of kontakt) {
+          const option = document.createElement('option'); option.value = String(index);
+          option.textContent = item.label || item.name; group.appendChild(option);
+        }
+        $('#instrument-select').appendChild(group);
+      }
     } else $('#instrument-select').innerHTML = '<option value="">未找到乐器音源</option>';
     $('#effect-select').innerHTML = availableEffects.length
       ? availableEffects.map((name,index) => `<option value="${index}">${escapeHtml(name)}</option>`).join('')
@@ -2160,13 +2169,13 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   const asioBridge = String(state?.type || '').includes('ASIO4ALL');
   $('#audio-output-select').hidden = asioBridge;
   // Keep the recovery entry available even after ASIO startup falls back.
-  $('#configure-asio4all').hidden = false;
+  $('#configure-asio4all').hidden = !asioBridge;
   $('#configure-asio4all').innerHTML = '打开 ASIO4ALL 面板（选择输出端点） <span aria-hidden="true">↗</span>';
   $('#configure-asio4all').style.marginTop = asioBridge ? '0' : '10px';
   $('#audio-output-label').htmlFor = asioBridge ? 'configure-asio4all' : 'audio-output-select';
   $('#audio-output-help').textContent = asioBridge
     ? '面板中选择实际声卡输出，不要启用虚拟线缆或麦克风；关闭后尝试恢复声音。'
-    : '可选择共享输出设备；测试 ASIO4ALL 时，先打开下方面板选择端点，再选择风吟低延迟模式。';
+    : '选择实际扬声器或耳机；Windows共享输出不需要ASIO4ALL。';
   $('#audio-driver-help').textContent = asioBridge
     ? '默认低延迟方案：ASIO4ALL 输出，VB-CABLE 接收网页声音；浏览器输出保持“默认”'
     : sharedAsioActive
@@ -2229,7 +2238,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.12 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.13 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

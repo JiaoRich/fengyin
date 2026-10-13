@@ -73,23 +73,26 @@ int main()
                 "SWAM velocity must remain unchanged");
     }
     fengyin::changeKongArticulation(1, 26, [](int) { return false; },
-        [&](const auto& message) { messages.push_back(message); });
+        [&](const auto& message) { messages.push_back(message); }, [](int) { return 0.7f; });
     require(messages.empty(), "Idle bite must not emit keyswitch notes");
     fengyin::changeKongArticulation(1, 26, [](int n) { return n == 60; },
-        [&](const auto& message) { messages.push_back(message); });
-    require(messages.size() == 2 && messages[0].isNoteOn() && messages[0].getNoteNumber() == 26
-        && messages[1].isNoteOff() && messages[1].getNoteNumber() == 26,
-        "Articulation must not interrupt or retrigger the musical note");
+        [&](const auto& message) { messages.push_back(message); }, [](int) { return 0.7f; });
+    require(messages.size() == 4 && messages[0].isNoteOff() && messages[0].getNoteNumber() == 60
+        && messages[1].isNoteOn() && messages[1].getNoteNumber() == 26
+        && messages[2].isNoteOff() && messages[2].getNoteNumber() == 26
+        && messages[3].isNoteOn() && messages[3].getNoteNumber() == 60,
+        "Articulation must select between old note off and same-pitch restart");
+    require(std::abs(messages[3].getFloatVelocity()-0.7f)<0.01f,"Restart must preserve original velocity");
     messages.clear();
     for (int cycle = 0; cycle < 100; ++cycle)
     {
         for (int key : {26, 24})
             fengyin::changeKongArticulation(1, key, [](int n) { return n == 60; },
-                [&](const auto& message) { messages.push_back(message); });
+                [&](const auto& message) { messages.push_back(message); }, [](int) { return 0.7f; });
     }
-    require(messages.size() == 400, "Repeated bite/release must emit exactly paired keyswitches");
+    require(messages.size() == 800, "Repeated press/release must restart held voice exactly once");
     for (const auto& message : messages)
-        require(message.isNoteOnOrOff() && (message.getNoteNumber() == 24 || message.getNoteNumber() == 26),
+        require(message.isNoteOnOrOff() && (message.getNoteNumber() == 24 || message.getNoteNumber() == 26 || message.getNoteNumber() == 60),
             "Bite/release must not change pitch, expression or the held musical note");
     messages.clear();
     fengyin::sendPerformanceReset(true, [&](const auto& message) { messages.push_back(message); });

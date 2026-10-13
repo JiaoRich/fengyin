@@ -11,7 +11,7 @@
 
 namespace
 {
-constexpr int currentAudioSetupRevision = 9;
+constexpr int currentAudioSetupRevision = 10;
 constexpr int currentTuningRevision = 8;
 constexpr double latencyCandidateTestMs = 3500.0;
 const auto engineModeName = juce::String::fromUTF8("风吟低延迟（ASIO4ALL）");
@@ -106,19 +106,18 @@ juce::String AudioDeviceService::initialise()
 {
     juce::String startupError;
    #if JUCE_WINDOWS
-    // Prefer the verified VB-CABLE + ASIO4ALL route. Missing prerequisites
-    // leave Windows shared output available without changing system drivers.
+    // Default to physical Windows shared output. ASIO bridge is opt-in.
     auto* audioSettings = properties.getUserSettings();
-    if (audioSettings != nullptr && audioSettings->getIntValue("productionAudioRouteRevision", 0) < 2)
+    if (audioSettings != nullptr && audioSettings->getIntValue("productionAudioRouteRevision", 0) < 3)
     {
-        audioSettings->setValue("productionAudioRouteRevision", 2);
-        if (!audioSettings->getBoolValue("audioModeExplicitChoice", false))
-            audioSettings->setValue("audioEngineEnabled", true);
+        audioSettings->setValue("productionAudioRouteRevision", 3);
+        audioSettings->setValue("audioEngineEnabled", false);
+        audioSettings->removeValue("audioDevice");
         if (!audioSettings->containsKey("audioEngineBuffer"))
             audioSettings->setValue("audioEngineBuffer", 128);
     }
-    const auto engineEnabled = audioSettings == nullptr
-        || audioSettings->getBoolValue("audioEngineEnabled", true);
+    const auto engineEnabled = audioSettings != nullptr
+        && audioSettings->getBoolValue("audioEngineEnabled", false);
     if (engineEnabled && (audioengine::AudioEngineProcessController::isAvailable()
         || juce::SystemStats::getEnvironmentVariable("FENGYIN_AUDIO_ENGINE_TEST", {}) == "1"))
     {
@@ -181,7 +180,18 @@ juce::String AudioDeviceService::restorePhysicalSharedOutput()
             state.setAttribute("audioInputDeviceName", juce::String());
             state.setAttribute("audioDeviceOutChans", "11");
             failure = manager.initialise(0, 2, &state, false);
-            if (failure.isEmpty() && manager.getCurrentAudioDevice() != nullptr) return {};
+            if (failure.isEmpty() && manager.getCurrentAudioDevice() != nullptr)
+            {
+                auto setup = manager.getAudioDeviceSetup();
+                if (manager.getCurrentAudioDevice()->getAvailableBufferSizes().contains(128))
+                {
+                    setup.bufferSize = 128;
+                    const auto bufferError = manager.setAudioDeviceSetup(setup, false);
+                    if (bufferError.isNotEmpty())
+                        juce::Logger::writeToLog("Shared 128-frame request rejected: " + bufferError);
+                }
+                if (manager.getCurrentAudioDevice() != nullptr) return {};
+            }
             manager.closeAudioDevice();
         }
     }
@@ -413,7 +423,7 @@ juce::String AudioDeviceService::selectDeviceType(const juce::String& typeName)
    #if JUCE_WINDOWS
     if (typeName == engineModeName)
     {
-        if (! audioengine::AudioEngineProcessController::isAvailable())
+        if (! bridgeDependenciesAvailable())
             return juce::String::fromUTF8(fengyin::audioengine::vbCableTrial()
                 ? "VB-CABLE 尚未安装或 CABLE Input 未启用，请安装基础版 VB-CABLE 后重启电脑"
                 : "风吟共享扬声器尚未安装或未启用");
@@ -495,6 +505,22 @@ juce::String AudioDeviceService::selectDeviceType(const juce::String& typeName)
         saveSettings();
     }
     return lastError;
+}
+
+bool AudioDeviceService::bridgeDependenciesAvailable()
+{
+   #if JUCE_WINDOWS
+    if (!audioengine::AudioEngineProcessController::isAvailable()) return false;
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\ASIO", 0, KEY_READ | KEY_WOW64_64KEY, &key) != ERROR_SUCCESS) return false;
+    bool found = false;
+    wchar_t name[256]; DWORD length = 256;
+    for (DWORD index=0; RegEnumKeyExW(key,index,name,&length,nullptr,nullptr,nullptr,nullptr)==ERROR_SUCCESS; ++index,length=256)
+        if (juce::String(name).containsIgnoreCase("ASIO4ALL")) { found=true; break; }
+    RegCloseKey(key); return found;
+   #else
+    return false;
+   #endif
 }
 
 juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName,
@@ -646,8 +672,8 @@ juce::String AudioDeviceService::preferredLiveDeviceType()
     const auto types = getAvailableDeviceTypes();
    #if JUCE_WINDOWS
     for (const auto& type : types)
-        if (type.containsIgnoreCase("Low Latency Mode")
-            || type.containsIgnoreCase(juce::String::fromUTF8("低延迟")))
+        if (type != engineModeName && (type.containsIgnoreCase("Low Latency Mode")
+            || type.containsIgnoreCase(juce::String::fromUTF8("低延迟"))))
             return type;
    #endif
     return {};
@@ -692,8 +718,8 @@ juce::String AudioDeviceService::configureAutomaticType(const juce::String& type
         setup.useDefaultInputChannels = false;
         setup.useDefaultOutputChannels = true;
         setup.sampleRate = sharedMixRate(*device);
-        setup.bufferSize = minimumLegalBuffer(device->getAvailableBufferSizes(),
-                                              device->getCurrentBufferSizeSamples());
+        setup.bufferSize = device->getAvailableBufferSizes().contains(128) ? 128
+            : minimumLegalBuffer(device->getAvailableBufferSizes(), device->getCurrentBufferSizeSamples());
         lastError = manager.setAudioDeviceSetup(setup, true);
     }
     return lastError;

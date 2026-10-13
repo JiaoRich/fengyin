@@ -325,8 +325,7 @@ void MidiInputService::setTechniqueMappings(const juce::Array<TechniqueMapping>&
     }
     if (auto* sink = performanceSink.load(std::memory_order_acquire))
         for (const auto& mapping : previous)
-            if (mapping.mode != TechniqueControlMode::off)
-                sink->techniqueChanged(targetForRole(mapping.technique), 0.0f);
+            sink->techniqueChanged(targetForRole(mapping.technique), 0.0f);
     saveTechniqueMappings();
 }
 
