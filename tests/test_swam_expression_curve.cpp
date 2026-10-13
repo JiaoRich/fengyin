@@ -1,5 +1,8 @@
 #include "SwamExpressionCurve.h"
 #include "TechniqueMidiDeduplication.h"
+#include "SwamTechniqueRouting.h"
+#include "SimpleTechniquePolicy.h"
+#include "SwamPluginClassifier.h"
 
 #include <cassert>
 #include <cmath>
@@ -104,6 +107,39 @@ int main(int argc, char** argv)
         assert(native.found && native.controller == 11 && !native.changed);
         assert(before == savedState);
         assert(!native.routes.empty());
+        auto prepared=before;
+        const bool growl=juce::String(filename).startsWith("tenor");
+        const auto routes=fengyin::SwamTechniqueRouting::prepare(prepared,true,growl);
+        if(!routes.supported)std::cerr<<"Routing stage="<<routes.stage<<" asset="<<filename<<std::endl;
+        assert(routes.supported && routes.vibrato>=0 && (!growl || routes.growl>=0));
+        const auto changed=fengyin::SwamExpressionCurve::applyToState(prepared);
+        assert(changed.found && changed.controller==native.controller);
+        auto twice=prepared;
+        assert(!fengyin::SwamTechniqueRouting::prepare(twice,true,growl).changed);
+        assert(twice==prepared);
+        auto flutterState=before;
+        const auto flutterRouting=fengyin::SwamTechniqueRouting::prepare(flutterState,false,false,true);
+        assert(flutterRouting.supported && flutterRouting.flutter>=1);
+        const auto flutterOnce=flutterState;
+        assert(!fengyin::SwamTechniqueRouting::prepare(flutterState,false,false,true).changed);
+        assert(flutterOnce==flutterState);
+        const auto decode=[](const juce::MemoryBlock& s){
+            auto outer=juce::AudioProcessor::getXmlFromBinary(s.getData(),static_cast<int>(s.getSize()));juce::MemoryBlock b;
+            b.fromBase64Encoding(outer->getChildByName("IComponent")->getAllSubText());
+            return juce::AudioProcessor::getXmlFromBinary(static_cast<const char*>(b.getData())+176,static_cast<int>(b.getSize()-176));
+        };
+        auto oldXml=decode(before),newXml=decode(prepared);
+        auto* oldTable=fengyin::SwamTechniqueRouting::findTable(*oldXml);
+        auto* newTable=fengyin::SwamTechniqueRouting::findTable(*newXml);
+        for(auto* oldEntry:oldTable->getChildIterator()){
+            auto* oldCurve=oldEntry->getChildByName("MIDIRemappingCurve");if(!oldCurve)continue;
+            juce::XmlElement* newEntry=nullptr;
+            for(auto* e:newTable->getChildIterator())if(e->getStringAttribute("parameterId")==oldEntry->getStringAttribute("parameterId"))newEntry=e;
+            assert(newEntry && oldCurve->isEquivalentTo(newEntry->getChildByName("MIDIRemappingCurve"), false));
+        }
+        oldXml->findParentElementOf(oldTable)->removeChildElement(oldTable,true);
+        newXml->findParentElementOf(newTable)->removeChildElement(newTable,true);
+        assert(oldXml->isEquivalentTo(newXml.get(), false)); // All non-mapping state is preserved.
     }
     // Optional installed-plugin verification: no audio device, no saved settings.
     if (argc >= 2)
@@ -157,6 +193,80 @@ int main(int argc, char** argv)
         juce::MemoryBlock state;
         plugin->getStateInformation(state);
         const auto before = state;
+        if(argc>=3 && juce::String(argv[2])=="--routing")
+        {
+            std::vector<float> values;for(auto* p:plugin->getParameters())values.push_back(p->getValue());
+            auto routed=state;
+            const bool needsGrowl=fengyin::simpleGrowl(fengyin::SwamPluginClassifier::instrumentKey(plugin->getName().toStdString()));
+            const auto plan=fengyin::SwamTechniqueRouting::prepare(routed,true,needsGrowl);
+            if(!plan.supported)return 20;
+            if(plan.changed)plugin->setStateInformation(routed.getData(),static_cast<int>(routed.getSize()));
+            juce::MemoryBlock restored;plugin->getStateInformation(restored);
+            auto inspect=restored;const auto checked=fengyin::SwamTechniqueRouting::prepare(inspect,true,needsGrowl);
+            if(!checked.supported||checked.changed||checked.vibrato!=plan.vibrato||checked.growl!=plan.growl)return 21;
+            int index=0;for(auto* p:plugin->getParameters())if(std::abs(p->getValue()-values[static_cast<size_t>(index++)])>.00001f)return 22;
+            auto routes=fengyin::SwamExpressionCurve::applyToState(restored);
+            {
+                auto o=juce::AudioProcessor::getXmlFromBinary(restored.getData(),static_cast<int>(restored.getSize()));juce::MemoryBlock b;
+                b.fromBase64Encoding(o->getChildByName("IComponent")->getAllSubText());
+                auto x=juce::AudioProcessor::getXmlFromBinary(static_cast<const char*>(b.getData())+176,static_cast<int>(b.getSize()-176));
+                if(auto* t=fengyin::SwamTechniqueRouting::findTable(*x))for(auto* e:t->getChildIterator())if(e->getStringAttribute("parameterId").equalsIgnoreCase("vibratoDepth"))std::cout<<e->toString()<<std::endl;
+            }
+            int vibratoChannel=1,growlChannel=1;
+            for(const auto& r:routes.routes){if(r.parameter.equalsIgnoreCase("vibratoDepth"))vibratoChannel=r.channel;if(r.parameter.equalsIgnoreCase("growl"))growlChannel=r.channel;}
+            juce::AudioBuffer<float> audio(2,256);juce::MidiBuffer midi;
+            midi.addEvent(juce::MidiMessage::controllerEvent(1,routes.controller,80),0);
+            midi.addEvent(juce::MidiMessage::noteOn(1,60,static_cast<juce::uint8>(80)),0);
+            plugin->processBlock(audio,midi);midi.clear();
+            midi.addEvent(juce::MidiMessage::controllerEvent(vibratoChannel,plan.vibrato,127),0);
+            if(needsGrowl)midi.addEvent(juce::MidiMessage::controllerEvent(growlChannel,plan.growl,127),0);
+            for(int block=0;block<128;++block){
+                audio.clear();midi.clear();
+                midi.addEvent(juce::MidiMessage::controllerEvent(vibratoChannel,plan.vibrato,127),0);
+                if(needsGrowl)midi.addEvent(juce::MidiMessage::controllerEvent(growlChannel,plan.growl,127),0);
+                plugin->processBlock(audio,midi);
+            }
+#if JUCE_MAC
+            CFRunLoopRunInMode(kCFRunLoopDefaultMode,0.1,false);
+#endif
+            bool vibrato=false,growl=false;for(auto* p:plugin->getParameters()){
+                if(p->getName(80)=="Vibrato Depth"){vibrato=p->getValue()>0;std::cout<<"Vibrato Depth="<<p->getValue()<<"\n";}
+                if(p->getName(80)=="Growl"){growl=p->getValue()>0;std::cout<<"Growl="<<p->getValue()<<"\n";}
+            }
+            // VST3 parameter getters report the saved base values, not always
+            // the live MIDI modulation. Verify the rendered signal instead.
+            const auto render=[&](int v,int g){
+                std::vector<float> samples;
+                for(int block=0;block<600;++block){
+                    audio.clear();midi.clear();
+                    if(block==0){midi.addEvent(juce::MidiMessage::controllerEvent(vibratoChannel,plan.vibrato,v),0);if(needsGrowl)midi.addEvent(juce::MidiMessage::controllerEvent(growlChannel,plan.growl,g),0);}
+                    plugin->processBlock(audio,midi);
+                    if(block>=200)samples.insert(samples.end(),audio.getReadPointer(0),audio.getReadPointer(0)+256);
+                }
+                return samples;
+            };
+            const auto baseline=render(0,0);
+            int centreLag=0;double bestPeriod=-1;
+            for(int lag=80;lag<=700;++lag){double sum=0,e1=0,e2=0;for(int i=0;i<4096;++i){sum+=baseline[static_cast<size_t>(i)]*baseline[static_cast<size_t>(i+lag)];e1+=baseline[static_cast<size_t>(i)]*baseline[static_cast<size_t>(i)];e2+=baseline[static_cast<size_t>(i+lag)]*baseline[static_cast<size_t>(i+lag)];}const auto c=sum/std::sqrt(e1*e2);if(c>bestPeriod){bestPeriod=c;centreLag=lag;}}
+            const auto analyse=[centreLag](const std::vector<float>& s){
+                std::vector<double> pitches;double power=0,correlation=0;int windows=0;
+                for(size_t start=0;start+4096<s.size();start+=4096){
+                    double best=-1;int bestLag=0;double energy=0;
+                    for(int i=0;i<2048;++i)energy+=s[start+i]*s[start+i];
+                    power+=energy;
+                    if(energy<1e-12)continue;
+                    for(int lag=static_cast<int>(centreLag*.85);lag<=static_cast<int>(centreLag*1.15);++lag){double sum=0,e2=0;for(int i=0;i<2048;++i){sum+=s[start+i]*s[start+i+lag];e2+=s[start+i+lag]*s[start+i+lag];}const auto c=sum/std::sqrt(energy*e2);if(c>best){best=c;bestLag=lag;}}
+                    pitches.push_back(1200*std::log2(48000.0/bestLag/261.625565));correlation+=best;++windows;
+                }
+                double low=1e9,high=-1e9;for(auto p:pitches){low=std::min(low,p);high=std::max(high,p);}
+                return std::array<double,3>{windows?high-low:0,windows?correlation/windows:0,power};
+            };
+            const auto off=analyse(baseline);const auto on=analyse(render(127,0));const auto growled=analyse(render(0,127));
+            std::cout<<"Rendered pitch spread off="<<off[0]<<" on="<<on[0]<<" correlation off="<<off[1]<<" growl="<<growled[1]<<" power="<<off[2]<<"\n";
+            if(off[2]<=1e-9 || on[0]<=off[0]+2.0)return 23;
+            if(needsGrowl && std::abs(growled[1]-off[1])<.005)return 24;
+            plugin->releaseResources();std::cout<<"PASS native routing readback, preserved parameters, CC drives both techniques\n";return 0;
+        }
         const auto mapping = fengyin::SwamExpressionCurve::applyToState(state);
         if (!mapping.found || state != before)
         {

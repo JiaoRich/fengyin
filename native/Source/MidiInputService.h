@@ -65,7 +65,7 @@ public:
     void beginBreathDetection() noexcept;
     [[nodiscard]] int finishBreathDetection(bool markCompleted = false) noexcept;
     void setTargetKey(int pitchClass);
-    void setTransposeSemitones(int semitones); // 相对收到的音符偏移；0 跟随电吹管。
+    void setTransposeSemitones(int semitones); // Legacy API; equivalent pitch class from hardware C.
     [[nodiscard]] int getTargetKey() const noexcept { return targetKey.load(std::memory_order_relaxed); }
     [[nodiscard]] int getTransposeSemitones() const noexcept { return transposeSemitones.load(std::memory_order_relaxed); }
     void setGrowlSensitivity(int level);
@@ -73,6 +73,8 @@ public:
     void setTechniqueMappings(const juce::Array<TechniqueMapping>& mappings);
     [[nodiscard]] juce::Array<TechniqueMapping> getTechniqueMappings() const;
     void setTechniqueContext(const juce::String& instrumentFamily);
+    void tickTechniqueAutomation();
+    [[nodiscard]] bool pitchMappingNeedsRemap() const noexcept { return pitchMappingRemap.load(); }
     void flushOnsetTrace() { onsetTrace.flush("input"); }
     void beginTechniqueLearn(PerformanceTechnique technique) noexcept;
     void cancelTechniqueLearn() noexcept;
@@ -128,5 +130,7 @@ private:
     std::atomic<int> learnedSourceType { 0 };
     std::atomic<int> learnedSourceNumber { -1 };
     std::atomic<bool> learnedSourceReady { false };
+    std::atomic<double> latestNoteStartedMs { -1.0 };
+    std::atomic<bool> pitchMappingRemap { false };
 };
 }

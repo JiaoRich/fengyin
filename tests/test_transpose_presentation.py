@@ -12,9 +12,10 @@ class TransposePresentationTests(unittest.TestCase):
         js = (ROOT/'prototype/app.js').read_text(encoding="utf-8")
         self.assertNotIn('main-play', html)
         self.assertNotIn('main-play', js)
-        self.assertIn('移调0</b>', html)
+        self.assertIn('id="performance-key"', html)
+        self.assertIn('电吹管需设C调', html)
         self.assertNotIn(' 半音 · 0跟随电吹管', html)
-        self.assertIn('`移调${selectedTargetKey', js)
+        self.assertIn('function changePerformanceKey', js)
 
     def test_same_voice_and_short_announcements(self):
         raw = (ROOT/'prototype/voice-catalog.js').read_text(encoding="utf-8")

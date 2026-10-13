@@ -172,7 +172,7 @@ class HostRegressionTests(unittest.TestCase):
     def test_transpose_preserves_active_notes_and_uses_note_map(self):
         self.assertIn("void MidiInputService::setTransposeSemitones", MIDI)
         self.assertIn("transposeFromTo", PITCH_KEY)
-        self.assertNotIn("PitchKey::transposeFromTo", MIDI)
+        self.assertIn("PitchKey::transposeFromTo(0,", MIDI)
         update = MIDI.split('void MidiInputService::updateEffectiveTranspose()', 1)[1].split('\n}', 1)[0]
         self.assertNotIn('noteOff', update)
         self.assertNotIn("keyCalibrationPending", MIDI)
@@ -186,8 +186,8 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("nativeEvent('copyMachineCode')", JS)
         html = (ROOT / "prototype" / "index.html").read_text(encoding="utf-8")
         self.assertNotIn('id="transpose-dialog"', html)
-        self.assertIn('id="transpose-minus"', html)
-        self.assertIn('移调，0为跟随电吹管', html)
+        self.assertIn('id="performance-key"', html)
+        self.assertIn('电吹管需设C调', html)
         self.assertNotIn("beginKeyCalibration", MAIN)
         self.assertIn("copyMachineCode", MAIN)
 

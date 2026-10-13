@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "SimpleTechniquePolicy.h"
 #include "ToneDiagnostic.h"
 #include "TonePackage.h"
 #include "BinaryData.h"
@@ -637,6 +638,7 @@ void MainComponent::setupWebInterface()
                                                                          static_cast<int>(payload.getProperty("technique", 0))))
                 : fengyin::techniqueFromId(requestedId);
             if (requestedTechnique == fengyin::PerformanceTechnique::count) return;
+            if (!fengyin::simpleRoleSupported(currentInstrumentKey.toStdString(),requestedTechnique)) return;
             const auto technique = static_cast<int>(requestedTechnique);
             if (! midi.getSnapshot().deviceConnected)
             {
@@ -658,12 +660,18 @@ void MainComponent::setupWebInterface()
         {
             const auto target = fengyin::techniqueFromId(payload.getProperty("techniqueId", {}).toString().toStdString());
             if (target == fengyin::PerformanceTechnique::count) return;
+            if (!fengyin::simpleRoleSupported(currentInstrumentKey.toStdString(),target)) return;
             const auto modeText = payload.getProperty("mode", "auto").toString();
             auto mode = fengyin::TechniqueControlMode::automatic;
             if (modeText == "breath") mode = fengyin::TechniqueControlMode::breath;
             else if (modeText == "hardware") mode = fengyin::TechniqueControlMode::hardware;
             else if (modeText == "hybrid") mode = fengyin::TechniqueControlMode::hybrid;
             else if (modeText == "off") mode = fengyin::TechniqueControlMode::off;
+            const auto actualTarget=target==fengyin::PerformanceTechnique::mute
+                ? fengyin::simpleOther(currentInstrumentKey.toStdString()) : target;
+            if(mode!=fengyin::TechniqueControlMode::off && !pluginHost.hasIndependentTechniqueRoute(actualTarget))return;
+            if (target == fengyin::PerformanceTechnique::mute && mode != fengyin::TechniqueControlMode::off)
+                mode = fengyin::TechniqueControlMode::hardware;
             auto mappings = midi.getTechniqueMappings();
             auto found = false;
             for (auto& mapping : mappings)
@@ -1267,6 +1275,7 @@ void MainComponent::resized()
 
 void MainComponent::timerCallback()
 {
+    midi.tickTechniqueAutomation(); // Independent of browser frame rate.
     if(const auto token=voicePrompts.consumeFinished();token!=0 && webInterface)
         webInterface->emitEventIfBrowserIsVisible("voiceFinished",token);
     if (superLowLatencyRunning && ++superLowLatencyPollTicks >= 30)
@@ -1367,7 +1376,7 @@ void MainComponent::timerCallback()
         automaticBreathDetectionActive = false;
         automaticBreathDetectionEndsAtMs = 0.0;
     }
-    // Technique automation is consumed by the audio graph, not the UI timer.
+    // Automatic technique timing is independent of browser visual frame rate.
     if (activeTechniqueLearn >= 0)
     {
         const auto learned = midi.consumeTechniqueLearnResult();
@@ -1567,6 +1576,7 @@ void MainComponent::timerCallback()
             : currentInstrumentKey.isNotEmpty() ? "builtin:" + currentInstrumentKey + ":" + currentToneStyleId
                                                 : juce::String());
         state->setProperty("techniqueLearning", activeTechniqueLearn);
+        state->setProperty("pitchMappingNeedsRemap",midi.pitchMappingNeedsRemap());
         const auto currentFamily = currentTechniqueFamily();
         state->setProperty("instrumentFamily", utf8(fengyin::SwamPluginClassifier::familyChineseName(currentFamily)));
         juce::Array<juce::var> techniqueMappings;
@@ -1591,17 +1601,20 @@ void MainComponent::timerCallback()
             item->setProperty("id", role.id);
             item->setProperty("name", utf8(role.name));
             item->setProperty("relevant", true);
-            item->setProperty("pluginSupported", true);
+            const auto actualRole=role.role==fengyin::PerformanceTechnique::mute
+                ? fengyin::simpleOther(currentInstrumentKey.toStdString()) : role.role;
+            item->setProperty("pluginSupported", fengyin::simpleRoleSupported(currentInstrumentKey.toStdString(),role.role)
+                && pluginHost.hasIndependentTechniqueRoute(actualRole));
             item->setProperty("hardwareAvailable", true);
             item->setProperty("supported", true);
             item->setProperty("recommendedSource", utf8("只学习硬件信号，具体技巧随音色自动切换"));
             item->setProperty("recommendationReason", utf8("全局硬件控制位"));
-            item->setProperty("defaultMode", static_cast<int>(fengyin::TechniqueControlMode::breath));
+            item->setProperty("defaultMode", static_cast<int>(fengyin::TechniqueControlMode::off));
             item->setProperty("featured", true);
             item->setProperty("sourceType", 0);
             item->setProperty("sourceNumber", -1);
             item->setProperty("toggle", false);
-            item->setProperty("mode", static_cast<int>(fengyin::TechniqueControlMode::breath));
+            item->setProperty("mode", static_cast<int>(fengyin::TechniqueControlMode::off));
             item->setProperty("strength", 0.5f);
             for (const auto& mapping : midi.getTechniqueMappings())
                 if (mapping.technique == role.role)
@@ -3360,8 +3373,7 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName, bool ap
     // Complete all plugin-state changes before the real-time callback begins.
     pluginHost.attachTo(audio.getDeviceManager());
     juce::Logger::writeToLog("Plugin output attached");
-    midi.setTechniqueContext(currentPluginBrand == "kong" ? currentInstrumentKey
-        : utf8(fengyin::SwamPluginClassifier::familyKey(family)));
+    midi.setTechniqueContext(currentInstrumentKey);
     midi.setPerformanceSink(&pluginHost);
     configureTechniqueDefaults();
     if (currentPluginBrand == "kong")

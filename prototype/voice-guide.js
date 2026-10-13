@@ -27,7 +27,7 @@
   function speakText(text){const x=catalog.find(x=>x.text.replace(/[。～]/g,'')===text.replace(/[。～]/g,''));return x?say(x.id):Promise.resolve(false);}
   const controlName=name=>name.split('／')[0].replace(/功能键\s*1/,'功能键一').replace(/功能键\s*2/,'功能键二').replace(/功能键\s*3/,'功能键三');
   window.fengyinVoice={say,stop,speakText,
-    learning(name){learnedName=controlName(name);say(name.includes('咬嘴')?'V047':name.includes('体感')?'V048':name.includes('摇杆')?'V049':'V050');},
+    learning(name){learnedName=controlName(name);say(/咬嘴|颤音|揉弦/.test(name)?'V047':name.includes('体感')?'V048':name.includes('摇杆')?'V049':'V050');},
     cleared(name){speakText(`已取消${controlName(name)}映射。`);},
     tone(name){if(!toneEnabled)return;const spoken=name.replace('次中萨','次中音萨克斯').replace('上低萨','上低音萨克斯').replace('高萨','高音萨克斯').replace('中萨','中音萨克斯').replaceAll('-', '，');return speakText(spoken);},
     async beforeRecording(){
@@ -66,7 +66,7 @@
     ['检测气息','V005','#adapter-match','wind'],
     ['选择音色','V011','#preset-grid','sounds'],
     ['试着吹奏','G002','#sound-name','play'],
-    ['移调','T001','#transpose-key','play'],
+    ['演奏调','T001','#transpose-key','play'],
     ['弯音范围','G004','#bend-range-button','play'],
     ['演奏音量','V028','#master-volume','play'],
     ['混响','V029','#performance-reverb','play'],

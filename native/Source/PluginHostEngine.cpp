@@ -1,5 +1,8 @@
 #include "PluginHostEngine.h"
 #include "TechniqueMidiDeduplication.h"
+#include "SwamTechniqueRouting.h"
+#include "SimpleTechniquePolicy.h"
+#include "SwamPluginClassifier.h"
 #include "BreathResponse.h"
 #include "SerialEffectRouting.h"
 #include "ScopedGraphPause.h"
@@ -559,6 +562,25 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve()
 
     juce::MemoryBlock state;
     plugin->getStateInformation(state);
+    const auto original=state;
+    const auto key=SwamPluginClassifier::instrumentKey(plugin->getName().toStdString());
+    const bool wantFlutter=simpleOther(key)==PerformanceTechnique::flutter;
+    const auto configured=SwamTechniqueRouting::prepare(state,simpleVibrato(key),simpleGrowl(key),wantFlutter);
+    if(configured.supported && configured.changed)
+    {
+        // Once per activation, while the graph is paused, never on each CC or mode switch.
+        plugin->setStateInformation(state.getData(),static_cast<int>(state.getSize()));
+        juce::MemoryBlock verified;plugin->getStateInformation(verified);
+        auto check=verified;
+        const auto routing=SwamTechniqueRouting::prepare(check,simpleVibrato(key),simpleGrowl(key),wantFlutter);
+        if(!routing.supported || routing.changed || routing.vibrato!=configured.vibrato || routing.growl!=configured.growl || routing.flutter!=configured.flutter)
+        {
+            plugin->setStateInformation(original.getData(),static_cast<int>(original.getSize()));
+            state=original;
+            juce::Logger::writeToLog("SWAM automatic technique routing failed verification; original state restored");
+        }
+        else {state=verified;juce::Logger::writeToLog("SWAM automatic technique routes verified; curves preserved");}
+    }
     const auto result = SwamExpressionCurve::applyToState(state);
     for (const auto& route : result.routes)
     {
@@ -1015,6 +1037,10 @@ void PluginHostEngine::techniqueChanged(PerformanceTechnique technique, float va
         return;
     }
     techniqueValues[index].store(safeValue, std::memory_order_relaxed);
+    // A direct depth parameter write bypasses SWAM's mapping curve. Never
+    // advertise the simplified SWAM modes without an independent MIDI route.
+    if ((technique == PerformanceTechnique::vibrato || technique == PerformanceTechnique::growl)
+        && !hasIndependentTechniqueRoute(technique)) return;
     if (const int route = nativeTechniqueRoutes[index].load(std::memory_order_relaxed))
     {
         bool unique = route != ((swamExpressionChannel.load() << 8) | (swamExpressionController.load() + 1));

@@ -35,6 +35,7 @@ function applyWindowMode(compact) {
   (compactMode ? $('.window-mode-bar') : $('.system-pills')).appendChild(windowControls);
   closeQuickTones();
   if (compactMode) showPage('play');
+  requestVisualFrame();
 }
 $('#window-mode-toggle').onclick = () => nativeEvent('setCompactMode', {compact:!compactMode});
 $('.system-pills').appendChild($('#window-mode-toggle'));
@@ -100,6 +101,7 @@ const kongPresets = [
 let simulating = false;
 let recording = false;
 let animationFrame;
+let visualTimer = null;
 let videoUrl;
 let selectedVideoFile;
 let videoGeneration = 0;
@@ -319,12 +321,16 @@ function instrumentFamily(key = '') {
 }
 
 function buildTechniquePlan(key = '') {
-  return (techniqueLibrary[instrumentFamily(key)] || []).map(([id,name,icon,description,mode,recommendation,strength,featured], index) => ({
-    id,name,icon,description:'由用户映射控制，曲线和深度随音源方案保存',mode,recommendation,strength,featured,index
-  }));
+  const other = {'kong-erhu':'揉弦','kong-matouqin':'揉弦','kong-hulusi':'颤音','kong-xun':'颤音','kong-nanxiao':'颤音','kong-guzheng':'摇指','kong-liuqin':'轮奏','kong-pipa':'轮指','kong-sanxian':'轮奏','kong-dizi':'花舌','kong-suona':'花舌','kong-sheng':'花舌',flute:'花舌',piccolo:'花舌'}[key];
+  return [
+    {id:'vibrato',name:/violin|viola|cello|double-bass/.test(key)?'揉弦':'颤音',icon:'≈',index:1,pluginSupported:/sax|violin|viola|cello|double-bass/.test(key)},
+    {id:'growl',name:'嘶吼音',icon:'≋',index:0,pluginSupported:['alto-sax','tenor-sax','baritone-sax'].includes(key)},
+    {id:'mute',name:other?`其他技巧：${other}`:'其他技巧',icon:'✦',index:8,pluginSupported:!!other}
+  ].map(item=>({...item,description:item.id==='mute'?'按住触发，松开恢复':item.id==='vibrato'?'咬嘴控制，或长音600毫秒后400毫秒淡入':'按键触发，或气息控制',mode:'off',strength:100,featured:true}));
 }
 
 function buildAdaptiveTechniquePlan(key = '', state = {}) {
+  return mergeBackendTechniquePlan(key,state,state.techniqueMappings || techniqueMappings);
   const plan = buildTechniquePlan(key);
   const connected = !!state.deviceConnected;
   const hasButtons = !!state.hasAssignableButtons;
@@ -352,16 +358,9 @@ function buildAdaptiveTechniquePlan(key = '', state = {}) {
 }
 
 function mergeBackendTechniquePlan(key, state, mappings) {
-  const roles = [
-    {id:'vibrato',name:'咬嘴／压力',description:'连续信号；随音色自动变成颤音、揉弦等',icon:'≈',strength:55,index:1},
-    {id:'growl',name:'体感控制',description:'抬管等连续动作；自动对应嘶吼、花舌、颤弓',icon:'≋',strength:50,index:0},
-    {id:'portamento',name:'摇杆／拇指控制',description:'连续控制滑音与音色过渡',icon:'⌁',strength:45,index:3},
-    {id:'mute',name:'功能键 1',description:'瞬时开关技巧，具体功能由当前音色决定',icon:'1',strength:50,index:8},
-    {id:'altFingering',name:'功能键 2',description:'第二个瞬时技巧控制位',icon:'2',strength:50,index:7},
-    {id:'halfValve',name:'功能键 3',description:'第三个瞬时技巧控制位',icon:'3',strength:50,index:9}
-  ];
-  if (!window.__JUCE__?.backend?.emitEvent || !Array.isArray(mappings)) return roles.map(item=>({...item,mode:'breath',featured:true}));
-  const modes = ['breath','breath','hardware','hardware','breath'];
+  const roles = buildTechniquePlan(key || currentInstrument?.instrumentKey || state.instrumentKey || '');
+  if (!Array.isArray(mappings)) return roles;
+  const modes = ['breath','breath','hardware','hardware','off'];
   return roles.map(item => {
     const backend = mappings.find(entry => entry.id === item.id);
     if (!backend) return {...item,mode:'off',featured:true};
@@ -375,7 +374,8 @@ function mergeBackendTechniquePlan(key, state, mappings) {
       sourceType:Number(backend.sourceType || 0),
       sourceNumber:Number(backend.sourceNumber ?? -1),
       toggle:!!backend.toggle,
-      pluginSupported:true
+      pluginSupported:item.pluginSupported && backend.pluginSupported !== false,
+      routeMissing:item.pluginSupported && backend.pluginSupported === false
     };
   });
 }
@@ -512,6 +512,7 @@ function showPage(page) {
   $('#page-title').textContent = titles[page];
   if (page === 'audio') nativeEvent('requestAudioSettings');
   if (page === 'sounds') promptForKongLibraryIfNeeded();
+  requestVisualFrame();
 }
 
 function promptForKongLibraryIfNeeded() {
@@ -1164,26 +1165,21 @@ function formatTime(seconds) {
   return `${minutes}:${rest}`;
 }
 
-$('#theme').addEventListener('change', event => document.body.dataset.theme = event.target.value);
+$('#theme').addEventListener('change', event => { document.body.dataset.theme = event.target.value; updateStaticTheme(); requestVisualFrame(); });
 $('#master-volume').addEventListener('input', event => {
   $('#master-volume-value').textContent = `${event.target.value}%`;
   nativeEvent('setMasterVolume', {value:Number(event.target.value)/100});
 });
 function updateTransposeDisplay(targetKey) {
-  selectedTargetKey = Math.max(-12, Math.min(12, Math.round(Number(targetKey) || 0)));
-  $('#transpose-key-name').textContent = `移调${selectedTargetKey > 0 ? '+' : ''}${selectedTargetKey}`;
-  $('#transpose-minus').disabled = selectedTargetKey === -12;
-  $('#transpose-plus').disabled = selectedTargetKey === 12;
+  selectedTargetKey = ((Math.round(Number(targetKey) || 0) % 12) + 12) % 12;
+  $('#performance-key').value = String(selectedTargetKey);
 }
-function changeTranspose(delta) {
-  updateTransposeDisplay(selectedTargetKey + delta);
+function changePerformanceKey(value) {
+  updateTransposeDisplay(value);
   nativeEvent('setKeyTranspose', {targetKey:selectedTargetKey});
-  const numbers = ['零','一','二','三','四','五','六','七','八','九','十','十一','十二'];
-  const text = selectedTargetKey === 0 ? '关闭移调' : `${selectedTargetKey > 0 ? '加' : '减'}${numbers[Math.abs(selectedTargetKey)]}个半音`;
-  window.fengyinVoice?.speakText(text);
+  window.fengyinVoice?.say(`V026_${String(selectedTargetKey + 1).padStart(2,'0')}`);
 }
-$('#transpose-minus').addEventListener('click', () => changeTranspose(-1));
-$('#transpose-plus').addEventListener('click', () => changeTranspose(1));
+$('#performance-key').addEventListener('change', event => changePerformanceKey(event.target.value));
 updateTransposeDisplay(0);
 function renderBendRange(state) {
   bendState = state;
@@ -1293,11 +1289,11 @@ function renderTechniqueMappings(force = false) {
   list.innerHTML = techniquePlan.map(item => {
     const hardware = item.mode === 'hardware';
     const mapped = sourceDescription(item) !== '未设置';
-    const modeLabels = {off:'关闭',breath:'气息控制',hardware:'硬件控制'};
+    const modeLabels = item.id === 'mute' ? {off:'关闭',hardware:'按键触发'} : item.id === 'vibrato' ? {off:'关闭',hardware:'咬嘴控制',breath:'自动颤音'} : {off:'关闭',hardware:'按键触发',breath:'自动嘶吼'};
     return `<article class="technique-card ${item.featured ? '' : 'secondary'}" data-technique-id="${item.id}">
       <div class="technique-card-head"><div class="technique-card-title"><span class="technique-card-icon">${item.icon}</span><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.description)}</p></div></div><span class="technique-card-state">${item.mode === 'off' ? '已关闭' : hardware ? (mapped ? '✓ 已映射' : '待映射') : '✓ 已配置'}</span></div>
-      <div class="technique-control"><select aria-label="${escapeHtml(item.name)}控制方式">${Object.entries(modeLabels).map(([value,label]) => `<option value="${value}" ${item.mode === value ? 'selected' : ''}>${label}</option>`).join('')}</select><button class="learn-source" ${hardware ? '' : 'hidden'}>${Number(window.fengyinTechniqueLearning) === item.index ? '等待操作…' : '点击映射'}</button></div>
-      <p class="recommendation">${hardware ? escapeHtml(sourceDescription(item)) : '气息原值控制；曲线与深度在音源插件中设置，并随方案保存'}</p>
+      <div class="technique-control"><select ${item.pluginSupported ? '' : 'disabled'} aria-label="${escapeHtml(item.name)}控制方式">${Object.entries(modeLabels).map(([value,label]) => `<option value="${value}" ${item.mode === value ? 'selected' : ''}>${label}</option>`).join('')}</select><button class="learn-source" ${hardware && item.pluginSupported ? '' : 'hidden'}>${Number(window.fengyinTechniqueLearning) === item.index ? '等待操作…' : mapped ? '重新映射' : '点击映射'}</button></div>
+      <p class="recommendation">${item.routeMissing ? '风吟未能验证此音源的自动技巧映射，请导出诊断供排查；不会绕过曲线写深度参数。' : !item.pluginSupported ? '当前乐器不支持此项' : hardware ? escapeHtml(sourceDescription(item)) : '曲线与深度使用音源方案预设'}</p>
     </article>`;
   }).join('');
   $$('#technique-list .learn-source').forEach(button => button.addEventListener('click', event => {
@@ -1305,7 +1301,7 @@ function renderTechniqueMappings(force = false) {
     const item = techniquePlan.find(entry => entry.id === button.closest('.technique-card')?.dataset.techniqueId);
     if (item) startTechniqueLearning(item,false);
   }));
-  $('#technique-more').hidden = !techniquePlan.some(item => !item.featured);
+  $('#technique-more').hidden = true;
 }
 function startTechniqueLearning(item,inline = false) {
   window.fengyinVoice?.learning(item.name);
@@ -1323,11 +1319,13 @@ function startTechniqueLearning(item,inline = false) {
   techniqueHint.textContent = `正在识别“${item.name}”：请在 10 秒内操作一次吹嘴、摇杆或按键……`;
   $('#learning-dialog-title').textContent = `正在识别“${item.name}”`;
   $('#learning-dialog-message').textContent = '请操作一次希望用于这项技巧的按键、摇杆或吹嘴。普通音符和气息波动会自动忽略。';
+  $('#learning-dialog-message').textContent += '弯音信号不参与映射；咬嘴若输出弯音，请在电吹管上改为连续CC。同一控制器映射两项技巧会同时触发。';
   $('#technique-learning-dialog').hidden = false;
   renderTechniqueMappings();
 }
 
 function adapterTechniqueItems() {
+  return mergeBackendTechniquePlan(currentInstrument?.instrumentKey || latestBackendState.instrumentKey || '',latestBackendState,techniqueMappings);
   if (adapterMode === 'hardware') {
     // Hardware roles are device-level mappings and must stay available even
     // before an instrument has been loaded.  Do not derive this panel from
@@ -1363,6 +1361,10 @@ function updateLocalTechniqueConfiguration(id, mode, strength) {
 function renderAdapterTechniqueGrid() {
   const grid = $('#adapter-technique-grid');
   if (!grid) return;
+  techniquePlan = adapterTechniqueItems();
+  grid.innerHTML = '<button type="button" id="simple-techniques-open">设置颤音、嘶吼与其他技巧</button><p>选择音色后设置；弯音信号始终保留给弯音。</p>';
+  $('#simple-techniques-open').onclick = openTechniqueDialog;
+  return;
   const hardware = adapterMode === 'hardware';
   const items = adapterTechniqueItems();
   const signature = JSON.stringify([items, adapterMode, window.fengyinTechniqueLearning]);
@@ -1478,7 +1480,7 @@ function openTechniqueDialog() {
   if (!techniquePlan.length) techniquePlan = buildAdaptiveTechniquePlan(currentInstrument.instrumentKey, latestBackendState);
   $('#technique-dialog-title').textContent = '全局演奏技巧';
   $('#technique-dialog-subtitle').textContent = `${latestBackendState.deviceName || '当前电吹管'} · 映射一次，切换乐器继续使用`;
-  $('#technique-ready').textContent = `已自动配置 ${techniquePlan.filter(item => item.mode !== 'off').length} 项`;
+  $('#technique-ready').textContent = `已开启 ${techniquePlan.filter(item => item.mode !== 'off' && item.pluginSupported).length} 项`;
   techniqueDialog.hidden = false;
   techniqueHint.textContent = '保留音源方案的技巧曲线；硬件控制请点击“点击映射”。';
   renderTechniqueMappings();
@@ -1521,6 +1523,7 @@ $('#technique-list').addEventListener('change', event => {
     techniqueHint.textContent = wording[item.mode];
     nativeEvent('setTechniqueConfiguration', {techniqueId:item.id,mode:item.mode,strength:item.strength/100});
     renderTechniqueMappings(true);
+    if (item.mode === 'hardware' && sourceDescription(item) === '未设置') startTechniqueLearning(item,false);
   }
   if (event.target.matches('input[type="range"]')) {
     item.strength = Number(event.target.value);
@@ -1564,7 +1567,7 @@ $('#record').addEventListener('click', async event => {
 $('#recording-manager').addEventListener('click', () => nativeEvent('showRecordings'));
 $('#low-performance').addEventListener('change', event => {
   document.body.classList.toggle('low-performance', event.target.checked);
-  toast(event.target.checked ? '已开启流畅模式' : '已恢复精美动画');
+  toast(event.target.checked ? '已开启流畅模式' : '已关闭低性能模式，主题背景保持静态');
 });
 
 function trialTimeText(seconds) {
@@ -1818,7 +1821,18 @@ function renderSmartAdapter(state) {
 window.__JUCE__?.backend?.addEventListener('backendState', state => {
   $('#export-current-tone').disabled = !state.pluginLoaded || !!state.pluginLoading || state.pluginBrand !== 'swam';
   renderBendRange(state);
+  const visualSignature = value=>JSON.stringify([Math.round(Number(value.breath||0)*127),Math.round(Number(value.instrumentPeak||0)*200),Math.round(Number(value.outputLeftPeak||0)*200),Math.round(Number(value.outputRightPeak||0)*200),!!value.pluginLoaded]);
+  const visualChanged = visualSignature(state) !== visualSignature(latestBackendState);
   latestBackendState = state || {};
+  if (!sessionStorage.getItem('fy-performance-key-v3-notice')) {
+    sessionStorage.setItem('fy-performance-key-v3-notice','yes');
+    toast('演奏调模式：请先将电吹管设置为C调，再选择演奏调。');
+  }
+  if (state.pitchMappingNeedsRemap && !sessionStorage.getItem('fy-pitch-remap-'+state.deviceIdentifier)) {
+    sessionStorage.setItem('fy-pitch-remap-'+state.deviceIdentifier,'yes');
+    toast('旧弯音技巧映射已解除。弯音专用，请用CC、压力或按键重新映射技巧。');
+  }
+  if (visualChanged) requestVisualFrame();
   if (typeof state.compactMode === 'boolean' && state.compactMode !== compactMode) applyWindowMode(state.compactMode);
   const connected = !!state.deviceConnected;
   const adapterDeviceKey = String(state.deviceIdentifier || state.deviceId || state.deviceName || state.deviceProfileName || 'connected-device');
@@ -2191,7 +2205,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.10 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.11 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},
@@ -2459,15 +2473,26 @@ function drawBreathWave(ratio, breath, accent, accent2) {
   breathWaveContext.shadowBlur = 0;
 }
 
+function requestVisualFrame() {
+  if (visualTimer !== null || document.hidden) return;
+  visualTimer = setTimeout(()=>{animationFrame=requestAnimationFrame(draw);},Math.max(0,1000/24-(performance.now()-lastDrawAt)));
+}
+function updateStaticTheme() {
+  const palettes = {spring:['#123c2b','#68e7ac'],summer:['#103940','#65e0d2'],autumn:['#38271c','#e7aa5e'],winter:['#183454','#b7ecff'],'china-red':['#431316','#ff4b52'],gold:['#392719','#ffc85a'],minimal:['#202b36','#75a9dc']};
+  const [base,accent] = palettes[document.body.dataset.theme] || ['#112d49','#43d9ff'];
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000"><defs><radialGradient id="g"><stop stop-color="${base}"/><stop offset="1" stop-color="#07101d"/></radialGradient></defs><rect width="1600" height="1000" fill="url(#g)"/><path d="M0 850 Q600 500 1600 120 M0 930 Q800 620 1600 280" fill="none" stroke="${accent}" stroke-opacity=".12" stroke-width="3"/></svg>`;
+  document.body.style.backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
 function draw(timestamp = performance.now()) {
-  const targetInterval = document.body.classList.contains('video-playing') ? 1000/24 : 1000/60;
+  visualTimer = null;
+  if (document.hidden || !$('#page-play').classList.contains('active') || !$('#technique-dialog').hidden) return;
+  const targetInterval = 1000/24;
   if (timestamp - lastDrawAt < targetInterval) {
-    animationFrame = requestAnimationFrame(draw);
+    requestVisualFrame();
     return;
   }
   lastDrawAt = timestamp;
   if (!appFocused && ++unfocusedFrame % 4 !== 0) {
-    animationFrame = requestAnimationFrame(draw);
     return;
   }
   const ratio = window.devicePixelRatio || 1;
@@ -2491,9 +2516,8 @@ function draw(timestamp = performance.now()) {
   const styles = getComputedStyle(document.body);
   const a = styles.getPropertyValue('--accent').trim();
   const b = styles.getPropertyValue('--accent-2').trim();
-  drawThemeAtmosphere(ratio,a,b);
-  drawBreathWave(ratio,safeBreath,a,b);
-  const bars = 66;
+  if ($('#page-play').classList.contains('active')) drawBreathWave(ratio,safeBreath,a,b);
+  const bars = compactMode ? 0 : 66;
   for(let i=0;i<bars;i++) {
     const x = i*bounds.width/bars;
     const wave = Math.abs(Math.sin(i*.24+tick*3)+Math.sin(i*.08-tick)*.45);
@@ -2510,11 +2534,14 @@ function draw(timestamp = performance.now()) {
   $('#meter-l').style.width = `${Math.min(100,Number(latestBackendState.outputLeftPeak||0)*100)}%`;
   $('#meter-r').style.width = `${Math.min(100,Number(latestBackendState.outputRightPeak||0)*100)}%`;
   if (!window.__JUCE__?.backend?.emitEvent) $('#cpu').textContent = `${Math.round(14+Math.abs(Math.sin(tick*.3))*9)}%`;
-  animationFrame = requestAnimationFrame(draw);
+  // No recurring frame loop: new MIDI/meter state, resize or transition wakes us.
+  if (Math.abs(rimTarget-compactRimBreath)>.001) requestVisualFrame(); // Finish only the active fade.
 }
-draw();
+updateStaticTheme(); requestVisualFrame();
+window.addEventListener('resize', requestVisualFrame);
+document.addEventListener('visibilitychange',()=>{if(document.hidden){clearTimeout(visualTimer);visualTimer=null;cancelAnimationFrame(animationFrame);}else requestVisualFrame();});
 
-window.addEventListener('focus', () => { appFocused = true; unfocusedFrame = 0; });
+window.addEventListener('focus', () => { appFocused = true; unfocusedFrame = 0; requestVisualFrame(); });
 window.addEventListener('blur', () => { appFocused = false; });
 
 window.addEventListener('beforeunload', () => {

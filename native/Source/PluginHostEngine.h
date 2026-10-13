@@ -74,6 +74,17 @@ public:
 
     void attachTo(juce::AudioDeviceManager& deviceManager);
     void detach();
+    [[nodiscard]] bool hasIndependentTechniqueRoute(PerformanceTechnique technique) const noexcept
+    {
+        const auto index=static_cast<size_t>(technique);
+        if(index>=nativeTechniqueRoutes.size())return false;
+        if(kongExpressionMode.load())return kongTechniqueRoutes[index].keyswitch>=0;
+        const int route=nativeTechniqueRoutes[index].load();
+        if(route==0 || route==((swamExpressionChannel.load()<<8)|(swamExpressionController.load()+1)))return false;
+        for(size_t i=0;i<nativeTechniqueRoutes.size();++i)
+            if(i!=index && nativeTechniqueRoutes[i].load()==route)return false;
+        return true;
+    }
     void loadAsync(const juce::PluginDescription& description,
                    double sampleRate,
                    int bufferSize,

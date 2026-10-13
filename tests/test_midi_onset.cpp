@@ -6,6 +6,7 @@
 #include "RealtimeMidiQueue.h"
 #include "OrderedMidiQueue.h"
 #include "MidiOnsetTrace.h"
+#include "SimpleTechniquePolicy.h"
 #include <thread>
 
 namespace fengyin {
@@ -18,6 +19,7 @@ struct MidiInputServiceTestAccess {
         message.setTimeStamp(time);
         service.handleIncomingMidiMessage(nullptr, message);
     }
+    static void elapsed(MidiInputService& service,double ms) {service.latestNoteStartedMs.store(juce::Time::getMillisecondCounterHiRes()-ms);}
 };
 }
 struct Sink : fengyin::MidiPerformanceSink {
@@ -137,14 +139,39 @@ int main() {
         assert(sink.events[sink.events.size()-2].value == 1);
         assert(sink.events.back().value == 0);
     }
-    for (const auto& e : sink.events) assert(e.type == 'T');
+    for (const auto& e : sink.events) assert(e.type == 'P'); // Old wheel mappings cannot steal pitch.
     sink.events.clear();
     fengyin::MidiInputServiceTestAccess::wheelWhileMappingBusy(service);
-    assert(sink.events.empty()); // No transient bypass into ordinary bend.
+    assert(sink.events.size()==1 && sink.events[0].type=='P'); // Bend passes even during mapping contention.
     service.setTechniqueMappings({});
     sink.events.clear();
     send(juce::MidiMessage::pitchWheel(1, 16383), 41);
     assert(sink.events.size() == 1 && sink.events[0].type == 'P' && sink.events[0].value == 1);
+    service.beginTechniqueLearn(fengyin::PerformanceTechnique::vibrato);
+    send(juce::MidiMessage::pitchWheel(1,0),42);
+    assert(!service.consumeTechniqueLearnResult().ready);
+    assert(sink.events.back().type=='P' && sink.events.back().value==-1);
+    service.cancelTechniqueLearn();
+    service.setTechniqueContext("alto-sax");
+    mapping.sourceType=fengyin::TechniqueSourceType::controller;
+    mapping.sourceNumber=74;mapping.mode=fengyin::TechniqueControlMode::breath;
+    service.setTechniqueMappings({mapping});
+    note(70,80,43);cc(127,43.1);
+    fengyin::MidiInputServiceTestAccess::elapsed(service,500);
+    service.tickTechniqueAutomation();assert(sink.events.back().type=='T' && sink.events.back().value==0);
+    fengyin::MidiInputServiceTestAccess::elapsed(service,800);
+    service.tickTechniqueAutomation();assert(std::abs(sink.events.back().value-.5f)<.02f);
+    fengyin::MidiInputServiceTestAccess::elapsed(service,1100);
+    service.tickTechniqueAutomation();assert(sink.events.back().value==1);
+    note(72,80,44);service.tickTechniqueAutomation();assert(sink.events.back().value==0);
+    // Ending the preceding held note cannot restart/reset the new note timer.
+    send(juce::MidiMessage::noteOff(1,70),44.1);
+    fengyin::MidiInputServiceTestAccess::elapsed(service,1100);
+    service.tickTechniqueAutomation();assert(sink.events.back().value==1);
+    cc(0,44.2);service.tickTechniqueAutomation();assert(sink.events.back().value==0);
+    assert(fengyin::simpleGrowl("alto-sax") && !fengyin::simpleGrowl("soprano-sax"));
+    assert(fengyin::simpleOther("kong-pipa")==fengyin::PerformanceTechnique::tremolo);
+    assert(fengyin::automaticVibratoFade(600)==0 && fengyin::automaticVibratoFade(1000)==1);
     service.setPerformanceSink(nullptr);
     // Exercise the real JUCE collector after FengYin's realtime queue, including
     // a breath update and Note On sharing the exact timestamp.

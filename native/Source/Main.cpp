@@ -79,7 +79,7 @@ private:
                            juce::jmin(900, juce::jmax(700, available.getHeight() - 32)));
             setVisible(true);
             setFullScreen(true);
-            startTimerHz(30);
+            startTimerHz(24); // Visual companion window only; audio/MIDI clocks are unchanged.
         }
 
         void maximiseButtonPressed() override { content->requestCompactMode(!content->compactMode); }
