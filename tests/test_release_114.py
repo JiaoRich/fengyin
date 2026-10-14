@@ -2,6 +2,8 @@ from pathlib import Path
 import json,zipfile,hashlib,unittest,subprocess,shutil,tempfile,xml.etree.ElementTree as E
 ROOT=Path(__file__).resolve().parents[1]
 class Release114(unittest.TestCase):
+    def test_windows_powershell_chinese_script_has_utf8_bom(self):
+        self.assertTrue((ROOT/'scripts/build-windows.ps1').read_bytes().startswith(b'\xef\xbb\xbf'))
     def test_execute_tempo_and_wet_delay(self):
         compiler=shutil.which('c++') or shutil.which('clang++')
         if compiler:
