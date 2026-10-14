@@ -19,7 +19,7 @@ struct PublishedToneDefinition
 
 // The release catalogue is deliberately explicit. Installing another plug-in
 // must never make an unreviewed tone appear in the customer-facing library.
-inline constexpr std::array<PublishedToneDefinition, 30> publishedToneCatalog {{
+inline constexpr std::array<PublishedToneDefinition, 31> publishedToneCatalog {{
     { "soprano-kenny",       "高萨-原声",       "soprano-sax",       "kenny",          PublishedToneKind::swamPackage, "soprano-kenny.fytonepack" },
     { "soprano-pop",         "高萨-流行",       "soprano-sax",       "pop-high",       PublishedToneKind::swamStyle,   {} },
     { "alto-jazz",           "中萨-爵士",       "alto-sax",          "jazz",           PublishedToneKind::swamPackage,   "alto-jazz.fytonepack" },
@@ -36,7 +36,8 @@ inline constexpr std::array<PublishedToneDefinition, 30> publishedToneCatalog {{
     { "piccolo",             "短笛",          "piccolo",          "natural",        PublishedToneKind::swamPackage,   "piccolo.fytonepack" },
     { "clarinet",            "单簧管",         "clarinet",         "natural",        PublishedToneKind::swamPackage,   "clarinet.fytonepack" },
     { "oboe",                "双簧管",         "oboe",             "natural",        PublishedToneKind::swamPackage,   "oboe.fytonepack" },
-    { "violin",              "小提琴",       "violin",           "natural",        PublishedToneKind::swamPackage,   "violin.fytonepack" },
+    { "violin",              "甜美小提琴",       "violin",           "natural",        PublishedToneKind::swamPackage,   "violin-sweet.fytonepack" },
+    { "violin-soft",         "柔美小提琴",       "violin",           "natural",        PublishedToneKind::swamPackage,   "violin-soft.fytonepack" },
     { "cello",               "大提琴",       "cello",            "natural",        PublishedToneKind::swamPackage,   "cello.fytonepack" },
     { "kong-erhu",           "二胡",          "kong-erhu",        "release",        PublishedToneKind::kongProject, "erhu.kam" },
     { "kong-guzheng",        "古筝",          "kong-guzheng",     "release",        PublishedToneKind::kongProject, "guzheng.kam" },

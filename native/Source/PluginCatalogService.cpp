@@ -99,7 +99,7 @@ void PluginCatalogService::startScan(juce::FileSearchPath paths, bool rescanExis
     // An old validation failure must not permanently exclude a required engine.
     const auto blocked = knownPlugins.getBlacklistedFiles();
     for (const auto& path : blocked)
-        if (rescanExisting || path.containsIgnoreCase("SWAM") || path.containsIgnoreCase("Fresh Air")
+        if (rescanExisting || path.containsIgnoreCase("SWAM") || path.containsIgnoreCase("Fresh Air") || path.containsIgnoreCase("magic.CURVE")
             || path.containsIgnoreCase("Qin") || path.containsIgnoreCase("Kong"))
             knownPlugins.removeFromBlacklist(path);
 

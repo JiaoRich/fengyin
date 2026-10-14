@@ -96,6 +96,7 @@ public:
     virtual void breathChanged(float value, double timestampSeconds = 0.0) noexcept = 0;
     virtual void pitchBendChanged(float bipolarValue, double timestampSeconds = 0.0) noexcept = 0;
     virtual void techniqueChanged(PerformanceTechnique, float) noexcept {}
+    virtual void automaticVibratoChanged(float input, float fade) noexcept { techniqueChanged(PerformanceTechnique::vibrato,input*fade); }
     virtual void resetPerformance() noexcept {}
 };
 }

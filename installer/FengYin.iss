@@ -5,7 +5,7 @@
   #define OutputDir "."
 #endif
 #ifndef AppVersion
-  #define AppVersion "1.1.13"
+  #define AppVersion "1.1.14"
 #endif
 #ifndef ChineseMessages
   #define ChineseMessages "compiler:Languages\ChineseSimplified.isl"
@@ -29,7 +29,7 @@ Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 SetupLogging=yes
-InfoBeforeFile={#SourceDir}\AudioComponents.txt
+InfoBeforeFile={#SourceDir}\InstallNotice.txt
 CloseApplications=yes
 RestartApplications=no
 AlwaysRestart=yes
@@ -43,7 +43,6 @@ FinishedRestartMessage=风吟已安装完成。音频驱动需要重启电脑后
 
 [Tasks]
 Name: "desktopicon"; Description: "在桌面创建快捷方式"; GroupDescription: "快捷方式："; Flags: unchecked
-Name: "asiobridge"; Description: "安装 ASIO4ALL 和 VB-CABLE（仅风吟低延迟模式需要）"; GroupDescription: "可选音频组件："; Flags: unchecked
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -139,6 +138,26 @@ begin
     or HasFreshAirBinary(ExpandConstant('{commoncf64}\VST3\Slate Digital\Fresh Air.vst3'));
 end;
 
+function HasMagicCurveAt(Path: String; Depth: Integer): Boolean;
+var
+  Item: TFindRec;
+begin
+  Result := FileExists(Path + '\magic.CURVE.vst3')
+    or FileExists(Path + '\magic.CURVE.vst3\Contents\x86_64-win\magic.CURVE.vst3');
+  if Result or (Depth <= 0) then Exit;
+  if FindFirst(Path + '\*', Item) then
+  begin
+    try
+      repeat
+        if ((Item.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0)
+          and (Item.Name <> '.') and (Item.Name <> '..') then
+          if HasMagicCurveAt(Path + '\' + Item.Name, Depth - 1) then
+          begin Result := True; Exit; end;
+      until not FindNext(Item);
+    finally FindClose(Item); end;
+  end;
+end;
+
 function NeedsFreshAir(): Boolean;
 begin
   Result := not HasFreshAir();
@@ -190,19 +209,14 @@ begin
       SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     RaiseException('无法保存安装前的声音输出，请关闭风吟后重试。');
   if ResultCode <> 0 then RaiseException('声音输出仍被占用或无法保存，请关闭风吟后重试。');
-  if WizardIsTaskSelected('asiobridge') then
+  { Audio drivers remain bundled for explicit in-app opt-in only. }
+  RunRequiredComponent('{app}\components\magic.CURVE\magic.CURVE-1.0.2-Windows-Setup.exe',
+    '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /LOG="{app}\components\magic.CURVE\install.log"', '');
+  if not HasMagicCurveAt(ExpandConstant('{commoncf64}\VST3'), 4) then
   begin
-  MarkAudioDriverRestart();
-  RunRequiredComponent('{app}\components\ASIO4ALL\ASIO4ALL_2_22.exe', '', '');
-  if NeedsASIO4ALL() then RaiseException('ASIO4ALL 安装未完成，请完成原厂安装向导。');
-  ExplainVBCableInstall();
-  RunRequiredComponent('{app}\components\VB-CABLE\VBCABLE_Setup_x64.exe', '', '{app}\components\VB-CABLE');
-  if NeedsVBCable() then
-  begin
-    MsgBox('尚未检测到可用的 VB-CABLE。如果刚才原厂程序执行了 Remove Driver，必须重新完成 Install Driver。接下来再次打开安装器；若提示必须先重启，请重启后重新运行风吟安装包。', mbInformation, MB_OK);
-    RunRequiredComponent('{app}\components\VB-CABLE\VBCABLE_Setup_x64.exe', '', '{app}\components\VB-CABLE');
-  end;
-  VerifyVBCableInstalled();
+    MsgBox('magic.CURVE 尚未发现64位VST3组件，将打开原厂安装器。请勾选VST3并使用默认位置。', mbInformation, MB_OK);
+    RunRequiredComponent('{app}\components\magic.CURVE\magic.CURVE-1.0.2-Windows-Setup.exe', '/NORESTART', '');
+    if not HasMagicCurveAt(ExpandConstant('{commoncf64}\VST3'), 4) then RaiseException('magic.CURVE VST3 安装未完成，甜美小提琴依赖尚不可用。');
   end;
   RunRequiredComponent('{app}\components\Fresh Air\Setup Fresh Air v1.0.8.exe',
     '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /TYPE=full /LOG="{app}\components\Fresh Air\install.log"', '');

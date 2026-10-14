@@ -1,6 +1,7 @@
 #include "PluginHostEngine.h"
 #include "TechniqueMidiDeduplication.h"
 #include "SwamTechniqueRouting.h"
+#include "SwamStateCompatibility.h"
 #include "SimpleTechniquePolicy.h"
 #include "SwamPluginClassifier.h"
 #include "BreathResponse.h"
@@ -320,14 +321,14 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                                  double sampleRate,
                                  int bufferSize,
                                  const juce::MemoryBlock& initialState,
-                                 LoadCallback callback)
+                                 LoadCallback callback, bool verifyStateRoundtrip)
 {
     unload();
     const auto generation = loadGeneration;
     juce::Logger::writeToLog("Plugin load request " + juce::String(generation) + ": " + description.name);
     formatManager.createPluginInstanceAsync(
         description, sampleRate, bufferSize,
-        [this, description, sampleRate, bufferSize, initialState, generation,
+        [this, description, sampleRate, bufferSize, initialState, generation, verifyStateRoundtrip,
          guard = lifetime, completion = std::move(callback)]
         (std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error) mutable
         {
@@ -354,6 +355,14 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                 juce::Logger::writeToLog("Plugin state restore begin; bytes=" + juce::String(initialState.getSize()));
                 instance->setStateInformation(initialState.getData(),
                                               static_cast<int>(initialState.getSize()));
+                if(verifyStateRoundtrip) {
+                    juce::MemoryBlock returned;instance->getStateInformation(returned);
+                    if(!SwamStateCompatibility::preserved(initialState,returned)) {
+                        if(completion)completion(false,juce::String::fromUTF8("SWAM跨版本恢复未通过完整参数与曲线回读，未启用该方案；请用本机版本重新导出。"));
+                        return;
+                    }
+                    juce::Logger::writeToLog("SWAM 3.8.2 -> 3.9.4 complete parameter and MIDI curve roundtrip verified");
+                }
                 juce::Logger::writeToLog("Plugin state restore returned");
             }
             auto processingGraph = std::make_unique<TechniqueProcessingGraph>();
@@ -363,6 +372,7 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                 if (kongExpressionMode.load() || !message.isController()) return false;
                 const int route=(message.getChannel()<<8)|(message.getControllerNumber()+1);
                 if (route==((swamExpressionChannel.load()<<8)|(swamExpressionController.load()+1))) return false;
+                if(automaticVibratoDirect.load()>=0&&route==nativeTechniqueRoutes[static_cast<size_t>(PerformanceTechnique::vibrato)].load())return true;
                 for (const auto technique : {PerformanceTechnique::vibrato,PerformanceTechnique::growl,PerformanceTechnique::flutter})
                 {
                     const auto index=static_cast<size_t>(technique);
@@ -436,6 +446,7 @@ void PluginHostEngine::unload()
     swamExpressionController.store(11, std::memory_order_relaxed);
     swamExpressionChannel.store(1, std::memory_order_relaxed);
     for (auto& route : nativeTechniqueRoutes) route.store(0, std::memory_order_relaxed);
+    vibratoRateParameter.store(nullptr);automaticVibratoActive.store(false);automaticVibratoDirect.store(-1);vibratoLinear.store(false);
     juce::Logger::writeToLog("Plugin unload complete");
     for (auto& value : lastNativeTechniqueMessages) value.store(0, std::memory_order_relaxed);
 }
@@ -499,7 +510,10 @@ juce::Array<ToneParameterValue> PluginHostEngine::captureToneParameters() const
         auto* parameter = parameters[index];
         if (parameter == nullptr || parameter == instrumentModelParameter) continue;
         if (isMidiRoutingParameter(normalisedParameterName(*parameter))) continue;
-        result.add({ stableParameterIdentifier(*parameter, index), parameter->getValue() });
+        const bool tempoOverride=parameter==vibratoRateParameter.load()&&automaticVibratoActive.load();
+        const auto expected=tempoVibratoRates[MusicTempoPolicy::valid(musicTempoMode.load())];
+        const auto value=tempoOverride&&std::abs(parameter->getValue()-expected)<.0001f?originalVibratoRate:parameter->getValue();
+        result.add({ stableParameterIdentifier(*parameter, index), value });
     }
     return result;
 }
@@ -606,10 +620,15 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve()
         else {state=verified;juce::Logger::writeToLog("SWAM automatic technique routes verified; curves preserved");}
     }
     const auto result = SwamExpressionCurve::applyToState(state);
+    vibratoLinear.store(false);
     for (const auto& route : result.routes)
     {
         const auto parameter = route.parameter.toLowerCase().removeCharacters(" ._-");
         if (parameter == "expression") swamExpressionChannel.store(route.channel);
+        if(parameter=="vibratodepth") {
+            vibratoInputMin.store(route.inputMin);vibratoInputMax.store(route.inputMax);vibratoOutputMin.store(route.outputMin);vibratoOutputMax.store(route.outputMax);
+            vibratoLinear.store(route.linear&&std::isfinite(route.inputMin)&&std::isfinite(route.inputMax)&&std::isfinite(route.outputMin)&&std::isfinite(route.outputMax));
+        }
         const std::pair<const char*, PerformanceTechnique> names[] = {
             {"vibratodepth", PerformanceTechnique::vibrato}, {"growl", PerformanceTechnique::growl},
             {"flutter", PerformanceTechnique::flutter}, {"portamento", PerformanceTechnique::portamento},
@@ -635,6 +654,7 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve()
     if (result.controller >= 0 && result.controller <= 127)
         swamExpressionController.store(result.controller, std::memory_order_relaxed);
     lastBreathMidiValue.store(-1, std::memory_order_relaxed);
+    prepareTempoVibrato(*plugin);
     for (const auto technique : {PerformanceTechnique::vibrato, PerformanceTechnique::growl, PerformanceTechnique::flutter})
         techniqueChanged(technique, 0.0f);
     // Activation only discovers routing. Saved/native curves remain authoritative;
@@ -724,7 +744,13 @@ juce::MemoryBlock PluginHostEngine::captureInstrumentState()
 {
     juce::MemoryBlock state;
     const ScopedGraphPause pause(graph.get());
-    if (auto* plugin = getPlugin()) plugin->getStateInformation(state);
+    if (auto* plugin = getPlugin()) {
+        auto* rate=vibratoRateParameter.load();const float current=rate?rate->getValue():0;
+        const bool overridden=rate&&automaticVibratoActive.load()&&std::abs(current-tempoVibratoRates[MusicTempoPolicy::valid(musicTempoMode.load())])<.0001f;
+        if(overridden)rate->setValueNotifyingHost(originalVibratoRate);
+        plugin->getStateInformation(state);
+        if(overridden)rate->setValueNotifyingHost(current);
+    }
     // Resume without releasing the existing instrument.
     return state;
 }
@@ -1015,7 +1041,56 @@ void PluginHostEngine::pitchBendChanged(float bipolarValue, double timestampSeco
     queue(juce::MidiMessage::pitchWheel(performanceChannel.load(std::memory_order_relaxed), pitch), timestampSeconds);
 }
 
-void PluginHostEngine::techniqueChanged(PerformanceTechnique technique, float value) noexcept
+void PluginHostEngine::prepareTempoVibrato(juce::AudioPluginInstance& plugin)
+{
+    vibratoRateParameter.store(nullptr);automaticVibratoActive.store(false);automaticVibratoDirect.store(-1);
+    const auto key=SwamPluginClassifier::instrumentKey(plugin.getName().toStdString());
+    for(auto* p:plugin.getParameters())if(p->getName(100)=="Vibrato Rate") {
+        originalVibratoRate=p->getValue();
+        for(int mode=0;mode<3;++mode){
+            const auto policy=MusicTempoPolicy::forMode(mode);const float wanted=(key=="violin"||key=="cello")?policy.stringsRate:policy.saxRate;
+            float best=-1;double delta=1e9;float lo=0,hi=1;
+            const auto lowValue=p->getText(0,100).getDoubleValue(),highValue=p->getText(1,100).getDoubleValue();
+            if(wanted>=juce::jmin(lowValue,highValue)&&wanted<=juce::jmax(lowValue,highValue))
+              for(int i=0;i<28;++i){float n=(lo+hi)*.5f;const auto actual=p->getText(n,100).getDoubleValue();double diff=std::abs(actual-wanted);if(diff<delta){delta=diff;best=n;}if(diff<.001)break;if((actual<wanted)==(lowValue<highValue))lo=n;else hi=n;}
+            tempoVibratoRates[mode]=delta<.05?best:-1;
+        }
+        vibratoRateParameter.store(p);tempoRateDirty.store(true);break;
+    }
+}
+
+void PluginHostEngine::techniqueChanged(PerformanceTechnique technique,float value) noexcept
+{
+    if(technique==PerformanceTechnique::vibrato){if(automaticVibratoActive.exchange(false))tempoRateDirty.store(true);automaticVibratoDirect.store(-1);}
+    routeTechnique(technique,value);
+}
+
+void PluginHostEngine::automaticVibratoChanged(float input,float fade) noexcept
+{
+    if(!hasIndependentTechniqueRoute(PerformanceTechnique::vibrato)){routeTechnique(PerformanceTechnique::vibrato,0);return;}
+    if(!automaticVibratoActive.exchange(true))tempoRateDirty.store(true);
+    const auto index=static_cast<size_t>(PerformanceTechnique::vibrato);
+    input=std::isfinite(input)?juce::jlimit(0.f,1.f,input):0;fade=std::isfinite(fade)?juce::jlimit(0.f,1.f,fade):0;
+    if(input==0||fade==0){automaticVibratoDirect.store(-1);routeTechnique(PerformanceTechnique::vibrato,0);return;}
+    if(vibratoLinear.load()){
+        const float lo=vibratoInputMin.load(),hi=vibratoInputMax.load(),min=vibratoOutputMin.load(),max=vibratoOutputMax.load();
+        const float target=(min+(max-min)*juce::jlimit(0.f,1.f,(input*127-lo)/(hi-lo)))*fade;
+        if(target<=min) {
+            // The curve cannot express values below its floor. Ramp the actual
+            // depth only in this small region; retain the native route elsewhere.
+            techniqueValues[index].store(input);automaticVibratoDirect.store(juce::jlimit(0.f,1.f,target/127));
+            techniqueDirty[index].store(true);lastNativeTechniqueMessages[index].store(0);return;
+        }
+        automaticVibratoDirect.store(-1);
+        routeTechnique(PerformanceTechnique::vibrato,juce::jlimit(0.f,1.f,(lo+(target-min)/(max-min)*(hi-lo))/127));
+        return;
+    }
+    // Unknown/non-linear curves are never guessed or rewritten. Preserve the
+    // native input fade and expose this limitation in the UI diagnostic state.
+    automaticVibratoDirect.store(-1);routeTechnique(PerformanceTechnique::vibrato,input*fade);
+}
+
+void PluginHostEngine::routeTechnique(PerformanceTechnique technique, float value) noexcept
 {
     const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
     const auto index = static_cast<size_t>(technique);
@@ -1381,6 +1456,12 @@ int PluginHostEngine::applySwamToneProfile(const SwamToneProfile& profile, bool 
 
 void PluginHostEngine::flushTechniqueValues()
 {
+    if(tempoRateDirty.exchange(false))if(auto* p=vibratoRateParameter.load()) {
+        const auto target=automaticVibratoActive.load()?tempoVibratoRates[MusicTempoPolicy::valid(musicTempoMode.load())]:originalVibratoRate;
+        if(target>=0)p->setValueNotifyingHost(target);
+    }
+    const float direct=automaticVibratoDirect.load();
+    if(direct>=0&&automaticVibratoActive.load())if(auto* p=techniqueParameters[static_cast<size_t>(PerformanceTechnique::vibrato)].load())p->setValueNotifyingHost(direct);
     for (size_t index = 0; index < techniqueParameters.size(); ++index)
         if (techniqueDirty[index].exchange(false, std::memory_order_acq_rel))
             if (nativeTechniqueRoutes[index].load() == 0

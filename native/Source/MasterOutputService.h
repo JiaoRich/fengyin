@@ -4,6 +4,7 @@
 #include <array>
 #include <atomic>
 #include "AirProcessor.h"
+#include "WetPreDelay.h"
 
 namespace fengyin
 {
@@ -35,6 +36,7 @@ public:
     void setEqTone(float value) noexcept { eqTone.store(juce::jlimit(-1.0f, 1.0f, value)); }
     void setWarmth(float value) noexcept { warmth.store(juce::jlimit(0.0f, 1.0f, value)); }
     void setReverbMix(float value) noexcept { reverbMix.store(juce::jlimit(0.0f, 0.6f, value)); }
+    void setReverbPreDelay(float ms) noexcept { reverbPreDelayMs.store(std::isfinite(ms)?juce::jlimit(0.0f,80.0f,ms):0.0f); }
     void setInstrumentProfile(InstrumentMixProfile value) noexcept { instrumentProfile.store(static_cast<int>(value)); }
     void setToneStyle(const ToneStyleSettings& settings) noexcept;
 
@@ -92,6 +94,9 @@ private:
     std::atomic<double> sampleRate { 48000.0 };
 
     juce::Reverb instrumentReverb;
+    WetPreDelay wetPreDelay;
+    std::atomic<float> reverbPreDelayMs {40.0f};
+    std::array<std::array<float,512>,2> wetScratch {};
     std::atomic<bool> reverbParametersDirty { true };
     float lastInstrumentReverbMix = -1.0f;
     int lastInstrumentProfile = -1;

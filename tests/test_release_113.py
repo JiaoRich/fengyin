@@ -5,8 +5,8 @@ class Release113(unittest.TestCase):
     def read(self,p): return (ROOT/p).read_text(encoding='utf-8')
     def test_optional_bridge_and_default_shared(self):
         installer=self.read('installer/FengYin.iss')
-        self.assertIn("if WizardIsTaskSelected('asiobridge') then",installer)
-        self.assertIn('Flags: unchecked',installer.split('Name: "asiobridge"',1)[1].splitlines()[0])
+        self.assertNotIn("WizardIsTaskSelected('asiobridge')",installer)
+        self.assertNotIn('Name: "asiobridge"',installer)
         service=self.read('native/Source/AudioDeviceService.cpp')
         self.assertIn('getBoolValue("audioEngineEnabled", false)',service)
         self.assertIn('getAvailableBufferSizes().contains(128)',service)

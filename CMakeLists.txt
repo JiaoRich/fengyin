@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.13 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.14 LANGUAGES C CXX)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
 set(CMAKE_CXX_STANDARD 20)
@@ -65,7 +65,8 @@ juce_add_binary_data(FengYinWebAssets SOURCES
     assets/tone-packages/piccolo.fytonepack
     assets/tone-packages/clarinet.fytonepack
     assets/tone-packages/oboe.fytonepack
-    assets/tone-packages/violin.fytonepack
+    assets/tone-packages/violin-sweet.fytonepack
+    assets/tone-packages/violin-soft.fytonepack
     assets/tone-packages/cello.fytonepack
     assets/tone-packages/kong/erhu.kam
     assets/tone-packages/kong/guzheng.kam
@@ -330,6 +331,9 @@ install(FILES
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(FengYinMusicTempoTests tests/test_music_tempo.cpp)
+    target_include_directories(FengYinMusicTempoTests PRIVATE native/Source)
+    add_test(NAME music_tempo COMMAND FengYinMusicTempoTests)
     # Tests must execute their checks (and assert expressions) in Release too.
     if(MSVC)
         add_compile_options(/UNDEBUG)

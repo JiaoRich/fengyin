@@ -1,5 +1,5 @@
-﻿param(
-    [string]$Version = "1.1.13",
+param(
+    [string]$Version = "1.1.14",
     [switch]$SkipInstaller
 )
 
@@ -110,6 +110,11 @@ Copy-Item (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES.md") $PackageDir -Force
 & (Join-Path $PSScriptRoot "prepare-vbcable.ps1") -Destination (Join-Path $PackageDir "components\VB-CABLE")
 & (Join-Path $PSScriptRoot "prepare-asio4all.ps1") -Destination (Join-Path $PackageDir "components\ASIO4ALL")
 & (Join-Path $PSScriptRoot "prepare-fresh-air.ps1") -Destination (Join-Path $PackageDir "components\Fresh Air")
+$MagicDestination = Join-Path $PackageDir "components\magic.CURVE"
+Copy-Item (Join-Path $ProjectRoot "installer\InstallNotice.txt") (Join-Path $PackageDir "InstallNotice.txt") -Force
+if ((Get-FileHash (Join-Path $ProjectRoot "assets\components\magic.CURVE-1.0.2-Windows-Setup.exe") -Algorithm SHA256).Hash -ne '5AEBF446018D5F8FCE87F332E9D8A01194A98E02536DE132BF1C64939417BDBD') { throw 'magic.CURVE installer SHA-256 mismatch' }
+New-Item -ItemType Directory -Path $MagicDestination -Force | Out-Null
+Copy-Item (Join-Path $ProjectRoot "assets\components\magic.CURVE-1.0.2-Windows-Setup.exe") (Join-Path $MagicDestination "magic.CURVE-1.0.2-Windows-Setup.exe") -Force
 Copy-Item (Join-Path $ProjectRoot "installer\AudioComponents.txt") $PackageDir -Force
 if (Test-Path $FfmpegPath) {
     Copy-Item $FfmpegPath (Join-Path $PackageDir "ffmpeg.exe") -Force

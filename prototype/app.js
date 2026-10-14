@@ -1192,6 +1192,11 @@ $('#transpose-grid').addEventListener('click',event=>{
 $('#cancel-transpose').addEventListener('click',()=>{$('#transpose-dialog').hidden=true;});
 $('#transpose-dialog').addEventListener('click',event=>{if(event.target===$('#transpose-dialog'))$('#transpose-dialog').hidden=true;});
 updateTransposeDisplay(0);
+$('#music-tempo').addEventListener('click',event=>{
+  const button=event.target.closest('[data-tempo]');if(!button)return;
+  const mode=Number(button.dataset.tempo);window.__JUCE__?.backend?.emitEvent('setMusicTempo',{mode});
+  window.fengyinVoice?.say(['MT_SLOW','MT_MEDIUM','MT_FAST'][mode]);
+});
 function renderBendRange(state) {
   bendState = state;
   const loaded = !!state.pluginLoaded && !state.pluginLoading;
@@ -1848,6 +1853,9 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   const visualSignature = value=>JSON.stringify([Math.round(Number(value.breath||0)*127),Math.round(Number(value.instrumentPeak||0)*200),Math.round(Number(value.outputLeftPeak||0)*200),Math.round(Number(value.outputRightPeak||0)*200),!!value.pluginLoaded]);
   const visualChanged = visualSignature(state) !== visualSignature(latestBackendState);
   latestBackendState = state || {};
+  $$('#music-tempo [data-tempo]').forEach(button=>{const active=Number(button.dataset.tempo)===Number(state.musicTempoMode??1);button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));});
+  $('#music-tempo').title=state.pluginBrand==='swam'&&state.automaticVibratoLinear===false&&/sax|violin|cello/.test(state.instrumentKey||'')?'当前技巧曲线为非线性，淡入沿原输入曲线；混响预延迟正常联动。':'调整自动颤音介入和风吟混响预延迟；咬颤保持音色方案设置。';
+  if(!localStorage.getItem('fy-music-tempo-v1-guide')){localStorage.setItem('fy-music-tempo-v1-guide','yes');toast('乐曲速度默认中速：慢速低于80，中速80至120，快速高于120 BPM。可调整自动颤音和混响预延迟。');window.fengyinVoice?.say('MT_GUIDE');}
   if (!sessionStorage.getItem('fy-performance-key-v3-notice')) {
     sessionStorage.setItem('fy-performance-key-v3-notice','yes');
     toast('演奏调模式：请先将电吹管设置为C调，再选择演奏调。');
@@ -2238,7 +2246,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.13 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.14 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

@@ -383,6 +383,12 @@ void MainComponent::setupWebInterface()
             else if (action == "up") pluginHost.moveEffect(index, index - 1);
             else if (action == "down") pluginHost.moveEffect(index, index + 1);
         })
+        .withEventListener("setMusicTempo", [this](juce::var payload)
+        {
+            const int mode=fengyin::MusicTempoPolicy::valid(static_cast<int>(payload.getProperty("mode",1)));
+            midi.setMusicTempoMode(mode);pluginHost.setMusicTempoMode(mode);
+            masterOutput.setReverbPreDelay(fengyin::MusicTempoPolicy::forMode(mode).predelayMs);
+        })
         .withEventListener("openPlugin", [this](juce::var)
         {
             const auto opened = isActivated && studioUnlocked && pluginHost.showPluginEditor(false);
@@ -1296,7 +1302,7 @@ void MainComponent::resized()
 
 void MainComponent::timerCallback()
 {
-    midi.tickTechniqueAutomation(); // Independent of browser frame rate.
+    // Technique automation uses its own 10ms timer, not the UI frame clock.
     if(const auto token=voicePrompts.consumeFinished();token!=0 && webInterface)
         webInterface->emitEventIfBrowserIsVisible("voiceFinished",token);
     if (superLowLatencyRunning && ++superLowLatencyPollTicks >= 30)
@@ -1526,6 +1532,10 @@ void MainComponent::timerCallback()
         state->setProperty("growlSensitivity", midi.getGrowlSensitivity());
         state->setProperty("automaticBreathDetection", automaticBreathDetectionActive);
         state->setProperty("reverbMix", masterOutput.getReverbMix());
+        const auto tempo=fengyin::MusicTempoPolicy::forMode(midi.getMusicTempoMode());
+        state->setProperty("musicTempoMode",midi.getMusicTempoMode());state->setProperty("musicTempoBpm",tempo.bpm);
+        state->setProperty("automaticVibratoLinear",pluginHost.hasLinearAutomaticVibratoFade());
+        state->setProperty("reverbPreDelayMs",tempo.predelayMs);
         state->setProperty("eqTone", masterOutput.getEqTone());
         state->setProperty("toneWarmth", masterOutput.getWarmth());
         state->setProperty("toneStyleId", currentToneStyleId);
@@ -2023,6 +2033,7 @@ void MainComponent::loadSelectedPlugin()
     // A new instrument invalidates any pending effect factory callback.
     effectLoading = false;
     pluginLoading = true;
+    midi.setPerformanceSink(nullptr);
     loadPluginButton.setEnabled(false);
     pluginHost.loadAsync(chosen,
                          status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
@@ -3257,10 +3268,11 @@ void MainComponent::loadPreset(fengyin::SoundPreset preset,
     const auto savedInstrumentXml = juce::parseXML(preset.instrumentDescriptionXml);
     const bool differentVersion = savedInstrumentXml && savedInstrument.loadFromXml(*savedInstrumentXml)
         && savedInstrument.version != chosen.version;
+    const bool verifiedForwardMigration=differentVersion&&preset.pluginBrand=="swam"&&savedInstrument.version=="3.8.2"&&chosen.version=="3.9.4";
     juce::String compatibilityWarning;
     if (differentVersion && preset.pluginBrand == "swam")
     {
-        if (preset.instrumentState.getSize() > 0)
+        if (preset.instrumentState.getSize() > 0 && !verifiedForwardMigration)
         {
             const auto message = utf8("方案与本机 SWAM 版本不同，不能安全恢复完整插件状态：")
                 + savedInstrument.version + " → " + chosen.version;
@@ -3297,6 +3309,7 @@ void MainComponent::loadPreset(fengyin::SoundPreset preset,
     pluginStatus.setText(utf8("正在恢复音色方案……"), juce::dontSendNotification);
     effectLoading = false;
     pluginLoading = true;
+    midi.setPerformanceSink(nullptr);
     pluginHost.loadAsync(chosen,
                          status.sampleRate > 0.0 ? status.sampleRate : 48000.0,
                          status.bufferSize > 0 ? status.bufferSize : 128,
@@ -3314,7 +3327,7 @@ void MainComponent::loadPreset(fengyin::SoundPreset preset,
                              activatePluginOutput(message, preset.instrumentState.getSize() == 0 && preset.samplerState.getSize() == 0, false);
                              pluginLoading = false;
                              completeLoadedPreset(preset, completion);
-                         });
+                         },verifiedForwardMigration);
 }
 
 void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
@@ -3408,6 +3421,7 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName, bool ap
             ? utf8(fengyin::SwamPluginClassifier::instrumentChineseName(pluginName.toStdString())) : utf8("空音 Qin Engine");
     }
     pluginHost.setKongExpressionMode(currentPluginBrand == "kong");
+    pluginHost.setMusicTempoMode(midi.getMusicTempoMode());masterOutput.setReverbPreDelay(fengyin::MusicTempoPolicy::forMode(midi.getMusicTempoMode()).predelayMs);
     pluginHost.configureKongTechniqueProfile(currentPluginBrand == "kong" ? currentInstrumentKey : juce::String());
     if (currentPluginBrand == "swam" && configureRoutes)
         pluginHost.applyStandardSwamExpressionCurve();

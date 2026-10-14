@@ -19,10 +19,10 @@ class AdjustedPackages(unittest.TestCase):
                 self.assertAlmostEqual(float(attack.get('value')),row['attackExpression'],places=6)
     def test_catalogue_retirement(self):
         text=(ROOT/'native/Source/PublishedToneCatalog.h').read_text(encoding='utf-8')
-        self.assertEqual(len(re.findall(r'\{ "',text)),30)
+        self.assertEqual(len(re.findall(r'\{ "',text)),31)
         for ident in ('baritone-jazz','baritone-pop','bassoon','viola','violin-section','viola-section','cello-section'):
             self.assertNotIn(f'"{ident}"',text)
-        self.assertIn('"小提琴"',text);self.assertIn('"大提琴"',text)
+        self.assertIn('"甜美小提琴"',text);self.assertIn('"柔美小提琴"',text);self.assertIn('"大提琴"',text)
     def test_final_routing_after_restore_and_kontakt_not_kam(self):
         main=(ROOT/'native/Source/MainComponent.cpp').read_text(encoding='utf-8')
         loaded=main.split('void MainComponent::completeLoadedPreset',1)[1].split('void MainComponent::activatePluginOutput',1)[0]

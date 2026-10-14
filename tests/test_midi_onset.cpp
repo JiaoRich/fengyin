@@ -157,9 +157,9 @@ int main() {
     mapping.sourceNumber=74;mapping.mode=fengyin::TechniqueControlMode::breath;
     service.setTechniqueMappings({mapping});
     note(70,80,43);cc(127,43.1);
-    fengyin::MidiInputServiceTestAccess::elapsed(service,500);
+    fengyin::MidiInputServiceTestAccess::elapsed(service,400);
     service.tickTechniqueAutomation();assert(sink.events.back().type=='T' && sink.events.back().value==0);
-    fengyin::MidiInputServiceTestAccess::elapsed(service,800);
+    fengyin::MidiInputServiceTestAccess::elapsed(service,525);
     service.tickTechniqueAutomation();assert(std::abs(sink.events.back().value-.5f)<.02f);
     fengyin::MidiInputServiceTestAccess::elapsed(service,1100);
     service.tickTechniqueAutomation();assert(sink.events.back().value==1);

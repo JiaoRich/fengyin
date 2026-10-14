@@ -59,7 +59,7 @@ class AudioStartupRecovery(unittest.TestCase):
 
     def test_both_driver_installers_require_restart(self):
         source = (ROOT / 'installer/FengYin.iss').read_text(encoding='utf-8')
-        self.assertIn("RunRequiredComponent('{app}\\components\\ASIO4ALL\\ASIO4ALL_2_22.exe'", source)
+        self.assertNotIn("RunRequiredComponent('{app}\\components\\ASIO4ALL\\ASIO4ALL_2_22.exe'", source)
         self.assertIn('AlwaysRestart=yes', source)
         self.assertNotIn('postinstall skipifsilent', source)
         self.assertIn('not NeedRestart()', source)

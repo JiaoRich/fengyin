@@ -41,6 +41,8 @@ void MasterOutputService::setSampleRate(double value) noexcept
     instrumentReverb.setSampleRate(validRate);
     airProcessor.prepare(validRate);
     instrumentReverb.reset();
+    wetPreDelay.prepare(validRate);
+    wetPreDelay.setDelay(reverbPreDelayMs.load());
     lastInstrumentReverbMix = -1.0f;
 }
 
@@ -61,7 +63,7 @@ void MasterOutputService::updateInstrumentReverb(float mix, const ProfileSetting
     parameters.damping = styleDamping.load(std::memory_order_relaxed);
     parameters.wetLevel = juce::jlimit(0.0f, 0.48f, mix * settings.reverbScale);
     // JUCE multiplies dryLevel by two internally; 0.5 means unity, not 1.0.
-    parameters.dryLevel = 0.5f * (1.0f - parameters.wetLevel * 0.32f);
+    parameters.dryLevel = 0.0f; // dry is mixed immediately, outside the wet-only delay.
     parameters.width = styleWidth.load(std::memory_order_relaxed);
     instrumentReverb.setParameters(parameters);
     lastInstrumentReverbMix = mix;
@@ -143,12 +145,18 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
     updateInstrumentReverb(wetMix, settings);
     if (wetMix > 0.0f)
     {
-        if (channels > 1 && outputs[0] != nullptr && outputs[1] != nullptr)
-            instrumentReverb.processStereo(outputs[0], outputs[1], samples);
-        else if (outputs[0] != nullptr)
-            instrumentReverb.processMono(outputs[0], samples);
+        const auto dryScale=1.0f-juce::jlimit(0.0f,.48f,wetMix*settings.reverbScale)*.32f;
+        wetPreDelay.setDelay(reverbPreDelayMs.load());
+        for(int pos=0;pos<samples;pos+=512) {
+            const int n=juce::jmin(512,samples-pos);const bool stereo=channels>1&&outputs[1]!=nullptr;
+            for(int c=0;c<(stereo?2:1);++c)if(outputs[c])std::copy_n(outputs[c]+pos,n,wetScratch[c].data());
+            if(stereo)instrumentReverb.processStereo(wetScratch[0].data(),wetScratch[1].data(),n);
+            else instrumentReverb.processMono(wetScratch[0].data(),n);
+            wetPreDelay.process(wetScratch[0].data(),stereo?wetScratch[1].data():nullptr,n);
+            for(int c=0;c<(stereo?2:1);++c)if(outputs[c])for(int i=0;i<n;++i)outputs[c][pos+i]=outputs[c][pos+i]*dryScale+wetScratch[c][i];
+        }
     }
-    else instrumentReverb.reset();
+    else {instrumentReverb.reset();wetPreDelay.reset();}
 
     // The visible performance fader owns only the instrument bus. No limiter,
     // fixed makeup gain or master gain is applied to the accompaniment.

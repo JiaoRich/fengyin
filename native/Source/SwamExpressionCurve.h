@@ -19,7 +19,8 @@ struct SwamExpressionCurve
         bool found = false;
         bool changed = false;
         int controller = -1;
-        struct Route { juce::String parameter; int controller; int channel; };
+        struct Route { juce::String parameter; int controller; int channel;
+            bool linear=false; float inputMin=0,inputMax=127,outputMin=0,outputMax=127; };
         std::vector<Route> routes;
     };
 

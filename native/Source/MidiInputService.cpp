@@ -10,19 +10,23 @@ MidiInputService::MidiInputService(bool persistSettings)
     techniqueHardwareInput.fill(0.0f);
     techniqueBreathInput.fill(0.0f);
     if (!persistSettings) return;
+    automaticTimerEnabled=true;
     juce::PropertiesFile::Options options;
     options.applicationName = "FengYinMidi";
     options.filenameSuffix = ".settings";
     options.folderName = "FengYin";
     options.osxLibrarySubFolder = "Application Support";
     properties.setStorageParameters(options);
-    if (auto* settingsFile = properties.getUserSettings())
+    if (auto* settingsFile = properties.getUserSettings()) {
         targetKey.store(PitchKey::normalise(settingsFile->getIntValue("performanceKeyV3", 0)));
+        musicTempoMode.store(MusicTempoPolicy::valid(settingsFile->getIntValue("musicTempoV1",1)));
+    }
     updateEffectiveTranspose();
 }
 
 MidiInputService::~MidiInputService()
 {
+    stopTimer();
     disconnect();
 }
 
@@ -237,9 +241,11 @@ void MidiInputService::setExpressionSettings(ExpressionSettings settings)
 
 void MidiInputService::setPerformanceSink(MidiPerformanceSink* sink) noexcept
 {
+    stopTimer(); // joins the automation callback before replacing/destroying the sink.
     performanceSink.store(sink, std::memory_order_release);
     if (sink != nullptr)
         sink->resetPerformance();
+    if(sink!=nullptr&&automaticTimerEnabled)startTimer(10);
 }
 
 void MidiInputService::beginBreathDetection() noexcept
@@ -266,6 +272,12 @@ int MidiInputService::finishBreathDetection(bool markCompleted) noexcept
         }
     }
     return detected;
+}
+
+void MidiInputService::setMusicTempoMode(int mode)
+{
+    musicTempoMode.store(MusicTempoPolicy::valid(mode));
+    if(auto* settings=properties.getUserSettings()) {settings->setValue("musicTempoV1",musicTempoMode.load());settings->saveIfNeeded();}
 }
 
 void MidiInputService::setTargetKey(int pitchClass)
@@ -673,7 +685,7 @@ void MidiInputService::tickTechniqueAutomation()
         if (mapping.technique == PerformanceTechnique::vibrato)
         {
             const auto elapsed = juce::Time::getMillisecondCounterHiRes() - latestNoteStartedMs.load(std::memory_order_relaxed);
-            sink->techniqueChanged(mapping.technique, playing ? b * automaticVibratoFade(elapsed) : 0.0f);
+            sink->automaticVibratoChanged(playing?b:0.0f,playing?MusicTempoPolicy::forMode(musicTempoMode.load()).fade(elapsed):0.0f);
         }
         else if (mapping.technique == PerformanceTechnique::growl)
             sink->techniqueChanged(mapping.technique, playing ? b : 0.0f);

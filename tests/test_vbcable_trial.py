@@ -52,10 +52,8 @@ class VBCableTrialTests(unittest.TestCase):
 
     def test_release_installer_cannot_silently_skip_vbcable(self):
         installer = self.read("installer/FengYin.iss")
-        run_line = next(line for line in installer.splitlines()
-                        if "RunRequiredComponent('{app}\\components\\VB-CABLE" in line)
-        self.assertNotIn("Tasks: vbcable", run_line)
-        self.assertNotIn("Check: NeedsVBCable", run_line)
+        self.assertNotIn("RunRequiredComponent('{app}\\components\\VB-CABLE", installer)
+        self.assertNotIn('Name: "asiobridge"', installer)
         self.assertIn("VerifyVBCableInstalled();", installer)
         self.assertIn("RaiseException('VB-CABLE 未完成安装", installer)
 

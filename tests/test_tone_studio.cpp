@@ -179,7 +179,7 @@ int main()
     }
     const auto bundled=juce::File(juce::String::fromUTF8(__FILE__)).getParentDirectory().getParentDirectory().getChildFile("assets/tone-packages");
     const auto files=bundled.findChildFiles(juce::File::findFiles,false,"*.fytonepack");
-    assert(files.size()==17);
+    assert(files.size()==19);
     for(const auto& file:files){juce::String error;const auto imported=fengyin::TonePackage::read(file,error);assert(imported && error.isEmpty());}
     assert(directory.deleteRecursively());
 }

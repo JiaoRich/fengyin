@@ -29,6 +29,7 @@ body{background-size:cover;background-position:center;background-attachment:fixe
 #transpose-key{display:inline-flex;align-items:center;gap:5px;padding:0 10px;border:1px solid var(--line)!important;background:rgba(255,255,255,.055)!important;border-radius:12px}
 #performance-key{border:0;background:transparent;color:var(--text);font:inherit}
 #performance-key option{background:var(--bg);color:var(--text)}
+.music-tempo{display:flex;align-items:center;gap:5px;flex-wrap:wrap}.music-tempo span{font-size:12px;opacity:.75}.music-tempo button{padding:8px 10px;font:inherit}.music-tempo button.active{border-color:var(--accent);background:var(--accent-soft)}body.compact-mode .music-tempo{grid-column:1/-1;justify-content:center}
 .technique-mode-bar,.adapter-mode-inline,#technique-more{display:none!important}
 /* Same neutral button surface as the surrounding performance actions. */
 #transpose-key.transpose-stepper{display:inline-flex;align-items:center;gap:0;padding:0;border:1px solid var(--line)!important;background:rgba(255,255,255,.055)!important;border-radius:12px;overflow:hidden;flex-shrink:0}

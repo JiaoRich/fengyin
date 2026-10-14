@@ -14,6 +14,7 @@
 #include "MidiPerformanceSink.h"
 #include "PitchKey.h"
 #include "MidiOnsetTrace.h"
+#include "MusicTempoPolicy.h"
 
 namespace fengyin
 {
@@ -41,7 +42,7 @@ struct TechniqueLearnResult
     TechniqueMapping mapping;
 };
 
-class MidiInputService final : private juce::MidiInputCallback
+class MidiInputService final : private juce::MidiInputCallback, private juce::HighResolutionTimer
 {
 public:
     explicit MidiInputService(bool persistSettings = true);
@@ -65,6 +66,8 @@ public:
     void beginBreathDetection() noexcept;
     [[nodiscard]] int finishBreathDetection(bool markCompleted = false) noexcept;
     void setTargetKey(int pitchClass);
+    void setMusicTempoMode(int mode);
+    int getMusicTempoMode() const noexcept { return musicTempoMode.load(); }
     void setTransposeSemitones(int semitones); // Legacy API; equivalent pitch class from hardware C.
     [[nodiscard]] int getTargetKey() const noexcept { return targetKey.load(std::memory_order_relaxed); }
     [[nodiscard]] int getTransposeSemitones() const noexcept { return transposeSemitones.load(std::memory_order_relaxed); }
@@ -131,6 +134,9 @@ private:
     std::atomic<int> learnedSourceNumber { -1 };
     std::atomic<bool> learnedSourceReady { false };
     std::atomic<double> latestNoteStartedMs { -1.0 };
+    std::atomic<int> musicTempoMode { 1 };
+    bool automaticTimerEnabled=false;
+    void hiResTimerCallback() override { tickTechniqueAutomation(); }
     std::atomic<bool> pitchMappingRemap { false };
 };
 }

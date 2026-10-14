@@ -17,6 +17,13 @@ void inspect(juce::XmlElement& element, SwamExpressionCurve::Result& result, boo
             && channel >= 1 && channel <= 17)
         {
             result.routes.push_back({parameter, cc, channel == 17 ? 1 : channel});
+            if(auto* curve=element.getChildByName("MIDIRemappingCurve")) {
+                auto& route=result.routes.back();
+                route.inputMin=static_cast<float>(curve->getDoubleAttribute("input_min",0));route.inputMax=static_cast<float>(curve->getDoubleAttribute("input_max",127));
+                route.outputMin=static_cast<float>(curve->getDoubleAttribute("out_min",0));route.outputMax=static_cast<float>(curve->getDoubleAttribute("out_max",127));
+                route.linear=curve->getDoubleAttribute("shape",1)==0&&curve->getIntAttribute("bypass",0)==0&&curve->getIntAttribute("bipolar",0)==0
+                    &&route.inputMax>route.inputMin&&route.outputMax>route.outputMin;
+            }
             if (parameter.equalsIgnoreCase("expression"))
             {
                 result.found = true;

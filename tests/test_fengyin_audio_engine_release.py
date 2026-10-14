@@ -131,7 +131,8 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         self.assertIn("HKLM64", installer)
         self.assertIn("InprocServer32", installer)
         self.assertIn("FileExists(RemoveQuotes(Server))", installer)
-        self.assertIn("RunRequiredComponent('{app}\\components\\ASIO4ALL", installer)
+        self.assertNotIn("RunRequiredComponent('{app}\\components\\ASIO4ALL", installer)
+        self.assertIn("RunRequiredComponent('{app}\\components\\magic.CURVE", installer)
         self.assertNotIn("Tasks: asio4all; Check: NeedsASIO4ALL", installer)
         self.assertNotIn("FengYinDriverSetup.exe", self.read("scripts/build-windows.ps1"))
 
@@ -183,10 +184,10 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
             "高萨-原声", "高萨-流行", "中萨-爵士", "中萨-深情", "中萨-流行",
             "次中萨-醇厚", "次中萨-温暖", "次中萨-气包音",
             "小号", "高音小号", "中音长号", "低音长号", "长笛", "短笛", "单簧管", "双簧管",
-            "小提琴", "大提琴",
+            "甜美小提琴", "柔美小提琴", "大提琴",
             "二胡", "古筝", "葫芦丝", "柳琴", "马头琴", "曲笛", "埙", "唢呐", "三弦", "琵琶", "笙", "南箫",
         ]
-        self.assertIn("std::array<PublishedToneDefinition, 30>", catalog)
+        self.assertIn("std::array<PublishedToneDefinition, 31>", catalog)
         for name in expected_names:
             self.assertEqual(catalog.count(f'"{name}"'), 1, name)
         self.assertNotIn("扫描本机", catalog)

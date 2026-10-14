@@ -1,5 +1,6 @@
 #pragma once
 #include "SwamToneApplication.h"
+#include "MusicTempoPolicy.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_utils/juce_audio_utils.h>
@@ -93,7 +94,7 @@ public:
                    double sampleRate,
                    int bufferSize,
                    const juce::MemoryBlock& initialState,
-                   LoadCallback callback);
+                   LoadCallback callback, bool verifyStateRoundtrip = false);
     void unload();
     void loadEffectAsync(const juce::PluginDescription& description,
                          double sampleRate, int bufferSize, LoadCallback callback);
@@ -161,12 +162,23 @@ public:
     }
     void pitchBendChanged(float bipolarValue, double timestampSeconds = 0.0) noexcept override;
     void techniqueChanged(PerformanceTechnique technique, float value) noexcept override;
+    void automaticVibratoChanged(float input,float fade) noexcept override;
+    void setMusicTempoMode(int mode) noexcept { musicTempoMode.store(MusicTempoPolicy::valid(mode));tempoRateDirty.store(true); }
+    bool hasLinearAutomaticVibratoFade() const noexcept { return vibratoLinear.load(); }
     void resetPerformance() noexcept override;
     void flushTechniqueValues();
     [[nodiscard]] bool supportsTechnique(PerformanceTechnique technique) const noexcept;
     [[nodiscard]] int getProcessingLatencySamples() const noexcept;
 
 private:
+    void routeTechnique(PerformanceTechnique technique,float value) noexcept;
+    void prepareTempoVibrato(juce::AudioPluginInstance& plugin);
+    std::atomic<int> musicTempoMode {1};
+    std::atomic<bool> automaticVibratoActive {false},tempoRateDirty {false},vibratoLinear {false};
+    std::atomic<float> vibratoInputMin {0},vibratoInputMax {127},vibratoOutputMin {0},vibratoOutputMax {127};
+    std::atomic<juce::AudioProcessorParameter*> vibratoRateParameter {nullptr};
+    float originalVibratoRate=0;std::array<float,3> tempoVibratoRates {{-1,-1,-1}};
+    std::atomic<float> automaticVibratoDirect {-1};
     juce::var swamToneAudit;
     bool queue(juce::MidiMessage message, double timestampSeconds) noexcept;
     bool rebuildConnections();

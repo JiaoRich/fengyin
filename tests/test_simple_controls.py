@@ -45,4 +45,5 @@ assert.equal(p[0].mode,'off');assert.equal(p[0].sourceNumber,74);assert(p[1].rou
         self.assertIn('PitchKey::transposeFromTo(0,',MIDI)
         self.assertIn('performanceKeyV3',MIDI)
         self.assertNotIn('getIntValue("transposeOffsetV2"',MIDI)
-        self.assertIn('b * automaticVibratoFade(elapsed)',MIDI)
+        self.assertIn('sink->automaticVibratoChanged',MIDI)
+        self.assertIn('MusicTempoPolicy::forMode(musicTempoMode.load()).fade(elapsed)',MIDI)

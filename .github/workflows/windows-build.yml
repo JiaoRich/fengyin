@@ -105,6 +105,17 @@ jobs:
         shell: powershell
         run: ./scripts/test-fresh-air-install.ps1
 
+      - name: 验证 magic.CURVE 全新安装
+        shell: powershell
+        run: ./scripts/test-magic-curve-install.ps1
+
+      - name: 保存 magic.CURVE 安装验证日志
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: magic-CURVE-install-test
+          path: magic-curve-install-test/
+
       - name: 实际执行安装末尾时间标记表达式
         shell: powershell
         run: ./scripts/test-installer-marker.ps1

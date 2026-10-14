@@ -1,0 +1,121 @@
+[
+  {
+    "name": "甜美小提琴",
+    "sourceSha256": "7489a80dfa55a95960b9c0bacb086ca2f8892c7b436ce4779d2fbed36508a4a7",
+    "asset": "violin-sweet.fytonepack",
+    "dependencies": [
+      {
+        "role": "instrument",
+        "name": "SWAM Violin 3",
+        "manufacturer": "Audio Modeling",
+        "version": "3.9.4",
+        "format": "VST3",
+        "uid": 1115992012,
+        "bypassed": false
+      },
+      {
+        "role": "effect",
+        "name": "magic.CURVE",
+        "manufacturer": "MBM Audio",
+        "version": "1.0.2",
+        "format": "VST3",
+        "uid": -88685889,
+        "bypassed": false
+      }
+    ],
+    "approvedParameterChanges": [
+      "Attack snapshot -> Expression; original attackType=2 state preserved, user authorised"
+    ],
+    "completeStateUnchanged": true
+  },
+  {
+    "name": "柔美小提琴",
+    "sourceSha256": "c4c28feb82b493c880677d3ab5894be9fcf8a0c5d6d7947877ff917fa594ba7c",
+    "asset": "violin-soft.fytonepack",
+    "dependencies": [
+      {
+        "role": "instrument",
+        "name": "SWAM Violin 3",
+        "manufacturer": "Audio Modeling",
+        "version": "3.8.2",
+        "format": "VST3",
+        "uid": 1115992012,
+        "bypassed": false
+      }
+    ],
+    "approvedParameterChanges": [],
+    "completeStateUnchanged": true
+  },
+  {
+    "name": "双簧管",
+    "sourceSha256": "b5e607dbf073462545e10e96c5f42adff59cca2aafc6416a4a616c687cd9c68a",
+    "asset": "oboe.fytonepack",
+    "dependencies": [
+      {
+        "role": "instrument",
+        "name": "SWAM Oboe 3",
+        "manufacturer": "Audio Modeling",
+        "version": "3.8.2",
+        "format": "VST3",
+        "uid": -1799192255,
+        "bypassed": false
+      }
+    ],
+    "approvedParameterChanges": [],
+    "completeStateUnchanged": true
+  },
+  {
+    "name": "长笛",
+    "sourceSha256": "a732d16705fb1003f4df2504fe9db3035c5bcb56dcf88a14084d59c26c0c8c57",
+    "asset": "flute.fytonepack",
+    "dependencies": [
+      {
+        "role": "instrument",
+        "name": "SWAM Flute 3",
+        "manufacturer": "Audio Modeling",
+        "version": "3.8.2",
+        "format": "VST3",
+        "uid": -335313072,
+        "bypassed": false
+      }
+    ],
+    "approvedParameterChanges": [],
+    "completeStateUnchanged": true
+  },
+  {
+    "name": "短笛",
+    "sourceSha256": "43e10732a8e09a9a253db6f2347b6fd245ecdd37405e727e7bb626c19bd8f0b5",
+    "asset": "piccolo.fytonepack",
+    "dependencies": [
+      {
+        "role": "instrument",
+        "name": "SWAM Piccolo 3",
+        "manufacturer": "Audio Modeling",
+        "version": "3.8.2",
+        "format": "VST3",
+        "uid": 462058815,
+        "bypassed": false
+      }
+    ],
+    "approvedParameterChanges": [],
+    "completeStateUnchanged": true
+  },
+  {
+    "name": "单簧管",
+    "sourceSha256": "4a91d867c8af24d8bfc9e5f9945bfc3201c36ac55d5ee4be8fb2aac872659dec",
+    "asset": "clarinet.fytonepack",
+    "dependencies": [
+      {
+        "role": "instrument",
+        "name": "SWAM Clarinet 3",
+        "manufacturer": "Audio Modeling",
+        "version": "3.8.2",
+        "format": "VST3",
+        "uid": -1698663602,
+        "bypassed": false
+      }
+    ],
+    "approvedParameterChanges": [],
+    "completeStateUnchanged": true
+  }
+]
