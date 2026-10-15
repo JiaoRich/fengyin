@@ -79,6 +79,12 @@ int main() {
     }
     Sink sink;
     {
+        fengyin::MidiInputService defaults(false);
+        const auto mappings=defaults.getTechniqueMappings();
+        assert(mappings.size()==1 && mappings[0].technique==fengyin::PerformanceTechnique::vibrato);
+        assert(mappings[0].mode==fengyin::TechniqueControlMode::breath);
+    }
+    {
         Sink pitchSink;
         fengyin::MidiInputService pitch(false);
         pitch.setPerformanceSink(&pitchSink);
@@ -169,8 +175,28 @@ int main() {
     fengyin::MidiInputServiceTestAccess::elapsed(service,1100);
     service.tickTechniqueAutomation();assert(sink.events.back().value==1);
     cc(0,44.2);service.tickTechniqueAutomation();assert(sink.events.back().value==0);
+    // All three tempo choices retain the same original input-CC envelope:
+    // zero during wait, half input halfway through fade, full input at its end.
+    for (int mode=0;mode<3;++mode) {
+        service.setMusicTempoMode(mode);
+        const auto policy=fengyin::MusicTempoPolicy::forMode(mode);
+        note(74+mode,80,45+mode);cc(127,45.1+mode);
+        fengyin::MidiInputServiceTestAccess::elapsed(service,policy.waitMs-10);
+        service.tickTechniqueAutomation();assert(sink.events.back().value==0);
+        fengyin::MidiInputServiceTestAccess::elapsed(service,policy.waitMs+policy.fadeMs*.5);
+        service.tickTechniqueAutomation();assert(std::abs(sink.events.back().value-.5f)<.02f);
+        fengyin::MidiInputServiceTestAccess::elapsed(service,policy.waitMs+policy.fadeMs+10);
+        service.tickTechniqueAutomation();assert(sink.events.back().value==1);
+        cc(0,45.2+mode);service.tickTechniqueAutomation();assert(sink.events.back().value==0);
+    }
     assert(fengyin::simpleGrowl("alto-sax") && !fengyin::simpleGrowl("soprano-sax"));
     assert(fengyin::simpleOther("kong-pipa")==fengyin::PerformanceTechnique::tremolo);
+    assert(fengyin::simpleVibrato("kong-erhu-2") && fengyin::simpleVibrato("kong-jinghu"));
+    assert(!fengyin::simpleVibrato("kong-pipa"));
+    for(const char* key:{"flute","piccolo","alto-flute","bass-flute","clarinet","bass-clarinet","oboe","english-horn","bassoon","contrabassoon","trumpet","piccolo-trumpet","alto-trombone","bass-trombone","horn-f","euphonium","bass-tuba"})
+        assert(fengyin::simpleVibrato(key));
+    assert(fengyin::simpleOther("kong-erhu-2")==fengyin::PerformanceTechnique::tremolo);
+    assert(fengyin::simpleOther("kong-matouqin")==fengyin::PerformanceTechnique::count);
     assert(fengyin::automaticVibratoFade(600)==0 && fengyin::automaticVibratoFade(1000)==1);
     service.setPerformanceSink(nullptr);
     // Exercise the real JUCE collector after FengYin's realtime queue, including

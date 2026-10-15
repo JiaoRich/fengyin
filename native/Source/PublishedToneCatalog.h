@@ -5,7 +5,7 @@
 
 namespace fengyin
 {
-enum class PublishedToneKind { swamStyle, swamPackage, kongProject };
+enum class PublishedToneKind { swamStyle, swamPackage, kongProject, kongPackage };
 
 struct PublishedToneDefinition
 {
@@ -19,7 +19,7 @@ struct PublishedToneDefinition
 
 // The release catalogue is deliberately explicit. Installing another plug-in
 // must never make an unreviewed tone appear in the customer-facing library.
-inline constexpr std::array<PublishedToneDefinition, 31> publishedToneCatalog {{
+inline constexpr std::array<PublishedToneDefinition, 32> publishedToneCatalog {{
     { "soprano-kenny",       "高萨-原声",       "soprano-sax",       "kenny",          PublishedToneKind::swamPackage, "soprano-kenny.fytonepack" },
     { "soprano-pop",         "高萨-流行",       "soprano-sax",       "pop-high",       PublishedToneKind::swamStyle,   {} },
     { "alto-jazz",           "中萨-爵士",       "alto-sax",          "jazz",           PublishedToneKind::swamPackage,   "alto-jazz.fytonepack" },
@@ -36,20 +36,21 @@ inline constexpr std::array<PublishedToneDefinition, 31> publishedToneCatalog {{
     { "piccolo",             "短笛",          "piccolo",          "natural",        PublishedToneKind::swamPackage,   "piccolo.fytonepack" },
     { "clarinet",            "单簧管",         "clarinet",         "natural",        PublishedToneKind::swamPackage,   "clarinet.fytonepack" },
     { "oboe",                "双簧管",         "oboe",             "natural",        PublishedToneKind::swamPackage,   "oboe.fytonepack" },
-    { "violin",              "甜美小提琴",       "violin",           "natural",        PublishedToneKind::swamPackage,   "violin-sweet.fytonepack" },
+    { "violin",              "激情小提琴",       "violin",           "natural",        PublishedToneKind::swamPackage,   "violin-sweet.fytonepack" },
     { "violin-soft",         "柔美小提琴",       "violin",           "natural",        PublishedToneKind::swamPackage,   "violin-soft.fytonepack" },
     { "cello",               "大提琴",       "cello",            "natural",        PublishedToneKind::swamPackage,   "cello.fytonepack" },
-    { "kong-erhu",           "二胡",          "kong-erhu",        "release",        PublishedToneKind::kongProject, "erhu.kam" },
-    { "kong-guzheng",        "古筝",          "kong-guzheng",     "release",        PublishedToneKind::kongProject, "guzheng.kam" },
-    { "kong-hulusi",         "葫芦丝",         "kong-hulusi",      "release",        PublishedToneKind::kongProject, "hulusi.kam" },
-    { "kong-liuqin",         "柳琴",          "kong-liuqin",      "release",        PublishedToneKind::kongProject, "liuqin.kam" },
-    { "kong-matouqin",       "马头琴",         "kong-matouqin",    "release",        PublishedToneKind::kongProject, "matouqin.kam" },
-    { "kong-qudi",           "曲笛",          "kong-dizi",        "release",        PublishedToneKind::kongProject, "qudi.kam" },
-    { "kong-xun",            "埙",           "kong-xun",         "release",        PublishedToneKind::kongProject, "xun.kam" },
-    { "kong-suona",          "唢呐",          "kong-suona",       "release",        PublishedToneKind::kongProject, "suona.kam" },
-    { "kong-sanxian",        "三弦",          "kong-sanxian",     "release",        PublishedToneKind::kongProject, "sanxian.kam" },
-    { "kong-pipa",           "琵琶",          "kong-pipa",        "release",        PublishedToneKind::kongProject, "pipa.kam" },
-    { "kong-sheng",          "笙",           "kong-sheng",       "release",        PublishedToneKind::kongProject, "sheng.kam" },
-    { "kong-nanxiao",        "南箫",          "kong-nanxiao",     "release",        PublishedToneKind::kongProject, "nanxiao.kam" },
+    { "kong-erhu",           "二胡",          "kong-erhu-2",      "release",        PublishedToneKind::kongPackage, "folk-erhu.fytonepack" },
+    { "kong-hulusi",         "葫芦丝",         "kong-hulusi",      "release",        PublishedToneKind::kongPackage, "folk-hulusi.fytonepack" },
+    { "kong-liuqin",         "柳琴",          "kong-liuqin",      "release",        PublishedToneKind::kongPackage, "folk-liuqin.fytonepack" },
+    { "kong-matouqin",       "马头琴",         "kong-matouqin",    "release",        PublishedToneKind::kongPackage, "folk-matouqin.fytonepack" },
+    { "kong-qudi",           "曲笛",          "kong-dizi",        "release",        PublishedToneKind::kongPackage, "folk-qudi.fytonepack" },
+    { "kong-xun",            "埙",           "kong-xun",         "release",        PublishedToneKind::kongPackage, "folk-xun.fytonepack" },
+    { "kong-suona",          "唢呐",          "kong-suona-2",     "release",        PublishedToneKind::kongPackage, "folk-suona.fytonepack" },
+    { "kong-sanxian",        "三弦",          "kong-sanxian",     "release",        PublishedToneKind::kongPackage, "folk-sanxian.fytonepack" },
+    { "kong-pipa",           "琵琶",          "kong-pipa",        "release",        PublishedToneKind::kongPackage, "folk-pipa.fytonepack" },
+    { "kong-nanxiao",        "南箫",          "kong-nanxiao",     "release",        PublishedToneKind::kongPackage, "folk-nanxiao.fytonepack" },
+    { "kong-dongxiao",       "洞箫",          "kong-xiao",        "release",        PublishedToneKind::kongPackage, "folk-dongxiao.fytonepack" },
+    { "kong-bangdi",         "梆笛",          "kong-dizi-2",      "release",        PublishedToneKind::kongPackage, "folk-bangdi.fytonepack" },
+    { "kong-jinghu",         "京胡",          "kong-jinghu",      "release",        PublishedToneKind::kongPackage, "folk-jinghu.fytonepack" },
 }};
 }

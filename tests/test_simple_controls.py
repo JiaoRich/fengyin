@@ -21,7 +21,7 @@ for(const key of ['soprano-sax','alto-sax','tenor-sax','baritone-sax','violin-se
 assert(!buildTechniquePlan('soprano-sax')[1].pluginSupported);
 assert(buildTechniquePlan('alto-sax')[1].pluginSupported);
 assert(buildTechniquePlan('violin-section')[0].pluginSupported);
-assert(!buildTechniquePlan('flute')[0].pluginSupported);
+assert(buildTechniquePlan('flute')[0].pluginSupported);
 assert.equal(buildTechniquePlan('kong-pipa')[2].name,'其他技巧：轮指');
 let p=mergeBackendTechniquePlan('alto-sax',{},[{id:'vibrato',mode:4,sourceType:1,sourceNumber:74},{id:'growl',mode:1,pluginSupported:false}]);
 assert.equal(p[0].mode,'off');assert.equal(p[0].sourceNumber,74);assert(p[1].routeMissing);

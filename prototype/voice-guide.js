@@ -27,9 +27,9 @@
   function speakText(text){const x=catalog.find(x=>x.text.replace(/[。～]/g,'')===text.replace(/[。～]/g,''));return x?say(x.id):Promise.resolve(false);}
   const controlName=name=>name.split('／')[0].replace(/功能键\s*1/,'功能键一').replace(/功能键\s*2/,'功能键二').replace(/功能键\s*3/,'功能键三');
   window.fengyinVoice={say,stop,speakText,
-    learning(name){learnedName=controlName(name);say(/咬嘴|颤音|揉弦/.test(name)?'V047':name.includes('体感')?'V048':name.includes('摇杆')?'V049':'V050');},
-    cleared(name){speakText(`已取消${controlName(name)}映射。`);},
-    tone(name){if(!toneEnabled)return;const spoken=name.replace('次中萨','次中音萨克斯').replace('上低萨','上低音萨克斯').replace('高萨','高音萨克斯').replace('中萨','中音萨克斯').replaceAll('-', '，');return speakText(spoken);},
+    learning(name){learnedName=controlName(name);say(/咬嘴|颤音|揉弦/.test(name)?'V047':'NEW_MAP_START');},
+    cleared(){say('NEW_MAP_CLEAR');},
+    tone(name){if(!toneEnabled)return;const spoken=name.replace('次中萨','次中音萨克斯').replace('上低萨','上低音萨克斯').replace('高萨','高音萨克斯').replace('中萨','中音萨克斯').replaceAll('-', '，');const match=catalog.find(x=>x.text.replace(/[。～]/g,'')===spoken);return say(match?.id || 'NEW_TONE_GENERIC');},
     async beforeRecording(){
       if(countdown)return false;if(!enabled)return true;
       countdown=true;const button=document.querySelector('#record');button.disabled=true;
@@ -128,10 +128,10 @@
   backend?.addEventListener('recordingSaved',ok=>{state={...state,recording:false};if(ok)say('V042');});
   backend?.addEventListener('windowModeChanged',compact=>{if(!compact && wasCompact && !guiding)say('V032');wasCompact=!!compact;place();});
   backend?.addEventListener('videoAudioState',result=>{if(result?.ready&&!videoReady)say('V036');videoReady=!!result?.ready;});
-  backend?.addEventListener('techniqueLearnResult',result=>{if(result.success)speakText(`${learnedName}已设置好。`);else say('V052');});
+  backend?.addEventListener('techniqueLearnResult',result=>{if(result.success)say('NEW_MAP_OK');else say('V052');});
   backend?.addEventListener('breathMatchResult',result=>{if(!result.success)say('V007');});
   backend?.addEventListener('bendRangeResult',result=>{if(result.success && result.value)say(`V027_${String(result.value).padStart(2,'0')}`);});
-  document.querySelector('#cancel-technique-learning')?.addEventListener('click',()=>say('V055'));
+  document.querySelector('#cancel-technique-learning')?.addEventListener('click',()=>say('NEW_MAP_CANCEL'));
   const offer=setInterval(()=>{
     if(localStorage.getItem('fy-guide-seen')){clearInterval(offer);return;}
     if(busy() || !document.querySelector('#license-lock').hidden)return;

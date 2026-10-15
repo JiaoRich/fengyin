@@ -152,6 +152,16 @@ int main()
     assert(kongZip.getNumEntries()==3);
     std::unique_ptr<juce::InputStream> kam(kongZip.createStreamForEntry(kongZip.getIndexOfFileName("instrument.KAM")));
     assert(kam&&kam->readEntireStreamAsString()=="KAM bytes");
+    preset.kongTechniques={true,1,2,0};
+    const auto routedFile=directory.getChildFile("kong-routed.fytonepack");
+    assert(fengyin::TonePackage::write(preset,routedFile));
+    const auto routed=fengyin::TonePackage::read(routedFile,importError);
+    assert(routed && routed->kongTechniques.enabled && routed->kongTechniques.vibratoCC==1
+        && routed->kongTechniques.otherChannel==2 && routed->kongTechniques.otherKeyswitchIndex==0);
+    juce::ZipFile routedZip(routedFile);
+    std::unique_ptr<juce::InputStream> routedManifest(routedZip.createStreamForEntry(routedZip.getIndexOfFileName("manifest.json")));
+    assert(int(juce::JSON::parse(routedManifest->readEntireStreamAsString())["version"])==2);
+    preset.kongTechniques={};
     preset.pluginBrand="kontakt";preset.containerAdapter="kontakt";
     preset.containerProjectState.reset();preset.samplerState=juce::MemoryBlock("native kontakt state",20);
     const auto kontaktFile=directory.getChildFile("kontakt.fytonepack");
@@ -179,7 +189,16 @@ int main()
     }
     const auto bundled=juce::File(juce::String::fromUTF8(__FILE__)).getParentDirectory().getParentDirectory().getChildFile("assets/tone-packages");
     const auto files=bundled.findChildFiles(juce::File::findFiles,false,"*.fytonepack");
-    assert(files.size()==19);
-    for(const auto& file:files){juce::String error;const auto imported=fengyin::TonePackage::read(file,error);assert(imported && error.isEmpty());}
+    assert(files.size()==32);
+    int routedFolkPackages=0;
+    for(const auto& file:files){
+        juce::String error;const auto imported=fengyin::TonePackage::read(file,error);assert(imported && error.isEmpty());
+        if(file.getFileName().startsWith("folk-")) {
+            ++routedFolkPackages;
+            assert(imported->pluginBrand=="kong" && imported->kongTechniques.enabled);
+            assert(imported->samplerState.getSize()>0 && imported->containerProjectState.getSize()>0);
+        }
+    }
+    assert(routedFolkPackages==13);
     assert(directory.deleteRecursively());
 }

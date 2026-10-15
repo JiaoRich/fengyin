@@ -88,7 +88,16 @@ int main()
         std::cout<<"DSP first RMS="<<first<<" second RMS="<<second<<" ratio="<<ratio<<"\n";
         assert(std::isfinite(ratio) && ratio>.8 && ratio<1.25);
     }
-    static_assert(fengyin::publishedToneCatalog.size() == 31);
+    static_assert(fengyin::publishedToneCatalog.size() == 32);
+    int routedFolkCount=0;
+    for(const auto& tone:fengyin::publishedToneCatalog) {
+        assert(tone.id!="kong-guzheng" && tone.id!="kong-sheng");
+        if(tone.kind==fengyin::PublishedToneKind::kongPackage) {
+            ++routedFolkCount;
+            assert(tone.assetName.starts_with("folk-") && tone.assetName.ends_with(".fytonepack"));
+        }
+    }
+    assert(routedFolkCount==13);
     for (size_t i = 0; i < fengyin::publishedToneCatalog.size(); ++i)
     {
         const auto& tone = fengyin::publishedToneCatalog[i];

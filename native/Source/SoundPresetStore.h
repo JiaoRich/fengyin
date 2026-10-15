@@ -1,4 +1,5 @@
 #pragma once
+#include "KongTechniqueProfile.h"
 
 #include <juce_core/juce_core.h>
 #include <optional>
@@ -32,6 +33,7 @@ struct SoundPreset
     juce::MemoryBlock containerProjectState;
     bool containerInstrument = false;
     juce::String containerAdapter;
+    KongTechniqueProfile kongTechniques;
     bool customTone = false;
     float compressionThreshold = 0.58f;
     float compressionRatio = 1.7f;

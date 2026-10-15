@@ -321,12 +321,13 @@ function instrumentFamily(key = '') {
 }
 
 function buildTechniquePlan(key = '') {
-  const other = {'kong-erhu':'揉弦','kong-matouqin':'揉弦','kong-hulusi':'颤音','kong-xun':'颤音','kong-nanxiao':'颤音','kong-guzheng':'摇指','kong-liuqin':'轮奏','kong-pipa':'轮指','kong-sanxian':'轮奏','kong-dizi':'花舌','kong-suona':'花舌','kong-sheng':'花舌',flute:'花舌',piccolo:'花舌'}[key];
+  const other = {'kong-erhu':'颤弓','kong-erhu-2':'颤弓','kong-jinghu':'颤弓','kong-guzheng':'摇指','kong-liuqin':'轮音','kong-pipa':'轮指','kong-sanxian':'轮音','kong-dizi':'花舌','kong-dizi-2':'吐音','kong-suona':'花舌','kong-suona-2':'花舌','kong-sheng':'花舌',flute:'花舌',piccolo:'花舌'}[key];
+  const folkVibrato = ['kong-erhu','kong-erhu-2','kong-matouqin','kong-hulusi','kong-hulusi-2','kong-xun','kong-nanxiao','kong-xiao','kong-dizi','kong-dizi-2','kong-suona','kong-suona-2','kong-jinghu'].includes(key);
   return [
-    {id:'vibrato',name:/violin|viola|cello|double-bass/.test(key)?'揉弦':'颤音',icon:'≈',index:1,pluginSupported:/sax|violin|viola|cello|double-bass/.test(key)},
+    {id:'vibrato',name:/violin|viola|cello|double-bass|kong-erhu|kong-matouqin|kong-jinghu/.test(key)?'揉弦':'颤音',icon:'≈',index:1,pluginSupported:folkVibrato || /sax|violin|viola|cello|double-bass|flute|piccolo|clarinet|oboe|english-horn|bassoon|trumpet|trombone|flugelhorn|tuba|euphonium|horn-f|horn-bb/.test(key)},
     {id:'growl',name:'嘶吼音',icon:'≋',index:0,pluginSupported:['alto-sax','tenor-sax','baritone-sax'].includes(key)},
     {id:'mute',name:other?`其他技巧：${other}`:'其他技巧',icon:'✦',index:8,pluginSupported:!!other}
-  ].map(item=>({...item,description:item.id==='mute'?'按住触发，松开恢复':item.id==='vibrato'?'咬嘴控制，或长音600毫秒后400毫秒淡入':'按键触发，或气息控制',mode:'off',strength:100,featured:true}));
+  ].map(item=>({...item,description:item.id==='mute'?'按住触发，松开恢复':item.id==='vibrato'?'咬嘴控制，或按乐曲速度在长音中渐入':'按键触发，或气息控制',mode:'off',strength:100,featured:true}));
 }
 
 function buildAdaptiveTechniquePlan(key = '', state = {}) {
@@ -363,7 +364,7 @@ function mergeBackendTechniquePlan(key, state, mappings) {
   const modes = ['breath','breath','hardware','hardware','off'];
   return roles.map(item => {
     const backend = mappings.find(entry => entry.id === item.id);
-    if (!backend) return {...item,mode:'off',featured:true};
+    if (!backend) return {...item,mode:item.id==='vibrato'?'breath':'off',featured:true};
     return {
       ...item,
       index:Number(backend.technique ?? item.index),
@@ -1308,7 +1309,7 @@ function renderTechniqueMappings(force = false) {
     const modeLabels = item.id === 'mute' ? {off:'关闭',hardware:'按键触发'} : item.id === 'vibrato' ? {off:'关闭',hardware:'咬嘴控制',breath:'自动颤音'} : {off:'关闭',hardware:'按键触发',breath:'自动嘶吼'};
     return `<article class="technique-card ${item.featured ? '' : 'secondary'}" data-technique-id="${item.id}">
       <div class="technique-card-head"><div class="technique-card-title"><span class="technique-card-icon">${item.icon}</span><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.description)}</p></div></div><span class="technique-card-state">${item.mode === 'off' ? '已关闭' : hardware ? (mapped ? '✓ 已映射' : '待映射') : '✓ 已配置'}</span></div>
-      <div class="technique-control"><div class="technique-mode-buttons">${Object.entries(modeLabels).map(([value,label]) => `<button type="button" data-technique-mode="${value}" aria-pressed="${item.mode === value}" ${!item.routeMissing ? '' : 'disabled'}>${label}</button>`).join('')}</div><button class="learn-source" ${hardware && !item.routeMissing ? '' : 'hidden'}>${Number(window.fengyinTechniqueLearning) === item.index ? '等待操作…' : mapped ? '重新映射' : '点击映射'}</button></div>
+      <div class="technique-control"><div class="technique-mode-buttons">${Object.entries(modeLabels).map(([value,label]) => `<button type="button" data-technique-mode="${value}" aria-pressed="${item.mode === value}" ${!item.routeMissing ? '' : 'disabled'}>${label}</button>`).join('')}</div><button class="learn-source" ${hardware && !item.routeMissing ? '' : 'hidden'}>${Number(window.fengyinTechniqueLearning) === item.index ? '等待操作…' : mapped ? '重新映射' : '点击映射'}</button><button class="clear-source" ${mapped?'':'hidden'}>取消映射</button></div>
       <p class="recommendation">${item.routeMissing ? '风吟未能验证此音源的自动技巧映射，请导出诊断供排查；不会绕过曲线写深度参数。' : !item.pluginSupported ? '全局映射会保留；当前音色不使用此项' : hardware ? escapeHtml(sourceDescription(item)) : '曲线与深度使用音源方案预设'}</p>
     </article>`;
   }).join('');
@@ -1319,6 +1320,17 @@ function renderTechniqueMappings(force = false) {
   }));
   $('#technique-more').hidden = true;
 }
+$('#technique-list').addEventListener('click',event=>{
+  const button=event.target.closest('.clear-source');if(!button)return;
+  const item=techniquePlan.find(entry=>entry.id===button.closest('[data-technique-id]')?.dataset.techniqueId);
+  if(!item)return;
+  nativeEvent('removeTechniqueMapping',{technique:item.index});
+  window.fengyinVoice?.cleared(item.name);
+  const saved=techniqueMappings.find(entry=>entry.id===item.id);
+  if(saved){saved.sourceType=0;saved.sourceNumber=-1;saved.toggle=false;saved.mode=4;}
+  item.sourceType=0;item.sourceNumber=-1;item.mode='off';window.fengyinTechniqueLearning=-1;
+  renderTechniqueMappings(true);
+});
 function startTechniqueLearning(item,inline = false) {
   window.fengyinVoice?.learning(item.name);
   window.fengyinTechniqueLearning = item.index;
@@ -1529,6 +1541,9 @@ $('#technique-list').addEventListener('click',event=>{
   if(!item)return;
   item.mode=button.dataset.techniqueMode;
   nativeEvent('setTechniqueConfiguration',{techniqueId:item.id,mode:item.mode,strength:item.strength/100});
+  window.fengyinVoice?.say(item.id==='vibrato' ? (item.mode==='off'?'V058_01':item.mode==='hardware'?'NEW_VIB_HARDWARE':'V057_01')
+    :item.id==='growl'?(item.mode==='off'?'V058_02':item.mode==='hardware'?'NEW_GROWL_HARDWARE':'V057_02')
+    :item.mode==='off'?'NEW_OTHER_OFF':'NEW_OTHER_ON');
   if(item.mode==='hardware' && sourceDescription(item)==='未设置')startTechniqueLearning(item,false);
   renderTechniqueMappings(true);
 });
@@ -1854,7 +1869,7 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   const visualChanged = visualSignature(state) !== visualSignature(latestBackendState);
   latestBackendState = state || {};
   $$('#music-tempo [data-tempo]').forEach(button=>{const active=Number(button.dataset.tempo)===Number(state.musicTempoMode??1);button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));});
-  $('#music-tempo').title=state.pluginBrand==='swam'&&state.automaticVibratoLinear===false&&/sax|violin|cello/.test(state.instrumentKey||'')?'当前技巧曲线为非线性，淡入沿原输入曲线；混响预延迟正常联动。':'调整自动颤音介入和风吟混响预延迟；咬颤保持音色方案设置。';
+  $('#music-tempo').title='调整自动颤音介入和风吟混响预延迟；咬颤保持音色方案设置。';
   if(!localStorage.getItem('fy-music-tempo-v1-guide')){localStorage.setItem('fy-music-tempo-v1-guide','yes');toast('乐曲速度默认中速：慢速低于80，中速80至120，快速高于120 BPM。可调整自动颤音和混响预延迟。');window.fengyinVoice?.say('MT_GUIDE');}
   if (!sessionStorage.getItem('fy-performance-key-v3-notice')) {
     sessionStorage.setItem('fy-performance-key-v3-notice','yes');
@@ -2246,7 +2261,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.14 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.15 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

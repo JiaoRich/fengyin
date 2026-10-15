@@ -372,7 +372,6 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                 if (kongExpressionMode.load() || !message.isController()) return false;
                 const int route=(message.getChannel()<<8)|(message.getControllerNumber()+1);
                 if (route==((swamExpressionChannel.load()<<8)|(swamExpressionController.load()+1))) return false;
-                if(automaticVibratoDirect.load()>=0&&route==nativeTechniqueRoutes[static_cast<size_t>(PerformanceTechnique::vibrato)].load())return true;
                 for (const auto technique : {PerformanceTechnique::vibrato,PerformanceTechnique::growl,PerformanceTechnique::flutter})
                 {
                     const auto index=static_cast<size_t>(technique);
@@ -446,7 +445,7 @@ void PluginHostEngine::unload()
     swamExpressionController.store(11, std::memory_order_relaxed);
     swamExpressionChannel.store(1, std::memory_order_relaxed);
     for (auto& route : nativeTechniqueRoutes) route.store(0, std::memory_order_relaxed);
-    vibratoRateParameter.store(nullptr);automaticVibratoActive.store(false);automaticVibratoDirect.store(-1);vibratoLinear.store(false);
+    vibratoRateParameter.store(nullptr);automaticVibratoActive.store(false);
     juce::Logger::writeToLog("Plugin unload complete");
     for (auto& value : lastNativeTechniqueMessages) value.store(0, std::memory_order_relaxed);
 }
@@ -620,15 +619,10 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve()
         else {state=verified;juce::Logger::writeToLog("SWAM automatic technique routes verified; curves preserved");}
     }
     const auto result = SwamExpressionCurve::applyToState(state);
-    vibratoLinear.store(false);
     for (const auto& route : result.routes)
     {
         const auto parameter = route.parameter.toLowerCase().removeCharacters(" ._-");
         if (parameter == "expression") swamExpressionChannel.store(route.channel);
-        if(parameter=="vibratodepth") {
-            vibratoInputMin.store(route.inputMin);vibratoInputMax.store(route.inputMax);vibratoOutputMin.store(route.outputMin);vibratoOutputMax.store(route.outputMax);
-            vibratoLinear.store(route.linear&&std::isfinite(route.inputMin)&&std::isfinite(route.inputMax)&&std::isfinite(route.outputMin)&&std::isfinite(route.outputMax));
-        }
         const std::pair<const char*, PerformanceTechnique> names[] = {
             {"vibratodepth", PerformanceTechnique::vibrato}, {"growl", PerformanceTechnique::growl},
             {"flutter", PerformanceTechnique::flutter}, {"portamento", PerformanceTechnique::portamento},
@@ -969,6 +963,9 @@ void PluginHostEngine::noteOn(int noteNumber, float velocity, double timestampSe
     {
         queue(kongBreathExpression(performanceChannel.load(std::memory_order_relaxed),
             lastBreathMidiValue.load(std::memory_order_relaxed)), timestampSeconds);
+        if(kongVibratoCC.load()==1)
+            queue(juce::MidiMessage::controllerEvent(performanceChannel.load(),1,
+                juce::roundToInt(kongTechniqueInputs[static_cast<size_t>(PerformanceTechnique::vibrato)].load()*127.f)),timestampSeconds);
         bool playing = false;
         for (const auto& held : activeNotes) playing |= held.load(std::memory_order_relaxed);
         if (!playing)
@@ -1018,6 +1015,7 @@ void PluginHostEngine::noteOff(int noteNumber, double timestampSeconds) noexcept
 
 void PluginHostEngine::breathChanged(float value, double timestampSeconds) noexcept
 {
+    const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
     const auto midiValue = juce::jlimit(0, 127, juce::roundToInt(value * 127.0f));
     if (lastBreathMidiValue.exchange(midiValue, std::memory_order_relaxed) == midiValue)
         return;
@@ -1034,6 +1032,7 @@ void PluginHostEngine::breathChanged(float value, double timestampSeconds) noexc
 
 void PluginHostEngine::pitchBendChanged(float bipolarValue, double timestampSeconds) noexcept
 {
+    const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
     const auto pitch = juce::jlimit(0, 16383,
         juce::roundToInt(8192.0f + juce::jlimit(-1.0f, 1.0f, bipolarValue)
                          * (bipolarValue < 0.0f ? 8192.0f : 8191.0f)));
@@ -1043,7 +1042,7 @@ void PluginHostEngine::pitchBendChanged(float bipolarValue, double timestampSeco
 
 void PluginHostEngine::prepareTempoVibrato(juce::AudioPluginInstance& plugin)
 {
-    vibratoRateParameter.store(nullptr);automaticVibratoActive.store(false);automaticVibratoDirect.store(-1);
+    vibratoRateParameter.store(nullptr);automaticVibratoActive.store(false);
     const auto key=SwamPluginClassifier::instrumentKey(plugin.getName().toStdString());
     for(auto* p:plugin.getParameters())if(p->getName(100)=="Vibrato Rate") {
         originalVibratoRate=p->getValue();
@@ -1061,7 +1060,7 @@ void PluginHostEngine::prepareTempoVibrato(juce::AudioPluginInstance& plugin)
 
 void PluginHostEngine::techniqueChanged(PerformanceTechnique technique,float value) noexcept
 {
-    if(technique==PerformanceTechnique::vibrato){if(automaticVibratoActive.exchange(false))tempoRateDirty.store(true);automaticVibratoDirect.store(-1);}
+    if(technique==PerformanceTechnique::vibrato){if(automaticVibratoActive.exchange(false))tempoRateDirty.store(true);}
     routeTechnique(technique,value);
 }
 
@@ -1069,25 +1068,10 @@ void PluginHostEngine::automaticVibratoChanged(float input,float fade) noexcept
 {
     if(!hasIndependentTechniqueRoute(PerformanceTechnique::vibrato)){routeTechnique(PerformanceTechnique::vibrato,0);return;}
     if(!automaticVibratoActive.exchange(true))tempoRateDirty.store(true);
-    const auto index=static_cast<size_t>(PerformanceTechnique::vibrato);
     input=std::isfinite(input)?juce::jlimit(0.f,1.f,input):0;fade=std::isfinite(fade)?juce::jlimit(0.f,1.f,fade):0;
-    if(input==0||fade==0){automaticVibratoDirect.store(-1);routeTechnique(PerformanceTechnique::vibrato,0);return;}
-    if(vibratoLinear.load()){
-        const float lo=vibratoInputMin.load(),hi=vibratoInputMax.load(),min=vibratoOutputMin.load(),max=vibratoOutputMax.load();
-        const float target=(min+(max-min)*juce::jlimit(0.f,1.f,(input*127-lo)/(hi-lo)))*fade;
-        if(target<=min) {
-            // The curve cannot express values below its floor. Ramp the actual
-            // depth only in this small region; retain the native route elsewhere.
-            techniqueValues[index].store(input);automaticVibratoDirect.store(juce::jlimit(0.f,1.f,target/127));
-            techniqueDirty[index].store(true);lastNativeTechniqueMessages[index].store(0);return;
-        }
-        automaticVibratoDirect.store(-1);
-        routeTechnique(PerformanceTechnique::vibrato,juce::jlimit(0.f,1.f,(lo+(target-min)/(max-min)*(hi-lo))/127));
-        return;
-    }
-    // Unknown/non-linear curves are never guessed or rewritten. Preserve the
-    // native input fade and expose this limitation in the UI diagnostic state.
-    automaticVibratoDirect.store(-1);routeTechnique(PerformanceTechnique::vibrato,input*fade);
+    // Use the established CC input fade. Tempo changes timing/rate only;
+    // SWAM remains responsible for the preset's technique response curve.
+    routeTechnique(PerformanceTechnique::vibrato,input*fade);
 }
 
 void PluginHostEngine::routeTechnique(PerformanceTechnique technique, float value) noexcept
@@ -1099,8 +1083,16 @@ void PluginHostEngine::routeTechnique(PerformanceTechnique technique, float valu
     if (kongExpressionMode.load(std::memory_order_relaxed))
     {
         const auto previous = kongTechniqueInputs[index].exchange(safeValue, std::memory_order_relaxed);
+        if(kongProfile.enabled && technique==PerformanceTechnique::vibrato) {
+            if(kongVibratoCC.load()==1)
+                queue(juce::MidiMessage::controllerEvent(performanceChannel.load(),1,juce::roundToInt(safeValue*127.f)),0.0);
+            return; // Continuous modulation, never a vibrato keyswitch/restart.
+        }
         const auto route = kongTechniqueRoutes[index];
-        if (route.keyswitch >= 0 && (previous <= 0.5f) != (safeValue <= 0.5f))
+        // A secondary slot already contains its chosen articulation. On
+        // release, switch back without restarting the outgoing technique slot.
+        if (route.keyswitch >= 0 && (route.channel <= 1 || safeValue > 0.5f)
+            && (previous <= 0.5f) != (safeValue <= 0.5f))
         {
             int selected = route.normalKey;
             for (size_t i = 0; i < kongTechniqueRoutes.size(); ++i)
@@ -1174,33 +1166,46 @@ void PluginHostEngine::switchPerformanceChannel(int channel) noexcept
     channel = juce::jlimit(1, 16, channel);
     const auto previous = performanceChannel.exchange(channel, std::memory_order_relaxed);
     if (previous == channel) return;
-    // Initialise the destination before retriggering a held note. Qin can latch
-    // controller state at attack; sending expression after Note On is too late.
     const auto breathValue = juce::jmax(0, lastBreathMidiValue.load(std::memory_order_relaxed));
-    queue(kongBreathExpression(channel, breathValue), 0.0);
-    queue(juce::MidiMessage::pitchWheel(channel, lastPitchWheel.load(std::memory_order_relaxed)), 0.0);
-    for (int note = 0; note < 128; ++note)
-        if (activeNotes[static_cast<size_t>(note)].load(std::memory_order_relaxed))
-        {
-            queue(juce::MidiMessage::noteOff(previous, note), 0.0);
-            queue(juce::MidiMessage::noteOn(channel, note,
-                activeVelocities[static_cast<size_t>(note)].load(std::memory_order_relaxed)), 0.0);
-        }
+    changeKongChannel(previous, channel, breathValue, lastPitchWheel.load(std::memory_order_relaxed),
+        [this](int note) { return activeNotes[static_cast<size_t>(note)].load(std::memory_order_relaxed); },
+        [this](const auto& message) { queue(message, 0.0); },
+        [this](int note) { return activeVelocities[static_cast<size_t>(note)].load(std::memory_order_relaxed); },
+        kongVibratoCC.load()==1 ? juce::roundToInt(kongTechniqueInputs[static_cast<size_t>(PerformanceTechnique::vibrato)].load()*127.f) : -1);
 }
 
-void PluginHostEngine::configureKongTechniqueProfile(const juce::String& key) noexcept
+void PluginHostEngine::configureKongTechniqueProfile(const juce::String& key,const KongTechniqueProfile& profile) noexcept
 {
+    const auto state=key.isEmpty()?juce::MemoryBlock():captureContainerState();
+    const auto tree=KongProjectFile::readPluginComponentState(state);
+    const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
+    kongProfile=profile;
+    kongVibratoCC.store(-1);
     for (auto& route : kongTechniqueRoutes) route = {};
     for (auto& value : kongTechniqueInputs) value.store(0.0f, std::memory_order_relaxed);
     switchPerformanceChannel(1);
     if (key.isEmpty()) return;
     player.beginOnsetTrace();
     juce::Logger::writeToLog("ONSET begin 30s bounded capture: " + key);
-    const auto state = captureContainerState();
-    auto tree = KongProjectFile::readPluginComponentState(state);
-    if (!tree.isValid())
+    if (!tree.isValid() || tree.getChildWithName("PresetList").getNumChildren()==0)
     {
         juce::Logger::writeToLog("Kong technique binding failed: unsupported state; instrument=" + key);
+        return;
+    }
+    if(profile.enabled) {
+        if(profile.vibratoCC==1) {
+            kongVibratoCC.store(1);
+            for(auto slot:tree.getChildWithName("PresetList")) {
+                const int channel=int(slot.getProperty("MIDI",0))+1;
+                if(channel>=1&&channel<=16)queue(juce::MidiMessage::controllerEvent(channel,1,0),0.0);
+            }
+        }
+        const auto target=simpleOther(key.toStdString());
+        if(target!=PerformanceTechnique::count && profile.otherChannel>0) {
+            const auto binding=findKongTechniqueAt(tree,profile.otherChannel,profile.otherKeyswitchIndex);
+            kongTechniqueRoutes[static_cast<size_t>(target)]={binding.channel,binding.keyswitch,binding.normalKey};
+            if(binding.channel==0) juce::Logger::writeToLog("Explicit Qin technique binding rejected: "+key);
+        }
         return;
     }
     const auto bind = [this, &tree](PerformanceTechnique technique, const juce::StringArray& names)
@@ -1208,9 +1213,16 @@ void PluginHostEngine::configureKongTechniqueProfile(const juce::String& key) no
         const auto binding = findKongTechnique(tree, names);
         kongTechniqueRoutes[static_cast<size_t>(technique)] = {binding.channel, binding.keyswitch, binding.normalKey};
     };
-    bind(PerformanceTechnique::vibrato, key == "kong-xun"
-        ? juce::StringArray{"Vib_Mellow", "Vib_Main", "Vib_Layers", "Vib_Bright"}
-        : juce::StringArray{"Vib_Main", "Vib_Layers", "Vib_Mellow", "Vib_Bright"});
+    // Older/custom Qin packages have no explicit route metadata. Their
+    // continuous vibrato uses the same native CC1 as the verified new packs,
+    // never a Vib_Main/Vib_Mellow sample keyswitch and held-note restart.
+    if(simpleVibrato(key.toStdString())) {
+        kongVibratoCC.store(1);
+        for(auto slot:tree.getChildWithName("PresetList")) {
+            const int channel=int(slot.getProperty("MIDI",0))+1;
+            if(channel>=1&&channel<=16)queue(juce::MidiMessage::controllerEvent(channel,1,0),0.0);
+        }
+    }
     bind(PerformanceTechnique::flutter, {"Flutter", "Flutter2"});
     bind(PerformanceTechnique::tremolo, {"Main_Shake_Mellow", "Roll", "Sus_Main_Roll", "Tremolo"});
     bind(PerformanceTechnique::pizzicato, {"Pizz"});
@@ -1218,6 +1230,12 @@ void PluginHostEngine::configureKongTechniqueProfile(const juce::String& key) no
 
 void PluginHostEngine::resetPerformance() noexcept
 {
+    const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
+    if(kongVibratoCC.load()==1) {
+        queue(juce::MidiMessage::controllerEvent(1,1,0),0.0);
+        if(kongProfile.otherChannel>1 && kongProfile.otherChannel<=16)
+            queue(juce::MidiMessage::controllerEvent(kongProfile.otherChannel,1,0),0.0);
+    }
     for (auto& value : lastNativeTechniqueMessages) value.store(0, std::memory_order_relaxed);
     lastBreathMidiValue.store(-1, std::memory_order_relaxed);
     player.requestPerformanceReset();
@@ -1460,8 +1478,6 @@ void PluginHostEngine::flushTechniqueValues()
         const auto target=automaticVibratoActive.load()?tempoVibratoRates[MusicTempoPolicy::valid(musicTempoMode.load())]:originalVibratoRate;
         if(target>=0)p->setValueNotifyingHost(target);
     }
-    const float direct=automaticVibratoDirect.load();
-    if(direct>=0&&automaticVibratoActive.load())if(auto* p=techniqueParameters[static_cast<size_t>(PerformanceTechnique::vibrato)].load())p->setValueNotifyingHost(direct);
     for (size_t index = 0; index < techniqueParameters.size(); ++index)
         if (techniqueDirty[index].exchange(false, std::memory_order_acq_rel))
             if (nativeTechniqueRoutes[index].load() == 0

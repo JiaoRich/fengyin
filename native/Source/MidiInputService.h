@@ -42,7 +42,7 @@ struct TechniqueLearnResult
     TechniqueMapping mapping;
 };
 
-class MidiInputService final : private juce::MidiInputCallback, private juce::HighResolutionTimer
+class MidiInputService final : private juce::MidiInputCallback
 {
 public:
     explicit MidiInputService(bool persistSettings = true);
@@ -135,8 +135,6 @@ private:
     std::atomic<bool> learnedSourceReady { false };
     std::atomic<double> latestNoteStartedMs { -1.0 };
     std::atomic<int> musicTempoMode { 1 };
-    bool automaticTimerEnabled=false;
-    void hiResTimerCallback() override { tickTechniqueAutomation(); }
     std::atomic<bool> pitchMappingRemap { false };
 };
 }

@@ -21,9 +21,9 @@ class TransposePresentationTests(unittest.TestCase):
         raw = (ROOT/'prototype/voice-catalog.js').read_text(encoding="utf-8")
         catalog = json.loads(raw.split('=',1)[1].strip().rstrip(';'))
         items = {i['id']:i for i in catalog['items']}
-        self.assertEqual(items['T000']['text'], '关闭移调')
-        self.assertEqual(items['TU01']['text'], '加一个半音')
-        self.assertEqual(items['TD01']['text'], '减一个半音')
+        self.assertEqual(items['V026_01']['text'], '演奏调已设为C调。')
+        self.assertEqual(items['V026_12']['text'], '演奏调已设为B调。')
+        self.assertEqual(catalog['voice'],'x6_wuyediantai_mini')
         for item in items.values():
             self.assertEqual(item.get('voice',catalog['voice']), catalog['voice'])
             self.assertGreater((ROOT/'assets/voice'/f"{item['id']}.wav").stat().st_size,4096)

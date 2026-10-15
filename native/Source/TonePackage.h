@@ -49,7 +49,8 @@ struct TonePackage
         if (! readEntry("manifest.json", manifestBytes) || ! readEntry("tone.xml", toneBytes))
             return fail("方案包缺少清单或音色数据");
         const auto manifest = juce::JSON::parse(manifestBytes.toString());
-        if (manifest["format"].toString() != "fengyin-tone-package" || static_cast<int>(manifest["version"]) != 1
+        const int packageVersion=static_cast<int>(manifest["version"]);
+        if (manifest["format"].toString() != "fengyin-tone-package" || (packageVersion!=1 && packageVersion!=2)
             || static_cast<bool>(manifest["pluginBinariesIncluded"])) return fail("方案包版本或格式不支持");
         const auto* files = manifest["files"].getArray();
         if (! files || files->size() != zip.getNumEntries() - 1) return fail("方案包清单不完整");
@@ -77,6 +78,13 @@ struct TonePackage
         const auto presets = SoundPresetStore::fromXml(*xml);
         if (presets.size() != 1 || presets[0].instrumentChineseName.isEmpty()) return fail("音色数据不完整");
         auto preset = presets[0];
+        if(packageVersion==2 && (preset.pluginBrand!="kong" || !preset.kongTechniques.enabled))
+            return fail("新版民乐方案缺少明确的技巧路由");
+        if(preset.kongTechniques.enabled && (preset.kongTechniques.vibratoCC!=-1 && preset.kongTechniques.vibratoCC!=1))
+            return fail("民乐颤音控制器不支持");
+        if(preset.kongTechniques.enabled && (preset.kongTechniques.otherChannel<0 || preset.kongTechniques.otherChannel>16
+            || preset.kongTechniques.otherKeyswitchIndex < -1 || preset.kongTechniques.otherKeyswitchIndex>127))
+            return fail("民乐技巧通道或奏法索引异常");
         const float scalars[] { preset.eqTone, preset.bass, preset.air, preset.warmth, preset.reverbMix,
             preset.compressionThreshold, preset.compressionRatio, preset.saturation, preset.harshControl,
             preset.reverbRoomSize, preset.reverbDamping, preset.reverbWidth, preset.outputGain };
@@ -159,7 +167,7 @@ struct TonePackage
         auto* root = new juce::DynamicObject();
         juce::var manifest(root);
         root->setProperty("format", "fengyin-tone-package");
-        root->setProperty("version", 1);
+        root->setProperty("version", preset.kongTechniques.enabled ? 2 : 1);
         root->setProperty("instrument", preset.instrumentChineseName);
         root->setProperty("style", preset.name);
         root->setProperty("dependencies", dependencies);

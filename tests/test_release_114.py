@@ -23,7 +23,7 @@ class Release114(unittest.TestCase):
                 self.assertEqual(p.get('name'),entry['name']);self.assertTrue(p.find('INSTRUMENT_STATE').text)
                 self.assertEqual(m['dependencies'],entry['dependencies'])
                 for f in m['files']:self.assertEqual(hashlib.sha256(z.read(f['path'])).hexdigest(),f['sha256'])
-        sweet=next(x for x in audit if x['name']=='甜美小提琴');self.assertEqual(len(sweet['dependencies']),2)
+        sweet=next(x for x in audit if x['asset']=='violin-sweet.fytonepack');self.assertEqual(len(sweet['dependencies']),2)
         self.assertEqual(sweet['dependencies'][1]['name'],'magic.CURVE')
     def test_no_asio_install_prompt_and_magic_hash(self):
         iss=(ROOT/'installer/FengYin.iss').read_text(encoding='utf-8');body=iss.split('procedure CurStepChanged',1)[1]
@@ -31,9 +31,10 @@ class Release114(unittest.TestCase):
         self.assertNotIn('Name: "asiobridge"',iss);self.assertIn('HasMagicCurveAt',body)
         magic=ROOT/'assets/components/magic.CURVE-1.0.2-Windows-Setup.exe'
         self.assertEqual(hashlib.sha256(magic.read_bytes()).hexdigest(),'5aebf446018d5f8fce87f332e9d8a01194a98e02536de132bf1c64939417bdbd')
-    def test_automation_separate_from_ui_and_originals_retained(self):
+    def test_automation_previous_timer_and_originals_retained(self):
         midi=(ROOT/'native/Source/MidiInputService.cpp').read_text(encoding='utf-8');host=(ROOT/'native/Source/PluginHostEngine.cpp').read_text(encoding='utf-8')
-        self.assertIn('startTimer(10)',midi);self.assertIn('stopTimer(); // joins',midi)
+        self.assertNotIn('startTimer(10)',midi)
+        self.assertIn('midi.tickTechniqueAutomation()', (ROOT/'native/Source/MainComponent.cpp').read_text(encoding='utf-8'))
         self.assertIn('sink->automaticVibratoChanged',midi);self.assertIn('originalVibratoRate',host)
         self.assertIn('SwamStateCompatibility::preserved',host)
         self.assertIn('verifiedForwardMigration',(ROOT/'native/Source/MainComponent.cpp').read_text(encoding='utf-8'))

@@ -39,6 +39,15 @@ int main()
                 assert(binding.normalKey == 24);
             }
         assert(fengyin::findKongTechnique(tree, {"nonexistent-articulation"}).keyswitch == -1);
+        if(juce::String(asset)=="pipa.kam") {
+            const auto exact=fengyin::findKongTechniqueAt(tree,1,10);
+            assert(exact.channel==1 && exact.keyswitch==34);
+            assert(fengyin::findKongTechniqueAt(tree,1,128).channel==0);
+        }
+        if(juce::String(asset)=="suona.kam") {
+            const auto independent=fengyin::findKongTechniqueAt(tree,2,0);
+            assert(independent.channel==2 && independent.keyswitch==-1);
+        }
         bool compared = false;
         for (auto* entry : releaseRoot->getChildIterator())
             if (entry->getStringAttribute("asset") == asset)
@@ -108,6 +117,24 @@ int main()
     assert(generatedDescription.has_value());
     assert(generatedDescription->kai == "ErHu");
     assert(generatedDescription->preset == "Sus_Main");
+    // A tuner save must retain the technique slot, its MIDI channel, selected
+    // articulation and native rack enums, including edits to either slot.
+    auto dual=juce::ValueTree::readFromData(preset.containerProjectState.getData(),preset.containerProjectState.getSize());
+    auto dualSlots=dual.getChildWithName("PresetList");
+    auto second=dualSlots.getChild(0).createCopy();
+    second.setProperty("MIDI",1,nullptr);second.setProperty("IsSelected",false,nullptr);
+    second.setProperty("Tone",17.0,nullptr);second.setProperty("IndexSelectedKeyswitch",7,nullptr);
+    dualSlots.addChild(second,-1,nullptr);
+    dual.getChildWithName("RackParam").setProperty("MainTune",432.0,nullptr);
+    juce::MemoryOutputStream previousDual;dual.writeToStream(previousDual);
+    second.setProperty("Volume",91.0,nullptr);second.setProperty("Tone",23.0,nullptr);
+    juce::MemoryOutputStream editedDual;dual.writeToStream(editedDual);
+    const auto liveDual=fengyin::KongProjectFile::toPluginState(editedDual.getMemoryBlock());
+    const auto savedDual=fengyin::KongProjectFile::fromPluginState(liveDual,previousDual.getMemoryBlock());
+    const auto savedTree=juce::ValueTree::readFromData(savedDual.getData(),savedDual.getSize());
+    assert(savedTree.isEquivalentTo(dual));
+    assert(savedTree.getChildWithName("PresetList").getNumChildren()==2);
+    assert(int(savedTree.getChildWithName("PresetList").getChild(1)["MIDI"])==1);
     const auto referenceVstStatePath = juce::SystemStats::getEnvironmentVariable("FENGYIN_REFERENCE_VST_STATE", {});
     if (referenceVstStatePath.isNotEmpty())
     {
@@ -121,6 +148,7 @@ int main()
         assert(extracted->preset == "Sus_Main");
     }
     preset.customTone = true;
+    preset.kongTechniques={true,1,2,0};
     preset.compressionRatio = 2.4f;
     preset.harshControl = 0.22f;
     preset.outputGain = 0.92f;
@@ -153,6 +181,8 @@ int main()
     assert(loaded->toneStyleId == "warm-jazz");
     assert(loaded->baseToneStyleId == "warm-jazz");
     assert(loaded->pluginBrand == "kong");
+    assert(loaded->kongTechniques.enabled && loaded->kongTechniques.vibratoCC==1
+        && loaded->kongTechniques.otherChannel==2 && loaded->kongTechniques.otherKeyswitchIndex==0);
     assert(loaded->instrumentKey == "kong-erhu");
     assert(loaded->instrumentChineseName == juce::String::fromUTF8("二胡"));
     assert(loaded->pluginProgramName == "Erhu");

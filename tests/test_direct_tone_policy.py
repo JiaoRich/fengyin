@@ -66,7 +66,7 @@ class DirectTonePolicy(unittest.TestCase):
     def test_offline_transpose_voice_assets(self):
         catalog = json.loads((ROOT / 'prototype/voice-catalog.js').read_text(encoding='utf-8').split('=', 1)[1].strip().rstrip(';'))
         clips = {item['id']: item for item in catalog['items']}
-        ids = ['T001', 'T000'] + [f'{prefix}{n:02d}' for prefix in ('TU', 'TD') for n in range(1, 13)]
+        ids = ['T001'] + [f'V026_{n:02d}' for n in range(1, 13)]
         for ident in ids:
             self.assertIn(ident, clips)
             with wave.open(str(ROOT / 'assets/voice' / (ident + '.wav')), 'rb') as clip:

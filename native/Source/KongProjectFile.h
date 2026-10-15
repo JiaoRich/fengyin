@@ -85,7 +85,8 @@ public:
     // Never persist a guessed KAM when the live plug-in can provide its exact
     // selected KAI and articulation. Convert the state captured from QinEngine
     // into the native project format instead.
-    static juce::MemoryBlock fromPluginState(const juce::MemoryBlock& pluginState)
+    static juce::MemoryBlock fromPluginState(const juce::MemoryBlock& pluginState,
+                                             const juce::MemoryBlock& previousProject = {})
     {
         if (pluginState.getSize() == 0) return {};
         const auto state = readPluginComponentState(pluginState);
@@ -98,6 +99,15 @@ public:
         if (! state.hasType("State")) return {};
         const auto sourceList = state.getChildWithName("PresetList");
         if (! sourceList.isValid()) return {};
+        juce::ValueTree project;
+        if(previousProject.getSize()>0)
+            project=juce::ValueTree::readFromData(previousProject.getData(),previousProject.getSize());
+        if(!project.hasType("KAMFileRoot")) project={};
+        const auto previousList=project.getChildWithName("PresetList");
+        juce::ValueTree selectedBefore;
+        for(auto slot:previousList)
+            if(bool(slot.getProperty("IsSelected",false))) {selectedBefore=slot;break;}
+        juce::ValueTree list("PresetList");
         for (int index = 0; index < sourceList.getNumChildren(); ++index)
         {
             const auto slot = sourceList.getChild(index);
@@ -106,14 +116,26 @@ public:
             const auto preset = slot.getProperty("Preset").toString();
             if (kai.isEmpty() || preset.isEmpty()) continue;
 
-            // QinEngine's VST3 component state deliberately omits IsSelected
-            // and contains runtime-only fields such as NoteRanges. A native
-            // KAM contains the same exact KAI/preset identity in a compact,
-            // canonical schema. Build that schema from the values selected in
-            // the live editor; never infer them from the user's display name.
-            return create(kai, preset);
+            if(!project.isValid()) {
+                const auto seed=create(kai,preset);
+                project=juce::ValueTree::readFromData(seed.getData(),seed.getSize());
+            }
+            juce::ValueTree copy("Preset");
+            for(const auto* property:{"KAI","Preset","MIDI","Audio","Volume","Tone","Balance","FXAUX","IndexSelectedKeyswitch"})
+                if(slot.hasProperty(property)) copy.setProperty(property,slot.getProperty(property),nullptr);
+            const bool selected=selectedBefore.isValid()
+                ? slot["KAI"]==selectedBefore["KAI"] && slot["Preset"]==selectedBefore["Preset"] && slot["MIDI"]==selectedBefore["MIDI"]
+                : list.getNumChildren()==0;
+            copy.setProperty("IsSelected",selected,nullptr);
+            list.addChild(copy,-1,nullptr);
         }
-        return {};
+        if(list.getNumChildren()==0 || !project.isValid()) return {};
+        if(!hasSelectedPreset(list)) list.getChild(0).setProperty("IsSelected",true,nullptr);
+        // Keep the native rack's menu IDs from the original KAM. Runtime rack
+        // values use a different representation; do not guess inverse enums.
+        project.removeChild(project.getChildWithName("PresetList"),nullptr);
+        project.addChild(list,-1,nullptr);
+        juce::MemoryOutputStream output;project.writeToStream(output);return output.getMemoryBlock();
     }
 
     // Convert a native .KAM project into the exact schema consumed by

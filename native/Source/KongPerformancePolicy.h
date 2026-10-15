@@ -13,6 +13,22 @@ inline float performanceVelocity(bool, float input) noexcept
     return juce::jlimit(0.0f, 1.0f, input);
 }
 
+// One transition, one restart per held musical note. Initialise controllers
+// before the destination NoteOn; never briefly restart the outgoing slot.
+template <typename Held, typename Send, typename Velocity>
+void changeKongChannel(int previous, int destination, int breath, int bend,
+                       Held held, Send send, Velocity velocity, int modulation = -1)
+{
+    if (previous == destination) return;
+    for (int note = 0; note < 128; ++note)
+        if (held(note)) send(juce::MidiMessage::noteOff(previous, note));
+    send(kongBreathExpression(destination, breath));
+    if(modulation>=0) send(juce::MidiMessage::controllerEvent(destination,1,juce::jlimit(0,127,modulation)));
+    send(juce::MidiMessage::pitchWheel(destination, juce::jlimit(0, 16383, bend)));
+    for (int note = 0; note < 128; ++note)
+        if (held(note)) send(juce::MidiMessage::noteOn(destination, note, velocity(note)));
+}
+
 template <typename Held, typename Send, typename Velocity>
 void changeKongArticulation(int channel, int key, Held held, Send send, Velocity velocity)
 {

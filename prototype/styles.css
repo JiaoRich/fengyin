@@ -71,5 +71,6 @@ body{background-size:cover;background-position:center;background-attachment:fixe
 #adapter-technique-grid #technique-list { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px; }
 .technique-mode-buttons { display:flex;flex-wrap:wrap;gap:6px; }
 .technique-mode-buttons button[aria-pressed="true"] { border-color:var(--accent);background:var(--accent-soft);color:var(--accent); }
+.technique-control .clear-source { grid-column:2;color:var(--muted); }
 #technique-settings { display:none!important; }
 @media(max-width:900px){#adapter-technique-grid #technique-list{grid-template-columns:1fr;}}

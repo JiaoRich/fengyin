@@ -85,7 +85,8 @@ private:
     void showRecordingManager();
     void showSetupGuide(bool automatic = false);
     static juce::File getOnboardingMarkerFile();
-    void activatePluginOutput(const juce::String& pluginName, bool applyDefaults = true, bool configureRoutes = true);
+    void activatePluginOutput(const juce::String& pluginName, bool applyDefaults = true, bool configureRoutes = true,
+                              const fengyin::KongTechniqueProfile& kongProfile = {});
     void applyCurrentSwamToneStyle();
     void applyInstrumentBendRange();
     void changeInstrumentBendRange(const juce::var& payload);
@@ -186,6 +187,7 @@ private:
     juce::MemoryBlock editingReturnInstrumentState;
     fengyin::EffectChainStates editingReturnEffects;
     juce::MemoryBlock editingReturnContainerProjectState;
+    fengyin::KongTechniqueProfile editingReturnKongTechniques;
     fengyin::ToneStyleSettings editingReturnToneSettings;
     juce::String currentToneStyleId { "natural" };
     juce::String currentPluginBrand { "swam" };

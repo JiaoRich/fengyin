@@ -1,6 +1,7 @@
 #pragma once
 #include "SwamToneApplication.h"
 #include "MusicTempoPolicy.h"
+#include "KongTechniqueProfile.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_utils/juce_audio_utils.h>
@@ -79,7 +80,11 @@ public:
     {
         const auto index=static_cast<size_t>(technique);
         if(index>=nativeTechniqueRoutes.size())return false;
-        if(kongExpressionMode.load())return kongTechniqueRoutes[index].keyswitch>=0;
+        if(kongExpressionMode.load()) {
+            if(technique==PerformanceTechnique::vibrato&&kongVibratoCC.load()==1)return true;
+            const auto& route=kongTechniqueRoutes[index];
+            return route.channel>0 && (route.keyswitch>=0 || route.channel>1);
+        }
         const int route=nativeTechniqueRoutes[index].load();
         if(route==0 || route==((swamExpressionChannel.load()<<8)|(swamExpressionController.load()+1)))return false;
         for(size_t i=0;i<nativeTechniqueRoutes.size();++i)
@@ -149,7 +154,9 @@ public:
     bool applyStandardSwamExpressionCurve();
     bool applyExpressionAttackControl();
     bool setBendRange(int semitones);
-    void configureKongTechniqueProfile(const juce::String& instrumentKey) noexcept;
+    void configureKongTechniqueProfile(const juce::String& instrumentKey,
+                                       const KongTechniqueProfile& profile = {}) noexcept;
+    [[nodiscard]] KongTechniqueProfile getKongTechniqueProfile() const { return kongProfile; }
     void flushOnsetTrace() { player.flushOnsetTrace(); }
 
     void noteOn(int noteNumber, float velocity, double timestampSeconds = 0.0) noexcept override;
@@ -164,7 +171,6 @@ public:
     void techniqueChanged(PerformanceTechnique technique, float value) noexcept override;
     void automaticVibratoChanged(float input,float fade) noexcept override;
     void setMusicTempoMode(int mode) noexcept { musicTempoMode.store(MusicTempoPolicy::valid(mode));tempoRateDirty.store(true); }
-    bool hasLinearAutomaticVibratoFade() const noexcept { return vibratoLinear.load(); }
     void resetPerformance() noexcept override;
     void flushTechniqueValues();
     [[nodiscard]] bool supportsTechnique(PerformanceTechnique technique) const noexcept;
@@ -174,11 +180,9 @@ private:
     void routeTechnique(PerformanceTechnique technique,float value) noexcept;
     void prepareTempoVibrato(juce::AudioPluginInstance& plugin);
     std::atomic<int> musicTempoMode {1};
-    std::atomic<bool> automaticVibratoActive {false},tempoRateDirty {false},vibratoLinear {false};
-    std::atomic<float> vibratoInputMin {0},vibratoInputMax {127},vibratoOutputMin {0},vibratoOutputMax {127};
+    std::atomic<bool> automaticVibratoActive {false},tempoRateDirty {false};
     std::atomic<juce::AudioProcessorParameter*> vibratoRateParameter {nullptr};
     float originalVibratoRate=0;std::array<float,3> tempoVibratoRates {{-1,-1,-1}};
-    std::atomic<float> automaticVibratoDirect {-1};
     juce::var swamToneAudit;
     bool queue(juce::MidiMessage message, double timestampSeconds) noexcept;
     bool rebuildConnections();
@@ -219,6 +223,8 @@ private:
     std::array<std::atomic<int>, static_cast<size_t>(PerformanceTechnique::count)> nativeTechniqueRoutes {};
     std::array<std::atomic<int>, static_cast<size_t>(PerformanceTechnique::count)> lastNativeTechniqueMessages {};
     std::atomic<int> lastBreathMidiValue { -1 };
+    KongTechniqueProfile kongProfile;
+    std::atomic<int> kongVibratoCC {-1};
     struct KongTechniqueRoute { int channel = 0; int keyswitch = -1; int normalKey = -1; };
     std::array<KongTechniqueRoute, static_cast<size_t>(PerformanceTechnique::count)> kongTechniqueRoutes {};
     std::array<std::atomic<float>, static_cast<size_t>(PerformanceTechnique::count)> kongTechniqueInputs {};

@@ -17,10 +17,15 @@ class AttackControlPolicyTests(unittest.TestCase):
                 xml = archive.read('tone.xml')
                 controls = [p for p in ET.fromstring(xml).iter('TONE_PARAMETER')
                             if p.get('id', '').endswith(':attackcontrol')]
-                self.assertEqual(len(controls), 1)
-                # Verified Windows enums differ between saxophones and strings.
-                expected=0.666666686534882 if path.stem in ('violin','violin-sweet','violin-soft','cello') else 1.0
-                self.assertAlmostEqual(float(controls[0].get('value')),expected,places=6)
+                preset=ET.fromstring(xml).find('PRESET')
+                if preset.get('pluginBrand')=='swam':
+                    self.assertEqual(len(controls), 1)
+                    # Verified Windows enums differ between saxophones and strings.
+                    expected=0.666666686534882 if path.stem in ('violin','violin-sweet','violin-soft','cello') else 1.0
+                    self.assertAlmostEqual(float(controls[0].get('value')),expected,places=6)
+                else:
+                    self.assertEqual(preset.get('pluginBrand'),'kong')
+                    self.assertEqual(controls,[])  # SWAM enums must not be invented for Qin.
                 manifest = json.loads(archive.read('manifest.json'))
                 for entry in manifest['files']:
                     payload = archive.read(entry['path'])

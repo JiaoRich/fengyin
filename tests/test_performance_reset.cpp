@@ -58,6 +58,39 @@ int main()
         }
     }
     std::vector<juce::MidiMessage> messages;
+    for (int destination : {2, 1})
+    {
+        messages.clear();
+        const int previous = destination == 2 ? 1 : 2;
+        fengyin::changeKongChannel(previous, destination, 83, 10000,
+            [](int note) { return note == 60 || note == 67; },
+            [&](const auto& message) { messages.push_back(message); },
+            [](int note) { return note == 60 ? .4f : .8f; });
+        require(messages.size() == 6, "Channel change must emit two offs, controllers, two ons");
+        require(messages[0].isNoteOff() && messages[1].isNoteOff()
+            && messages[0].getChannel() == previous && messages[1].getChannel() == previous,
+            "Outgoing notes must stop first");
+        require(messages[2].isControllerOfType(11) && messages[2].getControllerValue() == 83
+            && messages[2].getChannel() == destination, "Expression must follow destination before attack");
+        require(messages[3].isPitchWheel() && messages[3].getPitchWheelValue() == 10000
+            && messages[3].getChannel() == destination, "Bend must follow destination before attack");
+        require(messages[4].isNoteOn() && messages[5].isNoteOn()
+            && messages[4].getChannel() == destination && messages[5].getChannel() == destination
+            && messages[4].getNoteNumber() == 60 && messages[5].getNoteNumber() == 67,
+            "Only destination may restart held pitches");
+        require(std::abs(messages[4].getFloatVelocity()-.4f)<.01f
+            && std::abs(messages[5].getFloatVelocity()-.8f)<.01f, "Per-note velocities must survive channel switch");
+    }
+    messages.clear();
+    fengyin::changeKongChannel(1, 1, 83, 10000, [](int) { return true; },
+        [&](const auto& message) { messages.push_back(message); }, [](int) { return .5f; });
+    require(messages.empty(), "Unchanged channel must not retrigger");
+    fengyin::changeKongChannel(1,2,83,10000,[](int n){return n==60;},
+        [&](const auto& m){messages.push_back(m);},[](int){return .5f;},72);
+    require(messages.size()==5 && messages[2].isControllerOfType(1)
+        && messages[2].getChannel()==2 && messages[2].getControllerValue()==72
+        && messages.back().isNoteOn(),"Current vibrato must reach destination before held note attack");
+    messages.clear();
     for (int channel = 1; channel <= 16; ++channel)
     {
         const auto expression = fengyin::kongBreathExpression(channel, 64);

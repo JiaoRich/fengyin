@@ -733,7 +733,16 @@ void MainComponent::setupWebInterface()
             auto mappings = midi.getTechniqueMappings();
             for (int index = mappings.size(); --index >= 0;)
                 if (static_cast<int>(mappings.getReference(index).technique) == technique)
-                    mappings.remove(index);
+                {
+                    auto& mapping=mappings.getReference(index);
+                    mapping.sourceType=fengyin::TechniqueSourceType::none;
+                    mapping.sourceNumber=-1;
+                    mapping.toggle=false;
+                    mapping.mode=fengyin::TechniqueControlMode::off;
+                }
+            midi.cancelTechniqueLearn();
+            activeTechniqueLearn=-1;
+            techniqueLearnEndsAtMs=0;
             midi.setTechniqueMappings(mappings);
         })
         .withEventListener("setBuiltinEffects", [this](juce::var payload)
@@ -1302,7 +1311,7 @@ void MainComponent::resized()
 
 void MainComponent::timerCallback()
 {
-    // Technique automation uses its own 10ms timer, not the UI frame clock.
+    midi.tickTechniqueAutomation(); // Restore the established native UI timer path.
     if(const auto token=voicePrompts.consumeFinished();token!=0 && webInterface)
         webInterface->emitEventIfBrowserIsVisible("voiceFinished",token);
     if (superLowLatencyRunning && ++superLowLatencyPollTicks >= 30)
@@ -1534,7 +1543,6 @@ void MainComponent::timerCallback()
         state->setProperty("reverbMix", masterOutput.getReverbMix());
         const auto tempo=fengyin::MusicTempoPolicy::forMode(midi.getMusicTempoMode());
         state->setProperty("musicTempoMode",midi.getMusicTempoMode());state->setProperty("musicTempoBpm",tempo.bpm);
-        state->setProperty("automaticVibratoLinear",pluginHost.hasLinearAutomaticVibratoFade());
         state->setProperty("reverbPreDelayMs",tempo.predelayMs);
         state->setProperty("eqTone", masterOutput.getEqTone());
         state->setProperty("toneWarmth", masterOutput.getWarmth());
@@ -1640,7 +1648,9 @@ void MainComponent::timerCallback()
             item->setProperty("supported", true);
             item->setProperty("recommendedSource", utf8("只学习硬件信号，具体技巧随音色自动切换"));
             item->setProperty("recommendationReason", utf8("全局硬件控制位"));
-            item->setProperty("defaultMode", static_cast<int>(fengyin::TechniqueControlMode::off));
+            const auto defaultMode=role.role==fengyin::PerformanceTechnique::vibrato
+                ? fengyin::TechniqueControlMode::breath : fengyin::TechniqueControlMode::off;
+            item->setProperty("defaultMode", static_cast<int>(defaultMode));
             item->setProperty("featured", true);
             item->setProperty("sourceType", 0);
             item->setProperty("sourceNumber", -1);
@@ -1698,7 +1708,7 @@ void MainComponent::timerCallback()
             item->setProperty("name", utf8(tone.name.data()));
             item->setProperty("instrumentKey", utf8(tone.instrumentKey.data()));
             item->setProperty("styleId", utf8(tone.styleId.data()));
-            item->setProperty("kind", tone.kind == fengyin::PublishedToneKind::kongProject ? "kong"
+            item->setProperty("kind", (tone.kind == fengyin::PublishedToneKind::kongProject || tone.kind == fengyin::PublishedToneKind::kongPackage) ? "kong"
                 : tone.kind == fengyin::PublishedToneKind::swamPackage ? "package" : "swam");
             item->setProperty("assetName", utf8(tone.assetName.data()));
             publishedTones.add(juce::var(item.release()));
@@ -2152,7 +2162,7 @@ void MainComponent::loadPublishedTone(const juce::String& catalogueId)
         return;
     }
 
-    if (definition->kind == fengyin::PublishedToneKind::swamPackage)
+    if (definition->kind == fengyin::PublishedToneKind::swamPackage || definition->kind == fengyin::PublishedToneKind::kongPackage)
     {
         const auto file = juce::File::getSpecialLocation(juce::File::tempDirectory)
             .getNonexistentChildFile("fengyin-release-tone", ".fytonepack", false);
@@ -2467,7 +2477,7 @@ void MainComponent::commitContainerInstrument(const juce::String& name)
     currentPresetDisplayName = preset.name;
     currentPresetId = preset.id;
     currentPresetIsCustom = true;
-    pluginHost.configureKongTechniqueProfile(currentPluginBrand == "kong" ? currentInstrumentKey : juce::String());
+    pluginHost.configureKongTechniqueProfile(currentPluginBrand == "kong" ? currentInstrumentKey : juce::String(),preset.kongTechniques);
     midi.setTechniqueContext(currentInstrumentKey);
     containerInstrumentDraftActive = false;
     containerInstrumentDraftAdapter.clear();
@@ -2604,9 +2614,14 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
     preset.toneParameters = pluginHost.captureToneParameters();
     preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureContainerState()
         : currentPluginBrand=="kontakt" ? preset.instrumentState : juce::MemoryBlock();
+    preset.kongTechniques=currentPluginBrand=="kong" ? pluginHost.getKongTechniqueProfile() : fengyin::KongTechniqueProfile{};
     if (currentPluginBrand == "kong")
     {
-        preset.containerProjectState = fengyin::KongProjectFile::fromPluginState(preset.samplerState);
+        auto previousProject=preset.containerProjectState;
+        if(previousProject.getSize()==0)
+            for(const auto& existing:cachedPresets)
+                if(existing.id==currentPresetId) {previousProject=existing.containerProjectState;break;}
+        preset.containerProjectState = fengyin::KongProjectFile::fromPluginState(preset.samplerState,previousProject);
     }
     preset.instrumentModelIndex = pluginHost.getCurrentInstrumentModelIndex();
     preset.instrumentModelName = pluginHost.getCurrentInstrumentModelName();
@@ -2707,9 +2722,14 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
     preset.toneParameters = pluginHost.captureToneParameters();
     preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureContainerState()
         : currentPluginBrand=="kontakt" ? preset.instrumentState : juce::MemoryBlock();
+    preset.kongTechniques=currentPluginBrand=="kong" ? pluginHost.getKongTechniqueProfile() : fengyin::KongTechniqueProfile{};
     if (currentPluginBrand == "kong")
     {
-        preset.containerProjectState = fengyin::KongProjectFile::fromPluginState(preset.samplerState);
+        auto previousProject=preset.containerProjectState;
+        if(previousProject.getSize()==0)
+            for(const auto& existing:cachedPresets)
+                if(existing.id==currentPresetId) {previousProject=existing.containerProjectState;break;}
+        preset.containerProjectState = fengyin::KongProjectFile::fromPluginState(preset.samplerState,previousProject);
         if (preset.containerProjectState.getSize() == 0)
             for (const auto& existing : cachedPresets)
                 if (existing.instrumentKey == currentInstrumentKey && existing.containerProjectState.getSize() > 0)
@@ -3039,6 +3059,7 @@ void MainComponent::captureToneBeforePresetEdit()
     editingReturnInstrumentState = currentPluginBrand == "kong" ? juce::MemoryBlock() : pluginHost.captureInstrumentState();
     editingReturnEffects = pluginHost.captureEffectChain();
     editingReturnSamplerState = currentPluginBrand == "kong" ? pluginHost.captureKongState() : juce::MemoryBlock();
+    editingReturnKongTechniques=pluginHost.getKongTechniqueProfile();
     editingReturnContainerProjectState.reset();
     if (currentPluginBrand == "kong")
         for (const auto& preset : cachedPresets)
@@ -3099,6 +3120,7 @@ void MainComponent::restoreToneBeforePresetEdit()
     const auto modelIndex = editingReturnModelIndex;
     const auto parameters = editingReturnToneParameters;
     const auto samplerState = editingReturnSamplerState;
+    const auto kongTechniques=editingReturnKongTechniques;
     const auto toneSettings = editingReturnToneSettings;
     const auto effectStates = editingReturnEffects;
     const auto initialState = brand == "kong"
@@ -3115,7 +3137,7 @@ void MainComponent::restoreToneBeforePresetEdit()
                          status.bufferSize > 0 ? status.bufferSize : 128,
                          initialState,
                          [this, presetId, presetName, styleId, brand, instrumentKey, instrumentName,
-                          wasCustom, modelIndex, parameters, toneSettings, effectStates]
+                          wasCustom, modelIndex, parameters, toneSettings, effectStates, kongTechniques]
                          (bool success, const juce::String& message)
                          {
                              if (! success) { pluginLoading = false; return; }
@@ -3124,7 +3146,7 @@ void MainComponent::restoreToneBeforePresetEdit()
                              currentInstrumentChineseName = instrumentName;
                              auto finish = [safe = juce::Component::SafePointer<MainComponent>(this),
                                             presetId, presetName, styleId, brand, wasCustom,
-                                            modelIndex, parameters, toneSettings]
+                                            modelIndex, parameters, toneSettings, kongTechniques]
                              {
                                  if (safe == nullptr) return;
                                  if (modelIndex >= 0) safe->pluginHost.selectInstrumentModel(modelIndex);
@@ -3138,10 +3160,15 @@ void MainComponent::restoreToneBeforePresetEdit()
                                  safe->currentBaseToneSettings = toneSettings;
                                  safe->currentSwamToneParameterCount = parameters.size();
                                  safe->applyInstrumentBendRange();
+                                 if(brand=="kong") {
+                                     if(safe->pluginHost.getKongTechniqueProfile()!=kongTechniques)
+                                         safe->pluginHost.configureKongTechniqueProfile(safe->currentInstrumentKey,kongTechniques);
+                                     safe->midi.setTechniqueContext(safe->currentInstrumentKey);
+                                 }
                                  safe->pluginLoading = false;
                                  safe->pluginStatus.setText(utf8("已取消修改，恢复原音色"), juce::dontSendNotification);
                              };
-                             activatePluginOutput(message, false);
+                             activatePluginOutput(message, false, true, kongTechniques);
                              const auto audioStatus = audio.getStatus();
                              pluginHost.restoreEffectChain(effectStates, audioStatus.sampleRate > 0 ? audioStatus.sampleRate : 48000,
                                  audioStatus.bufferSize > 0 ? audioStatus.bufferSize : 128,
@@ -3324,7 +3351,7 @@ void MainComponent::loadPreset(fengyin::SoundPreset preset,
                                  if (completion) completion(false, utf8("方案载入失败：") + message);
                                  return;
                              }
-                             activatePluginOutput(message, preset.instrumentState.getSize() == 0 && preset.samplerState.getSize() == 0, false);
+                             activatePluginOutput(message, preset.instrumentState.getSize() == 0 && preset.samplerState.getSize() == 0, false,preset.kongTechniques);
                              pluginLoading = false;
                              completeLoadedPreset(preset, completion);
                          },verifiedForwardMigration);
@@ -3378,6 +3405,10 @@ void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
     applyInstrumentBendRange();
     // Final controls must follow all preset/model/parameter restoration, for
     // built-in and user-created packages alike. Full states are not flattened.
+    if(currentPluginBrand=="kong" && pluginHost.getKongTechniqueProfile()!=preset.kongTechniques) {
+        pluginHost.configureKongTechniqueProfile(currentInstrumentKey,preset.kongTechniques);
+        midi.setTechniqueContext(currentInstrumentKey);
+    }
     if(currentPluginBrand=="swam") pluginHost.applyStandardSwamExpressionCurve();
     pluginStatus.setText(utf8("已恢复音色：") + preset.name, juce::dontSendNotification);
     juce::Logger::writeToLog("Preset parameters restored; restoring effect chain");
@@ -3395,7 +3426,8 @@ void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
         });
 }
 
-void MainComponent::activatePluginOutput(const juce::String& pluginName, bool applyDefaults, bool configureRoutes)
+void MainComponent::activatePluginOutput(const juce::String& pluginName, bool applyDefaults, bool configureRoutes,
+                                         const fengyin::KongTechniqueProfile& kongProfile)
 {
     juce::Logger::writeToLog("Plugin output activation begin; defaults=" + juce::String(applyDefaults ? 1 : 0));
     audio.getDeviceManager().removeAudioCallback(&testSynth);
@@ -3422,7 +3454,7 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName, bool ap
     }
     pluginHost.setKongExpressionMode(currentPluginBrand == "kong");
     pluginHost.setMusicTempoMode(midi.getMusicTempoMode());masterOutput.setReverbPreDelay(fengyin::MusicTempoPolicy::forMode(midi.getMusicTempoMode()).predelayMs);
-    pluginHost.configureKongTechniqueProfile(currentPluginBrand == "kong" ? currentInstrumentKey : juce::String());
+    pluginHost.configureKongTechniqueProfile(currentPluginBrand == "kong" ? currentInstrumentKey : juce::String(),kongProfile);
     if (currentPluginBrand == "swam" && configureRoutes)
         pluginHost.applyStandardSwamExpressionCurve();
     // Complete all plugin-state changes before the real-time callback begins.

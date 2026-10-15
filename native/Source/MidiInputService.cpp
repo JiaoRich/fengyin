@@ -9,8 +9,12 @@ MidiInputService::MidiInputService(bool persistSettings)
     activeOutputNotes.fill(-1);
     techniqueHardwareInput.fill(0.0f);
     techniqueBreathInput.fill(0.0f);
+    TechniqueMapping defaultVibrato;
+    defaultVibrato.technique=PerformanceTechnique::vibrato;
+    defaultVibrato.mode=TechniqueControlMode::breath;
+    defaultVibrato.strength=1.0f;
+    techniqueMappings.add(defaultVibrato);
     if (!persistSettings) return;
-    automaticTimerEnabled=true;
     juce::PropertiesFile::Options options;
     options.applicationName = "FengYinMidi";
     options.filenameSuffix = ".settings";
@@ -26,7 +30,6 @@ MidiInputService::MidiInputService(bool persistSettings)
 
 MidiInputService::~MidiInputService()
 {
-    stopTimer();
     disconnect();
 }
 
@@ -241,11 +244,9 @@ void MidiInputService::setExpressionSettings(ExpressionSettings settings)
 
 void MidiInputService::setPerformanceSink(MidiPerformanceSink* sink) noexcept
 {
-    stopTimer(); // joins the automation callback before replacing/destroying the sink.
     performanceSink.store(sink, std::memory_order_release);
     if (sink != nullptr)
         sink->resetPerformance();
-    if(sink!=nullptr&&automaticTimerEnabled)startTimer(10);
 }
 
 void MidiInputService::beginBreathDetection() noexcept
@@ -448,6 +449,13 @@ void MidiInputService::loadTechniqueMappings()
             }
             loaded.add(mapping);
         }
+    }
+    if(std::none_of(loaded.begin(),loaded.end(),[](const auto& mapping){return mapping.technique==PerformanceTechnique::vibrato;})) {
+        TechniqueMapping mapping;
+        mapping.technique=PerformanceTechnique::vibrato;
+        mapping.mode=TechniqueControlMode::breath;
+        mapping.strength=1.0f;
+        loaded.add(mapping);
     }
     {
         const juce::SpinLock::ScopedLockType lock(techniqueLock);

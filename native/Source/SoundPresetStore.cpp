@@ -111,6 +111,10 @@ std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<Soun
         child->setAttribute("pluginProgramName", preset.pluginProgramName);
         child->setAttribute("containerInstrument", preset.containerInstrument);
         child->setAttribute("containerAdapter", preset.containerAdapter);
+        child->setAttribute("kongTechniqueProfile",preset.kongTechniques.enabled);
+        child->setAttribute("kongVibratoCC",preset.kongTechniques.vibratoCC);
+        child->setAttribute("kongOtherChannel",preset.kongTechniques.otherChannel);
+        child->setAttribute("kongOtherKeyswitchIndex",preset.kongTechniques.otherKeyswitchIndex);
         if ((preset.containerInstrument || preset.pluginBrand == "kong") && preset.samplerState.getSize() > 0)
             child->createNewChildElement("SAMPLER_STATE")->addTextElement(preset.samplerState.toBase64Encoding());
         if (preset.containerInstrument && preset.containerProjectState.getSize() > 0)
@@ -174,6 +178,10 @@ juce::Array<SoundPreset> SoundPresetStore::fromXml(const juce::XmlElement& root)
         preset.pluginProgramName = child->getStringAttribute("pluginProgramName");
         preset.containerInstrument = child->getBoolAttribute("containerInstrument", false);
         preset.containerAdapter = child->getStringAttribute("containerAdapter");
+        preset.kongTechniques.enabled=child->getBoolAttribute("kongTechniqueProfile",false);
+        preset.kongTechniques.vibratoCC=child->getIntAttribute("kongVibratoCC",-1);
+        preset.kongTechniques.otherChannel=child->getIntAttribute("kongOtherChannel",0);
+        preset.kongTechniques.otherKeyswitchIndex=child->getIntAttribute("kongOtherKeyswitchIndex",-1);
         if (preset.containerInstrument || preset.pluginBrand == "kong")
             if (const auto* state = child->getChildByName("SAMPLER_STATE"))
             {

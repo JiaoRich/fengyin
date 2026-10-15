@@ -277,7 +277,13 @@ int main(int argc, char** argv)
                     power+=energy;
                     if(energy<1e-12)continue;
                     for(int lag=static_cast<int>(centreLag*.85);lag<=static_cast<int>(centreLag*1.15);++lag){double sum=0,e2=0;for(int i=0;i<2048;++i){sum+=s[start+i]*s[start+i+lag];e2+=s[start+i+lag]*s[start+i+lag];}const auto c=sum/std::sqrt(energy*e2);if(c>best){best=c;bestLag=lag;}}
-                    pitches.push_back(1200*std::log2(48000.0/bestLag/261.625565));correlation+=best;++windows;
+                    // Integer-lag quantisation alone is about 9 cents at C4:
+                    // it can label ordinary pitch drift as residual vibrato.
+                    const auto corrAt=[&](int lag){double sum=0,e2=0;for(int i=0;i<2048;++i){sum+=s[start+i]*s[start+i+lag];e2+=s[start+i+lag]*s[start+i+lag];}return sum/std::sqrt(energy*e2);};
+                    const double a=corrAt(bestLag-1),b=corrAt(bestLag),c=corrAt(bestLag+1);
+                    const double curvature=a-2*b+c;
+                    const double fractional=bestLag+(std::abs(curvature)>1e-12?std::clamp(.5*(a-c)/curvature,-.5,.5):0);
+                    pitches.push_back(1200*std::log2(48000.0/fractional/261.625565));correlation+=best;++windows;
                 }
                 double low=1e9,high=-1e9;for(auto p:pitches){low=std::min(low,p);high=std::max(high,p);}
                 return std::array<double,3>{windows?high-low:0,windows?correlation/windows:0,power};
