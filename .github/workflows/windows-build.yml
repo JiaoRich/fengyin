@@ -3,6 +3,10 @@ name: Windows 编译与安装包
 on:
   workflow_dispatch:
     inputs:
+      kong_test:
+        description: Build independent Qin sustained-note technique test only
+        type: boolean
+        default: false
       startup_comparison:
         description: Build standalone ASIO startup comparison only
         type: boolean
@@ -24,6 +28,9 @@ permissions:
   contents: read
 
 jobs:
+  kong-test:
+    if: ${{ inputs.kong_test }}
+    uses: ./.github/workflows/kong-technique-test.yml
   startup-comparison:
     if: ${{ inputs.startup_comparison }}
     runs-on: windows-2022
@@ -86,7 +93,7 @@ jobs:
           name: FengYin-Crash-Capture
           path: diagnostic/FengYin-Crash-Capture.zip
   windows-release:
-    if: ${{ !inputs.diagnostic_only && !inputs.startup_comparison }}
+    if: ${{ !inputs.diagnostic_only && !inputs.startup_comparison && !inputs.kong_test }}
     name: Windows x64 Release
     runs-on: windows-2022
     timeout-minutes: 45
