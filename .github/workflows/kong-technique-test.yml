@@ -1,0 +1,35 @@
+name: Build independent Qin technique test
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - name: Parse launcher and build isolated test
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $tokens=$null; $errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path tools/kong-technique-test/Run.ps1),[ref]$tokens,[ref]$errors) | Out-Null
+          if($errors.Count){throw ($errors|Out-String)}
+          cmake -S tools/kong-technique-test -B build-kong-test -G "Visual Studio 17 2022" -A x64
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          cmake --build build-kong-test --config Release --parallel 4
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          New-Item -ItemType Directory -Path kong-test -Force | Out-Null
+          Copy-Item build-kong-test/FengYinKongTechniqueTest_artefacts/Release/FengYinKongTechniqueTest.exe kong-test/
+          Copy-Item tools/kong-technique-test/Start.cmd,tools/kong-technique-test/Run.ps1 kong-test/
+          Copy-Item tools/kong-technique-test/*.txt kong-test/ -Exclude CMakeLists.txt
+          Copy-Item assets/tone-packages/kong/release-states.xml kong-test/
+          & kong-test/FengYinKongTechniqueTest.exe --self-test "$pwd/self-test-$([char]0x6D4B)$([char]0x8BD5)"
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          Get-FileHash kong-test/FengYinKongTechniqueTest.exe | Format-List | Out-File kong-test/SHA256.txt
+      - uses: actions/upload-artifact@v5
+        with:
+          name: FengYin-Qin-Technique-Test
+          path: kong-test/
+          if-no-files-found: error
