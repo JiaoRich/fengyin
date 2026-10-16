@@ -1,0 +1,94 @@
+[
+  {
+    "asset": "soprano-kenny.fytonepack",
+    "name": "高萨-原声",
+    "beforeName": "高萨-原声",
+    "sourceSha256": "f731f16cb0e683cb16949ecb38c30ad6b8d13a2e0059b82ff81187839f5a968c",
+    "afterSha256": "f731f16cb0e683cb16949ecb38c30ad6b8d13a2e0059b82ff81187839f5a968c",
+    "attackSnapshotCorrected": false,
+    "opaqueStatesUnchanged": true,
+    "outputGain": "1.0",
+    "dependencies": [
+      {
+        "role": "instrument",
+        "name": "SWAM Soprano Sax 3",
+        "manufacturer": "Audio Modeling",
+        "version": "3.9.4",
+        "format": "VST3",
+        "uid": -153910706,
+        "bypassed": false
+      },
+      {
+        "role": "effect",
+        "name": "Fresh Air",
+        "manufacturer": "Slate Digital",
+        "version": "1.0.8",
+        "format": "VST3",
+        "uid": 759120715,
+        "bypassed": false
+      }
+    ]
+  },
+  {
+    "asset": "violin-bright.fytonepack",
+    "name": "小提琴-明亮",
+    "beforeName": "大军小提琴2",
+    "beforeNameAttribute": "&#22823;&#20891;&#23567;&#25552;&#29748;2",
+    "sourceSha256": "dc053a3996eb9d8952168e98018681dcaf20b334a9a2570cfe607e16049e57ad",
+    "afterSha256": "c1a493e4ab34b32d736dc538f47ad093e03e7f2f29600548c38133f16aa59d2c",
+    "attackSnapshotCorrected": true,
+    "opaqueStatesUnchanged": true,
+    "outputGain": "1.0",
+    "dependencies": [
+      {
+        "role": "instrument",
+        "name": "SWAM Violin 3",
+        "manufacturer": "Audio Modeling",
+        "version": "3.9.4",
+        "format": "VST3",
+        "uid": 1115992012,
+        "bypassed": false
+      },
+      {
+        "role": "effect",
+        "name": "Fresh Air",
+        "manufacturer": "Slate Digital",
+        "version": "1.0.8",
+        "format": "VST3",
+        "uid": 759120715,
+        "bypassed": false
+      },
+      {
+        "role": "effect",
+        "name": "magic.CURVE",
+        "manufacturer": "MBM Audio",
+        "version": "1.0.2",
+        "format": "VST3",
+        "uid": -88685889,
+        "bypassed": false
+      }
+    ]
+  },
+  {
+    "asset": "violin-soft.fytonepack",
+    "name": "小提琴-柔美",
+    "beforeName": "柔美小提琴",
+    "beforeNameAttribute": "柔美小提琴",
+    "sourceSha256": "9fc0fc99b8672bae55fc102f5ab8b176f9a66d6991543f782da33124cca10ede",
+    "afterSha256": "4bfd99486713f7bd7306a9ba64765db483e6366788354b86f46797e99b3f82d4",
+    "attackSnapshotCorrected": false,
+    "opaqueStatesUnchanged": true,
+    "outputGain": "1.9952623149688795",
+    "dependencies": [
+      {
+        "role": "instrument",
+        "name": "SWAM Violin 3",
+        "manufacturer": "Audio Modeling",
+        "version": "3.8.2",
+        "format": "VST3",
+        "uid": 1115992012,
+        "bypassed": false
+      }
+    ]
+  }
+]

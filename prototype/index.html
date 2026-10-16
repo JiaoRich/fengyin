@@ -132,6 +132,7 @@ body.compact-mode .app-shell:before,body.compact-mode .app-shell:after{display:n
 @keyframes compact-rim{to{--rim-angle:360deg}}
 @keyframes compact-tone-scroll{to{transform:translateX(calc(-1 * var(--tone-scroll-distance,0px)))}}
 @media(prefers-reduced-motion:reduce){body.compact-mode .app-shell:before,body.compact-mode .app-shell:after{animation:none}.tone-level i{transition:none}}
+body.compact-mode .window-mode-bar{touch-action:none}
 </style>
 <style>
 /* Quiet theme scrollbars and an anchored tone picker. */
@@ -215,9 +216,11 @@ body[data-theme=winter]{--surface-side:#1c2531;--surface-video:#1d2834;--surface
 body[data-theme=china-red]{--surface-side:#2d191d;--surface-video:#2d1a1e;--surface-raised:#49282e}
 body[data-theme=gold]{--surface-side:#2b2418;--surface-video:#2d2519;--surface-raised:#473b28}
 body[data-theme=minimal]{--surface-side:#1d2024;--surface-video:#1d2025;--surface-raised:#30353d}
-.sidebar,main>header{background:var(--surface-side)!important}
+.sidebar,main>header{background:transparent!important}
 .video-card,.video-placeholder,.video-screen,video{background:var(--surface-video)!important}
 .panel,.glass,.dialog,.chain-card,.custom-tone-step{background-color:var(--panel)!important}
+.technique-dialog,.technique-dialog-head{background:var(--surface-raised)!important}
+.technique-row button,.dialog-actions button{background-color:var(--surface-raised);color:var(--text)}
 select,input:not([type=range]):not([type=checkbox]),.custom-source-row select,.container-instrument-dialog input{background-color:var(--surface-raised)!important;color:var(--text)!important}
 body:not(.compact-mode) .app-shell{height:100vh;min-height:0;overflow:hidden}
 body:not(.compact-mode) main{height:100%;min-height:0;overflow:auto}
@@ -225,16 +228,16 @@ body:not(.compact-mode) #page-play.active{min-height:0!important;height:calc(100
 body:not(.compact-mode):has(#page-sounds.active) main{display:flex;flex-direction:column;overflow:hidden}
 body:not(.compact-mode) #page-sounds.active{flex:1;min-height:0;overflow:hidden}
 #page-sounds>.panel{height:100%;min-height:0!important;padding:12px!important;overflow:hidden;display:flex;flex-direction:column}
-#preset-grid{flex:1;min-height:0;overflow:auto;align-content:start;grid-auto-rows:minmax(64px,auto);gap:9px!important;margin:0!important;padding:3px}
-#page-sounds #preset-grid .instrument-preset-card.compact{position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-height:64px;gap:4px;padding:12px 24px 12px 12px;border-radius:12px}
+#preset-grid{flex:1;min-height:0;overflow:auto;align-content:start;grid-auto-rows:96px;gap:9px!important;margin:0!important;padding:3px}
+#page-sounds #preset-grid .instrument-preset-card.compact{position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;box-sizing:border-box;height:96px;min-height:0;gap:4px;padding:12px 24px 12px 12px;border-radius:12px}
 #preset-grid .instrument-preset-card.compact h3{margin:0;font-size:15px;line-height:1.4}
 #preset-grid .card-drag-handle{right:7px;top:8px;font-size:15px}
-#preset-grid .delete-tone{font-size:10px;padding:2px 5px!important;min-height:20px}
+#preset-grid .delete-tone{position:absolute;right:8px;bottom:6px;margin:0;font-size:10px;padding:2px 5px!important;min-height:20px}
 #preset-grid .tone-level{display:none!important}
 .action-bar .compact-action-row{display:flex;align-items:center;flex-wrap:wrap;gap:7px}
 .action-bar .compact-action-row>button,.action-bar .bend-control>button,.action-bar #transpose-key,.action-bar #theme-button,.action-bar #music-tempo button{height:38px!important;min-height:38px!important;padding:0 12px!important;border:1px solid var(--line)!important;border-radius:10px!important;background:var(--surface-raised)!important;color:var(--text)!important;font-size:12px!important;font-weight:600;box-shadow:none!important;white-space:nowrap}
 .action-bar #music-tempo{display:flex;gap:5px;align-items:center;border:0;background:none;padding:0}
-.action-bar #music-tempo>span{display:none}
+.action-bar #music-tempo>span{display:inline;white-space:nowrap}
 .action-bar #music-tempo button.active,.action-bar #record.recording{border-color:var(--accent)!important;background:var(--accent-soft)!important;color:var(--accent)!important}
 .action-bar #transpose-key select{padding:0 3px;border:0;background:transparent!important;font:inherit;color:inherit}
 .action-bar button:hover:not(:disabled){border-color:var(--accent)!important}
@@ -252,8 +255,10 @@ body:not(.compact-mode) #page-sounds.active{flex:1;min-height:0;overflow:hidden}
 #bend-confirm-message,#confirm-bend-range{display:none!important}
 body.presentation-hidden *,body.presentation-hidden *:before,body.presentation-hidden *:after{animation-play-state:paused!important;transition:none!important}
 @media(max-width:1180px){.action-bar .compact-action-row{gap:5px}.action-bar .compact-action-row>button,.action-bar #music-tempo button{padding:0 8px!important}}
-body.compact-mode .compact-action-row{display:flex!important;flex-wrap:wrap!important}
-body.compact-mode .compact-action-row>button{width:auto!important}
+body.compact-mode .compact-action-row{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;width:100%}
+body.compact-mode .compact-action-row>button{width:100%!important}
+body.compact-mode #music-tempo{grid-column:1/-1;justify-content:center;flex-wrap:wrap}
+.global-controls #theme-button{margin-left:auto}
 </style>
 </head>
 <body data-theme="neon">
@@ -383,7 +388,7 @@ body.compact-mode .compact-action-row>button{width:auto!important}
         <div class="audio-setting"><label for="audio-buffer-select">缓冲区</label><select id="audio-buffer-select"><option value="128">128（推荐）</option></select><small id="audio-buffer-help">128 延迟低；出现爆音时可改为 256</small></div>
       </div><div class="audio-summary"><div><span>当前预计延迟</span><strong class="green" id="audio-latency-value">正在检测…</strong></div><p id="audio-apply-status">首次启动和更换耳机、音响或声卡后会自动完成稳定性预检。</p><button id="audio-auto-optimize" type="button">智能优化</button></div>
       <div class="super-latency-card" hidden><div><span>板载声卡进阶优化</span><strong>超级低延迟优化</strong><p id="super-latency-status">正在检查系统声卡…</p></div><div class="super-latency-actions"><button id="restore-audio-driver" type="button" hidden>恢复原驱动</button><button id="super-latency-optimize" class="primary-button" type="button">开始优化</button></div></div></div></section>
-<section class="page" id="page-settings"><div class="panel glass"><div class="activation"><div><p>试用与永久授权</p><h3 id="license-title">可开始1小时完整试用</h3><div class="machine-code-row"><span id="machine-code">本机识别码：FY-8K2M-4R7P</span><button id="copy-machine-code" type="button">复制机器码</button></div></div><div class="license-actions"><button id="start-trial" type="button">开始1小时完整试用</button><input id="license-code" placeholder="请输入唯一激活码"><button id="activate" class="primary-button">永久激活</button></div></div><div class="settings-grid"><label class="toggle-row">低性能电脑模式<input id="low-performance" type="checkbox"><i></i></label><label class="toggle-row">启动时进入演奏页面<input type="checkbox" checked><i></i></label><label class="toggle-row">自动保存设置<input type="checkbox" checked><i></i></label><label class="toggle-row">检查软件更新<input type="checkbox" checked><i></i></label></div><div class="tone-diagnostic-section"><button id="export-current-tone" class="secondary-button" type="button" disabled>导出当前音色参数</button><p id="tone-diagnostic-status" role="status"></p></div><p class="prototype-note">风吟 1.1.16 · 本地运行，不会保存或上传个人资料。</p></div></section>
+<section class="page" id="page-settings"><div class="panel glass"><div class="activation"><div><p>试用与永久授权</p><h3 id="license-title">可开始1小时完整试用</h3><div class="machine-code-row"><span id="machine-code">本机识别码：FY-8K2M-4R7P</span><button id="copy-machine-code" type="button">复制机器码</button></div></div><div class="license-actions"><button id="start-trial" type="button">开始1小时完整试用</button><input id="license-code" placeholder="请输入唯一激活码"><button id="activate" class="primary-button">永久激活</button></div></div><div class="settings-grid"><label class="toggle-row">低性能电脑模式<input id="low-performance" type="checkbox"><i></i></label><label class="toggle-row">启动时进入演奏页面<input type="checkbox" checked><i></i></label><label class="toggle-row">自动保存设置<input type="checkbox" checked><i></i></label><label class="toggle-row">检查软件更新<input type="checkbox" checked><i></i></label></div><div class="tone-diagnostic-section"><button id="export-current-tone" class="secondary-button" type="button" disabled>导出当前音色参数</button><p id="tone-diagnostic-status" role="status"></p></div><p class="prototype-note">风吟 1.1.17 · 本地运行，不会保存或上传个人资料。</p></div></section>
     </main>
   </div>
   <div class="license-lock" id="license-lock" hidden>

@@ -21,7 +21,7 @@ struct PublishedToneDefinition
 // must never make an unreviewed tone appear in the customer-facing library.
 inline constexpr std::array<PublishedToneDefinition, 33> publishedToneCatalog {{
     { "soprano-kenny",       "高萨-原声",       "soprano-sax",       "kenny",          PublishedToneKind::swamPackage, "soprano-kenny.fytonepack" },
-    { "soprano-pop",         "高萨-流行",       "soprano-sax",       "pop-high",       PublishedToneKind::swamStyle,   {} },
+    { "soprano-pop",         "高萨-明亮",       "soprano-sax",       "pop-high",       PublishedToneKind::swamPackage, "soprano-pop.fytonepack" },
     { "alto-jazz",           "中萨-爵士",       "alto-sax",          "jazz",           PublishedToneKind::swamPackage,   "alto-jazz.fytonepack" },
     { "alto-deep",           "中萨-深情",       "alto-sax",          "deep",           PublishedToneKind::swamPackage,   "alto-deep.fytonepack" },
     { "alto-pop",            "中萨-流行",       "alto-sax",          "pop",            PublishedToneKind::swamPackage,   "alto-pop.fytonepack" },
@@ -36,8 +36,8 @@ inline constexpr std::array<PublishedToneDefinition, 33> publishedToneCatalog {{
     { "piccolo",             "短笛",          "piccolo",          "natural",        PublishedToneKind::swamPackage,   "piccolo.fytonepack" },
     { "clarinet",            "单簧管",         "clarinet",         "natural",        PublishedToneKind::swamPackage,   "clarinet.fytonepack" },
     { "oboe",                "双簧管",         "oboe",             "natural",        PublishedToneKind::swamPackage,   "oboe.fytonepack" },
-    { "violin",              "激情小提琴",       "violin",           "natural",        PublishedToneKind::swamPackage,   "violin-sweet.fytonepack" },
-    { "violin-soft",         "柔美小提琴",       "violin",           "natural",        PublishedToneKind::swamPackage,   "violin-soft.fytonepack" },
+    { "violin-bright",       "小提琴-明亮",       "violin",           "natural",        PublishedToneKind::swamPackage,   "violin-bright.fytonepack" },
+    { "violin-soft",         "小提琴-柔美",       "violin",           "natural",        PublishedToneKind::swamPackage,   "violin-soft.fytonepack" },
     { "cello",               "大提琴",       "cello",            "natural",        PublishedToneKind::swamPackage,   "cello.fytonepack" },
     { "kong-erhu",           "二胡",          "kong-erhu-2",      "release",        PublishedToneKind::kongPackage, "folk-erhu.fytonepack" },
     { "kong-hulusi",         "葫芦丝",         "kong-hulusi",      "release",        PublishedToneKind::kongPackage, "folk-hulusi.fytonepack" },

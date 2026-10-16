@@ -1,0 +1,217 @@
+{
+  "db": 6,
+  "method": "fixed preset outputGain; original plugin state/curves preserved",
+  "targets": [
+    {
+      "file": "flute.fytonepack",
+      "db": 6,
+      "beforeGainText": "1.0",
+      "afterGainText": "1.9952623149688795",
+      "beforePackageSha256": "07b65da7c650d5f5dcba05b466d19152c38ce2aeb3a4cc9f4d3ccc4639f5bd59",
+      "beforeToneSha256": "50a60d0e585bb31d2e19c051a936dfe0b33a1578875db708d3b5196fa4abc8d8",
+      "preservedEntries": {},
+      "afterPackageSha256": "1164b7acffe5bd7d2bcf7d6ec3f45833bf0105df5a81f01a389df8a739032bc8"
+    },
+    {
+      "file": "piccolo.fytonepack",
+      "db": 6,
+      "beforeGainText": "1.0",
+      "afterGainText": "1.9952623149688795",
+      "beforePackageSha256": "0456a879b3c7968894c66b0cafbc08dfeda108f070e2160f330b5e6ae3f858c7",
+      "beforeToneSha256": "7a8d77b8634138d3fcea7c5d9a2bcdf57c1fd9c5dd61dfe1f87ece6691dc97a4",
+      "preservedEntries": {},
+      "afterPackageSha256": "600eb9b524d12e83b4893acb51ff51af649ddf0792ba56d129c08f0f333295d5"
+    },
+    {
+      "file": "clarinet.fytonepack",
+      "db": 6,
+      "beforeGainText": "1.0",
+      "afterGainText": "1.9952623149688795",
+      "beforePackageSha256": "fe228d32ada4d16322f7656ee916f1fbc9eb36d12d9df5691a65765238d06cd3",
+      "beforeToneSha256": "071622cac5b4e1f2a7b733b4242c307f2a743f72335ea051d6fe3c97d5e8c78a",
+      "preservedEntries": {},
+      "afterPackageSha256": "23d54efb1d9f4733a1125d4f439e9e7b4a886aec4a6b6850c796fb6679f201e3"
+    },
+    {
+      "file": "oboe.fytonepack",
+      "db": 6,
+      "beforeGainText": "1.0",
+      "afterGainText": "1.9952623149688795",
+      "beforePackageSha256": "a5943113f34874e6bef0b4cc0ba6f6bb04c6282363c007d7a4824ce5b93db64c",
+      "beforeToneSha256": "408d43eab3ba2ab2062d66c22e731024525480d3b6153ca4f9298f3cafe9fee4",
+      "preservedEntries": {},
+      "afterPackageSha256": "0718f16650aca8a225a9a26308602888ac83ebcce1e8076df8555e45d40db9a5"
+    },
+    {
+      "file": "violin-soft.fytonepack",
+      "db": 6,
+      "beforeGainText": "1.0",
+      "afterGainText": "1.9952623149688795",
+      "beforePackageSha256": "3ed9d295530f0598502eb2877c531a28d175de59a400ed9152a28851c7f767b2",
+      "beforeToneSha256": "f5045e01abf228b87929ebc8af82b43175e96ba9da6f2c04b4b0c761268810b8",
+      "preservedEntries": {},
+      "afterPackageSha256": "4bfd99486713f7bd7306a9ba64765db483e6366788354b86f46797e99b3f82d4",
+      "preRenamePackageSha256": "9fc0fc99b8672bae55fc102f5ab8b176f9a66d6991543f782da33124cca10ede",
+      "displayRename": {
+        "before": "柔美小提琴",
+        "after": "小提琴-柔美"
+      }
+    },
+    {
+      "file": "folk-erhu.fytonepack",
+      "db": 6,
+      "beforeGainText": "1.0",
+      "afterGainText": "1.9952623149688795",
+      "beforePackageSha256": "46b98069a8694da9e23d5cb81758178bef5071f708115f0860808b3d80c6dd62",
+      "beforeToneSha256": "3fe4d2af41ed20a4314697a6e382d23112045597d5a97848469f7d624c52c12b",
+      "preservedEntries": {
+        "instrument.KAM": "1f1e3bcc94130854773a0c8d5bc79c54f44d8ea63f26891b31d12af527d51672"
+      },
+      "afterPackageSha256": "83a8b1d74ec935111522bb24ad64d4ef83c1f183e5cfed2b34f9157e38bc4e57"
+    },
+    {
+      "file": "folk-hulusi.fytonepack",
+      "db": 6,
+      "beforeGainText": "1.0",
+      "afterGainText": "1.9952623149688795",
+      "beforePackageSha256": "f5898b4febc2db5f2c38679134fae7f78da7d3a0d301564f1ddecd5c76dfd6a6",
+      "beforeToneSha256": "6a0bbffab8dfbc64b1eb3a1cd00761e029bc31205cff617f534451ac877c8cc7",
+      "preservedEntries": {
+        "instrument.KAM": "31a44f6ddb3b821ea0384f4b2f397379347d248365a4148a7ca6ad480897f32b"
+      },
+      "afterPackageSha256": "52c5f6436c6dae271be8809e9f721209f529c0f6ca6e9d1993f3806d40ef0916"
+    },
+    {
+      "file": "folk-liuqin.fytonepack",
+      "db": 6,
+      "beforeGainText": "1.0",
+      "afterGainText": "1.9952623149688795",
+      "beforePackageSha256": "463dc72fed32c6e639e17967aedf25e6bbdb102a492215f16a3ccdd38f9e6c7b",
+      "beforeToneSha256": "f0e3679889d68bc2fdbff2554d7d8582d171d5846d5861710f32318cd31a7779",
+      "preservedEntries": {
+        "instrument.KAM": "f3d0e2496be5f7dc118ed7390b3f80d64de9e5ef1bd340c0d551a46ff61185bf"
+      },
+      "afterPackageSha256": "8bcbf4f968612c50bc5f15b52a8976f901bd607926b20daf0872166e42ebdd40"
+    },
+    {
+      "file": "folk-matouqin.fytonepack",
+      "db": 6,
+      "beforeGainText": "1.0",
+      "afterGainText": "1.9952623149688795",
+      "beforePackageSha256": "0e0e5debe4c4da07753e4556e2014eab4779184d8d5ade25514b4421a0bfd2d5",
+      "beforeToneSha256": "d5c5527b2b764ad1d0807308324f226b9a2be601d3fe48f7357139269f8d5184",
+      "preservedEntries": {
+        "instrument.KAM": "218520a6019cbd7685d858c0c2385d7bcdd596188db70a46ef0664a23b6a3142"
+      },
+      "afterPackageSha256": "5a126d5b5bb737701152c76f5c97d99d636a80063cf54e6fd27675d201028900"
+    },
+    {
+      "file": "folk-qudi.fytonepack",
+      "db": 6,
+      "beforeGainText": "1.0",
+      "afterGainText": "1.9952623149688795",
+      "beforePackageSha256": "98b9bda12f18943cacc06d35e2f7a05ed616496280e82902890b2ce2f511c15e",
+      "beforeToneSha256": "b2b71c1eee7ad63f7ec88f9f5f3877351408a0e88c1574f2c7996b3f39b5615e",
+      "preservedEntries": {
+        "instrument.KAM": "357883cb50119797b8f1c219e692ec92fbe4eb204555750195d5051cbc0905c3"
+      },
+      "afterPackageSha256": "7ccb7c5ae947cc66db27620bb30118d116224ba52639913717905eff0c73522c"
+    },
+    {
+      "file": "folk-xun.fytonepack",
+      "db": 6,
+      "beforeGainText": "1.0",
+      "afterGainText": "1.9952623149688795",
+      "beforePackageSha256": "6a0a935febfbeded4a1e6053a1cb81de54902a08a307dc30d385e073d0b726cd",
+      "beforeToneSha256": "7c972e85618b76101983f4ea2e2ae727f99fdb476467d10ac8aae4da128d177f",
+      "preservedEntries": {
+        "instrument.KAM": "8db1b1e4cdff0c153f2f552ee5b347d44e6649567a9a4e2779f2f0938438bc2a"
+      },
+      "afterPackageSha256": "29b74c4208720d449a52b84712d8b82d5a1f6776b71033ecc639c2b233a2fb33"
+    },
+    {
+      "file": "folk-suona.fytonepack",
+      "db": 6,
+      "beforeGainText": "1.0",
+      "afterGainText": "1.9952623149688795",
+      "beforePackageSha256": "de8b7398fc0c2eca1403dd9313e0a2f833caa0d70485d8eb84a395af8761f5ed",
+      "beforeToneSha256": "3381fc71924a9d5a085bace61d4b62f1034dea66c6096a221fc70b56cea4fa0e",
+      "preservedEntries": {
+        "instrument.KAM": "bc549788a2e0afeeb32feac54eca0aaab8b9cea2841f553d8a6f72ebf7614dd5"
+      },
+      "afterPackageSha256": "25659a2bcee7ef5857a8fd21c403a4c3a1dc75a3dbefb13bebde3e5f039d49ad"
+    },
+    {
+      "file": "folk-sanxian.fytonepack",
+      "db": 6,
+      "beforeGainText": "1.0",
+      "afterGainText": "1.9952623149688795",
+      "beforePackageSha256": "6eeef093d83a351a853cf8689ff8bddc317bf50631a6ac0f8759859148d02315",
+      "beforeToneSha256": "5e2e3fef979da072ee21e096094a5a44dc4ebb393c4cc066818461367ab41415",
+      "preservedEntries": {
+        "instrument.KAM": "99d95e2e78376f53d4925b542e8709b20591ed6a304bb824c6727cc977f8e23a"
+      },
+      "afterPackageSha256": "8d4be1833cd6c839837097ddc1f9686eaf67a5bc04e620e3fa2d8df22f4deda0"
+    },
+    {
+      "file": "folk-pipa.fytonepack",
+      "db": 6,
+      "beforeGainText": "1.0",
+      "afterGainText": "1.9952623149688795",
+      "beforePackageSha256": "9a3dcbcef183a0edbbdc7fece8ee6ca7168304dc5c24bfa41e5554d7eb4e9051",
+      "beforeToneSha256": "3502f8f76b9fa2473ff0379eaf8bde7f78c220f7009de86f337c83017505d4d1",
+      "preservedEntries": {
+        "instrument.KAM": "37c15086fd08cd6440597f161d19e936c5e5755b5cb18ed6a9f880ee494edab8"
+      },
+      "afterPackageSha256": "0791dd59dfca81d2ec9b51f600bf5a9d8fdc7a3b6050924677b1c0fce0fe59f1"
+    },
+    {
+      "file": "folk-nanxiao.fytonepack",
+      "db": 6,
+      "beforeGainText": "1.0",
+      "afterGainText": "1.9952623149688795",
+      "beforePackageSha256": "443c86c8feb7099b151ee9a92916f9cf2b8cc9486b8443489346952bd0ddb452",
+      "beforeToneSha256": "73db8fc35eda50a1a6c53b730c5bc196f3449a87b9ea7c720a58caeb6f060c12",
+      "preservedEntries": {
+        "instrument.KAM": "aca42651f78f7412b646b2cc0fa71da9afe4379c893746f57154924517f30eec"
+      },
+      "afterPackageSha256": "a7b61b38107e5413c7245b8be26dafe13e5af139b85742db84aa1013faaeb395"
+    },
+    {
+      "file": "folk-dongxiao.fytonepack",
+      "db": 6,
+      "beforeGainText": "1.0",
+      "afterGainText": "1.9952623149688795",
+      "beforePackageSha256": "a4b4ab0b0f00d48eba19c5d93777307595c86dfe08ab5bca7dd17f76798c46b7",
+      "beforeToneSha256": "7197fb21f898f70fec0b91f4cf5b2b4d63fc3b30f4ab6b4f6634020e3448294b",
+      "preservedEntries": {
+        "instrument.KAM": "e0224ef15f88b8d86369b4dee52d20a56bed8c6aa5dfbdae009ad577925b98f9"
+      },
+      "afterPackageSha256": "80f255b6608ef49bfea0251f093708f023f73f2a4087271635ac0e66173b0f59"
+    },
+    {
+      "file": "folk-bangdi.fytonepack",
+      "db": 6,
+      "beforeGainText": "1.0",
+      "afterGainText": "1.9952623149688795",
+      "beforePackageSha256": "82b5d8cf3e3a197db3d07127a582b3c34082ef1e2f26f5acfba149c91ddf50b5",
+      "beforeToneSha256": "a0efffa9d3b5c55fe192a77da15ec294d97aec65ca68afd133d715dab40fa0bb",
+      "preservedEntries": {
+        "instrument.KAM": "ba9315a1c2743e08217eba92a01ea3fad3ce19089d0a4473a2a3a35c6ff97106"
+      },
+      "afterPackageSha256": "7bfe1c2ccf48283ec347ba0545710927d0abe4ad0d1878c14819e09f4450b94f"
+    },
+    {
+      "file": "folk-jinghu.fytonepack",
+      "db": 6,
+      "beforeGainText": "1.0",
+      "afterGainText": "1.9952623149688795",
+      "beforePackageSha256": "d4e6fc51ebc7749ad16c13cf7289a2e0f093b800fae286d7fa3bddcbb946391a",
+      "beforeToneSha256": "a2fed136df2621cc3b841e2d4393c9b7816158016d6129a3032c7d8fe7fceb11",
+      "preservedEntries": {
+        "instrument.KAM": "86548d53c0d0df4f855fb57afbabf7df76f04fe0de7a054beb272b22ab496d98"
+      },
+      "afterPackageSha256": "45a5f6c00deef9ab0ed2ddc60bee09b134d40a055887a0d53cedcd2eb222152a"
+    }
+  ]
+}

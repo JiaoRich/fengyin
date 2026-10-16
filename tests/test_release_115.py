@@ -3,18 +3,18 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 class Release115(unittest.TestCase):
     def test_reviewed_voice_assets_match_metadata(self):
-        audit_file=ROOT/'assets/voice/release-116-audit.json'
+        audit_file=ROOT/'assets/voice/release-117-audit.json'
         if not audit_file.exists():audit_file=ROOT/'assets/voice/release-115-audit.json'
         audit=json.loads(audit_file.read_text(encoding='utf-8'))
         catalog=json.loads((ROOT/'prototype/voice-catalog.js').read_text(encoding='utf-8').split('=',1)[1].strip().rstrip(';'))
-        self.assertEqual(len(audit),123 if audit_file.name=='release-116-audit.json' else 122)
+        self.assertEqual(len(audit),123 if audit_file.name in ('release-116-audit.json','release-117-audit.json') else 122)
         self.assertEqual({x['id'] for x in audit},{x['id'] for x in catalog['items']})
         self.assertEqual(catalog['voice'],'x6_wuyediantai_mini')
         for row in audit:
             file=ROOT/'assets/voice'/(row['id']+'.wav')
             self.assertEqual(hashlib.sha256(file.read_bytes()).hexdigest(),row['sha256'])
             with wave.open(str(file)) as w:self.assertGreater(w.getnframes(),1000)
-        self.assertEqual(next(x['text'] for x in audit if x['id']=='TONE_VIOLIN_SWEET'),'激情小提琴。')
+        self.assertEqual(next(x['text'] for x in audit if x['id']=='TONE_VIOLIN_BRIGHT'),'小提琴，明亮。')
         self.assertTrue({'TONE_DONGXIAO','TONE_BANGDI','TONE_JINGHU'}.issubset({x['id'] for x in audit}))
     def test_policy_and_missing_mapping_default_execute(self):
         node=shutil.which('node')

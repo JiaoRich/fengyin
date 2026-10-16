@@ -21,7 +21,7 @@ class AttackControlPolicyTests(unittest.TestCase):
                 if preset.get('pluginBrand')=='swam':
                     self.assertEqual(len(controls), 1)
                     # Verified Windows enums differ between saxophones and strings.
-                    expected=0.666666686534882 if path.stem in ('violin','violin-sweet','violin-soft','cello') else 1.0
+                    expected=0.666666686534882 if preset.get('instrumentKey') in ('violin','cello') else 1.0
                     self.assertAlmostEqual(float(controls[0].get('value')),expected,places=6)
                 else:
                     self.assertIn(preset.get('pluginBrand'),['kong','kontakt'])

@@ -1,4 +1,5 @@
 #include "PluginHostEngine.h"
+#include "KensaVibratoRange.h"
 #include "TechniqueMidiDeduplication.h"
 #include "SwamTechniqueRouting.h"
 #include "SwamStateCompatibility.h"
@@ -201,10 +202,27 @@ public:
         // is a common source of sluggish VST3 windows on Windows.
         setResizable(editorAllowsResize, false);
         centreWithSize(juce::jmax(320, getWidth()), juce::jmax(240, getHeight()));
-        setAlwaysOnTop(true);
+        // Editors must not cover the host's save/confirmation dialogs.
+        setAlwaysOnTop(false);
+        keepTitleBarOnScreen();
         setVisible(true);
+        keepTitleBarOnScreen();
         toFront(true);
         grabKeyboardFocus();
+    }
+    void keepTitleBarOnScreen()
+    {
+        const auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect(getBounds());
+        if (display == nullptr) return;
+        const auto area = display->userArea;
+        // Do not resize fixed-size third-party content. Even an oversized editor
+        // must leave its native title bar reachable in the selected work area.
+        juce::BorderSize<int> frame;
+        if (const auto* peer = getPeer())
+            if (const auto nativeFrame = peer->getFrameSizeIfPresent()) frame = *nativeFrame;
+        const int left = area.getX() + frame.getLeft(), top = area.getY() + frame.getTop();
+        setTopLeftPosition(juce::jlimit(left, juce::jmax(left, area.getRight() - frame.getRight() - getWidth()), getX()),
+                           juce::jlimit(top, juce::jmax(top, area.getBottom() - frame.getBottom() - getHeight()), getY()));
     }
     void closeButtonPressed() override { setVisible(false); }
 };
@@ -392,6 +410,9 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
             processingGraph->applyTechniqueValues = [this] { flushTechniqueValues(); };
             processingGraph->transformPerformanceMidi = [this](juce::MidiBuffer& messages,int count,double rate) {
                 suonaDualVoice.process(messages,count,rate);
+                const double now = juce::Time::getMillisecondCounterHiRes() * .001;
+                for (const auto event : messages)
+                    destinationTrace.record(event.getMessage(), now + event.samplePosition / juce::jmax(1.0,rate));
             };
             processingGraph->suppressTechniqueMidi = [this](const juce::MidiMessage& message)
             {
@@ -545,6 +566,7 @@ void PluginHostEngine::unload()
     currentDescription = {};
     suonaDualVoice.configure(false);
     kontaktStandardControls.store(false);
+    stringTremolo.clear();
     for (auto& parameter : techniqueParameters) parameter.store(nullptr);
     for (auto& dirty : techniqueDirty) dirty.store(false, std::memory_order_relaxed);
     instrumentModelParameter = nullptr;
@@ -756,6 +778,8 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve()
     if (result.controller >= 0 && result.controller <= 127)
         swamExpressionController.store(result.controller, std::memory_order_relaxed);
     lastBreathMidiValue.store(-1, std::memory_order_relaxed);
+    if(key=="violin" || key=="cello")stringTremolo.prepare(*plugin);
+    else stringTremolo.clear();
     prepareTempoVibrato(*plugin);
     for (const auto technique : {PerformanceTechnique::vibrato, PerformanceTechnique::growl, PerformanceTechnique::flutter})
         techniqueChanged(technique, 0.0f);
@@ -1025,6 +1049,7 @@ bool PluginHostEngine::showPluginEditor(bool effect)
     auto& window = effect ? effectEditorWindow : instrumentEditorWindow;
     if (window != nullptr)
     {
+        window->keepTitleBarOnScreen();
         window->setVisible(true);
         window->toFront(true);
         return true;
@@ -1188,9 +1213,18 @@ void PluginHostEngine::routeTechnique(PerformanceTechnique technique, float valu
     const auto index = static_cast<size_t>(technique);
     if (index >= techniqueValues.size()) return;
     const auto safeValue = juce::jlimit(0.0f, 1.0f, value);
+    if(technique==PerformanceTechnique::tremolo && !kongExpressionMode.load()) {
+        // Never fall back to a similarly named "Tremolo Mode" parameter if
+        // this plug-in/version failed the exact native articulation checks.
+        if(stringTremolo.available())stringTremolo.request(safeValue>.5f);
+        return;
+    }
     if (kontaktStandardControls.load()) {
         if(technique==PerformanceTechnique::vibrato) {
-            const int midiValue=juce::roundToInt(safeValue*127.f);
+            // Kenny G PRO: <=30 is the vibrato dead zone; >96 also adds
+            // a pitch offset. Preserve true OFF and use only the verified
+            // periodic-vibrato interval. This profile is Kensa-only.
+            const int midiValue=kensaVibratoController(safeValue);
             sendTechniqueController(lastNativeTechniqueMessages[index],(1<<8)|2,midiValue,true,[&] {
                 return queue(juce::MidiMessage::controllerEvent(1,1,midiValue),0.0);
             });
@@ -1308,6 +1342,7 @@ void PluginHostEngine::configureKongTechniqueProfile(const juce::String& key,con
     switchPerformanceChannel(1);
     if (key.isEmpty()) return;
     player.beginOnsetTrace();
+    destinationTrace.begin();
     juce::Logger::writeToLog("ONSET begin 30s bounded capture: " + key);
     if (!tree.isValid() || tree.getChildWithName("PresetList").getNumChildren()==0)
     {
@@ -1325,6 +1360,15 @@ void PluginHostEngine::configureKongTechniqueProfile(const juce::String& key,con
             flutter|=int(slot.getProperty("MIDI",0))==1 && text.contains("Suona2_Flutter");}
         suonaDualVoice.configure((key=="kong-suona" || key=="kong-suona-2") && slots.getNumChildren()==2 && profile.otherChannel==2 && main && flutter
             && juce::SystemStats::getEnvironmentVariable("FENGYIN_SUONA_LEGACY","0")!="1");
+        if (key=="kong-suona" || key=="kong-suona-2")
+        {
+            juce::Logger::writeToLog("Suona dual route=" + juce::String(suonaDualVoice.active() ? "enabled" : "legacy")
+                + " slots=" + juce::String(slots.getNumChildren()) + " main=" + juce::String(main ? 1 : 0)
+                + " flutter=" + juce::String(flutter ? 1 : 0) + " otherChannel=" + juce::String(profile.otherChannel));
+            for (auto slot : slots)
+                juce::Logger::writeToLog("Suona slot ch=" + juce::String(int(slot.getProperty("MIDI",0))+1)
+                    + " preset=" + slot.getProperty("Preset").toString());
+        }
         if(profile.vibratoCC==1) {
             kongVibratoCC.store(1);
             for(auto slot:tree.getChildWithName("PresetList")) {
@@ -1362,6 +1406,7 @@ void PluginHostEngine::configureKongTechniqueProfile(const juce::String& key,con
 
 void PluginHostEngine::resetPerformance() noexcept
 {
+    stringTremolo.request(false);
     const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
     suonaDualVoice.setFlutter(false);
     if(kontaktStandardControls.load())queue(juce::MidiMessage::controllerEvent(1,1,0),0.0);
@@ -1608,6 +1653,7 @@ int PluginHostEngine::applySwamToneProfile(const SwamToneProfile& profile, bool 
 
 void PluginHostEngine::flushTechniqueValues()
 {
+    stringTremolo.flush();
     if(tempoRateDirty.exchange(false))if(auto* p=vibratoRateParameter.load()) {
         const auto target=automaticVibratoActive.load()?tempoVibratoRates[MusicTempoPolicy::valid(musicTempoMode.load())]:originalVibratoRate;
         if(target>=0)p->setValueNotifyingHost(target);
@@ -1624,6 +1670,7 @@ void PluginHostEngine::flushTechniqueValues()
 
 bool PluginHostEngine::supportsTechnique(PerformanceTechnique technique) const noexcept
 {
+    if(technique==PerformanceTechnique::tremolo && stringTremolo.available())return true;
     const auto index = static_cast<size_t>(technique);
     return index < techniqueParameters.size() && techniqueParameters[index] != nullptr;
 }

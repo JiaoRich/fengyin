@@ -1,4 +1,5 @@
 #include "MidiInputService.h"
+#include "KensaVibratoRange.h"
 #include <cassert>
 #include <cmath>
 #include <vector>
@@ -20,6 +21,10 @@ struct MidiInputServiceTestAccess {
         service.handleIncomingMidiMessage(nullptr, message);
     }
     static void elapsed(MidiInputService& service,double ms) {service.latestNoteStartedMs.store(juce::Time::getMillisecondCounterHiRes()-ms);}
+    static void sendWhileMappingBusy(MidiInputService& service,juce::MidiMessage message) {
+        const juce::SpinLock::ScopedLockType lock(service.techniqueLock);
+        service.handleIncomingMidiMessage(nullptr,message);
+    }
 };
 }
 struct Sink : fengyin::MidiPerformanceSink {
@@ -33,6 +38,14 @@ struct Sink : fengyin::MidiPerformanceSink {
     void techniqueChanged(fengyin::PerformanceTechnique, float v) noexcept override { events.push_back({'T',v,0}); }
 };
 int main() {
+    assert(fengyin::kensaVibratoController(0)==0);
+    assert(fengyin::kensaVibratoController(-1)==0);
+    assert(fengyin::kensaVibratoController(1)==96);
+    int previousKensa=0;
+    for(int i=1;i<=10000;++i) {
+        const auto cc=fengyin::kensaVibratoController(i/10000.f);
+        assert(cc>=31 && cc<=96 && cc>=previousKensa);previousKensa=cc;
+    }
     struct TraceLogger : juce::Logger {
         std::vector<juce::String> lines;
         void logMessage(const juce::String& s) override { lines.push_back(s); }
@@ -78,6 +91,52 @@ int main() {
         assert(counts[0]==1000 && counts[1]==1000 && ordered.droppedCount()==0);
     }
     Sink sink;
+    // Kensa mouthpiece CC/pressure drives the technique, never pitch bend.
+    for(const auto source:{fengyin::TechniqueSourceType::controller,fengyin::TechniqueSourceType::channelPressure}) {
+        Sink routed;fengyin::MidiInputService input(false);input.setPerformanceSink(&routed);
+        input.setTechniqueContext("kontakt-kensa");fengyin::TechniqueMapping mapping;
+        mapping.technique=fengyin::PerformanceTechnique::vibrato;mapping.mode=fengyin::TechniqueControlMode::hardware;
+        mapping.sourceType=source;mapping.sourceNumber=74;input.setTechniqueMappings({mapping});routed.events.clear();
+        for(int value:{0,64,127,0})fengyin::MidiInputServiceTestAccess::send(input,
+            source==fengyin::TechniqueSourceType::controller?juce::MidiMessage::controllerEvent(1,74,value):juce::MidiMessage::channelPressureChange(1,value),1);
+        assert(routed.events.size()==4);
+        for(const auto& event:routed.events)assert(event.type=='T');
+        assert(routed.events.front().value==0&&routed.events[2].value==1&&routed.events.back().value==0);
+    }
+    // A globally learned technique key must not become a musical note on
+    // instruments that do not implement that role (e.g. the two xiao tones).
+    for (const auto* key : {"kong-nanxiao", "kong-xiao"})
+    for (const auto mode : {fengyin::TechniqueControlMode::hardware, fengyin::TechniqueControlMode::off,
+                           fengyin::TechniqueControlMode::automatic})
+    {
+        Sink routed;
+        fengyin::MidiInputService input(false);
+        input.setPerformanceSink(&routed);
+        input.setTechniqueContext(key);
+        fengyin::TechniqueMapping mapping;
+        mapping.technique=fengyin::PerformanceTechnique::mute;
+        mapping.mode=mode;
+        mapping.sourceType=fengyin::TechniqueSourceType::note;
+        mapping.sourceNumber=24;
+        input.setTechniqueMappings({mapping});
+        const auto sendKey=[&](juce::MidiMessage m){fengyin::MidiInputServiceTestAccess::send(input,m,1);};
+        sendKey(juce::MidiMessage::noteOn(1,67,juce::uint8(95)));
+        sendKey(juce::MidiMessage::noteOn(1,24,juce::uint8(100)));
+        sendKey(juce::MidiMessage::noteOff(1,24));
+        assert(routed.onNotes==std::vector<int>({67}));
+        assert(routed.offNotes.empty());
+        fengyin::MidiInputServiceTestAccess::sendWhileMappingBusy(input,juce::MidiMessage::noteOn(1,24,juce::uint8(100)));
+        fengyin::MidiInputServiceTestAccess::sendWhileMappingBusy(input,juce::MidiMessage::noteOff(1,24));
+        assert(routed.onNotes==std::vector<int>({67}) && routed.offNotes.empty());
+        sendKey(juce::MidiMessage::noteOff(1,67));
+        assert(routed.offNotes==std::vector<int>({67}));
+        // A normal note already held when the mapping is changed still gets
+        // its real NoteOff, rather than becoming a stuck voice.
+        sendKey(juce::MidiMessage::noteOn(1,65,juce::uint8(80)));
+        mapping.sourceNumber=65;input.setTechniqueMappings({mapping});
+        sendKey(juce::MidiMessage::noteOff(1,65));
+        assert(routed.offNotes.back()==65);
+    }
     {
         fengyin::MidiInputService defaults(false);
         const auto mappings=defaults.getTechniqueMappings();
@@ -191,6 +250,8 @@ int main() {
     }
     assert(fengyin::simpleGrowl("alto-sax") && !fengyin::simpleGrowl("soprano-sax"));
     assert(fengyin::simpleOther("kong-pipa")==fengyin::PerformanceTechnique::tremolo);
+    assert(fengyin::simpleOther("violin")==fengyin::PerformanceTechnique::tremolo);
+    assert(fengyin::simpleOther("cello")==fengyin::PerformanceTechnique::tremolo);
     assert(fengyin::simpleVibrato("kong-erhu-2") && fengyin::simpleVibrato("kong-jinghu"));
     assert(!fengyin::simpleVibrato("kong-pipa"));
     for(const char* key:{"flute","piccolo","alto-flute","bass-flute","clarinet","bass-clarinet","oboe","english-horn","bassoon","contrabassoon","trumpet","piccolo-trumpet","alto-trombone","bass-trombone","horn-f","euphonium","bass-tuba"})

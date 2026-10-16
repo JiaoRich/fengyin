@@ -21,6 +21,7 @@ inline bool simpleGrowl(std::string_view key) {
     return key == "alto-sax" || key == "tenor-sax" || key == "baritone-sax";
 }
 inline PerformanceTechnique simpleOther(std::string_view key) {
+    if(key=="violin" || key=="cello")return PerformanceTechnique::tremolo;
     if (key == "kong-erhu-2") key = "kong-erhu";
     if (key == "kong-guzheng-2") key = "kong-guzheng";
     if (key == "kong-dizi-2") key = "kong-dizi";

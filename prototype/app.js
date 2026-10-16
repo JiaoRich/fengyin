@@ -2,6 +2,23 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 let studioUnlocked = false, studioSavedId = '', studioExportAfterSave = false;
 let compactMode = false;
+let touchWindowGesture = null;
+function beginTouchWindowGesture(e, action) {
+  if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return false;
+  touchWindowGesture = {id:e.pointerId,x:e.screenX,y:e.screenY};
+  e.currentTarget.setPointerCapture(e.pointerId);
+  nativeEvent('windowAction',{action:`pointer-begin:${action}`});
+  return true;
+}
+document.addEventListener('pointermove',e=>{
+  if (!touchWindowGesture || e.pointerId!==touchWindowGesture.id) return;
+  e.preventDefault();
+  nativeEvent('windowAction',{action:`pointer-move:${Math.round(e.screenX-touchWindowGesture.x)}:${Math.round(e.screenY-touchWindowGesture.y)}`});
+},{passive:false});
+for(const event of ['pointerup','pointercancel','lostpointercapture']) document.addEventListener(event,e=>{
+  if (!touchWindowGesture || e.pointerId!==touchWindowGesture.id) return;
+  touchWindowGesture=null;nativeEvent('windowAction',{action:'pointer-end'});
+});
 const windowControls = document.createElement('div');
 windowControls.className = 'compact-window-controls';
 windowControls.innerHTML = '<button type="button" aria-label="最小化" data-action="minimise">−</button><button type="button" aria-label="关闭" data-action="close">×</button>';
@@ -13,6 +30,7 @@ windowControls.addEventListener('click', e => {
 $('.window-mode-bar').addEventListener('pointerdown', e => {
   if (!compactMode || e.button !== 0 || e.target.closest('button,input,select,a')) return;
   e.preventDefault();
+  if (beginTouchWindowGesture(e,'drag')) return;
   nativeEvent('windowAction', {action:'drag'});
 });
 // Capture resize gestures inside the WebView without recreating its native peer.
@@ -23,11 +41,13 @@ for (const edge of ['n','s','e','w','ne','nw','se','sw']) {
   handle.addEventListener('pointerdown', e => {
     if (!compactMode || e.button !== 0) return;
     e.preventDefault(); e.stopPropagation();
+    if (beginTouchWindowGesture(e,`resize-${edge}`)) return;
     nativeEvent('windowAction', {action:`resize-${edge}`});
   });
   document.body.appendChild(handle);
 }
 function applyWindowMode(compact) {
+  touchWindowGesture = null;
   compactMode = !!compact;
   document.body.classList.toggle('compact-mode', compactMode);
   $('#window-mode-toggle').textContent = compactMode ? '全屏' : '精简模式';
@@ -170,7 +190,7 @@ const toneStyleLibrary = {
     },
     {
       "id": "pop-high",
-      "name": "流行高音",
+      "name": "明亮",
       "description": "",
       "eq": 21.814000606536872,
       "reverb": 38.95620107650757,
@@ -321,7 +341,7 @@ function instrumentFamily(key = '') {
 }
 
 function buildTechniquePlan(key = '') {
-  const other = {'kong-erhu':'颤弓','kong-erhu-2':'颤弓','kong-jinghu':'颤弓','kong-guzheng':'摇指','kong-liuqin':'轮音','kong-pipa':'轮指','kong-sanxian':'轮音','kong-dizi':'花舌','kong-dizi-2':'吐音','kong-suona':'花舌','kong-suona-2':'花舌','kong-sheng':'花舌',flute:'花舌',piccolo:'花舌'}[key];
+  const other = {violin:'抖弓',cello:'抖弓','kong-erhu':'颤弓','kong-erhu-2':'颤弓','kong-jinghu':'颤弓','kong-guzheng':'摇指','kong-liuqin':'轮音','kong-pipa':'轮指','kong-sanxian':'轮音','kong-dizi':'花舌','kong-dizi-2':'吐音','kong-suona':'花舌','kong-suona-2':'花舌','kong-sheng':'花舌',flute:'花舌',piccolo:'花舌'}[key];
   const folkVibrato = ['kong-erhu','kong-erhu-2','kong-matouqin','kong-hulusi','kong-hulusi-2','kong-xun','kong-nanxiao','kong-xiao','kong-dizi','kong-dizi-2','kong-suona','kong-suona-2','kong-jinghu'].includes(key);
   return [
     {id:'vibrato',name:/violin|viola|cello|double-bass|kong-erhu|kong-matouqin|kong-jinghu/.test(key)?'揉弦':'颤音',icon:'≈',index:1,pluginSupported:key==='kontakt-kensa' || folkVibrato || /sax|violin|viola|cello|double-bass|flute|piccolo|clarinet|oboe|english-horn|bassoon|trumpet|trombone|flugelhorn|tuba|euphonium|horn-f|horn-bb/.test(key)},
@@ -703,13 +723,13 @@ const expertControls = [
   ['compression','压缩阈值 · Threshold',35],['ratio','压缩比 · Ratio',25],
   ['harsh','去刺耳 · Harsh Control',25],['reverb','混响强度 · Reverb Mix',18],
   ['room','空间大小 · Room Size',42],['damping','高频阻尼 · Damping',54],
-  ['width','立体声宽度 · Width',88],['output','输出音量 · Output Gain',80]
+  ['width','立体声宽度 · Width',88],['output','输出音量 · Output Gain',50]
 ];
 function toneStyleToExpert() {
   const style = toneStylesForInstrument(currentInstrument?.instrumentKey)[currentToneStyleIndex] || {};
   if (latestBackendState?.toneSettings && window.__JUCE__?.backend?.emitEvent)
     return Object.fromEntries(expertControls.map(([id,,fallback]) => [id,Number(latestBackendState.toneSettings[id] ?? fallback)]));
-  return {bass:50,air:0,brightness:Math.round((Number(style.eq || 0)+100)/2),warmth:Number(style.warmth ?? 20),compression:35,harsh:25,reverb:Number(style.reverb ?? 18),room:42,output:80};
+  return {bass:50,air:0,brightness:Math.round((Number(style.eq || 0)+100)/2),warmth:Number(style.warmth ?? 20),compression:35,harsh:25,reverb:Number(style.reverb ?? 18),room:42,output:50};
 }
 function renderExpertControls() {
   $('#expert-grid').innerHTML = expertControls.map(([id,label,fallback]) => `<div class="expert-control"><label for="expert-${id}"><span>${label}</span><b id="expert-${id}-value">${expertDisplay(id,expertSettings?.[id] ?? fallback)}</b></label><input id="expert-${id}" data-expert="${id}" type="range" min="0" max="100" step="0.001" value="${expertSettings?.[id] ?? fallback}" ${currentPluginLoaded ? '' : 'disabled'}></div>`).join('');
@@ -734,7 +754,7 @@ function expertDisplay(id,value) {
   if (id === 'bass') return `${((value/50-1)*12).toFixed(1)} dB`;
   if (id === 'ratio') return `${(1+value/100*3).toFixed(2)}:1`;
   if (id === 'compression') return `${(20*Math.log10(.85-value/100*.55)).toFixed(1)} dB`;
-  if (id === 'output') return `${(20*Math.log10(.5+value/100*.75)).toFixed(1)} dB`;
+  if (id === 'output') return value<=0?'−∞ dB':`${(20*Math.log10(value/50)).toFixed(1)} dB`;
   return `${value.toFixed(1)}%`;
 }
 // The custom-tone editor lives directly in the second step.
@@ -826,7 +846,7 @@ renderToneStyleSwitcher();
 // Use the actual available content width, including Windows display scaling.
 new ResizeObserver(entries => {
   const width = entries[0].contentRect.width;
-  const columns = Math.max(1, Math.min(8, Math.floor((width + 9) / 170)));
+  const columns = Math.max(1, Math.min(5, Math.floor((width + 9) / 170)));
   entries[0].target.style.setProperty('--preset-columns', columns);
   entries[0].target.style.setProperty('--scan-span', Math.max(1, columns - 1));
 }).observe($('#preset-grid'));
@@ -912,15 +932,21 @@ function renderPresets() {
   const cards=[];
   for (const tone of publishedTones) {
     const pluginIndex=availableInstruments.findIndex(p=>tone.kind==='kong' ? p.brand==='kong' : tone.kind==='kontakt' ? p.brand==='kontakt' : p.instrumentKey===tone.instrumentKey);
-    cards.push({id:`builtin:${tone.instrumentKey}:${tone.styleId}`,catalogId:tone.id,name:tone.name,
+    cards.push({id:`builtin:${tone.id}`,catalogId:tone.id,name:tone.name,
       pluginIndex,styleId:tone.styleId,instrumentKey:tone.instrumentKey,kind:tone.kind,index:-1,missing:pluginIndex<0});
   }
   savedPresets.forEach((p,index)=>{
     if(p.studioDraft || !p.published) return;
-    cards.push({id:`custom:${p.id}`,name:p.name,index,
+    cards.push({id:`custom:${p.id}`,presetId:p.id,name:p.name,index,
       missing:!availableInstruments.some(i=>i.pluginId===p.pluginId)});
   });
   let order=[]; try { order=JSON.parse(localStorage.getItem('fengyin-card-order-swam')||'[]'); } catch {}
+  // Migrate old instrument/style keys, including both formerly-colliding violins.
+  order=order.flatMap(key=>{
+    if(key==='builtin:violin')return ['builtin:violin-bright'];
+    if(cards.some(c=>c.id===key))return [key];
+    return publishedTones.filter(t=>`builtin:${t.instrumentKey}:${t.styleId}`===key).map(t=>`builtin:${t.id}`);
+  });
   cards.sort((a,b)=>(order.includes(a.id)?order.indexOf(a.id):1e9)-(order.includes(b.id)?order.indexOf(b.id):1e9));
   $('#preset-grid').innerHTML=cards.map(c=>`<section class="instrument-preset-card compact ${latestBackendState.activeToneVariantId===c.id?'active':''}" data-card-key="${escapeHtml(c.id)}" tabindex="0" role="button">
     <h3>${escapeHtml(c.name)}</h3><span class="card-drag-handle" draggable="true" aria-label="拖动排序">⠿</span>
@@ -941,7 +967,7 @@ function renderPresets() {
   }
   $$('#preset-grid .instrument-preset-card').forEach((el,i)=>{
     el.onclick=e=>{if(Date.now()-lastToneDragAt<300||e.target.closest('.card-drag-handle'))return;
-      if(e.target.closest('.delete-tone')){nativeEvent('deletePreset',{index:cards[i].index});return;} load(cards[i]);};
+      if(e.target.closest('.delete-tone')){nativeEvent('deletePreset',{id:cards[i].presetId});return;} load(cards[i]);};
     el.onkeydown=e=>{if(e.target===el&&(e.key==='Enter'||e.key===' ')){e.preventDefault();load(cards[i]);}};
   });
   bindInstrumentSorting();
@@ -1168,7 +1194,7 @@ $('#theme').addEventListener('change', event => { document.body.dataset.theme = 
 // Keep the native select as the source of options; use a non-modal upward menu.
 const themeButton=document.createElement('button'); themeButton.id='theme-button'; themeButton.type='button';
 themeButton.textContent='主题 ⌃'; themeButton.setAttribute('aria-haspopup','menu'); themeButton.setAttribute('aria-expanded','false');
-$('.compact-action-row').append(themeButton);
+$('.global-controls').append(themeButton);
 const themeMenu=document.createElement('div');themeMenu.className='inline-choice';themeMenu.hidden=true;themeMenu.setAttribute('role','menu');document.body.append(themeMenu);
 $('#bend-range-dialog [aria-modal]').removeAttribute('aria-modal');
 $('#bend-range-button').setAttribute('aria-haspopup','true');
@@ -2277,7 +2303,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.16 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.17 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},
@@ -2560,7 +2586,8 @@ function requestVisualFrame() {
 function updateStaticTheme() {
   const palettes = {spring:['#123c2b','#68e7ac'],summer:['#103940','#65e0d2'],autumn:['#38271c','#e7aa5e'],winter:['#183454','#b7ecff'],'china-red':['#431316','#ff4b52'],gold:['#392719','#ffc85a'],minimal:['#202b36','#75a9dc']};
   const [base,accent] = palettes[document.body.dataset.theme] || ['#112d49','#43d9ff'];
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000"><defs><radialGradient id="g"><stop stop-color="${base}"/><stop offset="1" stop-color="#07101d"/></radialGradient></defs><rect width="1600" height="1000" fill="url(#g)"/><path d="M0 850 Q600 500 1600 120 M0 930 Q800 620 1600 280" fill="none" stroke="${accent}" stroke-opacity=".12" stroke-width="3"/></svg>`;
+  const edge=getComputedStyle(document.body).getPropertyValue('--bg').trim();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000"><defs><radialGradient id="g"><stop stop-color="${base}"/><stop offset="1" stop-color="${edge}"/></radialGradient></defs><rect width="1600" height="1000" fill="url(#g)"/><path d="M0 850 Q600 500 1600 120 M0 930 Q800 620 1600 280" fill="none" stroke="${accent}" stroke-opacity=".12" stroke-width="3"/></svg>`;
   document.body.style.backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 function draw(timestamp = performance.now()) {

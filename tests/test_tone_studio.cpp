@@ -3,6 +3,7 @@
 #include "ScopedGraphPause.h"
 #include "ToneRestorePlan.h"
 #include "SuonaDualVoiceRouter.h"
+#include "SwamStringTremolo.h"
 #include <cassert>
 #include <cmath>
 
@@ -36,6 +37,23 @@ private:
 
 int main()
 {
+    {
+        TestEffect fake(1,0);
+        auto* selector=new juce::AudioParameterChoice("tremolo","Tremolo",{"OFF","Slow","Fast"},0);
+        auto* mode=new juce::AudioParameterChoice("mode","Tremolo Mode",{"Hz","Sync","Sync/Acc"},1);
+        auto* speed=new juce::AudioParameterFloat("speed","Tremolo Min Speed",5.f,11.f,8.f);
+        auto* pressure=new juce::AudioParameterFloat("bow","Bow Pressure",0.f,1.f,.62f);
+        fake.addParameter(selector);fake.addParameter(mode);fake.addParameter(speed);fake.addParameter(pressure);
+        fengyin::SwamStringTremolo tremolo;assert(tremolo.prepare(fake));
+        assert(mode->getIndex()==0 && std::abs(speed->get()-10.f)<.05f);
+        tremolo.request(true);tremolo.flush();assert(selector->getIndex()==1);
+        tremolo.setTempoMode(0);tremolo.flush();assert(std::abs(speed->get()-7.f)<.05f);
+        tremolo.setTempoMode(2);tremolo.flush();assert(selector->getIndex()==2 && std::abs(speed->get()-140.f/15)<.05f);
+        tremolo.request(false);tremolo.flush();assert(selector->getIndex()==0);
+        assert(std::abs(pressure->get()-.62f)<1e-6f);
+        tremolo.clear();assert(!tremolo.available());
+        TestEffect unsupported(1,0);assert(!tremolo.prepare(unsupported));
+    }
     // Exercise the exact production MIDI transform, not a mock crossfade.
     {
         fengyin::SuonaDualVoiceRouter router;router.configure(true);
@@ -215,10 +233,23 @@ int main()
     }
     const auto bundled=juce::File(juce::String::fromUTF8(__FILE__)).getParentDirectory().getParentDirectory().getChildFile("assets/tone-packages");
     const auto files=bundled.findChildFiles(juce::File::findFiles,false,"*.fytonepack");
-    assert(files.size()==33);
-    int routedFolkPackages=0;
+    // 33 published packages plus the retained, non-embedded legacy violin archive.
+    assert(files.size()==34);
+    int routedFolkPackages=0, boostedPackages=0;
     for(const auto& file:files){
         juce::String error;const auto imported=fengyin::TonePackage::read(file,error);assert(imported && error.isEmpty());
+        if (imported->outputGain > 1.5f)
+        {
+            ++boostedPackages;
+            assert(std::abs(imported->outputGain - std::pow(10.f,6.f/20.f)) < 1e-6f);
+            const auto copy=directory.getChildFile("gain-roundtrip-"+file.getFileName());
+            assert(fengyin::TonePackage::write(*imported,copy));
+            const auto restored=fengyin::TonePackage::read(copy,error);assert(restored);
+            assert(restored->outputGain==imported->outputGain);
+            assert(restored->instrumentState==imported->instrumentState);
+            assert(restored->samplerState==imported->samplerState);
+            assert(restored->containerProjectState==imported->containerProjectState);
+        }
         if(file.getFileName().startsWith("folk-")) {
             ++routedFolkPackages;
             assert(imported->pluginBrand=="kong" && imported->kongTechniques.enabled);
@@ -226,5 +257,6 @@ int main()
         }
     }
     assert(routedFolkPackages==13);
+    assert(boostedPackages==18);
     assert(directory.deleteRecursively());
 }

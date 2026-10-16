@@ -331,6 +331,7 @@ void MidiInputService::setTechniqueMappings(const juce::Array<TechniqueMapping>&
             }
             techniqueMappings.add(mapping);
         }
+        refreshTechniqueNoteMasks();
         techniquePreviousInput.fill(0.0f);
         techniqueToggleState.fill(false);
         techniqueHardwareInput.fill(0.0f);
@@ -340,6 +341,15 @@ void MidiInputService::setTechniqueMappings(const juce::Array<TechniqueMapping>&
         for (const auto& mapping : previous)
             sink->techniqueChanged(targetForRole(mapping.technique), 0.0f);
     saveTechniqueMappings();
+}
+
+void MidiInputService::refreshTechniqueNoteMasks() noexcept
+{
+    uint64_t masks[2] {};
+    for (const auto& mapping : techniqueMappings)
+        if (mapping.sourceType == TechniqueSourceType::note && mapping.sourceNumber >= 0 && mapping.sourceNumber < 128)
+            masks[mapping.sourceNumber / 64] |= uint64_t(1) << (mapping.sourceNumber % 64);
+    for (size_t i=0;i<2;++i) techniqueNoteMasks[i].store(masks[i], std::memory_order_release);
 }
 
 juce::Array<TechniqueMapping> MidiInputService::getTechniqueMappings() const
@@ -460,6 +470,7 @@ void MidiInputService::loadTechniqueMappings()
     {
         const juce::SpinLock::ScopedLockType lock(techniqueLock);
         techniqueMappings = loaded;
+        refreshTechniqueNoteMasks();
         techniquePreviousInput.fill(0.0f);
         techniqueToggleState.fill(false);
         techniqueHardwareInput.fill(0.0f);
@@ -532,6 +543,11 @@ bool MidiInputService::handleTechniqueMessage(const juce::MidiMessage& message, 
 
     bool capturedByLearn = false;
     const auto inputValue = techniqueMessageValue(message);
+    // Globally learned technique notes remain reserved even when a role is
+    // unsupported/disabled/automatic. Otherwise they become audible notes.
+    const bool reservedNote = sourceType == TechniqueSourceType::note
+        && (techniqueNoteMasks[static_cast<size_t>(sourceNumber / 64)].load(std::memory_order_acquire)
+            & (uint64_t(1) << (sourceNumber % 64))) != 0;
     const auto ordinaryPlayedNote = sourceType == TechniqueSourceType::note
         && breath.load(std::memory_order_relaxed) > 0.03f;
     const auto meaningfulContinuousSignal = sourceType == TechniqueSourceType::pitchWheel
@@ -554,7 +570,7 @@ bool MidiInputService::handleTechniqueMessage(const juce::MidiMessage& message, 
     {
         // Never let a potentially mapped wheel escape as an audible pitch bend
         // merely because the UI is updating its mapping. Notes still pass.
-        return capturedByLearn;
+        return capturedByLearn || reservedNote;
     }
     for (const auto& mapping : techniqueMappings)
     {
@@ -581,7 +597,7 @@ bool MidiInputService::handleTechniqueMessage(const juce::MidiMessage& message, 
         }
         consumedMessage = true;
     }
-    return consumedMessage || capturedByLearn;
+    return consumedMessage || capturedByLearn || reservedNote;
 }
 
 void MidiInputService::updateBreathDrivenTechniques(float mappedBreath, MidiPerformanceSink* sink, double)
@@ -615,7 +631,14 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
         ? message.getTimeStamp() : juce::Time::getMillisecondCounterHiRes() * 0.001;
     onsetTrace.record(message, timestampSeconds);
     const bool techniqueConsumed = handleTechniqueMessage(message, sink);
-    if (techniqueConsumed && !(message.isController() && message.getControllerNumber() == breathController.load()))
+    bool releaseExistingMusicalNote = false;
+    if (techniqueConsumed && message.isNoteOff())
+    {
+        const juce::SpinLock::ScopedLockType lock(noteMapLock);
+        releaseExistingMusicalNote = activeOutputNotes[static_cast<size_t>(message.getNoteNumber())] >= 0;
+    }
+    if (techniqueConsumed && ! releaseExistingMusicalNote
+        && !(message.isController() && message.getControllerNumber() == breathController.load()))
         return;
 
     if (message.isNoteOn())

@@ -32,8 +32,13 @@ class Release116(unittest.TestCase):
         audit=json.loads((ROOT/'assets/tone-packages/folk-defaults-116-audit.json').read_text(encoding='utf-8'))
         changed={'folk-'+x+'.fytonepack' for x in audit['targets']}
         self.assertEqual(len(changed),4)
+        gain_audit=json.loads((ROOT/'assets/tone-packages/output-gain-117-audit.json').read_text(encoding='utf-8'))
+        gain_rows={row['file']:row for row in gain_audit['targets']}
         for name,digest in audit['after'].items():
-            self.assertEqual(hashlib.sha256((ROOT/'assets/tone-packages'/name).read_bytes()).hexdigest(),digest)
+            row=gain_rows.get(name)
+            if row:self.assertEqual(row['beforePackageSha256'],digest)
+            expected=row['afterPackageSha256'] if row else digest
+            self.assertEqual(hashlib.sha256((ROOT/'assets/tone-packages'/name).read_bytes()).hexdigest(),expected)
             if name not in changed:self.assertEqual(audit['before'][name],digest)
     def test_container_reuse_is_bounded_and_does_not_keep_effects(self):
         host=(ROOT/'native/Source/PluginHostEngine.cpp').read_text(encoding='utf-8')
@@ -54,7 +59,7 @@ class Release116(unittest.TestCase):
         self.assertNotIn('showPluginEditor',warm)
         self.assertNotIn('setStateInformation',warm)
     def test_current_voice_assets_have_traceable_exact_synthesis_text(self):
-        audit=json.loads((ROOT/'assets/voice/release-116-audit.json').read_text(encoding='utf-8'))
+        audit=json.loads((ROOT/'assets/voice/release-117-audit.json').read_text(encoding='utf-8'))
         self.assertEqual(len(audit),123)
         byid={x['id']:x for x in audit}
         self.assertEqual(byid['V014_26']['speechText'],'二胡')

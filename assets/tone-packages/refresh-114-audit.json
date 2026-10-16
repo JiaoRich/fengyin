@@ -1,8 +1,8 @@
 [
   {
-    "name": "激情小提琴",
-    "sourceSha256": "7489a80dfa55a95960b9c0bacb086ca2f8892c7b436ce4779d2fbed36508a4a7",
-    "asset": "violin-sweet.fytonepack",
+    "name": "小提琴-明亮",
+    "sourceSha256": "dc053a3996eb9d8952168e98018681dcaf20b334a9a2570cfe607e16049e57ad",
+    "asset": "violin-bright.fytonepack",
     "dependencies": [
       {
         "role": "instrument",
@@ -11,6 +11,15 @@
         "version": "3.9.4",
         "format": "VST3",
         "uid": 1115992012,
+        "bypassed": false
+      },
+      {
+        "role": "effect",
+        "name": "Fresh Air",
+        "manufacturer": "Slate Digital",
+        "version": "1.0.8",
+        "format": "VST3",
+        "uid": 759120715,
         "bypassed": false
       },
       {
@@ -24,12 +33,12 @@
       }
     ],
     "approvedParameterChanges": [
-      "Attack snapshot -> Expression; original attackType=2 state preserved, user authorised"
+      "Attack snapshot 0.5 -> Expression 0.6666666865348816; user approved; full attackType=2 already Expression"
     ],
     "completeStateUnchanged": true
   },
   {
-    "name": "柔美小提琴",
+    "name": "小提琴-柔美",
     "sourceSha256": "c4c28feb82b493c880677d3ab5894be9fcf8a0c5d6d7947877ff917fa594ba7c",
     "asset": "violin-soft.fytonepack",
     "dependencies": [

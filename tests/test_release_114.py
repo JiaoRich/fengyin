@@ -23,8 +23,8 @@ class Release114(unittest.TestCase):
                 self.assertEqual(p.get('name'),entry['name']);self.assertTrue(p.find('INSTRUMENT_STATE').text)
                 self.assertEqual(m['dependencies'],entry['dependencies'])
                 for f in m['files']:self.assertEqual(hashlib.sha256(z.read(f['path'])).hexdigest(),f['sha256'])
-        sweet=next(x for x in audit if x['asset']=='violin-sweet.fytonepack');self.assertEqual(len(sweet['dependencies']),2)
-        self.assertEqual(sweet['dependencies'][1]['name'],'magic.CURVE')
+        bright=next(x for x in audit if x['asset']=='violin-bright.fytonepack');self.assertEqual(len(bright['dependencies']),3)
+        self.assertEqual({x['name'] for x in bright['dependencies'][1:]},{'Fresh Air','magic.CURVE'})
     def test_no_asio_install_prompt_and_magic_hash(self):
         iss=(ROOT/'installer/FengYin.iss').read_text(encoding='utf-8');body=iss.split('procedure CurStepChanged',1)[1]
         self.assertNotIn('ASIO4ALL_2_22.exe',body);self.assertNotIn('VBCABLE_Setup_x64.exe',body)
@@ -41,6 +41,6 @@ class Release114(unittest.TestCase):
         self.assertIn('musicTempoV1',midi)
     def test_added_voice_pcm(self):
         import wave
-        for id in ['MT_SLOW','MT_MEDIUM','MT_FAST','MT_GUIDE','TONE_VIOLIN_SWEET','TONE_VIOLIN_SOFT']:
+        for id in ['MT_SLOW','MT_MEDIUM','MT_FAST','MT_GUIDE','TONE_VIOLIN_BRIGHT','TONE_VIOLIN_SOFT']:
             with wave.open(str(ROOT/'assets/voice'/f'{id}.wav'),'rb') as w:
                 data=w.readframes(w.getnframes());self.assertGreater(len(data),4096);self.assertTrue(any(data))

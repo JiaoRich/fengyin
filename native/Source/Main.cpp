@@ -61,11 +61,23 @@ private:
             {
                 if (action == "close") closeButtonPressed();
                 else if (action == "minimise") setMinimised(true);
+                else if (action == "pointer-end") { pointerGesture = false; windowGesture.clear(); }
+                else if (content->compactMode && action.startsWith("pointer-begin:"))
+                {
+                    windowGesture = action.fromFirstOccurrenceOf(":", false, false);
+                    pointerGesture = true; gestureBounds = getBounds();
+                }
+                else if (pointerGesture && content->compactMode && action.startsWith("pointer-move:"))
+                {
+                    const auto parts = juce::StringArray::fromTokens(action, ":", "");
+                    if (parts.size() == 3) applyWindowGestureDelta({parts[1].getIntValue(),parts[2].getIntValue()});
+                }
                 else if (content->compactMode && (action == "drag" || action.startsWith("resize-")))
                 {
                     // WebView owns mouse capture. Track desktop coordinates rather
                     // than starting a delayed non-client loop on a borderless HWND.
                     windowGesture = action;
+                    pointerGesture = false;
                     gestureStart = juce::Desktop::getMousePosition();
                     gestureBounds = getBounds();
                 }
@@ -92,6 +104,7 @@ private:
 
         void applyMode(bool compact)
         {
+            pointerGesture = false; windowGesture.clear();
             borderless = compact;
             roundedWidth = -1;
             if (! compact) { updateRoundedWindow(false); setResizeLimits(1120, 700, 7680, 4320); setFullScreen(true); return; }
@@ -114,15 +127,21 @@ private:
         }
     private:
         juce::String windowGesture;
+        bool pointerGesture = false;
         juce::Point<int> gestureStart;
         juce::Rectangle<int> gestureBounds;
         void updateWindowGesture()
         {
             if (windowGesture.isEmpty()) return;
+            if (pointerGesture) return; // Touch/pen uses captured WebView pointer deltas, not mouse buttons.
             if (!content->compactMode || isFullScreen()
                 || !juce::ModifierKeys::getCurrentModifiersRealtime().isLeftButtonDown())
             { windowGesture.clear(); return; }
             const auto delta = juce::Desktop::getMousePosition() - gestureStart;
+            applyWindowGestureDelta(delta);
+        }
+        void applyWindowGestureDelta(juce::Point<int> delta)
+        {
             if (windowGesture == "drag")
             { setBounds(gestureBounds.translated(delta.x, delta.y)); return; }
             const auto edge = windowGesture.fromFirstOccurrenceOf("resize-", false, false);

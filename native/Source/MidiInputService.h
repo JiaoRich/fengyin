@@ -121,6 +121,8 @@ private:
     std::array<int, 128> activeOutputNotes {};
     mutable juce::SpinLock techniqueLock;
     juce::Array<TechniqueMapping> techniqueMappings;
+    std::array<std::atomic<uint64_t>, 2> techniqueNoteMasks {};
+    void refreshTechniqueNoteMasks() noexcept;
     juce::String techniqueContext { "other" }; // Current family only; mappings remain global per device.
     std::array<float, static_cast<size_t>(PerformanceTechnique::count)> techniquePreviousInput {};
     std::array<bool, static_cast<size_t>(PerformanceTechnique::count)> techniqueToggleState {};

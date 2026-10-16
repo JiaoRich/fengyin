@@ -49,6 +49,17 @@ void checkSaxophoneSwamProfiles(const juce::String& key)
 
 int main()
 {
+    // Persisted output gain is 0..2, including silence and tuner boosts.
+    {
+        fengyin::MasterOutputService chain;
+        auto settings = chain.getToneStyle();
+        for (float gain : {0.0f, 0.25f, 1.0f, 1.75f, 2.0f})
+        {
+            settings.outputGain = gain;
+            chain.setToneStyle(settings);
+            assert(chain.getToneStyle().outputGain == gain);
+        }
+    }
     // Neutral effects are sample-transparent. Fader only changes the instrument;
     // accompaniment and overloaded mixed output are never silently attenuated.
     {

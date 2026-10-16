@@ -31,6 +31,7 @@ EmbeddedToneAsset embeddedToneAsset(std::string_view name)
             return {data,size};
         }
     if (name == "soprano-kenny.fytonepack") return { BinaryData::sopranokenny_fytonepack, BinaryData::sopranokenny_fytonepackSize };
+    if (name == "soprano-pop.fytonepack") return { BinaryData::sopranopop_fytonepack, BinaryData::sopranopop_fytonepackSize };
     if (name == "tenor-air-pocket.fytonepack") return { BinaryData::tenorairpocket_fytonepack, BinaryData::tenorairpocket_fytonepackSize };
     if (name == "erhu.kam") return { BinaryData::erhu_kam, BinaryData::erhu_kamSize };
     if (name == "guzheng.kam") return { BinaryData::guzheng_kam, BinaryData::guzheng_kamSize };
@@ -477,8 +478,17 @@ void MainComponent::setupWebInterface()
         })
         .withEventListener("deletePreset", [this](juce::var payload)
         {
-            if (! studioUnlocked) return;
-            const auto index = static_cast<int>(payload.getProperty("index", -1));
+            const auto id = payload.getProperty("id", {}).toString();
+            auto index = static_cast<int>(payload.getProperty("index", -1));
+            if (id.isNotEmpty())
+            {
+                index = -1;
+                for (int i = 0; i < cachedPresets.size(); ++i)
+                    if (cachedPresets.getReference(i).id == id) { index = i; break; }
+            }
+            if (! juce::isPositiveAndBelow(index, cachedPresets.size())) return;
+            const auto& preset = cachedPresets.getReference(index);
+            if (! studioUnlocked && (preset.studioDraft || ! preset.published)) return;
             if (isActivated && juce::isPositiveAndBelow(index, cachedPresets.size()))
             {
                 presetSelector.setSelectedId(index + 1, juce::dontSendNotification);
@@ -1598,7 +1608,7 @@ void MainComponent::timerCallback()
         toneObject->setProperty("harsh", toneSettings.harshControl / 0.35f * 100.0f);
         toneObject->setProperty("reverb", toneSettings.reverbMix / 0.6f * 100.0f);
         toneObject->setProperty("room", toneSettings.reverbRoomSize * 100.0f);
-        toneObject->setProperty("output", (toneSettings.outputGain - 0.5f) / 0.75f * 100.0f);
+        toneObject->setProperty("output", toneSettings.outputGain * 50.0f);
         state->setProperty("toneSettings", juce::var(toneObject.release()));
         const auto currentPluginName = pluginHost.hasPlugin() ? pluginHost.getPluginName() : juce::String();
         state->setProperty("pluginName", pluginHost.hasPlugin() ? currentPluginName : utf8("安全测试音源"));
@@ -1647,10 +1657,20 @@ void MainComponent::timerCallback()
         state->setProperty("activePresetCustom", currentPresetIsCustom);
         state->setProperty("activePresetId", currentPresetId);
         state->setProperty("appVersion", JUCE_APPLICATION_VERSION_STRING);
-        state->setProperty("activeToneVariantId", currentPresetIsCustom && currentPresetId.isNotEmpty()
-            ? "custom:" + currentPresetId
-            : currentInstrumentKey.isNotEmpty() ? "builtin:" + currentInstrumentKey + ":" + currentToneStyleId
-                                                : juce::String());
+        juce::String activeVariant;
+        if (currentPresetIsCustom && currentPresetId.isNotEmpty()) activeVariant = "custom:" + currentPresetId;
+        else
+        {
+            // Catalogue variants can share instrument/style (the two violins).
+            // Resolve the loaded package name as well; never highlight both.
+            for (const auto& tone : fengyin::publishedToneCatalog)
+                if (currentInstrumentKey == utf8(tone.instrumentKey.data())
+                    && currentToneStyleId == utf8(tone.styleId.data())
+                    && (currentPresetDisplayName == utf8(tone.name.data())
+                        || (currentPresetDisplayName.isEmpty() && tone.kind == fengyin::PublishedToneKind::swamStyle)))
+                { activeVariant = "builtin:" + utf8(tone.id.data()); break; }
+        }
+        state->setProperty("activeToneVariantId", activeVariant);
         state->setProperty("techniqueLearning", activeTechniqueLearn);
         state->setProperty("pitchMappingNeedsRemap",midi.pitchMappingNeedsRemap());
         const auto currentFamily = currentTechniqueFamily();
@@ -2736,7 +2756,7 @@ fengyin::ToneStyleSettings MainComponent::customToneSettingsFromPayload(const ju
     result.reverbRoomSize = static_cast<float>(normal("room", result.reverbRoomSize));
     result.reverbDamping = static_cast<float>(normal("damping", result.reverbDamping));
     result.reverbWidth = static_cast<float>(normal("width", result.reverbWidth));
-    result.outputGain = static_cast<float>(0.5 + normal("output", 0.8) * 0.75);
+    result.outputGain = static_cast<float>(normal("output", result.outputGain / 2.0) * 2.0);
     return result;
 }
 
@@ -2911,7 +2931,7 @@ void MainComponent::exportStudioDraft(const juce::String& id)
     studioExportChooser = std::make_unique<juce::FileChooser>(utf8("导出方案包（插件安装文件另行分发）"),
         juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
             .getChildFile(juce::File::createLegalFileName(preset->instrumentChineseName + "-" + preset->name) + ".fytonepack"),
-        "*.fytonepack");
+        "*.fytonepack", true, false, this);
     auto safe = juce::Component::SafePointer<MainComponent>(this);
     studioExportChooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
         | juce::FileBrowserComponent::warnAboutOverwriting,
@@ -2955,22 +2975,15 @@ void MainComponent::deleteSelectedPreset()
                 if (safe->editingPresetId == id) safe->editingPresetId.clear();
                 if (safe->currentPresetId == id)
                 {
-                    const auto fallback = fengyin::ToneStyleCatalog::find(safe->currentInstrumentKey,
-                                                                          safe->currentToneStyleId.startsWith("custom:")
-                                                                              ? "natural" : safe->currentToneStyleId);
                     safe->currentPresetId.clear();
-                    safe->currentPresetDisplayName.clear();
                     safe->currentPresetIsCustom = false;
-                    safe->currentToneStyleId = fallback.id;
-                    safe->currentBaseToneSettings = fallback.settings;
-                    safe->masterOutput.setToneStyle(fallback.settings);
-                    safe->currentSwamToneParameterCount = safe->currentPluginBrand == "swam"
-                        ? safe->pluginHost.applySwamToneProfile(fallback.swam) : 0;
-                    if (safe->currentPluginBrand == "swam") safe->pluginHost.applyExpressionAttackControl();
+                    // Removing a saved card must not retune the live instrument.
                 }
                 safe->refreshPresetChoices();
                 safe->pluginStatus.setText(utf8("音色方案已删除"), juce::dontSendNotification);
             }
+            else if (result == 1 && safe != nullptr)
+                safe->pluginStatus.setText(utf8("删除失败，请检查方案目录是否可写"), juce::dontSendNotification);
         }));
 }
 

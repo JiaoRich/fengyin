@@ -181,10 +181,10 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
     def test_release_tone_catalog_is_explicit_and_all_embedded_assets_exist(self):
         catalog = self.read("native/Source/PublishedToneCatalog.h")
         expected_names = [
-            "高萨-原声", "高萨-流行", "中萨-爵士", "中萨-深情", "中萨-流行",
+            "高萨-原声", "高萨-明亮", "中萨-爵士", "中萨-深情", "中萨-流行",
             "次中萨-醇厚", "次中萨-温暖", "次中萨-气包音",
             "小号", "高音小号", "中音长号", "低音长号", "长笛", "短笛", "单簧管", "双簧管",
-            "激情小提琴", "柔美小提琴", "大提琴",
+            "小提琴-明亮", "小提琴-柔美", "大提琴",
             "二胡", "葫芦丝", "柳琴", "马头琴", "曲笛", "埙", "唢呐", "三弦", "琵琶", "南箫", "洞箫", "梆笛", "京胡",
         ]
         self.assertIn("std::array<PublishedToneDefinition, 33>", catalog)
@@ -201,7 +201,7 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
             self.assertTrue(asset.is_file() and asset.stat().st_size > 300, asset)
         self.assertEqual(
             hashlib.sha256((ROOT / "assets/tone-packages/soprano-kenny.fytonepack").read_bytes()).hexdigest(),
-            "61f86611c894c8b91697ffdab94bf6e1dccca9063eed0adc4bb55aa6fefea4d7",
+            "f731f16cb0e683cb16949ecb38c30ad6b8d13a2e0059b82ff81187839f5a968c",
         )
 
     def test_kong_release_routes_multichannel_techniques(self):

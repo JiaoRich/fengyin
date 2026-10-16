@@ -26,11 +26,13 @@
 #include "SwamExpressionCurve.h"
 #include "ToneParameterValue.h"
 #include "EffectChainState.h"
+#include "SwamStringTremolo.h"
 
 namespace fengyin
 {
 class RecordingAudioProcessorPlayer final : public juce::AudioProcessorPlayer
 {
+    friend struct PluginHostEngineTestAccess;
 public:
     void setRecordingService(RecordingService* service) noexcept { recorder = service; }
     void setAccompanimentService(AccompanimentAudioService* service) noexcept { accompaniment = service; }
@@ -71,6 +73,7 @@ private:
 
 class PluginHostEngine final : public MidiPerformanceSink
 {
+    friend struct PluginHostEngineTestAccess;
 public:
     using LoadCallback = std::function<void(bool success, const juce::String& message)>;
 
@@ -81,6 +84,7 @@ public:
     void detach();
     [[nodiscard]] bool hasIndependentTechniqueRoute(PerformanceTechnique technique) const noexcept
     {
+        if(technique==PerformanceTechnique::tremolo && stringTremolo.available())return true;
         if (kontaktStandardControls.load()) return technique==PerformanceTechnique::vibrato;
         const auto index=static_cast<size_t>(technique);
         if(index>=nativeTechniqueRoutes.size())return false;
@@ -165,7 +169,7 @@ public:
     void configureKongTechniqueProfile(const juce::String& instrumentKey,
                                        const KongTechniqueProfile& profile = {}) noexcept;
     [[nodiscard]] KongTechniqueProfile getKongTechniqueProfile() const { return kongProfile; }
-    void flushOnsetTrace() { player.flushOnsetTrace(); }
+    void flushOnsetTrace() { player.flushOnsetTrace(); destinationTrace.flush("plugin-input"); }
 
     void noteOn(int noteNumber, float velocity, double timestampSeconds = 0.0) noexcept override;
     void noteOff(int noteNumber, double timestampSeconds = 0.0) noexcept override;
@@ -178,7 +182,7 @@ public:
     void pitchBendChanged(float bipolarValue, double timestampSeconds = 0.0) noexcept override;
     void techniqueChanged(PerformanceTechnique technique, float value) noexcept override;
     void automaticVibratoChanged(float input,float fade) noexcept override;
-    void setMusicTempoMode(int mode) noexcept { musicTempoMode.store(MusicTempoPolicy::valid(mode));tempoRateDirty.store(true); }
+    void setMusicTempoMode(int mode) noexcept { musicTempoMode.store(MusicTempoPolicy::valid(mode));tempoRateDirty.store(true);stringTremolo.setTempoMode(mode); }
     void resetPerformance() noexcept override;
     void flushTechniqueValues();
     [[nodiscard]] bool supportsTechnique(PerformanceTechnique technique) const noexcept;
@@ -199,6 +203,8 @@ private:
 
     juce::AudioPluginFormatManager formatManager;
     RecordingAudioProcessorPlayer player;
+    MidiOnsetTrace destinationTrace;
+    SwamStringTremolo stringTremolo;
     std::unique_ptr<juce::AudioProcessorGraph> graph;
     juce::AudioProcessorGraph::Node::Ptr instrumentNode;
     struct EffectSlot

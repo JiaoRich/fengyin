@@ -222,7 +222,7 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertIn("const pluginIndex=availableInstruments.findIndex", JS)
         self.assertIn('class="instrument-preset-card compact', JS)
         self.assertNotIn("data-action=\"edit-custom\"", JS)
-        self.assertIn("id:`builtin:${tone.instrumentKey}:${tone.styleId}`", JS)
+        self.assertIn("id:`builtin:${tone.id}`", JS)
         self.assertIn("nativeEvent('editPreset',{index})", JS)
         self.assertIn("nativeEvent('saveCustomPreset'", JS)
 

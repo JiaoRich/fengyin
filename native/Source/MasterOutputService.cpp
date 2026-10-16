@@ -17,7 +17,8 @@ void MasterOutputService::setToneStyle(const ToneStyleSettings& settings) noexce
     styleRoomSize.store(juce::jlimit(0.0f, 1.0f, settings.reverbRoomSize));
     styleDamping.store(juce::jlimit(0.0f, 1.0f, settings.reverbDamping));
     styleWidth.store(juce::jlimit(0.0f, 1.0f, settings.reverbWidth));
-    styleOutputGain.store(juce::jlimit(0.5f, 1.25f, settings.outputGain));
+    // Match the persisted package range; do not silently discard tuner levels.
+    styleOutputGain.store(std::isfinite(settings.outputGain) ? juce::jlimit(0.0f, 2.0f, settings.outputGain) : 1.0f);
     bassTone.store(juce::jlimit(-1.0f, 1.0f, settings.bass));
     airAmount.store(std::isfinite(settings.air) ? juce::jlimit(0.0f, 1.0f, settings.air) : 0.0f);
     reverbParametersDirty.store(true, std::memory_order_release);
