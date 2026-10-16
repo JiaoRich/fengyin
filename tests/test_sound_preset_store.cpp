@@ -12,6 +12,31 @@ int main()
     const auto releaseXml = releaseFile.loadFileAsString();
     auto releaseRoot = juce::parseXML(releaseXml);
     assert(releaseRoot && releaseRoot->getNumChildElements() == 12);
+    // Approved straight defaults live in the released format-2 packages, not
+    // the legacy KAM fixtures above. Check both state and native project.
+    struct StraightDefault { const char* id; const char* articulation; int index; int slots; };
+    for (const auto& expected : {StraightDefault{"matouqin","Sus_Layers",0,1},
+         {"nanxiao","Sus_Main",8,1},{"dongxiao","Sus_Main",0,1},{"qudi","Sus_Main",1,2}})
+    {
+        juce::ZipFile package(releaseFile.getParentDirectory().getParentDirectory()
+            .getChildFile("folk-" + juce::String(expected.id) + ".fytonepack"));
+        std::unique_ptr<juce::InputStream> input(package.createStreamForEntry(package.getIndexOfFileName("tone.xml")));
+        assert(input);
+        auto xml=juce::parseXML(input->readEntireStreamAsString());assert(xml);
+        auto* preset=xml->getChildByName("PRESET");assert(preset);
+        juce::MemoryBlock state;assert(state.fromBase64Encoding(preset->getChildByName("SAMPLER_STATE")->getAllSubText()));
+        const auto list=fengyin::KongProjectFile::readPluginComponentState(state).getChildWithName("PresetList");
+        assert(list.getNumChildren()==expected.slots);
+        const auto first=list.getChild(0);auto names=first.getProperty("KeyswitchNames");
+        assert(int(first["MIDI"])==0&&int(first["IndexSelectedKeyswitch"])==expected.index);
+        assert(names.isArray()&&names[expected.index].toString()==expected.articulation);
+        if(expected.slots==2){assert(int(list.getChild(1)["MIDI"])==1);assert(list.getChild(1)["Preset"].toString()=="Qudi1_Flutter");}
+        std::unique_ptr<juce::InputStream> kamInput(package.createStreamForEntry(package.getIndexOfFileName("instrument.KAM")));
+        assert(kamInput);auto kam=juce::ValueTree::readFromStream(*kamInput).getChildWithName("PresetList");
+        assert(kam.getNumChildren()==expected.slots);
+        assert(int(kam.getChild(0)["IndexSelectedKeyswitch"])==expected.index);
+        assert(kam.getChild(0)["Preset"]==first["Preset"]);
+    }
     for (const auto* asset : {"erhu.kam", "guzheng.kam", "hulusi.kam", "liuqin.kam",
                              "matouqin.kam", "qudi.kam", "xun.kam", "suona.kam",
                              "sanxian.kam", "pipa.kam", "sheng.kam", "nanxiao.kam"})

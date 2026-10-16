@@ -176,6 +176,7 @@ private:
         void timerCallback() override
         {
             updateWindowGesture();
+            content->setWebPresentationVisible(isVisible() && !isMinimised());
             if (!isMinimised()) updateRoundedWindow(content->compactMode && !isFullScreen());
             glow.update(*this, content->compactMode && !isFullScreen() && !isMinimised()
                         && isVisible(), content->getWindowBreath(), smoothNativeCorners ? 8.0f : 28.0f);

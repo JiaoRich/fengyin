@@ -197,13 +197,13 @@ class HostRegressionTests(unittest.TestCase):
         audio_device = (ROOT / "native" / "Source" / "AudioDeviceService.cpp").read_text(encoding="utf-8")
         self.assertIn("accompanimentReadAheadSamples = 262144", accompaniment)
         self.assertIn("sustainedDriftChecks >= 5", video)
-        self.assertIn("videoPlaybackActive ? 6 : 3", MAIN)
+        self.assertIn("videoPlaybackActive ? 200.0 : 100.0", MAIN)
         self.assertIn("setVideoPlaybackState", JS)
         self.assertIn("followSystemDefaultOutput", audio_device)
         self.assertIn("getDefaultDeviceIndex(false)", audio_device)
         self.assertIn("isWindowsSharedType(current->getTypeName())", audio_device)
         self.assertIn("audio.followSystemDefaultOutput()", MAIN)
-        refresh = MAIN.index("videoPlaybackActive ? 6 : 3")
+        refresh = MAIN.index("videoPlaybackActive ? 200.0 : 100.0")
         self.assertGreater(MAIN.index("masterOutput.getSpectrum", refresh), refresh)
 
     def test_initial_audio_setup_prefers_low_latency_without_overriding_manual_choice(self):
@@ -347,7 +347,7 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("inventory must not create", (ROOT / "tests" / "ui_next_version.cjs").read_text(encoding="utf-8"))
 
     def test_container_state_is_restored_before_audio_graph_activation(self):
-        state_restore = HOST.index("instance->setStateInformation(initialState.getData()")
+        state_restore = HOST.index("restoredProcessor->setStateInformation(initialState.getData()")
         graph_activation = HOST.index("player.setProcessor(graph.get())", state_restore)
         self.assertLess(state_restore, graph_activation)
         load_function = MAIN[MAIN.index("void MainComponent::loadSelectedPreset"):]

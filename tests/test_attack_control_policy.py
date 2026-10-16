@@ -24,7 +24,7 @@ class AttackControlPolicyTests(unittest.TestCase):
                     expected=0.666666686534882 if path.stem in ('violin','violin-sweet','violin-soft','cello') else 1.0
                     self.assertAlmostEqual(float(controls[0].get('value')),expected,places=6)
                 else:
-                    self.assertEqual(preset.get('pluginBrand'),'kong')
+                    self.assertIn(preset.get('pluginBrand'),['kong','kontakt'])
                     self.assertEqual(controls,[])  # SWAM enums must not be invented for Qin.
                 manifest = json.loads(archive.read('manifest.json'))
                 for entry in manifest['files']:

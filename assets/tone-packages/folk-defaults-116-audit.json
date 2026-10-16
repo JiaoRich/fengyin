@@ -1,0 +1,55 @@
+{
+  "before": {
+    "folk-nanxiao.fytonepack": "19e1832899c475977ac5bc0561da898cc35d12181e005692ce9ebd3c47ba4fae",
+    "folk-suona.fytonepack": "de8b7398fc0c2eca1403dd9313e0a2f833caa0d70485d8eb84a395af8761f5ed",
+    "folk-dongxiao.fytonepack": "c6b234432000af0e1a974444f1a4bd3f6731b148caf438b680f8032f325b3fe8",
+    "folk-sanxian.fytonepack": "6eeef093d83a351a853cf8689ff8bddc317bf50631a6ac0f8759859148d02315",
+    "folk-erhu.fytonepack": "46b98069a8694da9e23d5cb81758178bef5071f708115f0860808b3d80c6dd62",
+    "folk-pipa.fytonepack": "9a3dcbcef183a0edbbdc7fece8ee6ca7168304dc5c24bfa41e5554d7eb4e9051",
+    "folk-jinghu.fytonepack": "d4e6fc51ebc7749ad16c13cf7289a2e0f093b800fae286d7fa3bddcbb946391a",
+    "folk-liuqin.fytonepack": "463dc72fed32c6e639e17967aedf25e6bbdb102a492215f16a3ccdd38f9e6c7b",
+    "folk-xun.fytonepack": "6a0a935febfbeded4a1e6053a1cb81de54902a08a307dc30d385e073d0b726cd",
+    "folk-qudi.fytonepack": "8d08fbc17f546fea7d87b082946d9122fc3ed5dd441561022e572c3cddbbf5fe",
+    "folk-bangdi.fytonepack": "82b5d8cf3e3a197db3d07127a582b3c34082ef1e2f26f5acfba149c91ddf50b5",
+    "folk-hulusi.fytonepack": "f5898b4febc2db5f2c38679134fae7f78da7d3a0d301564f1ddecd5c76dfd6a6",
+    "folk-matouqin.fytonepack": "473d85f4f452e119af0d8826ebe16de2c45e754ea4d402495bf3f6604fc3f6c7"
+  },
+  "after": {
+    "folk-nanxiao.fytonepack": "443c86c8feb7099b151ee9a92916f9cf2b8cc9486b8443489346952bd0ddb452",
+    "folk-suona.fytonepack": "de8b7398fc0c2eca1403dd9313e0a2f833caa0d70485d8eb84a395af8761f5ed",
+    "folk-dongxiao.fytonepack": "a4b4ab0b0f00d48eba19c5d93777307595c86dfe08ab5bca7dd17f76798c46b7",
+    "folk-sanxian.fytonepack": "6eeef093d83a351a853cf8689ff8bddc317bf50631a6ac0f8759859148d02315",
+    "folk-erhu.fytonepack": "46b98069a8694da9e23d5cb81758178bef5071f708115f0860808b3d80c6dd62",
+    "folk-pipa.fytonepack": "9a3dcbcef183a0edbbdc7fece8ee6ca7168304dc5c24bfa41e5554d7eb4e9051",
+    "folk-jinghu.fytonepack": "d4e6fc51ebc7749ad16c13cf7289a2e0f093b800fae286d7fa3bddcbb946391a",
+    "folk-liuqin.fytonepack": "463dc72fed32c6e639e17967aedf25e6bbdb102a492215f16a3ccdd38f9e6c7b",
+    "folk-xun.fytonepack": "6a0a935febfbeded4a1e6053a1cb81de54902a08a307dc30d385e073d0b726cd",
+    "folk-qudi.fytonepack": "98b9bda12f18943cacc06d35e2f7a05ed616496280e82902890b2ce2f511c15e",
+    "folk-bangdi.fytonepack": "82b5d8cf3e3a197db3d07127a582b3c34082ef1e2f26f5acfba149c91ddf50b5",
+    "folk-hulusi.fytonepack": "f5898b4febc2db5f2c38679134fae7f78da7d3a0d301564f1ddecd5c76dfd6a6",
+    "folk-matouqin.fytonepack": "0e0e5debe4c4da07753e4556e2014eab4779184d8d5ade25514b4421a0bfd2d5"
+  },
+  "targets": {
+    "matouqin": {
+      "articulation": "Sus_Layers",
+      "index": 0,
+      "slots": 1
+    },
+    "nanxiao": {
+      "articulation": "Sus_Main",
+      "index": 8,
+      "slots": 1
+    },
+    "dongxiao": {
+      "articulation": "Sus_Main",
+      "index": 0,
+      "slots": 1
+    },
+    "qudi": {
+      "articulation": "Sus_Main",
+      "index": 1,
+      "slots": 2
+    }
+  },
+  "scope": "Default articulation only; volume and all other slots preserved"
+}

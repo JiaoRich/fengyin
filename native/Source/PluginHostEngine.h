@@ -1,4 +1,5 @@
 #pragma once
+#include "SuonaDualVoiceRouter.h"
 #include "SwamToneApplication.h"
 #include "MusicTempoPolicy.h"
 #include "KongTechniqueProfile.h"
@@ -11,6 +12,8 @@
 #include <array>
 #include <vector>
 #include <optional>
+#include <map>
+#include <set>
 
 #include "MidiPerformanceSink.h"
 #include "RecordingService.h"
@@ -78,6 +81,7 @@ public:
     void detach();
     [[nodiscard]] bool hasIndependentTechniqueRoute(PerformanceTechnique technique) const noexcept
     {
+        if (kontaktStandardControls.load()) return technique==PerformanceTechnique::vibrato;
         const auto index=static_cast<size_t>(technique);
         if(index>=nativeTechniqueRoutes.size())return false;
         if(kongExpressionMode.load()) {
@@ -101,6 +105,10 @@ public:
                    const juce::MemoryBlock& initialState,
                    LoadCallback callback, bool verifyStateRoundtrip = false);
     void unload();
+    void prewarmContainers(const juce::Array<juce::PluginDescription>& descriptions,
+                           double sampleRate, int bufferSize);
+    [[nodiscard]] size_t idleContainerCount() const noexcept { return containerCache.size(); }
+    [[nodiscard]] size_t warmingContainerCount() const noexcept { return containersWarming.size(); }
     void loadEffectAsync(const juce::PluginDescription& description,
                          double sampleRate, int bufferSize, LoadCallback callback);
     void unloadEffect();
@@ -199,6 +207,18 @@ private:
         juce::PluginDescription description;
     };
     std::vector<EffectSlot> effectNodes;
+    struct CachedContainer
+    {
+        std::unique_ptr<juce::AudioPluginInstance> instance;
+        std::unique_ptr<juce::AudioProcessorGraph> graph;
+        juce::AudioProcessorGraph::Node::Ptr instrument, output, midi;
+    };
+    // At most one idle Qin and one idle Kontakt engine; never all tone samples.
+    std::map<juce::String, std::shared_ptr<CachedContainer>> containerCache;
+    std::set<juce::String> containersWarming;
+    using WarmCompletion = std::function<void(std::unique_ptr<juce::AudioPluginInstance>, const juce::String&)>;
+    std::map<juce::String, WarmCompletion> containerWarmWaiters;
+    void parkCurrentContainer();
     juce::AudioProcessorGraph::Node::Ptr audioOutputNode;
     juce::AudioProcessorGraph::Node::Ptr midiInputNode;
     juce::PluginDescription currentDescription;
@@ -224,6 +244,14 @@ private:
     std::array<std::atomic<int>, static_cast<size_t>(PerformanceTechnique::count)> lastNativeTechniqueMessages {};
     std::atomic<int> lastBreathMidiValue { -1 };
     KongTechniqueProfile kongProfile;
+    SuonaDualVoiceRouter suonaDualVoice;
+    std::atomic<bool> kontaktStandardControls{false};
+public:
+    void configureKontaktControls(bool enabled) noexcept {
+        kontaktStandardControls.store(enabled);
+        if(enabled) queue(juce::MidiMessage::controllerEvent(1,1,0),0.0);
+    }
+private:
     std::atomic<int> kongVibratoCC {-1};
     struct KongTechniqueRoute { int channel = 0; int keyswitch = -1; int normalKey = -1; };
     std::array<KongTechniqueRoute, static_cast<size_t>(PerformanceTechnique::count)> kongTechniqueRoutes {};

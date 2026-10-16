@@ -324,7 +324,7 @@ function buildTechniquePlan(key = '') {
   const other = {'kong-erhu':'颤弓','kong-erhu-2':'颤弓','kong-jinghu':'颤弓','kong-guzheng':'摇指','kong-liuqin':'轮音','kong-pipa':'轮指','kong-sanxian':'轮音','kong-dizi':'花舌','kong-dizi-2':'吐音','kong-suona':'花舌','kong-suona-2':'花舌','kong-sheng':'花舌',flute:'花舌',piccolo:'花舌'}[key];
   const folkVibrato = ['kong-erhu','kong-erhu-2','kong-matouqin','kong-hulusi','kong-hulusi-2','kong-xun','kong-nanxiao','kong-xiao','kong-dizi','kong-dizi-2','kong-suona','kong-suona-2','kong-jinghu'].includes(key);
   return [
-    {id:'vibrato',name:/violin|viola|cello|double-bass|kong-erhu|kong-matouqin|kong-jinghu/.test(key)?'揉弦':'颤音',icon:'≈',index:1,pluginSupported:folkVibrato || /sax|violin|viola|cello|double-bass|flute|piccolo|clarinet|oboe|english-horn|bassoon|trumpet|trombone|flugelhorn|tuba|euphonium|horn-f|horn-bb/.test(key)},
+    {id:'vibrato',name:/violin|viola|cello|double-bass|kong-erhu|kong-matouqin|kong-jinghu/.test(key)?'揉弦':'颤音',icon:'≈',index:1,pluginSupported:key==='kontakt-kensa' || folkVibrato || /sax|violin|viola|cello|double-bass|flute|piccolo|clarinet|oboe|english-horn|bassoon|trumpet|trombone|flugelhorn|tuba|euphonium|horn-f|horn-bb/.test(key)},
     {id:'growl',name:'嘶吼音',icon:'≋',index:0,pluginSupported:['alto-sax','tenor-sax','baritone-sax'].includes(key)},
     {id:'mute',name:other?`其他技巧：${other}`:'其他技巧',icon:'✦',index:8,pluginSupported:!!other}
   ].map(item=>({...item,description:item.id==='mute'?'按住触发，松开恢复':item.id==='vibrato'?'咬嘴控制，或按乐曲速度在长音中渐入':'按键触发，或气息控制',mode:'off',strength:100,featured:true}));
@@ -412,6 +412,7 @@ function isSupportedInstrument(item = {}) {
 }
 
 function showInstrumentArtwork(key, chineseName = '') {
+  if(key==='kontakt-kensa')key='soprano-sax';
   const picture = $('#instrument-picture');
   if (key.startsWith('kong-') || key.startsWith('container:kong-v3:')) {
     currentArtworkKey = key;
@@ -825,7 +826,7 @@ renderToneStyleSwitcher();
 // Use the actual available content width, including Windows display scaling.
 new ResizeObserver(entries => {
   const width = entries[0].contentRect.width;
-  const columns = Math.max(1, Math.min(3, Math.floor((width + 13) / 353)));
+  const columns = Math.max(1, Math.min(8, Math.floor((width + 9) / 170)));
   entries[0].target.style.setProperty('--preset-columns', columns);
   entries[0].target.style.setProperty('--scan-span', Math.max(1, columns - 1));
 }).observe($('#preset-grid'));
@@ -835,7 +836,7 @@ function bindInstrumentSorting() {
   const original = [...grid.querySelectorAll('.instrument-preset-card')];
   let source = null, committed = false, frame = 0, pointerX = 0, pointerY = 0, lastMove = 0;
   let scrollHost = document.scrollingElement;
-  for (let parent = grid.parentElement; parent; parent = parent.parentElement) {
+  for (let parent = grid; parent; parent = parent.parentElement) {
     if (/(auto|scroll)/.test(getComputedStyle(parent).overflowY) && parent.scrollHeight > parent.clientHeight) {
       scrollHost = parent; break;
     }
@@ -910,7 +911,7 @@ function renderPresets() {
   $('#library-tabs').hidden=true; $('#library-context').hidden=true;
   const cards=[];
   for (const tone of publishedTones) {
-    const pluginIndex=availableInstruments.findIndex(p=>tone.kind==='kong' ? p.brand==='kong' : p.instrumentKey===tone.instrumentKey);
+    const pluginIndex=availableInstruments.findIndex(p=>tone.kind==='kong' ? p.brand==='kong' : tone.kind==='kontakt' ? p.brand==='kontakt' : p.instrumentKey===tone.instrumentKey);
     cards.push({id:`builtin:${tone.instrumentKey}:${tone.styleId}`,catalogId:tone.id,name:tone.name,
       pluginIndex,styleId:tone.styleId,instrumentKey:tone.instrumentKey,kind:tone.kind,index:-1,missing:pluginIndex<0});
   }
@@ -922,7 +923,7 @@ function renderPresets() {
   let order=[]; try { order=JSON.parse(localStorage.getItem('fengyin-card-order-swam')||'[]'); } catch {}
   cards.sort((a,b)=>(order.includes(a.id)?order.indexOf(a.id):1e9)-(order.includes(b.id)?order.indexOf(b.id):1e9));
   $('#preset-grid').innerHTML=cards.map(c=>`<section class="instrument-preset-card compact ${latestBackendState.activeToneVariantId===c.id?'active':''}" data-card-key="${escapeHtml(c.id)}" tabindex="0" role="button">
-    <h3>${escapeHtml(c.name)}</h3><div class="tone-level" aria-label="当前音色演奏电平">${'<i></i>'.repeat(12)}</div><span class="card-drag-handle" draggable="true" aria-label="拖动排序">⠿</span>
+    <h3>${escapeHtml(c.name)}</h3><span class="card-drag-handle" draggable="true" aria-label="拖动排序">⠿</span>
     ${c.index>=0?'<button class="delete-tone" type="button">删除</button>':''}
     ${c.missing?'<small>缺少音源</small>':toneLoadInFlight&&pendingPresetNavigation?.name===c.name?'<small>正在加载…</small>':''}</section>`).join('');
   function load(c) {
@@ -1164,6 +1165,19 @@ function formatTime(seconds) {
 }
 
 $('#theme').addEventListener('change', event => { document.body.dataset.theme = event.target.value; updateStaticTheme(); requestVisualFrame(); });
+// Keep the native select as the source of options; use a non-modal upward menu.
+const themeButton=document.createElement('button'); themeButton.id='theme-button'; themeButton.type='button';
+themeButton.textContent='主题 ⌃'; themeButton.setAttribute('aria-haspopup','menu'); themeButton.setAttribute('aria-expanded','false');
+$('.compact-action-row').append(themeButton);
+const themeMenu=document.createElement('div');themeMenu.className='inline-choice';themeMenu.hidden=true;themeMenu.setAttribute('role','menu');document.body.append(themeMenu);
+$('#bend-range-dialog [aria-modal]').removeAttribute('aria-modal');
+$('#bend-range-button').setAttribute('aria-haspopup','true');
+function positionChoice(menu,button){const r=button.getBoundingClientRect();menu.style.maxHeight=Math.max(80,r.top-16)+'px';const box=menu.getBoundingClientRect();menu.style.left=Math.max(8,Math.min(innerWidth-box.width-8,r.right-box.width))+'px';menu.style.top=Math.max(8,r.top-box.height-7)+'px';}
+function closeThemeMenu(){themeMenu.hidden=true;themeButton.setAttribute('aria-expanded','false');}
+themeButton.onclick=()=>{if(!themeMenu.hidden)return closeThemeMenu();themeMenu.replaceChildren();for(const option of $('#theme').options){const b=document.createElement('button');b.textContent=option.textContent;b.setAttribute('role','menuitemradio');b.setAttribute('aria-checked',String(option.value===document.body.dataset.theme));b.onclick=()=>{$('#theme').value=option.value;$('#theme').dispatchEvent(new Event('change'));closeThemeMenu();themeButton.focus();};themeMenu.append(b);}themeMenu.hidden=false;themeButton.setAttribute('aria-expanded','true');positionChoice(themeMenu,themeButton);themeMenu.querySelector('[aria-checked=true]')?.focus();};
+document.addEventListener('pointerdown',e=>{if(!themeMenu.contains(e.target)&&!themeButton.contains(e.target))closeThemeMenu();if(!$('#bend-range-dialog').contains(e.target)&&!$('#bend-range-button').contains(e.target))$('#bend-range-dialog').hidden=true;});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeThemeMenu();$('#bend-range-dialog').hidden=true;}});
+window.addEventListener('resize',()=>{closeThemeMenu();$('#bend-range-dialog').hidden=true;});
 $('#master-volume').addEventListener('input', event => {
   $('#master-volume-value').textContent = `${event.target.value}%`;
   nativeEvent('setMasterVolume', {value:Number(event.target.value)/100});
@@ -1234,6 +1248,7 @@ $('#bend-range-button').addEventListener('click', () => {
   $('#reset-bend-range').disabled = false;
   showBendConfirmation();
   $('#bend-range-dialog').hidden = false;
+  positionChoice($('#bend-range-dialog'),$('#bend-range-button'));
   $('#close-bend-range').focus();
 });
 $('#bend-range-options').addEventListener('click', event => {
@@ -1241,6 +1256,7 @@ $('#bend-range-options').addEventListener('click', event => {
   if (!button || bendBusy) return;
   bendSelection = Number(button.dataset.bend);
   showBendConfirmation();
+  commitBendRange(false);
 });
 function commitBendRange(reset) {
   if (bendBusy || bendDialogKey !== bendState.bendPreferenceKey) return;
@@ -2261,7 +2277,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.15 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.16 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},
@@ -2529,8 +2545,16 @@ function drawBreathWave(ratio, breath, accent, accent2) {
   breathWaveContext.shadowBlur = 0;
 }
 
+let nativePresentationVisible = true;
+window.fengyinSetPresentationVisible = visible => {
+  nativePresentationVisible = !!visible;
+  document.body.classList.toggle('presentation-hidden', !nativePresentationVisible);
+  if (!nativePresentationVisible) { clearTimeout(visualTimer); visualTimer=null; cancelAnimationFrame(animationFrame); }
+  else requestVisualFrame();
+};
+window.__JUCE__?.backend?.addEventListener('presentationVisibility', window.fengyinSetPresentationVisible);
 function requestVisualFrame() {
-  if (visualTimer !== null || document.hidden) return;
+  if (visualTimer !== null || document.hidden || !nativePresentationVisible) return;
   visualTimer = setTimeout(()=>{animationFrame=requestAnimationFrame(draw);},Math.max(0,1000/24-(performance.now()-lastDrawAt)));
 }
 function updateStaticTheme() {
@@ -2541,7 +2565,7 @@ function updateStaticTheme() {
 }
 function draw(timestamp = performance.now()) {
   visualTimer = null;
-  if (document.hidden || !$('#page-play').classList.contains('active') || !$('#technique-dialog').hidden) return;
+  if (document.hidden || !nativePresentationVisible || !$('#page-play').classList.contains('active') || !$('#technique-dialog').hidden) return;
   const targetInterval = 1000/24;
   if (timestamp - lastDrawAt < targetInterval) {
     requestVisualFrame();
@@ -2566,9 +2590,6 @@ function draw(timestamp = performance.now()) {
   document.body.style.setProperty('--breath-energy', compactRimBreath.toFixed(3));
   document.body.style.setProperty('--breath-speed', `${12-compactRimBreath*6}s`);
   const tonePeak = currentPluginLoaded ? Math.min(1, Math.max(0, Number(latestBackendState.instrumentPeak || 0))) : 0;
-  $$('#preset-grid .active .tone-level i').forEach((bar,i) => {
-    bar.style.transform = `scaleY(${Math.max(.05,tonePeak*(.45+.55*Math.abs(Math.sin(i*.85+timestamp*.006))))})`;
-  });
   const styles = getComputedStyle(document.body);
   const a = styles.getPropertyValue('--accent').trim();
   const b = styles.getPropertyValue('--accent-2').trim();

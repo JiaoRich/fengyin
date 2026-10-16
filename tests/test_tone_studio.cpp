@@ -2,6 +2,7 @@
 #include "SerialEffectRouting.h"
 #include "ScopedGraphPause.h"
 #include "ToneRestorePlan.h"
+#include "SuonaDualVoiceRouter.h"
 #include <cassert>
 #include <cmath>
 
@@ -35,6 +36,31 @@ private:
 
 int main()
 {
+    // Exercise the exact production MIDI transform, not a mock crossfade.
+    {
+        fengyin::SuonaDualVoiceRouter router;router.configure(true);
+        juce::MidiBuffer midi;
+        midi.addEvent(juce::MidiMessage::controllerEvent(1,11,100),0);
+        midi.addEvent(juce::MidiMessage::noteOn(1,67,juce::uint8(90)),1);
+        router.process(midi,128,44100);
+        int ons=0;for(const auto m:midi)if(m.getMessage().isNoteOn())++ons;
+        assert(ons==2);
+        router.setFlutter(true);int main=-1,flutter=-1;
+        for(int b=0;b<16;++b){midi.clear();router.process(midi,128,44100);
+            for(const auto item:midi){const auto m=item.getMessage();assert(!m.isNoteOnOrOff());
+                if(m.isController()&&m.getControllerNumber()==11){if(m.getChannel()==1)main=m.getControllerValue();else if(m.getChannel()==2)flutter=m.getControllerValue();}}}
+        assert(main==0&&flutter==100);
+        router.setFlutter(false);
+        for(int b=0;b<16;++b){midi.clear();router.process(midi,128,44100);for(const auto item:midi)assert(!item.getMessage().isNoteOnOrOff());}
+        midi.clear();midi.addEvent(juce::MidiMessage::noteOff(1,67),0);
+        midi.addEvent(juce::MidiMessage::pitchWheel(1,9000),2);
+        midi.addEvent(juce::MidiMessage::controllerEvent(1,1,70),3);
+        router.process(midi,128,44100);int offs=0,bends=0,mods=0;
+        for(const auto item:midi){const auto m=item.getMessage();offs+=m.isNoteOff();bends+=m.isPitchWheel();mods+=m.isController()&&m.getControllerNumber()==1;}
+        assert(offs==2&&bends==2&&mods==2);
+        router.configure(false);midi.clear();midi.addEvent(juce::MidiMessage::noteOn(1,67,juce::uint8(90)),0);
+        router.process(midi,128,44100);assert(midi.getNumEvents()==1);
+    }
     const juce::Array<fengyin::ToneParameterValue> baseline {
         fengyin::ToneParameterValue{"timbre", .5f},
         fengyin::ToneParameterValue{"room", .2f},
@@ -189,7 +215,7 @@ int main()
     }
     const auto bundled=juce::File(juce::String::fromUTF8(__FILE__)).getParentDirectory().getParentDirectory().getChildFile("assets/tone-packages");
     const auto files=bundled.findChildFiles(juce::File::findFiles,false,"*.fytonepack");
-    assert(files.size()==32);
+    assert(files.size()==33);
     int routedFolkPackages=0;
     for(const auto& file:files){
         juce::String error;const auto imported=fengyin::TonePackage::read(file,error);assert(imported && error.isEmpty());

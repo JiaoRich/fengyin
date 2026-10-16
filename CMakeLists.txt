@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.15 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.16 LANGUAGES C CXX)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
 set(CMAKE_CXX_STANDARD 20)
@@ -81,6 +81,7 @@ juce_add_binary_data(FengYinWebAssets SOURCES
     assets/tone-packages/folk-dongxiao.fytonepack
     assets/tone-packages/folk-bangdi.fytonepack
     assets/tone-packages/folk-jinghu.fytonepack
+    assets/tone-packages/kontakt-kensa.fytonepack
     assets/tone-packages/kong/erhu.kam
     assets/tone-packages/kong/guzheng.kam
     assets/tone-packages/kong/hulusi.kam

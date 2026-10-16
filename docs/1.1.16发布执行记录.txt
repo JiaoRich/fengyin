@@ -1,0 +1,32 @@
+风吟1.1.16（本次用户确认范围）
+
+实现
+- 33套目录（新增肯萨）；四民乐直音默认，保留其他参数/槽位及原始用户KAM。
+- 音色页小卡片/无动态电平/拖动排序/仅网格滚动；标题固定，演奏操作只在演奏页。
+- 全主题侧栏/顶部/视频/底面配色；完整与精简共用按钮样式，主题和弯音非模态上拉，C调提醒弹窗不变。
+- 琴与Kontakt实例/图有界复用（最多2个闲置容器），移除旧效果节点，恢复完整方案状态；启动空闲、扫描结束后预热空引擎。并发前台请求复用正在预热的创建，不重复实例化。并未取消采样状态恢复，不承诺所有加载卡顿消失。
+- 唢呐仅两槽位Suona2_Main_Layers ch1 + Suona2_Flutter ch2、匹配显式技巧配置时启用双声部40ms等功率CC11淡化。真实乐曲音符并行发送到两槽，技巧边沿不额外NoteOn，CC1与弯音转发到两槽；其他音色保持原通道方案。FENGYIN_SUONA_LEGACY=1可用于诊断回退。
+- 肯萨保持用户完整Kontakt8.8.0音源状态和FreshAir1.0.8效果状态，仅目录身份改kontakt-kensa。统一颤音关闭/咬嘴/自动发ch1 CC1；气息继续ch1 CC11。频率保留用户方案值，尚无该库CC19→Hz标定，绝不猜测映射或宣称按速度自动调频已经验证。本机无Kontakt，目标Windows仍需实际发声和许可验证。
+- 午夜电台34条已批准替换+肯萨，123条正式WAV有SHA审计；未改声音身份，不做硬裁尾音。
+- 原生最小化状态只控制展示数据与视觉刷新；隐藏时跳过周期状态构造和FFT，恢复全量同步；可见闲置约1Hz，活动10Hz/视频活动5Hz。30Hz技巧/MIDI业务及录音/音频/伴奏不中断；不销毁、强挂起WebView2或结束其进程。没有Windows功耗百分比结论。
+
+验证记录（最终结果以对应日志末尾为准）
+- /private/tmp/fengyin-116-final-python.log：199项。
+- /private/tmp/fengyin-116-final-independent.log：Python及独立C++。
+- /private/tmp/fengyin-116-final-build.log：完整Mac编译。
+- /private/tmp/fengyin-116-final-ctest.log：24个CTest，包含正式SuonaDualVoiceRouter起音配对/40ms到目标/松开/弯音和CC1同步/关闭回退测试。
+- /private/tmp/fengyin-116-ui.cjs、ui.log、library.png、compact.png：Chrome正式页面33卡1366x768、100卡固定标题、全主题、弯音直选、隐藏恢复、精简模式；桥接为模拟，不冒充实际WebView2宿主测试。
+- 本地琴完整方案复用/预热测试见 /private/tmp/fy-container-reuse-final.log；四民乐真实状态回读和12组MIDI录音见 outputs/folk-straight-116。
+- 唢呐长演奏旧候选证据见 docs/唢呐长演奏验证-20261016.txt；正式头文件另由 tools/test-suona-long-performance.cpp production模式真实Qin3.17.2离线测试。不要混用候选旧实现的结论代替正式代码。
+
+发布边界
+不改音量/气息表情曲线/音高音域/驱动/ASIO/VB-CABLE。久置故障专项仍搁置。
+不得把CI当Windows实际音色、低配置Surface性能、WebView2耗电或Kontakt许可/采样库验证。
+原始用户包位于assets/incoming-tones/20261016；源文件不改，不纳入采样库/插件二进制/凭据。
+已开启automation每30分钟值守。提交构建后须用实际run更新值守指令；成功核验下载后交付并暂停。
+
+最终本地复核
+199项Python、独立C++、完整Mac编译、24CTest通过；git diff --check通过。Chrome正式页面布局与菜单/恢复检查通过。
+正式SuonaDualVoiceRouter的180秒paced原生Qin3.17.2渲染：324个源NoteOn、184次技巧边沿、0个技巧额外NoteOn，峰值0.49850、0削波，停音后CC探针尾部RMS约8.6e-38。插件processBlock墙钟p99约1.086ms，仍有24块超过名义2.90ms预算，不能称实际声卡无爆音或Surface验收完成。
+最终引擎复用测试 /private/tmp/fy-container-reuse-116-final.log：三次同实例完整状态/槽位/通道回读及非零发声通过；前台加入预热与失败回调通过。
+不声称已完成Windows安装/演奏/Kontakt本地发声、CC19频率标定或真实耗电测试。

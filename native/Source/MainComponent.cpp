@@ -261,6 +261,16 @@ MainComponent::~MainComponent()
     audio.getDeviceManager().removeAudioCallback(&testSynth);
 }
 
+void MainComponent::setWebPresentationVisible(bool visible)
+{
+    if (webPresentationVisible == visible) return;
+    webPresentationVisible = visible;
+    lastWebStateAtMs = 0; // Restore gets a complete current snapshot, not stale deltas.
+    if (webInterface && webInterfaceReady)
+        webInterface->evaluateJavascript(visible ? "window.fengyinSetPresentationVisible?.(true);"
+                                               : "window.fengyinSetPresentationVisible?.(false);");
+}
+
 void MainComponent::setupWebInterface()
 {
     auto options = juce::WebBrowserComponent::Options{}
@@ -1340,6 +1350,28 @@ void MainComponent::timerCallback()
         midi.pollConnection();
     }
     snapshot = midi.getSnapshot();
+    if (!containerPrewarmStarted && isActivated && pluginChoicesLoaded && !pluginCatalog.getProgress().scanning && !pluginLoading && !effectLoading
+        && !recorder.isRecording() && !videoPlaybackActive && snapshot.breath <= 0.01f
+        && snapshot.lastNote < 0 && juce::Time::getMillisecondCounterHiRes() >= containerPrewarmAfterMs)
+    {
+        juce::Array<juce::PluginDescription> containers;
+        std::optional<juce::PluginDescription> qin, kontakt;
+        for (const auto& candidate : cachedInstrumentPlugins)
+        {
+            const auto brand = fengyin::SupportedInstrumentClassifier::classify(candidate.name,
+                candidate.manufacturerName, candidate.fileOrIdentifier);
+            if (brand == fengyin::SupportedInstrumentClassifier::Brand::kong
+                && (!qin || candidate.version.compareNatural(qin->version) > 0)) qin = candidate;
+            else if (brand == fengyin::SupportedInstrumentClassifier::Brand::kontakt
+                && (!kontakt || candidate.version.compareNatural(kontakt->version) > 0)) kontakt = candidate;
+        }
+        if (qin) containers.add(*qin);
+        if (kontakt) containers.add(*kontakt);
+        const auto status = audio.getStatus();
+        pluginHost.prewarmContainers(containers, status.sampleRate > 0 ? status.sampleRate : 48000,
+                                    status.bufferSize > 0 ? status.bufferSize : 128);
+        containerPrewarmStarted = true;
+    }
     if (snapshot.breath > 0.01f || snapshot.lastNote >= 0)
         lastPerformanceActivityMs = juce::Time::getMillisecondCounterHiRes();
     if (audio.isAutomaticLatencyTuning()
@@ -1476,12 +1508,17 @@ void MainComponent::timerCallback()
     simulatedPhase += 0.09f;
     displayedLeftPeak = juce::jmax(displayedLeftPeak * 0.88f, juce::jlimit(0.0f, 1.0f, masterOutput.getLeftPeak()));
     displayedRightPeak = juce::jmax(displayedRightPeak * 0.88f, juce::jlimit(0.0f, 1.0f, masterOutput.getRightPeak()));
-    if (webInterface != nullptr && webInterfaceReady && ++webUpdateCounter >= (videoPlaybackActive ? 6 : 3))
+    const auto webNow = juce::Time::getMillisecondCounterHiRes();
+    const bool webActive = snapshot.breath > 0.01f || snapshot.lastNote >= 0
+        || videoPlaybackActive || recorder.isRecording() || pluginLoading || effectLoading || pluginCatalog.getProgress().scanning;
+    if (webPresentationVisible && webInterface != nullptr && webInterfaceReady
+        && webNow - lastWebStateAtMs >= (webActive ? (videoPlaybackActive ? 200.0 : 100.0) : 1000.0))
     {
+        lastWebStateAtMs = webNow;
         webUpdateCounter = 0;
         // FFT 只在真正要刷新网页时计算；视频播放期间由 30 次/秒降到 5 次/秒，
         // 把 CPU 时间优先留给 SWAM 与视频解码。
-        masterOutput.getSpectrum(spectrumLevels);
+        if (webActive) masterOutput.getSpectrum(spectrumLevels);
         auto state = std::make_unique<juce::DynamicObject>();
         state->setProperty("deviceConnected", snapshot.deviceConnected);
         state->setProperty("deviceName", midi.getConnectedDeviceName());
@@ -1709,6 +1746,7 @@ void MainComponent::timerCallback()
             item->setProperty("instrumentKey", utf8(tone.instrumentKey.data()));
             item->setProperty("styleId", utf8(tone.styleId.data()));
             item->setProperty("kind", (tone.kind == fengyin::PublishedToneKind::kongProject || tone.kind == fengyin::PublishedToneKind::kongPackage) ? "kong"
+                : tone.kind == fengyin::PublishedToneKind::kontaktPackage ? "kontakt"
                 : tone.kind == fengyin::PublishedToneKind::swamPackage ? "package" : "swam");
             item->setProperty("assetName", utf8(tone.assetName.data()));
             publishedTones.add(juce::var(item.release()));
@@ -2162,8 +2200,13 @@ void MainComponent::loadPublishedTone(const juce::String& catalogueId)
         return;
     }
 
-    if (definition->kind == fengyin::PublishedToneKind::swamPackage || definition->kind == fengyin::PublishedToneKind::kongPackage)
+    if (definition->kind == fengyin::PublishedToneKind::swamPackage || definition->kind == fengyin::PublishedToneKind::kongPackage || definition->kind == fengyin::PublishedToneKind::kontaktPackage)
     {
+        std::optional<fengyin::SoundPreset> imported;
+        if (const auto cached = publishedPresetCache.find(catalogueId); cached != publishedPresetCache.end())
+            imported = cached->second;
+        else
+        {
         const auto file = juce::File::getSpecialLocation(juce::File::tempDirectory)
             .getNonexistentChildFile("fengyin-release-tone", ".fytonepack", false);
         if (! file.replaceWithData(asset.data, static_cast<size_t>(asset.size)))
@@ -2172,12 +2215,14 @@ void MainComponent::loadPublishedTone(const juce::String& catalogueId)
             return;
         }
         juce::String error;
-        auto imported = fengyin::TonePackage::read(file, error);
+        imported = fengyin::TonePackage::read(file, error);
         file.deleteFile();
         if (! imported)
         {
             report(false, utf8("内置音色校验失败：") + error);
             return;
+        }
+        publishedPresetCache[catalogueId] = *imported;
         }
         auto preset = *imported;
         preset.id = utf8(definition->id.data());
@@ -3441,7 +3486,7 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName, bool ap
     const auto hasContainerInstrumentIdentity = currentInstrumentKey.startsWith("container:");
     if (currentPluginBrand == "kontakt") {
         if (!currentInstrumentKey.startsWith("kontakt") && !currentInstrumentKey.startsWith("container:kontakt:")) currentInstrumentKey="kontakt-engine";
-        currentInstrumentChineseName=utf8("Kontakt音源");
+        currentInstrumentChineseName=currentInstrumentKey=="kontakt-kensa"?utf8("肯萨"):utf8("Kontakt音源");
     }
     if (currentPluginBrand != "kontakt" && (currentPluginBrand == "swam" || currentInstrumentKey.isEmpty()
         || (! currentInstrumentKey.startsWith("kong-") && ! hasContainerInstrumentIdentity
@@ -3453,6 +3498,7 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName, bool ap
             ? utf8(fengyin::SwamPluginClassifier::instrumentChineseName(pluginName.toStdString())) : utf8("空音 Qin Engine");
     }
     pluginHost.setKongExpressionMode(currentPluginBrand == "kong");
+    pluginHost.configureKontaktControls(currentPluginBrand=="kontakt" && currentInstrumentKey=="kontakt-kensa");
     pluginHost.setMusicTempoMode(midi.getMusicTempoMode());masterOutput.setReverbPreDelay(fengyin::MusicTempoPolicy::forMode(midi.getMusicTempoMode()).predelayMs);
     pluginHost.configureKongTechniqueProfile(currentPluginBrand == "kong" ? currentInstrumentKey : juce::String(),kongProfile);
     if (currentPluginBrand == "swam" && configureRoutes)

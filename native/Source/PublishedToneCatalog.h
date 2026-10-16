@@ -5,7 +5,7 @@
 
 namespace fengyin
 {
-enum class PublishedToneKind { swamStyle, swamPackage, kongProject, kongPackage };
+enum class PublishedToneKind { swamStyle, swamPackage, kongProject, kongPackage, kontaktPackage };
 
 struct PublishedToneDefinition
 {
@@ -19,7 +19,7 @@ struct PublishedToneDefinition
 
 // The release catalogue is deliberately explicit. Installing another plug-in
 // must never make an unreviewed tone appear in the customer-facing library.
-inline constexpr std::array<PublishedToneDefinition, 32> publishedToneCatalog {{
+inline constexpr std::array<PublishedToneDefinition, 33> publishedToneCatalog {{
     { "soprano-kenny",       "高萨-原声",       "soprano-sax",       "kenny",          PublishedToneKind::swamPackage, "soprano-kenny.fytonepack" },
     { "soprano-pop",         "高萨-流行",       "soprano-sax",       "pop-high",       PublishedToneKind::swamStyle,   {} },
     { "alto-jazz",           "中萨-爵士",       "alto-sax",          "jazz",           PublishedToneKind::swamPackage,   "alto-jazz.fytonepack" },
@@ -52,5 +52,6 @@ inline constexpr std::array<PublishedToneDefinition, 32> publishedToneCatalog {{
     { "kong-dongxiao",       "洞箫",          "kong-xiao",        "release",        PublishedToneKind::kongPackage, "folk-dongxiao.fytonepack" },
     { "kong-bangdi",         "梆笛",          "kong-dizi-2",      "release",        PublishedToneKind::kongPackage, "folk-bangdi.fytonepack" },
     { "kong-jinghu",         "京胡",          "kong-jinghu",      "release",        PublishedToneKind::kongPackage, "folk-jinghu.fytonepack" },
+    { "kontakt-kensa", "肯萨", "kontakt-kensa", "release", PublishedToneKind::kontaktPackage, "kontakt-kensa.fytonepack" },
 }};
 }

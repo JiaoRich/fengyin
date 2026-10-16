@@ -3,9 +3,11 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 class Release115(unittest.TestCase):
     def test_reviewed_voice_assets_match_metadata(self):
-        audit=json.loads((ROOT/'assets/voice/release-115-audit.json').read_text(encoding='utf-8'))
+        audit_file=ROOT/'assets/voice/release-116-audit.json'
+        if not audit_file.exists():audit_file=ROOT/'assets/voice/release-115-audit.json'
+        audit=json.loads(audit_file.read_text(encoding='utf-8'))
         catalog=json.loads((ROOT/'prototype/voice-catalog.js').read_text(encoding='utf-8').split('=',1)[1].strip().rstrip(';'))
-        self.assertEqual(len(audit),122)
+        self.assertEqual(len(audit),123 if audit_file.name=='release-116-audit.json' else 122)
         self.assertEqual({x['id'] for x in audit},{x['id'] for x in catalog['items']})
         self.assertEqual(catalog['voice'],'x6_wuyediantai_mini')
         for row in audit:

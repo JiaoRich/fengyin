@@ -4,7 +4,7 @@
 #include <algorithm>
 namespace fengyin {
 inline bool simpleVibrato(std::string_view key) {
-    return key.find("sax") != std::string_view::npos || key.find("violin") != std::string_view::npos
+    return key=="kontakt-kensa" || key.find("sax") != std::string_view::npos || key.find("violin") != std::string_view::npos
         || key.find("viola") != std::string_view::npos || key.find("cello") != std::string_view::npos
         || key.find("double-bass") != std::string_view::npos
         || key.find("flute") != std::string_view::npos || key=="piccolo"

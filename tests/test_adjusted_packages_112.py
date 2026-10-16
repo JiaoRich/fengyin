@@ -19,7 +19,7 @@ class AdjustedPackages(unittest.TestCase):
                 self.assertAlmostEqual(float(attack.get('value')),row['attackExpression'],places=6)
     def test_catalogue_retirement(self):
         text=(ROOT/'native/Source/PublishedToneCatalog.h').read_text(encoding='utf-8')
-        self.assertEqual(len(re.findall(r'\{ "',text)),32)
+        self.assertEqual(len(re.findall(r'\{ "',text)),33)
         for ident in ('baritone-jazz','baritone-pop','bassoon','viola','violin-section','viola-section','cello-section'):
             self.assertNotIn(f'"{ident}"',text)
         self.assertIn('"激情小提琴"',text);self.assertIn('"柔美小提琴"',text);self.assertIn('"大提琴"',text)

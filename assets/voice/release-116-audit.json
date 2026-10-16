@@ -1,0 +1,863 @@
+[
+  {
+    "id": "V001",
+    "text": "欢迎使用风吟。接下来，我带您连接电吹管，并完成第一次演奏。",
+    "speechText": "欢迎使用风吟。接下来，我带您连接电吹管，并完成第一次演奏。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "604ef9ce8ef55d067def3206fb1c7470376c7f002b0e54aee72cf49c71e6c634"
+  },
+  {
+    "id": "V002",
+    "text": "请用数据线连接电吹管和电脑，并打开电吹管电源。",
+    "speechText": "请用数据线连接电吹管和电脑，并打开电吹管电源。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "e259ad7dc05273e899c7766aa7afc85827a0e3cd127beb15e4d5ee3a7ebabb2d"
+  },
+  {
+    "id": "V003",
+    "text": "电吹管已连接。",
+    "speechText": "电吹管已连接。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "a86a465a45a1b590fe81e72dc2b9591fe4f8e3fdc340dd49e810149051da9338"
+  },
+  {
+    "id": "V005",
+    "text": "请轻轻吹奏两到三秒，让风吟检测气息信号。",
+    "speechText": "请轻轻吹奏两到三秒，让风吟检测气息信号。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "5edc0541802077db23e86b2a48887a6cef11abfab2f7888374353682a41a3393"
+  },
+  {
+    "id": "V007",
+    "text": "暂未检测到气息信号，请确认电吹管已连接，再试一次。",
+    "speechText": "暂未检测到气息信号，请确认电吹管已连接，再试一次。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "8be6fe8fc146ef36805d83f696f7c7772bc0cc81ce0cb5b1e68d68ead8e70646"
+  },
+  {
+    "id": "V011",
+    "text": "点击一个音色名称，加载完成后就可以吹奏。",
+    "speechText": "点击一个音色名称，加载完成后就可以吹奏。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "8241d4582ca0f3790d3b7dec5888034ff546f127034acdb691f0d44b2fe3e0d9"
+  },
+  {
+    "id": "V012",
+    "text": "设置完成，可以开始演奏了，祝您玩得开心。",
+    "speechText": "设置完成，可以开始演奏了，祝您玩得开心。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "8aa564d956f718ac7d33c64dd5321f93a14eaa62e876ae817325537584ddc1f7"
+  },
+  {
+    "id": "V013",
+    "text": "已跳过引导。以后可以在软件设置里重新打开。",
+    "speechText": "已跳过引导。以后可以在软件设置里重新打开。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "2cbac8d965ef47bc137f920385cbcf474822750bd646cc8dcbac8182284da187"
+  },
+  {
+    "id": "V014_01",
+    "text": "高音萨克斯，原声。",
+    "speechText": "高音萨克斯，原声",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "fc6f519c3a25b5377eb2a4c8ca7bb265d2ad6581843566e321db32b1a6db666f"
+  },
+  {
+    "id": "V014_02",
+    "text": "高音萨克斯，流行。",
+    "speechText": "高音萨克斯，流行",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "c8a0e053268e5a32c1a6f1ae843892bc658f5cee5692de156fbc36f65734883b"
+  },
+  {
+    "id": "V014_03",
+    "text": "中音萨克斯，爵士。",
+    "speechText": "中音萨克斯，爵士",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "8dc8515fd20169329042ca8698e9982cfaa2d0505c3bd9712a452c0abffe2c24"
+  },
+  {
+    "id": "V014_04",
+    "text": "中音萨克斯，深情。",
+    "speechText": "中音萨克斯，深情",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "223bdd7bf6faa89b318f11d74f2e7d3b11750381b0ed7d7395a796374515bba8"
+  },
+  {
+    "id": "V014_05",
+    "text": "中音萨克斯，流行。",
+    "speechText": "中音萨克斯，流行",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "679c8e2fcea1e24be6dff7f7300f74b5367e1066d6fdddbb1e7fb03265b23639"
+  },
+  {
+    "id": "V014_06",
+    "text": "次中音萨克斯，醇厚。",
+    "speechText": "次中音萨克斯，醇厚",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "122739a06662111d4ec57ec7a09f623c3ebfdb8140d2a06f86652dd73b75e808"
+  },
+  {
+    "id": "V014_07",
+    "text": "次中音萨克斯，温暖。",
+    "speechText": "次中音萨克斯，温暖",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "19284da208a93c6360034b375db5bcf6321cd5cf614a89940b676b271c73739c"
+  },
+  {
+    "id": "V014_08",
+    "text": "次中音萨克斯，气包音。",
+    "speechText": "次中音萨克斯，气包音",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "ba4f6049d0bcf4a9d7800c3a5070b941b7045f696476689a589a17a1970b391c"
+  },
+  {
+    "id": "V014_11",
+    "text": "小号。",
+    "speechText": "小号",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "114dd664e1475efe571c0a13a94bc76834332190154a54cf389f27370fc901f4"
+  },
+  {
+    "id": "V014_12",
+    "text": "高音小号。",
+    "speechText": "高音小号",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "265f10a4bbe9d474c66a42688b8d8ec14f3560fd00413119196503390c43e11e"
+  },
+  {
+    "id": "V014_13",
+    "text": "中音长号。",
+    "speechText": "中音长号",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "e750025db203136c105ac46fa4002d2a0751e045c2678905348ab9a619742ef9"
+  },
+  {
+    "id": "V014_14",
+    "text": "低音长号。",
+    "speechText": "低音长号",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "38b797cefda7d8d917072bf4806f69c587eeaef83f0c96dde3a7273255b97fa5"
+  },
+  {
+    "id": "V014_15",
+    "text": "长笛。",
+    "speechText": "长笛",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "dd4973828284cc171bdd1764c1b0597f233cd837c42186038cf82801cb855205"
+  },
+  {
+    "id": "V014_16",
+    "text": "短笛。",
+    "speechText": "短笛",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "8da7f1879820d1eab4e74f863a10ce3c8a8595eaf670ea6e754fca18bfea0372"
+  },
+  {
+    "id": "V014_17",
+    "text": "单簧管。",
+    "speechText": "单簧管",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "dcbede8b1f17000c15112dd30d35bef3b9aeedd19d5b629012060a7ddd9afea8"
+  },
+  {
+    "id": "V014_18",
+    "text": "双簧管。",
+    "speechText": "双簧管",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "3b41829d3c47120d53408d5625f881e6a010f8e34eac3fae41ca89ea2c4e9b15"
+  },
+  {
+    "id": "V014_22",
+    "text": "大提琴。",
+    "speechText": "大提琴",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "5e209a06d7df43ee90852177d812669c27beba477005e16c4db33bc68921b02c"
+  },
+  {
+    "id": "V014_26",
+    "text": "二胡。",
+    "speechText": "二胡",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "39192516fd4a23621e9dfccbb572ea87ace06a03473de7a958ca590266e12653"
+  },
+  {
+    "id": "V014_27",
+    "text": "古筝。",
+    "speechText": "古筝。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "529407da0a4172c3079bba925fb20ab9f1bf1cf50bfa7ddbabce4c0d8cb9c554"
+  },
+  {
+    "id": "V014_28",
+    "text": "葫芦丝。",
+    "speechText": "葫芦丝",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "ab9d14d9976aac07f0d6b6a88fc763f323a1d7090abcd2678b24f2e5523f7b59"
+  },
+  {
+    "id": "V014_29",
+    "text": "柳琴。",
+    "speechText": "柳琴",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "9f9f799df23fb5b725bc3ebdd54f1a198f53460b0b5306f0b99c0e207d118c7d"
+  },
+  {
+    "id": "V014_30",
+    "text": "马头琴。",
+    "speechText": "马头琴",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "0454a6b55a30274d44eb62362c354e4f536c0bcf5de5317371c44dd1b1c29a15"
+  },
+  {
+    "id": "V014_31",
+    "text": "曲笛。",
+    "speechText": "曲笛",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "ed76985fee99658df0a391245ac6e94e1a29b8959dccf31902b2ba3d8c161cfe"
+  },
+  {
+    "id": "V014_32",
+    "text": "埙。",
+    "speechText": "埙",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "34765eb0506a56ea6add6961efee6c7f85a461d3698884514029758007de82d6"
+  },
+  {
+    "id": "V014_33",
+    "text": "唢呐。",
+    "speechText": "唢呐",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "ad31cc0fcbc569b65441c8a68a9097e3a78139ebee6b736b72bdd92528de4460"
+  },
+  {
+    "id": "V014_34",
+    "text": "三弦。",
+    "speechText": "三弦",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "159a044e5dec3895de4624b8c46e76cc9d2f9a19c947467b253f3acd1bf66d84"
+  },
+  {
+    "id": "V014_35",
+    "text": "琵琶。",
+    "speechText": "琵琶",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "a458678c340c78ea0017aeef3e58e34cae8404c555d7fe1e39e79a15d956ff5a"
+  },
+  {
+    "id": "V014_36",
+    "text": "笙。",
+    "speechText": "笙。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "bc987a5db42db307f9ce8550d8338e295d8028341d35274ad0743c6120ef85eb"
+  },
+  {
+    "id": "V014_37",
+    "text": "南箫。",
+    "speechText": "南箫",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "a235a1a4f4ed950d7da8524572c01de62bbe2618cd65fdb7df79c4a698dc52be"
+  },
+  {
+    "id": "V026_01",
+    "text": "演奏调已设为C调。",
+    "speechText": "演奏调已设为C调。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "12f59f8fa2bb34482900a7ceca70bad56abdc7687cb6f7d9cbc8affc7e7d5dd5"
+  },
+  {
+    "id": "V026_02",
+    "text": "演奏调已设为降D调。",
+    "speechText": "演奏调已设为降D调。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "d4215efb00eecc1b51309b170990ae617520d11a47de2c6dd2e26519a2514aa4"
+  },
+  {
+    "id": "V026_03",
+    "text": "演奏调已设为D调。",
+    "speechText": "演奏调已设为D调。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "211f89de9dccbe23bb149489794229699ac318707f1a1116493661965e379f1c"
+  },
+  {
+    "id": "V026_04",
+    "text": "演奏调已设为降E调。",
+    "speechText": "演奏调已设为降E调。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "0365a7c2a4248da4076fabcaf6507475a99b3ca199eae9bd3c3d8214a6700797"
+  },
+  {
+    "id": "V026_05",
+    "text": "演奏调已设为E调。",
+    "speechText": "演奏调已设为E调。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "7921226ba8ffd19c5950ae7e22e2be0fa46a012ea9b7e70484d9a25eaa85d898"
+  },
+  {
+    "id": "V026_06",
+    "text": "演奏调已设为F调。",
+    "speechText": "演奏调已设为F调。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "99b07ac32720e8e30bed51643eb12756253512710deb6ec9dd9d6eb71d28e149"
+  },
+  {
+    "id": "V026_07",
+    "text": "演奏调已设为升F调。",
+    "speechText": "演奏调已设为升F调。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "852707209d23f3251621c40600b8e51432970921fd36fb0608d53c99f642075e"
+  },
+  {
+    "id": "V026_08",
+    "text": "演奏调已设为G调。",
+    "speechText": "演奏调已设为G调。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "d90790ebb8a21fd69ed010719a625f5d33aa16d5192b67258c0df703336fd9d5"
+  },
+  {
+    "id": "V026_09",
+    "text": "演奏调已设为降A调。",
+    "speechText": "演奏调已设为降A调。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "be1fc174892db8a2f0d7c45bdb22acfb6d9a9146782f4fc5c7ac54a0578e8cbe"
+  },
+  {
+    "id": "V026_10",
+    "text": "演奏调已设为A调。",
+    "speechText": "演奏调已设为A调。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "19d413f869c1c4f5bdea4597f8e759aec307d58a10262946825bb563cfbd91e1"
+  },
+  {
+    "id": "V026_11",
+    "text": "演奏调已设为降B调。",
+    "speechText": "演奏调已设为降B调。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "d5230418c960374c2f68af16bd870fba9809a3dd3739bd6e760afe56cbcc9151"
+  },
+  {
+    "id": "V026_12",
+    "text": "演奏调已设为B调。",
+    "speechText": "演奏调已设为B调。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "97d52a509728722b54d6f9a11d971e74166c3b0c674304d88528cce741790882"
+  },
+  {
+    "id": "V027_01",
+    "text": "弯音范围已设为上下1个半音。",
+    "speechText": "弯音范围已设为上下1个半音。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "cf070258dffe52092d8b463a89e316c88a62fb1e2da1226d8ff6dc38593b3986"
+  },
+  {
+    "id": "V027_02",
+    "text": "弯音范围已设为上下2个半音。",
+    "speechText": "弯音范围已设为上下2个半音。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "a99341d6b0eea75b28aa7aa5a2b590d6c71656249d4a3fba9f3f1f0420359d97"
+  },
+  {
+    "id": "V027_03",
+    "text": "弯音范围已设为上下3个半音。",
+    "speechText": "弯音范围已设为上下3个半音。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "36b2ffbc4ca75050e1fba09bee6398f5763bf5b95cc59bbd8ff4c6b71a9773db"
+  },
+  {
+    "id": "V027_04",
+    "text": "弯音范围已设为上下4个半音。",
+    "speechText": "弯音范围已设为上下4个半音。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "4cf0fb4218ba908d0600e707b4c4c4763685e1a907b288a8764d32e6c48ef0b5"
+  },
+  {
+    "id": "V027_05",
+    "text": "弯音范围已设为上下5个半音。",
+    "speechText": "弯音范围已设为上下5个半音。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "d1ee58648adc31fa78b97473b6a7af99ecfef382b0b8eefb11aa93889f9ac6b0"
+  },
+  {
+    "id": "V027_06",
+    "text": "弯音范围已设为上下6个半音。",
+    "speechText": "弯音范围已设为上下6个半音。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "ef45690b0b6a36f9f8077705516c3f64fd4a14092c259599b4a6413d7c4bb280"
+  },
+  {
+    "id": "V027_07",
+    "text": "弯音范围已设为上下7个半音。",
+    "speechText": "弯音范围已设为上下7个半音。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "20a6c089d5af95700fab5a0b67803059d0dd4548161df59013c2aaeed3a1a4d2"
+  },
+  {
+    "id": "V027_08",
+    "text": "弯音范围已设为上下8个半音。",
+    "speechText": "弯音范围已设为上下8个半音。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "857d8824a6fd39b956d531cfb4e2cc410e9ddab4e04ed38f0d35786ef2ada276"
+  },
+  {
+    "id": "V027_09",
+    "text": "弯音范围已设为上下9个半音。",
+    "speechText": "弯音范围已设为上下9个半音。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "08f18683fbb55808962908f37cc5b183d038eb5d86cdfd3b2e5fa75a5b951101"
+  },
+  {
+    "id": "V027_10",
+    "text": "弯音范围已设为上下10个半音。",
+    "speechText": "弯音范围已设为上下10个半音。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "5ec2a4473c567656c6a0f77d832d30762cf6680f053aaaed1587cfa69cd433e0"
+  },
+  {
+    "id": "V027_11",
+    "text": "弯音范围已设为上下11个半音。",
+    "speechText": "弯音范围已设为上下11个半音。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "aa0ab9312bc41c775666d96dec35cdd7a7f3588d4b28502ad6f5ca4f9b1d6c29"
+  },
+  {
+    "id": "V027_12",
+    "text": "弯音范围已设为上下12个半音。",
+    "speechText": "弯音范围已设为上下12个半音。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "a271418257a325680f23c3bcc352ec1ad6027d1208d702b5accb3c39c55b9806"
+  },
+  {
+    "id": "V028",
+    "text": "吹奏音量只调整乐器声音，不影响伴奏音量。",
+    "speechText": "吹奏音量只调整乐器声音，不影响伴奏音量。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "f314fb54c8c9396a630cd3f90b961409d40f01e8caa88f21d8cf16542505a039"
+  },
+  {
+    "id": "V029",
+    "text": "混响让声音更有空间感。您可以边听边调整。",
+    "speechText": "混响让声音更有空间感。您可以边听边调整。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "c6b63f859effff486bd6cfd1d450732ff263329862ad3eb5c903069be7c94240"
+  },
+  {
+    "id": "V030",
+    "text": "点击精简模式，可以切换到小窗口。",
+    "speechText": "点击精简模式，可以切换到小窗口。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "8ba17a417f0223ec585417b6cb2db96164af3e8994c8f8d43eb4113fc3288886"
+  },
+  {
+    "id": "V031",
+    "text": "精简模式不支持视频伴奏。请使用其他软件播放伴奏。",
+    "speechText": "精简模式不支持视频伴奏。请使用其他软件播放伴奏。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "f8e30792357404bf036ab1c8d40ae3a28edea949a1e0f99bb0953b38e26f4c91"
+  },
+  {
+    "id": "V032",
+    "text": "已返回全屏模式。",
+    "speechText": "已返回全屏模式。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "cef4d72915d73c5112487f021f7a04e34d7533c811138fd0d215049be8ba4154"
+  },
+  {
+    "id": "V034",
+    "text": "在智能适配中，可以设置颤音、嘶吼音和其他技巧。",
+    "speechText": "在智能适配中，可以设置颤音、嘶吼音和其他技巧。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "9cacbfc8efeb8139ea0017143c5add6f74a3f6b4e94e27e505180e9a3b130aa2"
+  },
+  {
+    "id": "V079",
+    "text": "还未加载音色，请先在音色方案里选一个音色",
+    "speechText": "还未加载音色，请先在音色方案里选一个音色",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "2209a25ef35f84afce8bc56fd0afe4a7b5df1f746241e856ccf6903f8e18a827"
+  },
+  {
+    "id": "V035",
+    "text": "点击选择视频，打开电脑里的伴奏视频，再点击播放。",
+    "speechText": "点击选择视频，打开电脑里的伴奏视频，再点击播放。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "6eb690cb3ac66d57e78c12b2f95c970ec6c8fa8f014730b3003b14202cec3fbc"
+  },
+  {
+    "id": "V036",
+    "text": "伴奏已加载，点击播放即可开始。",
+    "speechText": "伴奏已加载，点击播放即可开始。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "1bc2a34092c609acc1836ca4b8c5d2f6c9965cd6a6a3154106cc437272c667ae"
+  },
+  {
+    "id": "V037",
+    "text": "这个视频暂时无法打开，请换一个支持的MP4视频试试。",
+    "speechText": "这个视频暂时无法打开，请换一个支持的MP4视频试试。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "129b02f288e83a225f078320cb5f05e7e331b5281751a78ff00a60ae87d4d312"
+  },
+  {
+    "id": "V038",
+    "text": "请先选择伴奏视频。",
+    "speechText": "请先选择伴奏视频。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "c2e8f3c332afc860ac8b484fcafcdc627a5e1e777a905b91b35de9601749a6c8"
+  },
+  {
+    "id": "V040",
+    "text": "点击开始录音，结束时点击停止录音。保存后可在我的录音中查看。",
+    "speechText": "点击开始录音，结束时点击停止录音。保存后可在我的录音中查看。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "b90e6d6fdb862c8762068d2e797a59dd8895287c2969e3f12c71a4a9ce166d2f"
+  },
+  {
+    "id": "V041",
+    "text": "3，2，1，开始录音。",
+    "speechText": "3，2，1，开始录音。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "85aa57de4b901962a9e4f895604b13604f416b72f24787aa6d918c694a7896ca"
+  },
+  {
+    "id": "V042",
+    "text": "录音已保存，可以在我的录音里查看。",
+    "speechText": "录音已保存，可以在我的录音里查看。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "3ec3cd95a1b1caafcda0240c912c941b47150743f3e6ef648faf482ef1eac4bf"
+  },
+  {
+    "id": "V046",
+    "text": "正在录音。请先停止并保存录音，再退出。",
+    "speechText": "正在录音。请先停止并保存录音，再退出。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "3465c03df995ebb4a4a0ef43007394f2332acb8acd4b99cc627764a20bd7eacf"
+  },
+  {
+    "id": "V047",
+    "text": "请轻咬吹嘴，让风吟识别咬嘴控制信号",
+    "speechText": "请轻咬吹嘴，让风吟识别咬嘴控制信号",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "88614550b3b4f3c3a7cfaa817cfafb53dd3988936d422ca3b0ff446582fd2d16"
+  },
+  {
+    "id": "V052",
+    "text": "没有识别到控制信号，请再试一次",
+    "speechText": "没有识别到控制信号，请再试一次",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "fafb40ab8c0b23dc05399c3ab5a68090b81cef50457dc591328925493e8ccb11"
+  },
+  {
+    "id": "V057_01",
+    "text": "已开启自动颤音。",
+    "speechText": "已开启自动颤音。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "9ccfca02f372d87b530c87b887f2c9fc4e40a332745bfbb73161e5266d6edcfa"
+  },
+  {
+    "id": "V057_02",
+    "text": "已开启自动嘶吼音。",
+    "speechText": "已开启自动嘶吼音。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "4d411aee337bd35ed7389c55ac0307626024ba11135c8c2a9e6c95f0da416474"
+  },
+  {
+    "id": "V058_01",
+    "text": "颤音控制已关闭。",
+    "speechText": "颤音控制已关闭。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "31da59ea3cfd3e674506564934f0110b762bf70b1f106c439903efcc9366e3aa"
+  },
+  {
+    "id": "V058_02",
+    "text": "嘶吼音已关闭。",
+    "speechText": "嘶吼音已关闭。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "4eab1c3e9b771f54ef0a4b5abe4d42abcd9dc3b846cf87d6c62e8af1f8488252"
+  },
+  {
+    "id": "V060",
+    "text": "电吹管连接已断开，请检查数据线和电源。",
+    "speechText": "电吹管连接已断开，请检查数据线和电源。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "bf300dc44f7678f1d52e8e480cbab6a060b4bbf5c85b37ae6b88706607ca6346"
+  },
+  {
+    "id": "V072",
+    "text": "语音提示已开启。",
+    "speechText": "语音提示已开启。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "3dd8233a2c12b46111dde3f0e630e47cef250301ec96eefde09751316210cda2"
+  },
+  {
+    "id": "V073",
+    "text": "语音提示已关闭。",
+    "speechText": "语音提示已关闭。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "160e3b46b968abfb6c13ddbf3b099f19468bef2456e6ef3dc69c85207efdd69c"
+  },
+  {
+    "id": "V076",
+    "text": "音色切换播报已开启。",
+    "speechText": "音色切换播报已开启。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "2475f2ad012f6219b8dcb7c2b36d9b4cdf4f29df96f2eddb3ecee11b7e44cc86"
+  },
+  {
+    "id": "V077",
+    "text": "音色切换播报已关闭。",
+    "speechText": "音色切换播报已关闭。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "2d417e1be40a9e8c203b126e74534258e660de00b35f7f16e27efbdae6456497"
+  },
+  {
+    "id": "G001",
+    "text": "请选择您喜欢的音色。",
+    "speechText": "请选择您喜欢的音色。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "299988ac5eb931958b08630b68de800be5e2cfa86445c0fadcd09119a1bb2113"
+  },
+  {
+    "id": "G002",
+    "text": "现在可以试着吹奏，准备好后点击下一步。",
+    "speechText": "现在可以试着吹奏，准备好后点击下一步。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "625310cac602f803249276cfed77deb5cb35d445fbb06ca330d7d6dd2df92e7b"
+  },
+  {
+    "id": "G003",
+    "text": "点击演奏调，选择歌曲需要的调式。",
+    "speechText": "点击演奏调，选择歌曲需要的调式。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "b57013e1e5a97770ed544aab8a043ec32f926b24906dc6e2b1fd920990b74c77"
+  },
+  {
+    "id": "G004",
+    "text": "点击弯音，设置弯音的变化范围。",
+    "speechText": "点击弯音，设置弯音的变化范围。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "209fbc818ccfa1c576ddd1cfde338bfb0a7f62653e3f556e9234083018b4e6a7"
+  },
+  {
+    "id": "G005",
+    "text": "在智能适配中，可以选择技巧的控制方式。",
+    "speechText": "在智能适配中，可以选择技巧的控制方式。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "032d13df711c868ee100351eb3c1c4b952c72fa2a9ca1a1cc26ccc8f47141401"
+  },
+  {
+    "id": "G006",
+    "text": "选择咬嘴控制或按键触发后，按提示完成映射。",
+    "speechText": "选择咬嘴控制或按键触发后，按提示完成映射。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "35e77dc605def06e8e30a7b180df7989b76deafd22f98ffa23876f92460d80ec"
+  },
+  {
+    "id": "G007",
+    "text": "如果不想使用某个映射，可以点击取消映射。",
+    "speechText": "如果不想使用某个映射，可以点击取消映射。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "51687aad8078ae6e6ddf35a5c8fa818ff075f5459c0552e82186290478313905"
+  },
+  {
+    "id": "G008",
+    "text": "选择视频后，点击播放开始伴奏，再次点击可以暂停。",
+    "speechText": "选择视频后，点击播放开始伴奏，再次点击可以暂停。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "ed7046763ea7ec1c691a307e9ab3e948a2c824df728a1a4d401d79f9ab2f76bf"
+  },
+  {
+    "id": "G009",
+    "text": "这里可以单独调整视频伴奏的音量。",
+    "speechText": "这里可以单独调整视频伴奏的音量。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "372050b7c363807124c96d810ab334bcd90fbc39fb5361cf11b7e64cad600915"
+  },
+  {
+    "id": "G010",
+    "text": "演奏结束后，点击停止录音，等待保存完成。",
+    "speechText": "演奏结束后，点击停止录音，等待保存完成。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "cdc31de66f0aed934ffc61964792d97c0501e4f7106379464abcd907b3277925"
+  },
+  {
+    "id": "G011",
+    "text": "点击我的录音，可以查看和播放已经保存的录音。",
+    "speechText": "点击我的录音，可以查看和播放已经保存的录音。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "d493e80ccbe4dff7beb14296d6ca185955601095f9e7acc2797042a471ca8e7b"
+  },
+  {
+    "id": "G012",
+    "text": "精简模式可以移动和调整窗口大小，点击全屏可以返回。",
+    "speechText": "精简模式可以移动和调整窗口大小，点击全屏可以返回。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "696d2bdf2e3e56df5fcd626f8a42f10f528293f29fe34d8ba15fecc3884de1c3"
+  },
+  {
+    "id": "G013",
+    "text": "在这里选择您喜欢的界面主题。",
+    "speechText": "在这里选择您喜欢的界面主题。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "9d0e1169cfb730e976d827f48a290bdf1aac47153a9bb3e4657d50bb283bb314"
+  },
+  {
+    "id": "G014",
+    "text": "声音设置中可以查看声音模式和输出设备。声音正常时，不需要修改。",
+    "speechText": "声音设置中可以查看声音模式和输出设备。声音正常时，不需要修改。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "a65e1c2b3e022d9e441209eac7fe4e6ca6e201f35a6f7d4ce2b4755680d64f30"
+  },
+  {
+    "id": "G015",
+    "text": "软件设置中可以关闭语音提示，也可以重新开始使用引导。",
+    "speechText": "软件设置中可以关闭语音提示，也可以重新开始使用引导。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "8921530f4bb06829e6b5054ff5ef4fd0b4d2c0357b03fec1547482dc04a95db4"
+  },
+  {
+    "id": "G016",
+    "text": "您可以点击上一步重看，也可以跳过当前步骤，或者结束引导。",
+    "speechText": "您可以点击上一步重看，也可以跳过当前步骤，或者结束引导。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "8351a98c1c1e6b89194de2c0a4647cf758ec924c11a8ef881c3db7f2de45fbec"
+  },
+  {
+    "id": "T001",
+    "text": "请先将电吹管设置为C调，再在演奏调中选择歌曲需要的调。",
+    "speechText": "请先将电吹管设置为C调，再在演奏调中选择歌曲需要的调。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "f7d277eb3a121bf5dae302454fdccabfb3eb62d9e788808a92fb63aaa32c17d2"
+  },
+  {
+    "id": "MT_SLOW",
+    "text": "慢速乐曲。",
+    "speechText": "慢速乐曲。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "303bfe5698ee71743f292679b74db27a45d3205f3102844244816aca98564f2f"
+  },
+  {
+    "id": "MT_MEDIUM",
+    "text": "中速乐曲。",
+    "speechText": "中速乐曲。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "f0d249dcccae0612c2ac7263610fa0aea5420c00952d37cf7df7ec7dc84fb338"
+  },
+  {
+    "id": "MT_FAST",
+    "text": "快速乐曲。",
+    "speechText": "快速乐曲。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "ff6d8519ff9fa5b156c2a45ebbfe5d51313e6eb9b90f9107c6c6e43f292e5602"
+  },
+  {
+    "id": "MT_GUIDE",
+    "text": "选择乐曲速度，风吟会自动进行颤音和混响优化",
+    "speechText": "选择乐曲速度，风吟会自动进行颤音和混响优化",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "f210e74089c6b39a5c3f96dae1d26596e6a29311f52a164ff4d8420dcec400e1"
+  },
+  {
+    "id": "TONE_VIOLIN_SWEET",
+    "text": "激情小提琴。",
+    "speechText": "激情小提琴",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "01b2c4a517d7a862d80e5ba6d89820409c29363724cdeddb77d966323a6a00d4"
+  },
+  {
+    "id": "TONE_VIOLIN_SOFT",
+    "text": "柔美小提琴。",
+    "speechText": "柔美小提琴",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "d28167a564f68623c55302fdb911d76bf416ad69987208917982eafc95b050c2"
+  },
+  {
+    "id": "NEW_MAP_START",
+    "text": "请操作一次要映射的按键或控制器。",
+    "speechText": "请操作一次要映射的按键或控制器。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "20236e524cb2ce08f78a884f3a1ca12a56db6b8a238af62453e0aeba6ed8c510"
+  },
+  {
+    "id": "NEW_MAP_OK",
+    "text": "映射成功，已保存这支电吹管的设置。",
+    "speechText": "映射成功，已保存这支电吹管的设置。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "6a41a221a52037db7fff61499490cfd75152dc333cceb22c8475eb96e7cc0475"
+  },
+  {
+    "id": "NEW_MAP_CLEAR",
+    "text": "已取消此项映射。",
+    "speechText": "已取消此项映射。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "7a363b421803c3bf0dcd4285f04a7aafdda97f2ccc2fd3bce286909819038037"
+  },
+  {
+    "id": "NEW_MAP_CANCEL",
+    "text": "已取消本次设置。",
+    "speechText": "已取消本次设置。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "a26af14f7cd0eec343b2b44a5a7023135bf833ed808af4d12586aa0f91543580"
+  },
+  {
+    "id": "NEW_VIB_HARDWARE",
+    "text": "已切换为咬嘴控制颤音。",
+    "speechText": "已切换为咬嘴控制颤音。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "903dae8609b2746013d4de9bf41c33a58ce870b04c20a1e8e7dbc174703ca76c"
+  },
+  {
+    "id": "NEW_GROWL_HARDWARE",
+    "text": "已切换为按键控制嘶吼音。",
+    "speechText": "已切换为按键控制嘶吼音。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "93d8159dfea109bd43803849f0a394a5c0e3805b127649112808a8466f54e786"
+  },
+  {
+    "id": "NEW_OTHER_ON",
+    "text": "其他技巧已启用，请使用映射的按键控制。",
+    "speechText": "其他技巧已启用，请使用映射的按键控制。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "8ad8b08a3a5cba1bfee9a4262b4163e712b3e7e896434349ad2b9988422bee9a"
+  },
+  {
+    "id": "NEW_OTHER_OFF",
+    "text": "其他技巧已关闭。",
+    "speechText": "其他技巧已关闭。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "0f7df8146a8cd0b631b4cd23ae041302e2894b801af6ee5380e57648b43ee5e1"
+  },
+  {
+    "id": "NEW_TONE_GENERIC",
+    "text": "音色加载完成。",
+    "speechText": "音色加载完成。",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "d6920353a6297c5165a453fde91f5c7be42422e7c513e9dc502334204db73330"
+  },
+  {
+    "id": "TONE_DONGXIAO",
+    "text": "洞箫。",
+    "speechText": "洞箫",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "a3cedb5583c68267543c17de56bc7877636efbc1bc03eab5598f7cfd6ee4cd4b"
+  },
+  {
+    "id": "TONE_BANGDI",
+    "text": "梆笛。",
+    "speechText": "梆笛",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "2ff0dfa1fc1afd58b2851d0eb18ff188999290e2955cfcdeb684d7f9ebe61a39"
+  },
+  {
+    "id": "TONE_JINGHU",
+    "text": "京胡。",
+    "speechText": "京胡",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "a4dd07bab1dc8d03adffedb0c398c9f51f8b5cbb6b83dc7adec3b3cfabbad2fe"
+  },
+  {
+    "id": "TONE_KENSA",
+    "text": "肯萨。",
+    "speechText": "肯萨",
+    "voice": "x6_wuyediantai_mini",
+    "sha256": "e14ef1733b422d3c5eaed9aa5cda098de1417bc10c655bb016af1f12ab0b3358"
+  }
+]

@@ -217,6 +217,9 @@ private:
     double webVideoPosition = 0.0;
     float webVideoVolume = 1.0f;
     bool pluginChoicesLoaded = false;
+    std::map<juce::String, fengyin::SoundPreset> publishedPresetCache;
+    bool containerPrewarmStarted = false;
+    const double containerPrewarmAfterMs = juce::Time::getMillisecondCounterHiRes() + 5000.0;
     bool pluginLoading = false;
     bool effectLoading = false;
     bool attemptedDefaultPreset = false;
@@ -257,6 +260,12 @@ private:
     std::unique_ptr<juce::WebBrowserComponent> webInterface;
     bool webInterfaceReady = false;
     int webUpdateCounter = 0;
+    bool webPresentationVisible = true;
+    double lastWebStateAtMs = 0;
+public:
+    // Presentation only: audio/MIDI timers and business callbacks keep running.
+    void setWebPresentationVisible(bool visible);
+private:
     bool videoPlaybackActive = false;
     int midiConnectionPollCounter = 0;
     int activeTechniqueLearn = -1;

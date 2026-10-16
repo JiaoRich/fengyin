@@ -187,7 +187,7 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
             "激情小提琴", "柔美小提琴", "大提琴",
             "二胡", "葫芦丝", "柳琴", "马头琴", "曲笛", "埙", "唢呐", "三弦", "琵琶", "南箫", "洞箫", "梆笛", "京胡",
         ]
-        self.assertIn("std::array<PublishedToneDefinition, 32>", catalog)
+        self.assertIn("std::array<PublishedToneDefinition, 33>", catalog)
         for name in expected_names:
             self.assertEqual(catalog.count(f'"{name}"'), 1, name)
         self.assertNotIn("扫描本机", catalog)

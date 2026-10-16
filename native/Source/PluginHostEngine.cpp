@@ -91,6 +91,7 @@ public:
     TechniqueProcessingGraph() { filteredMidi.ensureSize(256 * 1024); }
     std::function<void()> applyTechniqueValues;
     std::function<bool(const juce::MidiMessage&)> suppressTechniqueMidi;
+    std::function<void(juce::MidiBuffer&,int,double)> transformPerformanceMidi;
     void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& messages) override
     {
         if (applyTechniqueValues) applyTechniqueValues();
@@ -102,6 +103,7 @@ public:
                     filteredMidi.addEvent(metadata.data,metadata.numBytes,metadata.samplePosition);
             messages.swapWith(filteredMidi);
         }
+        if (transformPerformanceMidi) transformPerformanceMidi(messages,buffer.getNumSamples(),getSampleRate());
         juce::AudioProcessorGraph::processBlock(buffer, messages);
     }
 private:
@@ -323,12 +325,19 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                                  const juce::MemoryBlock& initialState,
                                  LoadCallback callback, bool verifyStateRoundtrip)
 {
+    parkCurrentContainer();
     unload();
     const auto generation = loadGeneration;
+    std::shared_ptr<CachedContainer> cached;
+    const auto cacheKey = description.createIdentifierString();
+    if (const auto found = containerCache.find(cacheKey); found != containerCache.end()
+        && (initialState.getSize() > 0 || found->second->instance != nullptr))
+    {
+        cached = found->second;
+        containerCache.erase(found);
+    }
     juce::Logger::writeToLog("Plugin load request " + juce::String(generation) + ": " + description.name);
-    formatManager.createPluginInstanceAsync(
-        description, sampleRate, bufferSize,
-        [this, description, sampleRate, bufferSize, initialState, generation, verifyStateRoundtrip,
+    auto finish = [this, description, sampleRate, bufferSize, initialState, generation, verifyStateRoundtrip, cached,
          guard = lifetime, completion = std::move(callback)]
         (std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error) mutable
         {
@@ -336,7 +345,9 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                 return;
             if (generation != loadGeneration) return;
             juce::Logger::writeToLog("Plugin instance ready " + juce::String(generation));
-            if (instance == nullptr)
+            auto* restoredProcessor = cached && cached->graph
+                ? dynamic_cast<juce::AudioPluginInstance*>(cached->instrument->getProcessor()) : instance.get();
+            if (restoredProcessor == nullptr)
             {
                 if (completion)
                     completion(false, error.isNotEmpty() ? error : juce::String("VST3 load failed"));
@@ -353,10 +364,10 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                     return;
                 }
                 juce::Logger::writeToLog("Plugin state restore begin; bytes=" + juce::String(initialState.getSize()));
-                instance->setStateInformation(initialState.getData(),
+                restoredProcessor->setStateInformation(initialState.getData(),
                                               static_cast<int>(initialState.getSize()));
                 if(verifyStateRoundtrip) {
-                    juce::MemoryBlock returned;instance->getStateInformation(returned);
+                    juce::MemoryBlock returned;restoredProcessor->getStateInformation(returned);
                     if(!SwamStateCompatibility::preserved(initialState,returned)) {
                         if(completion)completion(false,juce::String::fromUTF8("SWAM跨版本恢复未通过完整参数与曲线回读，未启用该方案；请用本机版本重新导出。"));
                         return;
@@ -365,11 +376,26 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                 }
                 juce::Logger::writeToLog("Plugin state restore returned");
             }
+            restoredProcessor->suspendProcessing(false);
+            if (cached && cached->graph)
+            {
+                graph = std::move(cached->graph);
+                instrumentNode = cached->instrument;
+                audioOutputNode = cached->output;
+                midiInputNode = cached->midi;
+                graph->setPlayConfigDetails(0, 2, sampleRate, bufferSize);
+                juce::Logger::writeToLog("Reusing cached container graph: " + description.name);
+            }
+            else
+            {
             auto processingGraph = std::make_unique<TechniqueProcessingGraph>();
             processingGraph->applyTechniqueValues = [this] { flushTechniqueValues(); };
+            processingGraph->transformPerformanceMidi = [this](juce::MidiBuffer& messages,int count,double rate) {
+                suonaDualVoice.process(messages,count,rate);
+            };
             processingGraph->suppressTechniqueMidi = [this](const juce::MidiMessage& message)
             {
-                if (kongExpressionMode.load() || !message.isController()) return false;
+                if (kongExpressionMode.load() || kontaktStandardControls.load() || !message.isController()) return false;
                 const int route=(message.getChannel()<<8)|(message.getControllerNumber()+1);
                 if (route==((swamExpressionChannel.load()<<8)|(swamExpressionController.load()+1))) return false;
                 for (const auto technique : {PerformanceTechnique::vibrato,PerformanceTechnique::growl,PerformanceTechnique::flutter})
@@ -389,6 +415,7 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
             midiInputNode = graph->addNode(std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(
                 juce::AudioProcessorGraph::AudioGraphIOProcessor::midiInputNode));
             instrumentNode = graph->addNode(std::move(instance));
+            }
             currentDescription = description;
             resolveTechniqueParameters();
             resolveInstrumentModelParameter();
@@ -419,7 +446,86 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
             // graph pointer across that callback.
             if (guard->load(std::memory_order_acquire) && generation == loadGeneration && graph)
                 graph->suspendProcessing(false);
-        });
+        };
+    if (cached)
+        finish(std::move(cached->instance), {});
+    else if (containersWarming.contains(cacheKey))
+        containerWarmWaiters[cacheKey] = std::move(finish);
+    else
+        formatManager.createPluginInstanceAsync(description, sampleRate, bufferSize, std::move(finish));
+}
+
+void PluginHostEngine::parkCurrentContainer()
+{
+    if (!graph || !instrumentNode) return;
+    const auto brand = SupportedInstrumentClassifier::classify(currentDescription.name,
+        currentDescription.manufacturerName, currentDescription.fileOrIdentifier);
+    if (brand != SupportedInstrumentClassifier::Brand::kong
+        && brand != SupportedInstrumentClassifier::Brand::kontakt) return;
+    player.setProcessor(nullptr); // Synchronise with the device before changing ownership.
+    instrumentEditorWindow.reset();
+    effectEditorWindow.reset();
+    graph->suspendProcessing(true);
+    for (const auto& effect : effectNodes) graph->removeNode(effect.node->nodeID);
+    effectNodes.clear();
+    auto entry = std::make_shared<CachedContainer>();
+    entry->graph = std::move(graph);
+    entry->instrument = instrumentNode;
+    entry->output = audioOutputNode;
+    entry->midi = midiInputNode;
+    const auto key = currentDescription.createIdentifierString();
+    if (!containerCache.contains(key) && containerCache.size() >= 2)
+        containerCache.erase(containerCache.begin());
+    containerCache[key] = std::move(entry);
+}
+
+void PluginHostEngine::prewarmContainers(const juce::Array<juce::PluginDescription>& descriptions,
+                                        double sampleRate, int bufferSize)
+{
+    for (const auto& description : descriptions)
+    {
+        const auto brand = SupportedInstrumentClassifier::classify(description.name,
+            description.manufacturerName, description.fileOrIdentifier);
+        if (brand != SupportedInstrumentClassifier::Brand::kong
+            && brand != SupportedInstrumentClassifier::Brand::kontakt) continue;
+        const auto key = description.createIdentifierString();
+        if (key == getPluginIdentifier() || containerCache.contains(key) || containersWarming.contains(key)) continue;
+        if (containerCache.size() + containersWarming.size() >= 2) break;
+        containersWarming.insert(key);
+        formatManager.createPluginInstanceAsync(description, sampleRate, bufferSize,
+            [this, key, sampleRate, bufferSize, guard = lifetime](std::unique_ptr<juce::AudioPluginInstance> instance,
+                                                               const juce::String& error)
+            {
+                if (!guard->load(std::memory_order_acquire)) return;
+                containersWarming.erase(key);
+                if (const auto waiter = containerWarmWaiters.find(key); waiter != containerWarmWaiters.end())
+                {
+                    auto finish = std::move(waiter->second);
+                    containerWarmWaiters.erase(waiter);
+                    if (instance)
+                    {
+                        instance->setPlayConfigDetails(0, 2, sampleRate, bufferSize);
+                        instance->prepareToPlay(sampleRate, bufferSize);
+                        instance->suspendProcessing(true);
+                    }
+                    finish(std::move(instance), error);
+                    return;
+                }
+                if (!instance || key == getPluginIdentifier() || containerCache.contains(key)
+                    || containerCache.size() >= 2)
+                {
+                    if (!instance) juce::Logger::writeToLog("Container prewarm unavailable: " + error);
+                    return;
+                }
+                instance->setPlayConfigDetails(0, 2, sampleRate, bufferSize);
+                instance->prepareToPlay(sampleRate, bufferSize);
+                instance->suspendProcessing(true);
+                auto entry = std::make_shared<CachedContainer>();
+                entry->instance = std::move(instance);
+                containerCache[key] = std::move(entry);
+                juce::Logger::writeToLog("Container prewarm ready: " + key);
+            });
+    }
 }
 
 void PluginHostEngine::unload()
@@ -437,6 +543,8 @@ void PluginHostEngine::unload()
     midiInputNode = nullptr;
     graph.reset();
     currentDescription = {};
+    suonaDualVoice.configure(false);
+    kontaktStandardControls.store(false);
     for (auto& parameter : techniqueParameters) parameter.store(nullptr);
     for (auto& dirty : techniqueDirty) dirty.store(false, std::memory_order_relaxed);
     instrumentModelParameter = nullptr;
@@ -1080,9 +1188,22 @@ void PluginHostEngine::routeTechnique(PerformanceTechnique technique, float valu
     const auto index = static_cast<size_t>(technique);
     if (index >= techniqueValues.size()) return;
     const auto safeValue = juce::jlimit(0.0f, 1.0f, value);
+    if (kontaktStandardControls.load()) {
+        if(technique==PerformanceTechnique::vibrato) {
+            const int midiValue=juce::roundToInt(safeValue*127.f);
+            sendTechniqueController(lastNativeTechniqueMessages[index],(1<<8)|2,midiValue,true,[&] {
+                return queue(juce::MidiMessage::controllerEvent(1,1,midiValue),0.0);
+            });
+        }
+        return;
+    }
     if (kongExpressionMode.load(std::memory_order_relaxed))
     {
         const auto previous = kongTechniqueInputs[index].exchange(safeValue, std::memory_order_relaxed);
+        if (suonaDualVoice.active() && technique==PerformanceTechnique::flutter) {
+            suonaDualVoice.setFlutter(safeValue>.5f);
+            return;
+        }
         if(kongProfile.enabled && technique==PerformanceTechnique::vibrato) {
             if(kongVibratoCC.load()==1)
                 queue(juce::MidiMessage::controllerEvent(performanceChannel.load(),1,juce::roundToInt(safeValue*127.f)),0.0);
@@ -1180,6 +1301,7 @@ void PluginHostEngine::configureKongTechniqueProfile(const juce::String& key,con
     const auto tree=KongProjectFile::readPluginComponentState(state);
     const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
     kongProfile=profile;
+    suonaDualVoice.configure(false);
     kongVibratoCC.store(-1);
     for (auto& route : kongTechniqueRoutes) route = {};
     for (auto& value : kongTechniqueInputs) value.store(0.0f, std::memory_order_relaxed);
@@ -1193,6 +1315,16 @@ void PluginHostEngine::configureKongTechniqueProfile(const juce::String& key,con
         return;
     }
     if(profile.enabled) {
+        // Exact verified two-slot articulation pair only; other/custom suona
+        // packages keep established routing. Environment switch is diagnostic
+        // rollback, not a new user-facing configuration requirement.
+        const auto slots=tree.getChildWithName("PresetList");
+        bool main=false,flutter=false;
+        for(auto slot:slots){const auto text=slot.toXmlString();
+            main|=int(slot.getProperty("MIDI",0))==0 && text.contains("Suona2_Main_Layers");
+            flutter|=int(slot.getProperty("MIDI",0))==1 && text.contains("Suona2_Flutter");}
+        suonaDualVoice.configure((key=="kong-suona" || key=="kong-suona-2") && slots.getNumChildren()==2 && profile.otherChannel==2 && main && flutter
+            && juce::SystemStats::getEnvironmentVariable("FENGYIN_SUONA_LEGACY","0")!="1");
         if(profile.vibratoCC==1) {
             kongVibratoCC.store(1);
             for(auto slot:tree.getChildWithName("PresetList")) {
@@ -1231,6 +1363,8 @@ void PluginHostEngine::configureKongTechniqueProfile(const juce::String& key,con
 void PluginHostEngine::resetPerformance() noexcept
 {
     const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
+    suonaDualVoice.setFlutter(false);
+    if(kontaktStandardControls.load())queue(juce::MidiMessage::controllerEvent(1,1,0),0.0);
     if(kongVibratoCC.load()==1) {
         queue(juce::MidiMessage::controllerEvent(1,1,0),0.0);
         if(kongProfile.otherChannel>1 && kongProfile.otherChannel<=16)
