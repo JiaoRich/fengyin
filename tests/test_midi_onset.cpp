@@ -40,11 +40,15 @@ struct Sink : fengyin::MidiPerformanceSink {
 int main() {
     assert(fengyin::kensaVibratoController(0)==0);
     assert(fengyin::kensaVibratoController(-1)==0);
-    assert(fengyin::kensaVibratoController(1)==96);
+    assert(fengyin::kensaVibratoController(1)==70);
+    assert(fengyin::kensaVibratoRateController(4.5f)==69);
+    assert(fengyin::kensaVibratoRateController(5.f)==85);
+    assert(fengyin::kensaVibratoRateController(5.5f)==101);
+    for(float hz:{4.5f,5.f,5.5f})assert(std::abs(fengyin::kensaNominalVibratoHz(fengyin::kensaVibratoRateController(hz))-hz)<.02);
     int previousKensa=0;
     for(int i=1;i<=10000;++i) {
         const auto cc=fengyin::kensaVibratoController(i/10000.f);
-        assert(cc>=31 && cc<=96 && cc>=previousKensa);previousKensa=cc;
+        assert(cc>=31 && cc<=70 && cc>=previousKensa);previousKensa=cc;
     }
     struct TraceLogger : juce::Logger {
         std::vector<juce::String> lines;

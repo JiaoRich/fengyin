@@ -255,7 +255,7 @@ private:
 public:
     void configureKontaktControls(bool enabled) noexcept {
         kontaktStandardControls.store(enabled);
-        if(enabled) queue(juce::MidiMessage::controllerEvent(1,1,0),0.0);
+        if(enabled) {queue(juce::MidiMessage::controllerEvent(1,1,0),0.0);tempoRateDirty.store(true);}
     }
 private:
     std::atomic<int> kongVibratoCC {-1};

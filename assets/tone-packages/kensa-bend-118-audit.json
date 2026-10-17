@@ -1,0 +1,23 @@
+{
+  "sourceSha256": "0ce7f0480793404dcd777bf4381fd70dcd89ddcc492e3fd2e519d316d5ac105e",
+  "packageSha256": "01d075365c9b1f940eea4a0f3e3619763d5fa9df6b5d2093ab5a51853e7863be",
+  "previousPackageSha256": "150102bb7048b116e763eff88254a100ad93c109fe1eb73ed9aa9ba7c8550493",
+  "source": "assets/incoming-tones/20261017/Kontakt音源-肯萨-弯音绑定.fytonepack",
+  "hostAutomationSlot": 1,
+  "parameterName": "percent",
+  "sourcePercent": 100,
+  "sourceNormalisedValue": 0.2307692319154739,
+  "declaredPercentRange": [
+    10,
+    400
+  ],
+  "originalOpaqueStatePreserved": true,
+  "originalEffectsPreserved": true,
+  "identityChanges": [
+    "instrumentKey: kontakt-engine -> kontakt-kensa",
+    "instrumentChineseName/manifest instrument: Kontakt音源 -> 肯萨"
+  ],
+  "windControllerButtonNotHostAutomatable": true,
+  "requiresSavedWindControllerOn": true,
+  "actualPitchEndpointsVerified": false
+}

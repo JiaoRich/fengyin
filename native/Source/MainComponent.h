@@ -10,6 +10,7 @@
 #include "VideoPlayerPanel.h"
 #include "LicenseService.h"
 #include "RecordingService.h"
+#include "WindowRecordingService.h"
 #include "AccompanimentAudioService.h"
 #include "MasterOutputService.h"
 #include "ToneStyleCatalog.h"
@@ -116,6 +117,8 @@ private:
     fengyin::WindowsLowLatencyOptimizer windowsLowLatencyOptimizer;
     fengyin::AccompanimentAudioService accompaniment;
     fengyin::RecordingService recorder;
+    fengyin::WindowRecordingService windowRecorder;
+    void toggleWindowRecording(const juce::var& payload);
     fengyin::MasterOutputService masterOutput;
     fengyin::TestSynthEngine testSynth;
     fengyin::VoicePromptService voicePrompts;

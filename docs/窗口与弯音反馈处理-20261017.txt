@@ -1,0 +1,37 @@
+状态：本地修改与验证中，尚未提交或发布安装包。
+
+一、本轮界面与窗口修复
+弯音按钮上拉菜单仅显示±1、±2、±3、±4、恢复推荐；点击即应用，保留失败提示和按乐器记忆。不再显示复杂确认弹窗。
+鼠标、触摸、笔统一使用单一捕获指针链路，忽略非主指针和重复开始；窗口移动消息最高24Hz合并，结束前发送最后移动量；失焦、隐藏和模式切换取消捕获，避免丢失结束事件后拖动状态残留。
+页面通过viewport、touch-action和手势/缩放滚轮拦截禁止页面缩放，保留单指滚动及边缘调整窗口大小；WebView2额外关闭IsZoomControlEnabled、IsPinchZoomEnabled并固定ZoomFactor=1。不改变系统DPI或Windows显示缩放。
+JUCE补丁仅在FENGYIN_LOCK_WEBVIEW_ZOOM编译开关下对本应用生效；已有音频驱动补丁内容未改。
+
+二、肯萨弯音：明确未完成
+现有正式包宿主参数中只有每通道PitchBend值，没有可验证的PitchSensitivity/弯音范围参数；不能把PitchBend值误认作范围。
+用户提供的库脚本中，弯音基准倍率为1，Windcontroller开启时再乘PitchSensitivity百分比；UI百分比范围10至400，属于库内部PGS控制，不是现有宿主可写参数。
+通用扫描SWAM式Pitch Bend Range参数失败并非库不能弯音；也不能未经实测假设RPN0能控制该脚本，或仅放大14位MIDI值而宣称±4半音成立。
+2026-10-17远程已连接。正式肯萨载入后，在调音师导入文档中的Kontakt音源-肯萨.fytonepack作为草稿副本，Kontakt/FreshAir恢复成功。原文件未覆盖。
+用户协助将Host Automation #0001分配给Pitch Sensitivity的percent旋钮；远程截图确认#0001显示percent - VST Kenny G Soprano Saxophone，当前100%。用户确认#0002拖到Use Windcontroller显示禁止；该按钮不接受当前Host Automation分配，未强行绑定或切换按钮。
+副本经风吟导出到测试电脑桌面Kontakt音源-肯萨.fytonepack，桌面文件可见；未覆盖文档原包。尚待用户把此新副本传回，检查宿主参数快照及完整状态持久性，再做100/200/300/400%与实际音高范围验证；不宣称已完成±1至±4适配。
+ToDesk远程点击可用，自动键盘/粘贴和拖拽未传达；标题栏拖动也无效，故仅请求用户完成必要手动操作，不以反复拖拽当作库不支持。界面已切到Kontakt经典视图以访问Host Automation，后关闭插件并最小化主窗口供用户传桌面新包。
+本机没有Kontakt，不能把MIDI模拟或源码分析当作实际库音高验收。未改NKI脚本、驱动、许可、音源曲线或其他调音参数。
+
+收到用户新包后的补充：
+Kontakt音源-肯萨(1).fytonepack SHA256=0ce7f0480793404dcd777bf4381fd70dcd89ddcc492e3fd2e519d316d5ac105e，ZIP与manifest摘要通过。
+新包Host Automation #0001已保存为index:1:percent，值0.2307692319154739，匹配KSP范围10至400中100%的归一化位置。相对旧包，#0001绑定新增、Kontakt内部nikt标识换名但值仍0、PitchBend快照回到精确中心0.5；EFFECT_CHAIN及风吟全部调音属性保持。完整Kontakt状态发生正常保存变化，不宣称和旧包逐字节相同。
+原始接收文件存assets/incoming-tones/20261017/Kontakt音源-肯萨-弯音绑定.fytonepack；内置副本只将通用kontakt-engine/名称恢复为kontakt-kensa/肯萨并更新manifest摘要，其他XML子节点（包括完整音源状态和效果链）与此次用户新包逐字节一致。审计assets/tone-packages/kensa-bend-118-audit.json。
+KensaBendRange仅在现有肯萨专用控制标志启用时使用，要求参数槽1名称percent，拒绝未绑定、改名、越界及写入回读不一致；失败恢复旧值。不改NKI脚本，不发送猜测的RPN，不增加音频移调，不将本规则套到其他Kontakt库。范围计算采用已提供的库脚本10至400%线性控制以及导出100%标定点，±1至±4分别请求100至400%；设置时发送弯音回中。前提为此方案保存的Use Windcontroller处于开启状态，不试图自动切换不可自动化按钮。
+216项Python通过/private/tmp/fy-118-kensa-python.log（含实际已接收包的摘要/状态保持）。完整Mac编译通过/private/tmp/fy-118-kensa-build.log；24项CTest通过/private/tmp/fy-118-kensa-ctest.log，其中新增测试模拟宿主整数百分比旋钮100/200/300/400%读写及其他参数不变。初次单测失败源于测试使用JUCE简便构造器，其0..1范围默认按0.01量化，不能模拟库10..400整数百分比；已按真实声明范围修正测试，生产回读容差未放宽。
+actualPitchEndpointsVerified仍为false：目标Windows上真实肯萨音高端点、持音切换、关闭/回中以及新代码下保存重载仍待验证。尚未提交或生成新的安装包。
+
+三、前轮本地修复继续保留
+弦乐抖弓由技巧键独占，激活时仅解除tremoloParam原气息绑定，保留曲线和其他参数；小提琴明亮原包确有该参数绑定CC11。
+两处SWAM乐器键从const char*地址比较改为std::string_view内容比较，避免跨编译器字符串池导致的弦乐抖弓/颤音频率分支失效。
+上轮肯萨颤音CC19真实调频、录屏仍未完成，不列为已交付；本次未触及音源授权、驱动、ASIO/VB-CABLE或气息曲线。
+
+四、验证证据
+浏览器：/private/tmp/fy-118-window-ui.cjs，全屏1366x768与精简680x900，五项上拉菜单实际点击、鼠标/触摸/笔事件链、第二指针忽略、失焦结束、Ctrl滚轮拦截及无JS错误通过。截图/private/tmp/fy-118-bend-full.png、fy-118-bend-compact.png。
+Python：214项通过，/private/tmp/fy-118-window-python.log。
+完整Mac构建日志：/private/tmp/fy-118-window-build.log。
+CTest日志：/private/tmp/fy-118-window-ctest.log。
+Windows原生WebView2手势、多DPI显示器拖动及肯萨弯音仍需目标机验证，不以浏览器合成事件替代。

@@ -3,6 +3,7 @@
 #include "SwamTechniqueRouting.h"
 #include "SimpleTechniquePolicy.h"
 #include "SwamPluginClassifier.h"
+#include "SwamStateCompatibility.h"
 
 #include <cassert>
 #include <cmath>
@@ -147,6 +148,29 @@ int main(int argc, char** argv)
         oldXml->findParentElementOf(oldTable)->removeChildElement(oldTable,true);
         newXml->findParentElementOf(newTable)->removeChildElement(newTable,true);
         assert(oldXml->isEquivalentTo(newXml.get(), false)); // All non-mapping state is preserved.
+    }
+    // Real released string packages: breath must never select bow tremolo.
+    for(const char* filename:{"violin-bright.fytonepack","violin-soft.fytonepack","cello.fytonepack"}) {
+        juce::ZipFile zip(root.getChildFile("assets/tone-packages").getChildFile(filename));
+        std::unique_ptr<juce::InputStream> input(zip.createStreamForEntry(zip.getIndexOfFileName("tone.xml")));
+        assert(input);auto doc=juce::parseXML(input->readEntireStreamAsString());assert(doc);
+        juce::MemoryBlock state;assert(state.fromBase64Encoding(doc->getChildByName("PRESET")->getChildByName("INSTRUMENT_STATE")->getAllSubText()));
+        assert(fengyin::SwamTechniqueRouting::prepare(state,true,false,false,true).supported);
+        auto before=fengyin::SwamStateCompatibility::read(state);assert(before);
+        assert(fengyin::SwamTechniqueRouting::prepare(state,true,false,false,true,true).supported);
+        auto after=fengyin::SwamStateCompatibility::read(state);assert(after);
+        std::map<juce::String,double> a,b;fengyin::SwamStateCompatibility::params(*before,a);fengyin::SwamStateCompatibility::params(*after,b);
+        assert(a==b);
+        auto* oldTable=fengyin::SwamTechniqueRouting::findTable(*before);
+        auto* newTable=fengyin::SwamTechniqueRouting::findTable(*after);
+        for(auto* e:newTable->getChildIterator())
+            if(e->getStringAttribute("parameterId")=="tremoloParam")assert(e->getIntAttribute("enabled")==0);
+        for(auto* e:oldTable->getChildIterator())
+            if(e->getStringAttribute("parameterId")=="tremoloParam")e->setAttribute("enabled",0);
+        assert(before->isEquivalentTo(after.get(),false)); // Only the binding's enabled flag changed.
+        const auto once=state;
+        assert(!fengyin::SwamTechniqueRouting::prepare(state,true,false,false,true,true).changed);
+        assert(once==state);
     }
     // Optional installed-plugin verification: no audio device, no saved settings.
     if (argc >= 2)

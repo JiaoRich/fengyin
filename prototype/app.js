@@ -3,9 +3,19 @@ const $$ = (selector) => [...document.querySelectorAll(selector)];
 let studioUnlocked = false, studioSavedId = '', studioExportAfterSave = false;
 let compactMode = false;
 let touchWindowGesture = null;
+let windowGestureMoveTimer=null;
+function flushWindowGestureMove() {
+  if(windowGestureMoveTimer!==null)clearTimeout(windowGestureMoveTimer);
+  windowGestureMoveTimer=null;
+  if(!touchWindowGesture?.delta)return;
+  const [x,y]=touchWindowGesture.delta;touchWindowGesture.delta=null;
+  nativeEvent('windowAction',{action:`pointer-move:${x}:${y}`});
+}
 function beginTouchWindowGesture(e, action) {
-  if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return false;
-  touchWindowGesture = {id:e.pointerId,x:e.screenX,y:e.screenY};
+  if (e.isPrimary === false || touchWindowGesture) return true;
+  // One captured-pointer path for mouse, pen and touch. Do not simultaneously
+  // run the native mouse polling path for synthetic touch mouse messages.
+  touchWindowGesture = {id:e.pointerId,x:e.screenX,y:e.screenY,target:e.currentTarget};
   e.currentTarget.setPointerCapture(e.pointerId);
   nativeEvent('windowAction',{action:`pointer-begin:${action}`});
   return true;
@@ -13,12 +23,29 @@ function beginTouchWindowGesture(e, action) {
 document.addEventListener('pointermove',e=>{
   if (!touchWindowGesture || e.pointerId!==touchWindowGesture.id) return;
   e.preventDefault();
-  nativeEvent('windowAction',{action:`pointer-move:${Math.round(e.screenX-touchWindowGesture.x)}:${Math.round(e.screenY-touchWindowGesture.y)}`});
+  touchWindowGesture.delta=[Math.round(e.screenX-touchWindowGesture.x),Math.round(e.screenY-touchWindowGesture.y)];
+  if(windowGestureMoveTimer===null)windowGestureMoveTimer=setTimeout(flushWindowGestureMove,1000/24);
 },{passive:false});
 for(const event of ['pointerup','pointercancel','lostpointercapture']) document.addEventListener(event,e=>{
   if (!touchWindowGesture || e.pointerId!==touchWindowGesture.id) return;
-  touchWindowGesture=null;nativeEvent('windowAction',{action:'pointer-end'});
+  flushWindowGestureMove();touchWindowGesture=null;nativeEvent('windowAction',{action:'pointer-end'});
 });
+function cancelWindowGesture() {
+  const gesture=touchWindowGesture;
+  if(!gesture)return;
+  if(windowGestureMoveTimer!==null)clearTimeout(windowGestureMoveTimer);
+  windowGestureMoveTimer=null;
+  touchWindowGesture=null;
+  if(gesture.target.hasPointerCapture?.(gesture.id))gesture.target.releasePointerCapture(gesture.id);
+  nativeEvent('windowAction',{action:'pointer-end'});
+}
+window.addEventListener('blur',cancelWindowGesture);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)cancelWindowGesture();});
+// Keep page scale fixed, not window size. Ordinary one-finger scrolling and
+// sliders remain usable; compact resizing remains available at the edges.
+document.addEventListener('touchstart',e=>{if(e.touches.length>1){cancelWindowGesture();e.preventDefault();}},{passive:false});
+for(const type of ['gesturestart','gesturechange'])document.addEventListener(type,e=>e.preventDefault(),{passive:false});
+document.addEventListener('wheel',e=>{if(e.ctrlKey)e.preventDefault();},{passive:false});
 const windowControls = document.createElement('div');
 windowControls.className = 'compact-window-controls';
 windowControls.innerHTML = '<button type="button" aria-label="最小化" data-action="minimise">−</button><button type="button" aria-label="关闭" data-action="close">×</button>';
@@ -47,7 +74,7 @@ for (const edge of ['n','s','e','w','ne','nw','se','sw']) {
   document.body.appendChild(handle);
 }
 function applyWindowMode(compact) {
-  touchWindowGesture = null;
+  cancelWindowGesture();
   compactMode = !!compact;
   document.body.classList.toggle('compact-mode', compactMode);
   $('#window-mode-toggle').textContent = compactMode ? '全屏' : '精简模式';
@@ -120,6 +147,7 @@ const kongPresets = [
 
 let simulating = false;
 let recording = false;
+let screenRecordingBusy=false;
 let animationFrame;
 let visualTimer = null;
 let videoUrl;
@@ -524,6 +552,8 @@ function toast(message) {
 function showPage(page) {
   if (compactMode) page = 'play';
   if (page === 'chain' && !studioUnlocked) return openStudioLogin();
+  for(const id of ['record-menu','bend-range-dialog'])if($('#'+id))$('#'+id).hidden=true;
+  $('#record-options')?.setAttribute('aria-expanded','false');
   $$('.nav-item,.page').forEach(el => el.classList.remove('active'));
   const button = $(`.nav-item[data-page="${page}"]`);
   button.classList.add('active');
@@ -1196,8 +1226,7 @@ const themeButton=document.createElement('button'); themeButton.id='theme-button
 themeButton.textContent='主题 ⌃'; themeButton.setAttribute('aria-haspopup','menu'); themeButton.setAttribute('aria-expanded','false');
 $('.global-controls').append(themeButton);
 const themeMenu=document.createElement('div');themeMenu.className='inline-choice';themeMenu.hidden=true;themeMenu.setAttribute('role','menu');document.body.append(themeMenu);
-$('#bend-range-dialog [aria-modal]').removeAttribute('aria-modal');
-$('#bend-range-button').setAttribute('aria-haspopup','true');
+$('#bend-range-button').setAttribute('aria-haspopup','menu');
 function positionChoice(menu,button){const r=button.getBoundingClientRect();menu.style.maxHeight=Math.max(80,r.top-16)+'px';const box=menu.getBoundingClientRect();menu.style.left=Math.max(8,Math.min(innerWidth-box.width-8,r.right-box.width))+'px';menu.style.top=Math.max(8,r.top-box.height-7)+'px';}
 function closeThemeMenu(){themeMenu.hidden=true;themeButton.setAttribute('aria-expanded','false');}
 themeButton.onclick=()=>{if(!themeMenu.hidden)return closeThemeMenu();themeMenu.replaceChildren();for(const option of $('#theme').options){const b=document.createElement('button');b.textContent=option.textContent;b.setAttribute('role','menuitemradio');b.setAttribute('aria-checked',String(option.value===document.body.dataset.theme));b.onclick=()=>{$('#theme').value=option.value;$('#theme').dispatchEvent(new Event('change'));closeThemeMenu();themeButton.focus();};themeMenu.append(b);}themeMenu.hidden=false;themeButton.setAttribute('aria-expanded','true');positionChoice(themeMenu,themeButton);themeMenu.querySelector('[aria-checked=true]')?.focus();};
@@ -1263,10 +1292,15 @@ function renderBendRange(state) {
 function showBendConfirmation() {
   const name = bendState.instrumentChineseName || '当前';
   $('#bend-confirm-message').textContent = `确定将${name}乐器的弯音范围修改为±${bendSelection}？点击确定系统将记住您的选择，下次再演奏${name}乐器时自动切换到您设定的弯音范围。`;
-  $$('#bend-range-options button').forEach(button => button.classList.toggle('active', Number(button.dataset.bend) === bendSelection));
+  $$('#bend-range-options button').forEach(button => {
+    const selected=Number(button.dataset.bend)===bendSelection;
+    button.classList.toggle('active',selected);button.setAttribute('aria-checked',String(selected));
+    button.disabled=bendBusy;
+  });
   $('#confirm-bend-range').disabled = bendBusy;
 }
 $('#bend-range-button').addEventListener('click', () => {
+  if(!$('#bend-range-dialog').hidden){$('#bend-range-dialog').hidden=true;return;}
   bendDialogKey = bendState.bendPreferenceKey;
   bendSelection = bendState.bendRange || bendState.bendRecommended || 1;
   bendBusy = false;
@@ -1275,7 +1309,7 @@ $('#bend-range-button').addEventListener('click', () => {
   showBendConfirmation();
   $('#bend-range-dialog').hidden = false;
   positionChoice($('#bend-range-dialog'),$('#bend-range-button'));
-  $('#close-bend-range').focus();
+  $('#bend-range-options button.active')?.focus();
 });
 $('#bend-range-options').addEventListener('click', event => {
   const button = event.target.closest('[data-bend]');
@@ -1287,6 +1321,7 @@ $('#bend-range-options').addEventListener('click', event => {
 function commitBendRange(reset) {
   if (bendBusy || bendDialogKey !== bendState.bendPreferenceKey) return;
   bendBusy = true;
+  showBendConfirmation();
   $('#confirm-bend-range').disabled = true;
   $('#reset-bend-range').disabled = true;
   $('#bend-result-message').textContent = '正在设置…';
@@ -1304,6 +1339,7 @@ $('#close-bend-range').addEventListener('click', () => { $('#bend-range-dialog')
 $('#bend-range-dialog').addEventListener('keydown', event => { if (event.key === 'Escape') $('#close-bend-range').click(); });
 window.__JUCE__?.backend?.addEventListener('bendRangeResult', result => {
   bendBusy = false;
+  showBendConfirmation();
   $('#confirm-bend-range').disabled = false;
   $('#reset-bend-range').disabled = false;
   $('#bend-result-message').textContent = result.message || '';
@@ -1639,6 +1675,7 @@ $('#cancel-technique-learning').addEventListener('click', () => {
 });
 
 $('#record').addEventListener('click', async event => {
+  if(screenRecordingBusy){nativeEvent('toggleWindowRecording',{});return;}
   if (!recording && video.src && window.__JUCE__?.backend?.emitEvent && !nativeAccompanimentReady) {
     return toast('伴奏音轨尚未准备好，请稍候再开始录音');
   }
@@ -1650,6 +1687,29 @@ $('#record').addEventListener('click', async event => {
   event.target.style.color = recording ? 'var(--danger)' : '';
   toast(recording ? '已开始模拟录音' : '模拟录音已保存');
 });
+const recordMenu=$('#record-menu'),recordOptions=$('#record-options');
+function closeRecordMenu(){recordMenu.hidden=true;recordOptions.setAttribute('aria-expanded','false');}
+recordOptions.addEventListener('click',()=>{
+  if(!recordMenu.hidden)return closeRecordMenu();
+  recordMenu.hidden=false;recordOptions.setAttribute('aria-expanded','true');positionChoice(recordMenu,recordOptions);
+});
+$('#record-audio-choice').onclick=()=>{
+  closeRecordMenu();if(screenRecordingBusy)return toast('请先停止并保存录屏');$('#record').click();
+};
+$('#record-video-choice').onclick=async()=>{
+  closeRecordMenu();if(recording)return toast('请先停止录音');
+  if(!window.__JUCE__?.backend)return toast('录视频需要Windows版风吟，不会在网页中模拟保存');
+  if(!screenRecordingBusy && window.fengyinVoice && !await window.fengyinVoice.beforeRecording())return;
+  const probe=document.createElement('span');probe.style.color='var(--bg)';document.body.append(probe);
+  const rgb=getComputedStyle(probe).color.match(/[\d.]+/g)?.map(Number)||[7,16,29];probe.remove();
+  const background='ff'+rgb.slice(0,3).map(n=>Math.max(0,Math.min(255,Math.round(n))).toString(16).padStart(2,'0')).join('');
+  nativeEvent('toggleWindowRecording',{background});
+};
+$('#screen-recordings').onclick=()=>{closeRecordMenu();nativeEvent('showScreenRecordings');};
+document.addEventListener('pointerdown',e=>{if(!recordMenu.contains(e.target)&&!recordOptions.contains(e.target))closeRecordMenu();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeRecordMenu();});
+window.addEventListener('resize',closeRecordMenu);
+window.__JUCE__?.backend?.addEventListener('screenRecordingMessage',message=>toast(String(message)));
 $('#recording-manager').addEventListener('click', () => nativeEvent('showRecordings'));
 $('#low-performance').addEventListener('change', event => {
   document.body.classList.toggle('low-performance', event.target.checked);
@@ -2069,8 +2129,10 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
     if (versionNode) versionNode.textContent = `风吟 ${state.appVersion} · 本地运行，不会保存或上传个人资料。`;
   }
   recording = !!state.recording;
-  $('#record').textContent = recording ? '■ 停止录音' : '● 开始录音';
-  $('#record').style.color = recording ? 'var(--danger)' : '';
+  screenRecordingBusy=!!state.screenRecordingBusy;
+  $('#record').textContent = screenRecordingBusy ? (state.screenRecordingStopping?'正在保存…':state.screenRecording?'■ 停止录屏':'录屏启动中…') : recording ? '■ 停止录音' : '● 开始录音';
+  $('#record').style.color = recording||screenRecordingBusy ? 'var(--danger)' : '';
+  $('#record').disabled=!!state.screenRecordingStopping;
 });
 const toneDiagnosticButton = $('#export-current-tone');
 const toneDiagnosticStatus = $('#tone-diagnostic-status');
@@ -2303,7 +2365,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.17 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.18 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

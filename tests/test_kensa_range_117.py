@@ -10,7 +10,7 @@ class KensaRange117(unittest.TestCase):
         self.assertIn('kensaVibratoController(safeValue)',route)
         helper=(ROOT/'native/Source/KensaVibratoRange.h').read_text(encoding='utf-8')
         self.assertIn('depth<=0.f',helper)
-        self.assertIn(',31,96)',helper)
+        self.assertIn(',31,70)',helper)
         self.assertNotIn('controllerEvent(1,19,',route)
     def test_soprano_bright_is_user_package_unchanged(self):
         source=ROOT/'assets/incoming-tones/20261017/高音萨克斯-高萨-明亮.fytonepack'

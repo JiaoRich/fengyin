@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.1.17",
+    [string]$Version = "1.1.18",
     [switch]$SkipInstaller
 )
 
@@ -104,6 +104,16 @@ if (-not (Test-Path $AudioEngineExe)) { throw "未找到独立音频引擎：$Au
 if (-not (Test-Path $AudioWatchdogExe)) { throw "未找到音频恢复守护程序：$AudioWatchdogExe" }
 Copy-Item $AudioEngineExe (Join-Path $PackageDir "FengYinAudioEngine.exe") -Force
 Copy-Item $AudioWatchdogExe (Join-Path $PackageDir "FengYinAudioWatchdog.exe") -Force
+$ScreenRecorderExe = Join-Path $BuildDir "Release\FengYinScreenRecorder.exe"
+if (-not (Test-Path $ScreenRecorderExe)) { throw "Screen recording component missing: $ScreenRecorderExe" }
+Copy-Item $ScreenRecorderExe (Join-Path $PackageDir "FengYinScreenRecorder.exe") -Force
+$RecorderCheck = Join-Path $BuildDir "screen-recorder-selftest.mp4"
+Invoke-Checked "Screen recorder MP4 encoding selftest" {
+    & $ScreenRecorderExe --selftest $RecorderCheck
+    if ($LASTEXITCODE -ne 0 -and (Test-Path "$RecorderCheck.error.txt")) { Get-Content "$RecorderCheck.error.txt" }
+}
+$RecorderFfmpeg = if (Test-Path $FfmpegPath) { $FfmpegPath } else { Join-Path $PreparedFfmpeg "ffmpeg.exe" }
+Invoke-Checked "Screen recorder decoded audio/video check" { python (Join-Path $PSScriptRoot "verify_screen_recording.py") $RecorderFfmpeg $RecorderCheck }
 # The public installer uses VB-CABLE. Never package or invoke the experimental driver.
 Copy-Item (Join-Path $ProjectRoot "README.md") $PackageDir -Force
 Copy-Item (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES.md") $PackageDir -Force

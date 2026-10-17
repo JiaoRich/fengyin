@@ -251,6 +251,7 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
 MainComponent::~MainComponent()
 {
     stopTimer();
+    windowRecorder.stop();
     audio.getDeviceManager().removeAudioCallback(&voicePrompts);
     pluginHost.setLatencyProbeActive(false);
     webVideoAudioExtractor.cancel();
@@ -264,6 +265,7 @@ MainComponent::~MainComponent()
 
 void MainComponent::setWebPresentationVisible(bool visible)
 {
+    if(!visible)windowRecorder.stop();
     if (webPresentationVisible == visible) return;
     webPresentationVisible = visible;
     lastWebStateAtMs = 0; // Restore gets a complete current snapshot, not stale deltas.
@@ -639,7 +641,7 @@ void MainComponent::setupWebInterface()
         })
         .withEventListener("optimiseAudioSettings", [this](juce::var)
         {
-            if (videoPlaybackActive || recorder.isRecording() || midi.getSnapshot().breath > 0.01f
+            if (videoPlaybackActive || recorder.isRecording() || windowRecorder.busy() || midi.getSnapshot().breath > 0.01f
                 || midi.getSnapshot().lastNote >= 0)
                 emitAudioSettingsState(false, utf8("请先暂停伴奏、录音和吹奏，再优化声音"));
             else if (! pluginHost.hasPlugin())
@@ -808,11 +810,20 @@ void MainComponent::setupWebInterface()
             int size=0;
             const auto* data=BinaryData::getNamedResource((id+"_wav").toRawUTF8(),size);
             const auto gain=static_cast<float>(payload.getProperty("volume",.45));
-            if(token<=0 || !data || recorder.isRecording() || !voicePrompts.play(data,size,token,gain))
+            if(token<=0 || !data || recorder.isRecording() || windowRecorder.busy() || !voicePrompts.play(data,size,token,gain))
                 if(webInterface)webInterface->emitEventIfBrowserIsVisible("voiceFinished",-token);
         })
         .withEventListener("stopVoice", [this](juce::var) {voicePrompts.stop();})
-        .withEventListener("toggleRecording", [this](juce::var) { voicePrompts.stop(); if (isActivated || recorder.isRecording()) toggleRecording(); })
+        .withEventListener("toggleRecording", [this](juce::var) {
+            voicePrompts.stop();
+            if(windowRecorder.busy())windowRecorder.stop();
+            else if(isActivated || recorder.isRecording())toggleRecording();
+        })
+        .withEventListener("toggleWindowRecording", [this](juce::var payload) {toggleWindowRecording(payload);})
+        .withEventListener("showScreenRecordings", [](juce::var) {
+            const auto folder=juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile(utf8("风吟录屏"));
+            folder.createDirectory();folder.revealToUser();
+        })
         .withEventListener("showRecordings", [](juce::var)
         {
             const auto folder = fengyin::RecordingService::getRecordingsFolder();
@@ -1216,6 +1227,11 @@ void MainComponent::paint(juce::Graphics& g)
 void MainComponent::requestCompactMode(bool compact)
 {
     if (compact == compactMode || windowModePromptOpen) return;
+    if(windowRecorder.busy()) {
+        windowRecorder.stop();
+        if(webInterface)webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",utf8("正在保存录屏，完成后可切换窗口模式"));
+        return;
+    }
     const juce::Component::SafePointer<MainComponent> safe(this);
     auto apply = [safe, compact](int result)
     {
@@ -1331,6 +1347,13 @@ void MainComponent::resized()
 
 void MainComponent::timerCallback()
 {
+    windowRecorder.poll();
+    if(windowRecorder.takeCompleted() && webInterface) {
+        const auto message=windowRecorder.error().isEmpty()
+            ? utf8("录屏已保存：")+windowRecorder.lastFile().getFullPathName():windowRecorder.error();
+        webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",message);
+        lastWebStateAtMs=0;
+    }
     midi.tickTechniqueAutomation(); // Restore the established native UI timer path.
     if(const auto token=voicePrompts.consumeFinished();token!=0 && webInterface)
         webInterface->emitEventIfBrowserIsVisible("voiceFinished",token);
@@ -1361,7 +1384,7 @@ void MainComponent::timerCallback()
     }
     snapshot = midi.getSnapshot();
     if (!containerPrewarmStarted && isActivated && pluginChoicesLoaded && !pluginCatalog.getProgress().scanning && !pluginLoading && !effectLoading
-        && !recorder.isRecording() && !videoPlaybackActive && snapshot.breath <= 0.01f
+        && !recorder.isRecording() && !windowRecorder.busy() && !videoPlaybackActive && snapshot.breath <= 0.01f
         && snapshot.lastNote < 0 && juce::Time::getMillisecondCounterHiRes() >= containerPrewarmAfterMs)
     {
         juce::Array<juce::PluginDescription> containers;
@@ -1385,7 +1408,7 @@ void MainComponent::timerCallback()
     if (snapshot.breath > 0.01f || snapshot.lastNote >= 0)
         lastPerformanceActivityMs = juce::Time::getMillisecondCounterHiRes();
     if (audio.isAutomaticLatencyTuning()
-        && (videoPlaybackActive || recorder.isRecording() || snapshot.breath > 0.01f || snapshot.lastNote >= 0))
+        && (videoPlaybackActive || recorder.isRecording() || windowRecorder.busy() || snapshot.breath > 0.01f || snapshot.lastNote >= 0))
     {
         pluginHost.setLatencyProbeActive(false);
         audio.cancelAutomaticLatencyTuning();
@@ -1395,7 +1418,7 @@ void MainComponent::timerCallback()
     {
         audioOutputSyncTicks = 0;
         const auto outputChanged = audio.systemDefaultOutputChanged();
-        const auto safeToReconfigure = ! videoPlaybackActive && ! recorder.isRecording()
+        const auto safeToReconfigure = ! videoPlaybackActive && ! recorder.isRecording() && !windowRecorder.busy()
             && juce::Time::getMillisecondCounterHiRes() - lastPerformanceActivityMs > 3000.0;
         if (outputChanged)
             followSystemAudioOutputIfNeeded();
@@ -1520,7 +1543,7 @@ void MainComponent::timerCallback()
     displayedRightPeak = juce::jmax(displayedRightPeak * 0.88f, juce::jlimit(0.0f, 1.0f, masterOutput.getRightPeak()));
     const auto webNow = juce::Time::getMillisecondCounterHiRes();
     const bool webActive = snapshot.breath > 0.01f || snapshot.lastNote >= 0
-        || videoPlaybackActive || recorder.isRecording() || pluginLoading || effectLoading || pluginCatalog.getProgress().scanning;
+        || videoPlaybackActive || recorder.isRecording() || windowRecorder.busy() || pluginLoading || effectLoading || pluginCatalog.getProgress().scanning;
     if (webPresentationVisible && webInterface != nullptr && webInterfaceReady
         && webNow - lastWebStateAtMs >= (webActive ? (videoPlaybackActive ? 200.0 : 100.0) : 1000.0))
     {
@@ -1583,6 +1606,9 @@ void MainComponent::timerCallback()
         state->setProperty("licenseMessage", currentLicenseStatus.message);
         state->setProperty("machineCode", machineCode);
         state->setProperty("recording", recorder.isRecording());
+        state->setProperty("screenRecordingBusy",windowRecorder.busy());
+        state->setProperty("screenRecording",windowRecorder.recording());
+        state->setProperty("screenRecordingStopping",windowRecorder.stopping());
         state->setProperty("transposeSemitones", midi.getTransposeSemitones());
         state->setProperty("targetKey", midi.getTargetKey());
         state->setProperty("growlSensitivity", midi.getGrowlSensitivity());
@@ -1910,6 +1936,7 @@ void MainComponent::emitSuperLowLatencyState(const juce::String& overrideMessage
 
 void MainComponent::startSuperLowLatencyOptimisation(bool restore)
 {
+    if(windowRecorder.busy()){emitSuperLowLatencyState(utf8("请先停止并保存录屏，再切换音频链路"));return;}
     if (superLowLatencyRunning) return;
     const auto status = windowsLowLatencyOptimizer.getStatus();
     if (! status.supported)
@@ -3863,8 +3890,26 @@ void MainComponent::showActivationDialog()
     }), false);
 }
 
+void MainComponent::toggleWindowRecording(const juce::var& payload)
+{
+    if(windowRecorder.busy()){windowRecorder.stop();return;}
+    auto tell=[this](const juce::String& message){if(webInterface)webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",message);};
+    if(!isActivated){tell(utf8("请先激活或开启试用"));return;}
+    if(recorder.isRecording()){tell(utf8("请先停止录音，再开始录屏"));return;}
+    const auto type=audio.getStatus().deviceType;
+    if(superLowLatencyRunning || type.containsIgnoreCase("ASIO") || type.containsIgnoreCase("Exclusive")) {
+        tell(utf8("录屏固定采集系统扬声器，请先切换Windows共享或共享低延迟模式，并让伴奏从同一默认扬声器播放"));return;
+    }
+    voicePrompts.stop();
+    const auto colour=juce::Colour::fromString(payload.getProperty("background","ff07101d").toString()).withAlpha(1.f);
+    if(!windowRecorder.start(getPeer()?getPeer()->getNativeHandle():nullptr,colour,compactMode))tell(windowRecorder.error());
+    else tell(utf8("正在启动录屏：仅录风吟窗口和系统默认扬声器声音；最小化或停止时保存"));
+    lastWebStateAtMs=0;
+}
+
 void MainComponent::toggleRecording()
 {
+    if(windowRecorder.busy())return;
     if (recorder.isRecording())
     {
         recorder.stop();
@@ -3940,6 +3985,9 @@ void MainComponent::emitAudioSettingsState(bool success, const juce::String& mes
 
 void MainComponent::applyAudioSettingsFromWeb(const juce::var& payload)
 {
+    if(windowRecorder.busy()) {
+        emitAudioSettingsState(false,utf8("请先停止并保存录屏，再更改音频设备"));return;
+    }
     pluginHost.setLatencyProbeActive(false);
     const auto previous = audio.getStatus();
     const auto previousWasSharedAsio = previous.deviceType.equalsIgnoreCase("ASIO")
@@ -4040,6 +4088,7 @@ void MainComponent::applyAudioSettingsFromWeb(const juce::var& payload)
 
 void MainComponent::showDeviceSettings()
 {
+    if(windowRecorder.busy()){if(webInterface)webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",utf8("请先停止并保存录屏，再更改音频设备"));return;}
     const auto current = audio.getStatus();
     const auto types = audio.getAvailableDeviceTypes();
     deviceDialog = std::make_unique<juce::AlertWindow>(utf8("声音设备设置"),

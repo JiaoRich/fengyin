@@ -12,6 +12,12 @@ function(replace_exact file before after)
     file(WRITE "${file}" "${content}")
 endfunction()
 
+# Lock the application UI's page scale, independently from the OS/window DPI.
+# Browser zoom and touchscreen pinch scale are separate WebView2 settings.
+replace_exact("${JUCE_SOURCE_DIR}/modules/juce_gui_extra/native/juce_WebBrowserComponent_windows.cpp"
+    "            settings->put_IsStatusBarEnabled (! preferences.getWinWebView2BackendOptions().getIsStatusBarDisabled());"
+    "           #if FENGYIN_LOCK_WEBVIEW_ZOOM\n            settings->put_IsZoomControlEnabled (false);\n            webViewController->put_ZoomFactor (1.0);\n            ComSmartPtr<ICoreWebView2Settings5> settings5;\n            settings.QueryInterface (settings5);\n            if (settings5 != nullptr) settings5->put_IsPinchZoomEnabled (false);\n           #endif\n            settings->put_IsStatusBarEnabled (! preferences.getWinWebView2BackendOptions().getIsStatusBarDisabled());")
+
 # The isolated render-only engine must not probe microphone pins during the
 # ASIO constructor's dummy-buffer cycle. Leave other JUCE hosts unchanged.
 set(asio "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/native/juce_ASIO_windows.cpp")

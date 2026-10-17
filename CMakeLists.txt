@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.17 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.18 LANGUAGES C CXX)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
 set(CMAKE_CXX_STANDARD 20)
@@ -143,6 +143,8 @@ target_sources(FengYin PRIVATE
     native/Source/Main.cpp
     native/Source/MainComponent.cpp
     native/Source/MainComponent.h
+    native/Source/WindowRecordingService.cpp
+    native/Source/WindowRecordingService.h
     native/Source/MidiInputService.cpp
     native/Source/MidiInputService.h
     native/Source/BreathMapper.h
@@ -208,6 +210,7 @@ target_compile_definitions(FengYin PRIVATE
     JUCE_APPLICATION_VERSION_STRING="${PROJECT_VERSION}"
     JUCE_USE_CURL=0
     JUCE_WEB_BROWSER=1
+    FENGYIN_LOCK_WEBVIEW_ZOOM=1
     JUCE_PLUGINHOST_VST3=1
 )
 
@@ -266,6 +269,11 @@ target_link_libraries(FengYinLicenseGenerator PRIVATE juce::juce_cryptography)
 
 if(WIN32)
     target_link_libraries(FengYin PRIVATE setupapi advapi32 shell32 avrt dwmapi)
+    add_executable(FengYinScreenRecorder WIN32 native/ScreenRecorder/main.cpp)
+    target_compile_definitions(FengYinScreenRecorder PRIVATE WINVER=0x0A00 _WIN32_WINNT=0x0A00)
+    target_compile_options(FengYinScreenRecorder PRIVATE /utf-8)
+    target_link_libraries(FengYinScreenRecorder PRIVATE windowsapp d3d11 dxgi dwmapi mfplat mfreadwrite mfuuid ole32 shell32)
+    install(TARGETS FengYinScreenRecorder RUNTIME DESTINATION .)
     target_compile_definitions(FengYin PRIVATE
         # ASIO 只供用户主动选择 KoordASIO 的 WASAPI 共享模式。默认和
         # 自动优化仍只使用 Windows 共享输出，不会打开独占驱动。

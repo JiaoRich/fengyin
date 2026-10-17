@@ -9,10 +9,10 @@
   let token=0, pending=null, state={}, connected=null, connectionTimer, noToneAt=0;
   let guiding=false, step=-1, guideTimer, countdown=false, learnedName='', wasCompact=false, videoReady=false;
   const emit=(name,value={})=>backend?.emitEvent(name,value);
-  const busy=()=>!!state.recording || Number(state.breath)>0.015 || !video.paused;
+  const busy=()=>!!state.recording || !!state.screenRecordingBusy || Number(state.breath)>0.015 || !video.paused;
   function stop(){emit('stopVoice');if(pending){clearTimeout(pending.timeout);pending.resolve(false);pending=null;}}
   function say(id,{force=false}={}){
-    if(!enabled || !clips.has(id) || (busy()&&!force) || state.recording)return Promise.resolve(false);
+    if(!enabled || !clips.has(id) || (busy()&&!force) || state.recording || state.screenRecordingBusy)return Promise.resolve(false);
     stop();const request=++token;
     return new Promise(resolve=>{
       pending={request,resolve,timeout:setTimeout(()=>{stop();},45000)};

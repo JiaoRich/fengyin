@@ -7,7 +7,9 @@ class Release116(unittest.TestCase):
             with zipfile.ZipFile(path) as z:
                 self.assertIsNone(z.testzip())
                 return ET.fromstring(z.read('tone.xml')).find('PRESET')
-        old=read(ROOT/'assets/incoming-tones/20261016/Kontakt音源-肯萨.fytonepack')
+        # The received 118 revision adds the user-assigned bend automation.
+        # Compare against that unmodified incoming source, not the retired state.
+        old=read(ROOT/'assets/incoming-tones/20261017/Kontakt音源-肯萨-弯音绑定.fytonepack')
         new=read(ROOT/'assets/tone-packages/kontakt-kensa.fytonepack')
         self.assertEqual(new.get('instrumentKey'),'kontakt-kensa')
         self.assertEqual([ET.tostring(x) for x in old],[ET.tostring(x) for x in new])
@@ -27,7 +29,11 @@ class Release116(unittest.TestCase):
         self.assertIn('slots.getNumChildren()==2',host)
         self.assertIn('suonaDualVoice.setFlutter(safeValue>.5f)',host)
         self.assertIn('controllerEvent(1,1,midiValue)',host)
-        self.assertNotIn('controllerEvent(1,19,',host)
+        # 1.1.18 adds a Kensa-only rate conversion derived from the supplied
+        # script; arbitrary Kontakt libraries must still not receive this CC.
+        rate=host.split('if(tempoRateDirty.exchange(false))',1)[1].split('for (size_t index',1)[0]
+        self.assertIn('if(kontaktStandardControls.load())',rate)
+        self.assertIn('controllerEvent(1,19,kensaVibratoRateController(hz))',rate)
     def test_only_four_folk_defaults_changed(self):
         audit=json.loads((ROOT/'assets/tone-packages/folk-defaults-116-audit.json').read_text(encoding='utf-8'))
         changed={'folk-'+x+'.fytonepack' for x in audit['targets']}

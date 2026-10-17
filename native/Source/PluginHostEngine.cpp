@@ -1,5 +1,6 @@
 #include "PluginHostEngine.h"
 #include "KensaVibratoRange.h"
+#include "KensaBendRange.h"
 #include "TechniqueMidiDeduplication.h"
 #include "SwamTechniqueRouting.h"
 #include "SwamStateCompatibility.h"
@@ -730,16 +731,17 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve()
     juce::MemoryBlock state;
     plugin->getStateInformation(state);
     const auto original=state;
-    const auto key=SwamPluginClassifier::instrumentKey(plugin->getName().toStdString());
+    const std::string_view key=SwamPluginClassifier::instrumentKey(plugin->getName().toStdString());
     const bool wantFlutter=simpleOther(key)==PerformanceTechnique::flutter;
-    const auto configured=SwamTechniqueRouting::prepare(state,simpleVibrato(key),simpleGrowl(key),wantFlutter,true);
+    const bool ownTremolo=key=="violin" || key=="cello";
+    const auto configured=SwamTechniqueRouting::prepare(state,simpleVibrato(key),simpleGrowl(key),wantFlutter,true,ownTremolo);
     if(configured.supported && configured.changed)
     {
         // Once per activation, while the graph is paused, never on each CC or mode switch.
         plugin->setStateInformation(state.getData(),static_cast<int>(state.getSize()));
         juce::MemoryBlock verified;plugin->getStateInformation(verified);
         auto check=verified;
-        const auto routing=SwamTechniqueRouting::prepare(check,simpleVibrato(key),simpleGrowl(key),wantFlutter,true);
+        const auto routing=SwamTechniqueRouting::prepare(check,simpleVibrato(key),simpleGrowl(key),wantFlutter,true,ownTremolo);
         if(!routing.supported || routing.changed || routing.vibrato!=configured.vibrato || routing.growl!=configured.growl || routing.flutter!=configured.flutter || routing.volume!=configured.volume)
         {
             plugin->setStateInformation(original.getData(),static_cast<int>(original.getSize()));
@@ -1176,7 +1178,7 @@ void PluginHostEngine::pitchBendChanged(float bipolarValue, double timestampSeco
 void PluginHostEngine::prepareTempoVibrato(juce::AudioPluginInstance& plugin)
 {
     vibratoRateParameter.store(nullptr);automaticVibratoActive.store(false);
-    const auto key=SwamPluginClassifier::instrumentKey(plugin.getName().toStdString());
+    const std::string_view key=SwamPluginClassifier::instrumentKey(plugin.getName().toStdString());
     for(auto* p:plugin.getParameters())if(p->getName(100)=="Vibrato Rate") {
         originalVibratoRate=p->getValue();
         for(int mode=0;mode<3;++mode){
@@ -1223,7 +1225,8 @@ void PluginHostEngine::routeTechnique(PerformanceTechnique technique, float valu
         if(technique==PerformanceTechnique::vibrato) {
             // Kenny G PRO: <=30 is the vibrato dead zone; >96 also adds
             // a pitch offset. Preserve true OFF and use only the verified
-            // periodic-vibrato interval. This profile is Kensa-only.
+            // periodic-vibrato interval, capped at the user's verified 70.
+            // This profile is Kensa-only.
             const int midiValue=kensaVibratoController(safeValue);
             sendTechniqueController(lastNativeTechniqueMessages[index],(1<<8)|2,midiValue,true,[&] {
                 return queue(juce::MidiMessage::controllerEvent(1,1,midiValue),0.0);
@@ -1499,6 +1502,14 @@ bool PluginHostEngine::setBendRange(int semitones)
 {
     auto* plugin = getPlugin();
     if (plugin == nullptr || semitones < 1 || semitones > 4) return false;
+    if(kontaktStandardControls.load()) {
+        // Profile identity is set by the loaded Kensa package, never just by
+        // the Kontakt plug-in name. #0001 must also have its verified binding.
+        if(!KensaBendRange::boundParameter(*plugin))return false;
+        const juce::ScopedLock lock(plugin->getCallbackLock());
+        pitchBendChanged(0.0f);
+        return KensaBendRange::set(*plugin,semitones);
+    }
     struct Change { juce::AudioProcessorParameter* parameter; float value; float old; };
     std::vector<Change> changes;
     bool foundUp = false, foundDown = false;
@@ -1654,9 +1665,15 @@ int PluginHostEngine::applySwamToneProfile(const SwamToneProfile& profile, bool 
 void PluginHostEngine::flushTechniqueValues()
 {
     stringTremolo.flush();
-    if(tempoRateDirty.exchange(false))if(auto* p=vibratoRateParameter.load()) {
-        const auto target=automaticVibratoActive.load()?tempoVibratoRates[MusicTempoPolicy::valid(musicTempoMode.load())]:originalVibratoRate;
-        if(target>=0)p->setValueNotifyingHost(target);
+    if(tempoRateDirty.exchange(false)) {
+        if(kontaktStandardControls.load()) {
+            const auto hz=MusicTempoPolicy::forMode(musicTempoMode.load()).saxRate;
+            if(!queue(juce::MidiMessage::controllerEvent(1,19,kensaVibratoRateController(hz)),0.0))
+                tempoRateDirty.store(true);
+        } else if(auto* p=vibratoRateParameter.load()) {
+            const auto target=automaticVibratoActive.load()?tempoVibratoRates[MusicTempoPolicy::valid(musicTempoMode.load())]:originalVibratoRate;
+            if(target>=0)p->setValueNotifyingHost(target);
+        }
     }
     for (size_t index = 0; index < techniqueParameters.size(); ++index)
         if (techniqueDirty[index].exchange(false, std::memory_order_acq_rel))

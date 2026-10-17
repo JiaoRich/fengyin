@@ -4,6 +4,7 @@
 #include "ToneRestorePlan.h"
 #include "SuonaDualVoiceRouter.h"
 #include "SwamStringTremolo.h"
+#include "KensaBendRange.h"
 #include <cassert>
 #include <cmath>
 
@@ -37,6 +38,27 @@ private:
 
 int main()
 {
+    {
+        TestEffect fake(1,0);
+        fake.addParameter(new juce::AudioParameterFloat("unused","#000",0.f,1.f,0.f));
+        // Match the library's integer-percent range, not JUCE's convenience
+        // constructor (which quantizes a 0..1 range to steps of 0.01).
+        auto* sensitivity=new juce::AudioParameterFloat("binding1","percent",
+            juce::NormalisableRange<float>(10.f,400.f,1.f),100.f);
+        auto* other=new juce::AudioParameterFloat("other","#002",0.f,1.f,.42f);
+        fake.addParameter(sensitivity);fake.addParameter(other);
+        for(int n=1;n<=4;++n){
+            assert(fengyin::KensaBendRange::set(fake,n));
+            assert(std::abs(sensitivity->get()-n*100.f)<.001f);
+            assert(std::abs(other->get()-.42f)<1e-6f);
+        }
+        assert(!fengyin::KensaBendRange::set(fake,0));
+        assert(!fengyin::KensaBendRange::set(fake,5));
+        TestEffect unbound(1,0);
+        unbound.addParameter(new juce::AudioParameterFloat("unused","#000",0.f,1.f,0.f));
+        unbound.addParameter(new juce::AudioParameterFloat("unused1","#001",0.f,1.f,0.f));
+        assert(!fengyin::KensaBendRange::set(unbound,1));
+    }
     {
         TestEffect fake(1,0);
         auto* selector=new juce::AudioParameterChoice("tremolo","Tremolo",{"OFF","Slow","Fast"},0);

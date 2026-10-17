@@ -12,7 +12,7 @@ struct SwamTechniqueRouting {
         for(auto* child:root.getChildIterator())if(auto* found=findTable(*child))return found;
         return nullptr;
     }
-    static Result prepare(juce::MemoryBlock& state,bool wantVibrato,bool wantGrowl,bool wantFlutter=false,bool shareVolume=false) {
+    static Result prepare(juce::MemoryBlock& state,bool wantVibrato,bool wantGrowl,bool wantFlutter=false,bool shareVolume=false,bool ownTremolo=false) {
         Result result;
         auto outer=juce::AudioProcessor::getXmlFromBinary(state.getData(),static_cast<int>(state.getSize()));
         if(!outer||!outer->hasTagName("VST3PluginState"))return result;
@@ -28,6 +28,14 @@ struct SwamTechniqueRouting {
         auto xml=juce::AudioProcessor::getXmlFromBinary(bytes+176,static_cast<int>(chunkSize));
         if(!xml||!xml->hasTagName("swam"))return result;
         auto* table=findTable(*xml);if(!table)return result;
+        // String bow tremolo belongs exclusively to the hardware technique key.
+        // A saved breath mapping would otherwise overwrite OFF (and the held
+        // key's selection) on the next CC11. Keep the curve and all other routes.
+        if(ownTremolo)for(auto* entry:table->getChildIterator())
+            if(entry->getStringAttribute("parameterId").equalsIgnoreCase("tremoloParam")
+                &&entry->getIntAttribute("enabled")!=0){
+                entry->setAttribute("enabled",0);result.changed=true;
+            }
         juce::XmlElement* expression=nullptr;
         if(shareVolume){
             for(auto* entry:table->getChildIterator())if(entry->getStringAttribute("parameterId").equalsIgnoreCase("expression")){
