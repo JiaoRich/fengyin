@@ -15,3 +15,5 @@
 本地验证记录：220项Python与scripts/test.sh独立C++通过；Chrome全屏1366x768、精简680x900以及480/560/680宽控件不重叠、录制菜单实际发出原生事件、弯音五项上拉与指针/缩放事件通过，无JavaScript错误。脚本/private/tmp/fy-118-window-ui.cjs、日志/private/tmp/fy-118-window-ui.log。录屏编码仅Windows实现，Mac构建不替代Windows helper编译与真实录屏测试；Windows发布脚本强制执行实际编码/解码自检，未通过不生成最终可交付包。
 
 完整Mac全目标编译及最终增量核对通过：/private/tmp/fy-118-all-build.log、fy-118-incremental-build.log；最终24/24 CTest通过：/private/tmp/fy-118-final-ctest.log。没有把Windows专用录屏源仅在Mac跳过编译当作该模块编译通过。
+
+build172 Windows主程序和录屏组件已编译通过，25/25 CTest和220Python通过。失败发生在录屏自检调度：PowerShell直接调用GUI子系统exe后立即执行解码，MP4尚不存在，原退出码也未被可靠取得。改为显式Start-Process取得句柄，最多等待60秒并读取实际ExitCode，再检查生成文件与解码；不跳过编码验收，不将缺文件当录屏能力通过。此修复仅测试调度，不改生产录屏/音频实现。

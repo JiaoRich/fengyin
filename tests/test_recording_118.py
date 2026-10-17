@@ -20,7 +20,10 @@ class Recording118Tests(unittest.TestCase):
     def test_recording_is_packaged_and_actual_encoded_media_checked(self):
         build=(ROOT/'scripts/build-windows.ps1').read_text(encoding='utf-8-sig')
         self.assertIn('Copy-Item $ScreenRecorderExe',build)
-        self.assertIn('--selftest $RecorderCheck',build)
+        self.assertIn("@('--selftest',",build)
+        self.assertIn('$RecorderProcess.WaitForExit(60000)',build)
+        self.assertIn('$global:LASTEXITCODE = $RecorderProcess.ExitCode',build)
+        self.assertNotIn('& $ScreenRecorderExe --selftest',build)
         self.assertIn('verify_screen_recording.py',build)
         helper=(ROOT/'native/ScreenRecorder/main.cpp').read_text(encoding='utf-8')
         self.assertIn('writer->Finalize()',helper)

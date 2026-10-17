@@ -109,8 +109,17 @@ if (-not (Test-Path $ScreenRecorderExe)) { throw "Screen recording component mis
 Copy-Item $ScreenRecorderExe (Join-Path $PackageDir "FengYinScreenRecorder.exe") -Force
 $RecorderCheck = Join-Path $BuildDir "screen-recorder-selftest.mp4"
 Invoke-Checked "Screen recorder MP4 encoding selftest" {
-    & $ScreenRecorderExe --selftest $RecorderCheck
+    # This is a GUI-subsystem executable. Do not let PowerShell start the
+    # decoder before native finalization has completed.
+    $RecorderProcess = Start-Process -FilePath $ScreenRecorderExe -ArgumentList @('--selftest', ('"{0}"' -f $RecorderCheck)) -PassThru
+    if (-not $RecorderProcess.WaitForExit(60000)) {
+        $RecorderProcess.Kill()
+        throw "Screen recorder encoding selftest timed out"
+    }
+    $RecorderProcess.Refresh()
+    $global:LASTEXITCODE = $RecorderProcess.ExitCode
     if ($LASTEXITCODE -ne 0 -and (Test-Path "$RecorderCheck.error.txt")) { Get-Content "$RecorderCheck.error.txt" }
+    if ($LASTEXITCODE -eq 0 -and -not (Test-Path $RecorderCheck)) { throw "Recorder exited without producing MP4" }
 }
 $RecorderFfmpeg = if (Test-Path $FfmpegPath) { $FfmpegPath } else { Join-Path $PreparedFfmpeg "ffmpeg.exe" }
 Invoke-Checked "Screen recorder decoded audio/video check" { python (Join-Path $PSScriptRoot "verify_screen_recording.py") $RecorderFfmpeg $RecorderCheck }
