@@ -96,7 +96,7 @@ int main(int argc, char** argv)
                  <<" virtualDesktop="<<GetSystemMetrics(SM_XVIRTUALSCREEN)<<","<<GetSystemMetrics(SM_YVIRTUALSCREEN)
                  <<" size="<<GetSystemMetrics(SM_CXVIRTUALSCREEN)<<"x"<<GetSystemMetrics(SM_CYVIRTUALSCREEN)<<std::endl;
         POINTER_TOUCH_INFO contact{};
-        contact.pointerInfo.pointerType=PT_TOUCH;contact.pointerInfo.pointerId=1;
+        contact.pointerInfo.pointerType=PT_TOUCH;contact.pointerInfo.pointerId=0;
         contact.touchMask=TOUCH_MASK_CONTACTAREA|TOUCH_MASK_ORIENTATION|TOUCH_MASK_PRESSURE;
         contact.orientation=90;contact.pressure=512;
         const auto inject=[&](int dx,int dy,POINTER_FLAGS flags) {
@@ -104,7 +104,7 @@ int main(int argc, char** argv)
             contact.pointerInfo.pointerFlags=flags;
             const auto p=contact.pointerInfo.ptPixelLocation;
             contact.rcContact={p.x-2,p.y-2,p.x+2,p.y+2};
-            std::cout<<"Inject flags="<<flags<<" point="<<p.x<<","<<p.y<<std::endl;
+            std::cout<<"Inject id="<<contact.pointerInfo.pointerId<<" flags="<<flags<<" point="<<p.x<<","<<p.y<<std::endl;
             if(!InjectTouchInput(1,&contact)){std::cerr<<"Touch injection failed: "<<GetLastError()<<" flags="<<flags<<" point="<<p.x<<","<<p.y<<"\n";return false;}
             juce::MessageManager::getInstance()->runDispatchLoopUntil(25);return true;
         };
