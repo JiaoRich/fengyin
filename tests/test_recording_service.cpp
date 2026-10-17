@@ -2,14 +2,24 @@
 #include "RecordingPaths.h"
 #include "AccompanimentAudioService.h"
 #include "VideoAudioExtractor.h"
+#include "VideoPlaybackCache.h"
 #include "MasterOutputService.h"
 #include <cassert>
 #include <algorithm>
 #include <cmath>
 #include <thread>
+#include <iostream>
+#if JUCE_MAC
+#include <CoreFoundation/CoreFoundation.h>
+#endif
 
-int main()
+int main(int argc,char** argv)
 {
+    struct TestLogger:juce::Logger {
+        void logMessage(const juce::String& text) override {std::cerr<<text<<std::endl;}
+        ~TestLogger() override {juce::Logger::setCurrentLogger(nullptr);}
+    } diagnostic;
+    if(argc==3)juce::Logger::setCurrentLogger(&diagnostic);
     fengyin::MasterOutputService master;
     master.setGain(0.5f);
     master.setSampleRate(48000.0);
@@ -91,6 +101,23 @@ int main()
     const auto cacheA = fengyin::VideoAudioExtractor::cacheFileFor(video, folder.getChildFile("cache"));
     const auto cacheB = fengyin::VideoAudioExtractor::cacheFileFor(video, folder.getChildFile("cache"));
     assert(cacheA == cacheB && cacheA.hasFileExtension("wav"));
+    const auto proxyA=fengyin::VideoPlaybackCache::cacheFileFor(video,folder);
+    assert(proxyA.hasFileExtension("mp4") && proxyA.getFileName().startsWith("v1-"));
+    assert(proxyA==fengyin::VideoPlaybackCache::cacheFileFor(video,folder));
+    assert(proxyA!=fengyin::VideoPlaybackCache::cacheFileFor(file,folder));
+    auto metadata=juce::JSON::parse(R"({"streams":[{"codec_name":"h264","width":3840,"height":2160,"avg_frame_rate":"60000/1001"}],"format":{"duration":"120.0"}})");
+    auto info=fengyin::VideoPlaybackCache::readInfo(metadata);
+    assert(info.width==3840 && std::abs(info.fps-59.94005994)<.0001);
+    assert(fengyin::VideoPlaybackCache::worthwhile(info));
+    auto hdr=metadata;hdr=juce::JSON::parse(R"({"streams":[{"codec_name":"hevc","width":3840,"height":2160,"avg_frame_rate":"60/1","color_transfer":"smpte2084","color_primaries":"bt2020","pix_fmt":"yuv420p10le"}],"format":{"duration":"120"}})");
+    assert(!fengyin::VideoPlaybackCache::worthwhile(fengyin::VideoPlaybackCache::readInfo(hdr)));
+    info.width=1920;info.height=1080;info.fps=24;assert(!fengyin::VideoPlaybackCache::worthwhile(info));
+    info.fps=60;info.duration=3600;assert(!fengyin::VideoPlaybackCache::worthwhile(info));
+    info=fengyin::VideoPlaybackCache::readInfo(juce::JSON::parse("{}"));
+    assert(!fengyin::VideoPlaybackCache::worthwhile(info));
+    const auto encode=fengyin::VideoPlaybackCache::encodeArguments(folder.getChildFile("ffmpeg"),video,proxyA);
+    assert(encode.contains("-an") && encode.contains("-nostdin") && encode.contains("1"));
+    assert(encode.joinIntoString(" ").contains("min(source_fps,24)"));
     const auto sidecar = folder.getChildFile("score.wav");
     assert(file.copyFileTo(sidecar));
     fengyin::AccompanimentAudioService accompaniment;
@@ -108,6 +135,39 @@ int main()
 
     accompaniment.release();
     accompaniment.unload();
+    if(argc==3) {
+        juce::ScopedJuceInitialiser_GUI init;
+        const juce::File ffmpeg(juce::String::fromUTF8(argv[1])),source(juce::String::fromUTF8(argv[2]));
+        const auto original=juce::SHA256(source).toHexString();
+        fengyin::VideoPlaybackCache cache(folder.getChildFile("proxy-cache"));
+        juce::File first;int passes=0;
+        std::function<void()> launch;
+        launch=[&] {
+            const bool started=cache.prepare(ffmpeg,source,[&](const juce::File& result){
+            if(!result.existsAsFile()) {juce::MessageManager::getInstance()->stopDispatchLoop();return;}
+            if(passes==0)first=result;else assert(result==first);
+            assert(juce::SHA256(source).toHexString()==original);
+            assert(result.getSize()>64 && result.getSize()<512LL*1024*1024);
+            if(++passes==2)juce::MessageManager::getInstance()->stopDispatchLoop();
+            else juce::Timer::callAfterDelay(50,launch);
+            });
+            if(!started){std::cerr<<"Could not start video cache task\n";juce::MessageManager::getInstance()->stopDispatchLoop();}
+        };
+        juce::Timer::callAfterDelay(30000,[]{juce::MessageManager::getInstance()->stopDispatchLoop();});
+        launch();
+       #if JUCE_MAC
+        const auto until=juce::Time::getMillisecondCounterHiRes()+31000;
+        while(passes<2 && !juce::MessageManager::getInstance()->hasStopMessageBeenSent()
+              && juce::Time::getMillisecondCounterHiRes()<until)
+            CFRunLoopRunInMode(kCFRunLoopDefaultMode,.01,false);
+       #else
+        juce::MessageManager::getInstance()->runDispatchLoop();
+       #endif
+        if(passes!=2){cache.interrupt();std::cerr<<"Video proxy preparation failed; passes="<<passes;return 50;}
+        // Keep a verified output for external decoding before test cleanup.
+        assert(first.copyFileTo(source.getSiblingFile("verified-proxy.mp4")));
+        std::cout<<"PASS native idle video proxy, reusable cache, original unchanged; external decode required\n";
+    }
     folder.deleteRecursively();
     return 0;
 }

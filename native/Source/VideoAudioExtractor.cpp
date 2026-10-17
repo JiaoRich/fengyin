@@ -19,8 +19,8 @@ public:
         destination.getParentDirectory().createDirectory();
         const auto temporary = destination.getSiblingFile(destination.getFileNameWithoutExtension() + ".part.wav");
         temporary.deleteFile();
-        juce::StringArray arguments { executable.getFullPathName(), "-hide_banner", "-loglevel", "error", "-y",
-                                      "-i", source.getFullPathName(), "-vn", "-ac", "2", "-ar", "48000",
+        juce::StringArray arguments { executable.getFullPathName(), "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-threads", "1",
+                                      "-i", source.getFullPathName(), "-vn", "-threads", "1", "-filter_threads", "1", "-ac", "2", "-ar", "48000",
                                       "-c:a", "pcm_s24le", temporary.getFullPathName() };
         juce::ChildProcess process;
         if (! process.start(arguments, juce::ChildProcess::wantStdErr))

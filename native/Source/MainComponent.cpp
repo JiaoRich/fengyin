@@ -255,6 +255,7 @@ MainComponent::~MainComponent()
     audio.getDeviceManager().removeAudioCallback(&voicePrompts);
     pluginHost.setLatencyProbeActive(false);
     webVideoAudioExtractor.cancel();
+    webVideoPlaybackCache.interrupt();
     accompaniment.pause();
     webInterface.reset();
     recorder.stop();
@@ -536,14 +537,14 @@ void MainComponent::setupWebInterface()
                 accompaniment.pause();
                 return;
             }
+            const bool wasPlaying = videoPlaybackActive;
             videoPlaybackActive = static_cast<bool>(payload.getProperty("playing", false));
-            webVideoPosition = static_cast<double>(payload.getProperty("position", webVideoPosition));
             audioOutputSyncTicks = 0;
             if (videoPlaybackActive)
             {
-                if (webVideoAudioReady)
+                interruptIdleVideoPreparation();
+                if (webVideoAudioReady && !wasPlaying)
                 {
-                    accompaniment.setPosition(webVideoPosition);
                     accompaniment.play();
                 }
             }
@@ -553,13 +554,33 @@ void MainComponent::setupWebInterface()
         .withEventListener("syncVideoPlayback", [this](juce::var payload)
         {
             if (static_cast<int>(payload.getProperty("generation", -1)) != webVideoGeneration) return;
-            webVideoPosition = static_cast<double>(payload.getProperty("position", webVideoPosition));
-            if (webVideoAudioReady && std::abs(accompaniment.getPosition() - webVideoPosition) > 0.35)
-                accompaniment.setPosition(webVideoPosition);
+            if (!webVideoAudioReady || webInterface == nullptr) return;
+            // The audio transport is the clock. Browser frame stalls must not
+            // rewind/seek the sound or invalidate its read-ahead buffer.
+            webVideoPosition = accompaniment.getPosition();
+            auto clock = std::make_unique<juce::DynamicObject>();
+            clock->setProperty("generation", webVideoGeneration);
+            clock->setProperty("seekRevision",webVideoSeekRevision);
+            clock->setProperty("position", webVideoPosition);
+            clock->setProperty("playing", videoPlaybackActive);
+            clock->setProperty("finished", accompaniment.hasFinished());
+            webInterface->emitEventIfBrowserIsVisible("videoPlaybackClock", juce::var(clock.release()));
+        })
+        .withEventListener("videoPlaybackMetrics", [this](juce::var payload)
+        {
+            if(!pluginHost.isStageTimingEnabled() || static_cast<int>(payload.getProperty("generation",-1))!=webVideoGeneration)return;
+            juce::Logger::writeToLog("Video timing: fps="+juce::String(static_cast<double>(payload.getProperty("fps",0)),2)
+                +" dropped="+juce::String(static_cast<int>(payload.getProperty("dropped",0)))
+                +" width="+juce::String(static_cast<int>(payload.getProperty("width",0)))
+                +" height="+juce::String(static_cast<int>(payload.getProperty("height",0)))
+                +" proxy="+juce::String(static_cast<bool>(payload.getProperty("proxy",false))?1:0));
         })
         .withEventListener("seekVideo", [this](juce::var payload)
         {
             if (static_cast<int>(payload.getProperty("generation", -1)) != webVideoGeneration) return;
+            const auto revision=static_cast<int>(payload.getProperty("seekRevision",0));
+            if(revision<webVideoSeekRevision)return;
+            webVideoSeekRevision=revision;
             webVideoPosition = static_cast<double>(payload.getProperty("position", 0.0));
             if (webVideoAudioReady) accompaniment.setPosition(webVideoPosition);
         })
@@ -808,6 +829,7 @@ void MainComponent::setupWebInterface()
                 ok ? utf8("诊断已保存到桌面，请将文本文件发给我。") : utf8("诊断导出失败，请检查桌面写入权限。"));
         })
         .withEventListener("playVoice", [this](juce::var payload) {
+            interruptIdleVideoPreparation();
             const auto id=payload.getProperty("id",juce::String()).toString();
             const int token=payload.getProperty("token",0);
             int size=0;
@@ -910,8 +932,13 @@ void MainComponent::chooseVideoForWebInterface()
 void MainComponent::loadVideoForWebInterface(const juce::File& file)
 {
     const auto generation = ++webVideoGeneration;
+    webVideoSeekRevision=0;
     videoPlaybackActive = false;
     webVideoAudioExtractor.cancel();
+    webVideoPlaybackCache.interrupt();
+    webVideoProxyReady = juce::File();
+    webVideoProxyAttempted = false;
+    webVideoPrepareAfterMs = juce::Time::getMillisecondCounterHiRes()+3000.0;
     accompaniment.unload();
     webVideoFile = file;
     webVideoPosition = 0.0;
@@ -961,6 +988,48 @@ void MainComponent::emitVideoAudioState(bool ready, const juce::String& message)
     result->setProperty("generation", webVideoGeneration);
     result->setProperty("message", message);
     webInterface->emitEventIfBrowserIsVisible("videoAudioState", juce::var(result.release()));
+}
+
+void MainComponent::updateIdleVideoPreparation()
+{
+    const auto now=juce::Time::getMillisecondCounterHiRes();
+    const bool busy=videoPlaybackActive || recorder.isRecording() || windowRecorder.busy()
+        || snapshot.breath>.01f || snapshot.lastNote>=0 || pluginLoading || effectLoading
+        || pluginHost.warmingContainerCount()>0
+        || audio.isAutomaticLatencyTuning() || pluginCatalog.getProgress().scanning;
+    if(busy) {
+        interruptIdleVideoPreparation();return;
+    }
+    if(now<webVideoPrepareAfterMs || !isActivated || !webVideoAudioReady || webVideoFile==juce::File())return;
+    if(webVideoProxyReady.existsAsFile()) {
+        if(webInterface && webPresentationVisible && webInterfaceReady) {
+            auto result=std::make_unique<juce::DynamicObject>();
+            result->setProperty("generation",webVideoGeneration);
+            result->setProperty("url",juce::URL(webVideoProxyReady).toString(false));
+            webInterface->emitEventIfBrowserIsVisible("videoPlaybackPrepared",juce::var(result.release()));
+            webVideoProxyReady=juce::File();
+        }
+        return;
+    }
+    if(webVideoProxyAttempted || webVideoPlaybackCache.busy())return;
+    webVideoProxyAttempted=true;
+    const auto generation=webVideoGeneration;
+    webVideoPlaybackCache.prepare(webVideoAudioExtractor.getExecutable(),webVideoFile,
+        [safeThis=juce::Component::SafePointer<MainComponent>(this),generation](const juce::File& file){
+            if(safeThis && safeThis->webVideoGeneration==generation && file.existsAsFile()) {
+                safeThis->webVideoProxyReady=file;
+                juce::Logger::writeToLog("Idle video playback cache ready (audio unchanged)");
+            }
+        });
+}
+
+void MainComponent::interruptIdleVideoPreparation()
+{
+    if(webVideoPlaybackCache.busy()) {
+        webVideoPlaybackCache.interrupt();
+        webVideoProxyAttempted=false;
+    }
+    webVideoPrepareAfterMs=juce::Time::getMillisecondCounterHiRes()+3000.0;
 }
 
 std::optional<juce::WebBrowserComponent::Resource> MainComponent::getWebResource(const juce::String& path)
@@ -1381,6 +1450,8 @@ void MainComponent::timerCallback()
         midi.pollConnection();
     }
     snapshot = midi.getSnapshot();
+    if (videoPlaybackActive && webVideoAudioReady && accompaniment.hasFinished())
+        videoPlaybackActive = false;
     if (!containerPrewarmStarted && isActivated && pluginChoicesLoaded && !pluginCatalog.getProgress().scanning && !pluginLoading && !effectLoading
         && !recorder.isRecording() && !windowRecorder.busy() && !videoPlaybackActive && snapshot.breath <= 0.01f
         && snapshot.lastNote < 0 && juce::Time::getMillisecondCounterHiRes() >= containerPrewarmAfterMs)
@@ -1405,6 +1476,7 @@ void MainComponent::timerCallback()
     }
     if (snapshot.breath > 0.01f || snapshot.lastNote >= 0)
         lastPerformanceActivityMs = juce::Time::getMillisecondCounterHiRes();
+    updateIdleVideoPreparation();
     if (audio.isAutomaticLatencyTuning()
         && (videoPlaybackActive || recorder.isRecording() || windowRecorder.busy() || snapshot.breath > 0.01f || snapshot.lastNote >= 0))
     {
@@ -1536,6 +1608,17 @@ void MainComponent::timerCallback()
         // 把 CPU 时间优先留给 SWAM 与视频解码。
         if (webActive) masterOutput.getSpectrum(spectrumLevels);
         auto state = std::make_unique<juce::DynamicObject>();
+        state->setProperty("audioTimingEnabled",pluginHost.isStageTimingEnabled());
+        if (webVideoAudioReady)
+        {
+            auto clock = std::make_unique<juce::DynamicObject>();
+            clock->setProperty("generation", webVideoGeneration);
+            clock->setProperty("seekRevision",webVideoSeekRevision);
+            clock->setProperty("position", accompaniment.getPosition());
+            clock->setProperty("playing", videoPlaybackActive);
+            clock->setProperty("finished", accompaniment.hasFinished());
+            state->setProperty("videoClock", juce::var(clock.release()));
+        }
         state->setProperty("deviceConnected", snapshot.deviceConnected);
         state->setProperty("deviceName", midi.getConnectedDeviceName());
         state->setProperty("deviceIdentifier", midi.getConnectedDeviceIdentifier());
@@ -1575,7 +1658,7 @@ void MainComponent::timerCallback()
                 + " sourcePeak=" + juce::String(pluginHost.takeDiagnosticSourcePeak(), 6)
                 + " callbacks=" + juce::String(pluginHost.getCallbackCount())
                 + " signalBlocks=" + juce::String(pluginHost.getSignalBlocks())
-                + " device=" + currentAudio.deviceName + "\n");
+                + " device=" + currentAudio.deviceName + pluginHost.takeStageTimingReport() + "\n");
         }
         state->setProperty("audioXruns", currentAudio.xRunCount);
         state->setProperty("callbackOverruns", static_cast<juce::int64>(pluginHost.getCallbackOverruns()));
@@ -2075,6 +2158,7 @@ void MainComponent::refreshPluginChoices()
 
 void MainComponent::loadSelectedPlugin()
 {
+    interruptIdleVideoPreparation();
     const auto selectedIndex = pluginSelector.getSelectedId() - 1;
     if (! juce::isPositiveAndBelow(selectedIndex, cachedInstrumentPlugins.size()))
     {
@@ -2586,6 +2670,7 @@ void MainComponent::cancelContainerInstrument()
 
 void MainComponent::loadSelectedEffect()
 {
+    interruptIdleVideoPreparation();
     if (! studioUnlocked || effectLoading || pluginLoading) return;
     const auto index = effectSelector.getSelectedId() - 1;
     if (! juce::isPositiveAndBelow(index, cachedEffectPlugins.size()) || ! pluginHost.hasPlugin()) return;
@@ -3277,6 +3362,7 @@ void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::Stri
 void MainComponent::loadPreset(fengyin::SoundPreset preset,
                               std::function<void(bool, const juce::String&)> completion)
 {
+    interruptIdleVideoPreparation();
     if (pluginLoading)
     {
         if (completion) completion(false, utf8("音源正在加载，请稍候，不要重复点击"));
@@ -3805,6 +3891,7 @@ void MainComponent::showActivationDialog()
 
 void MainComponent::toggleWindowRecording(const juce::var& payload)
 {
+    interruptIdleVideoPreparation();
     if(windowRecorder.busy()){windowRecorder.stop();return;}
     auto tell=[this](const juce::String& message){if(webInterface)webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",message);};
     if(!isActivated){tell(utf8("请先激活或开启试用"));return;}
@@ -3822,6 +3909,7 @@ void MainComponent::toggleWindowRecording(const juce::var& payload)
 
 void MainComponent::toggleRecording()
 {
+    interruptIdleVideoPreparation();
    #if JUCE_WINDOWS
     if(windowRecorder.busy()) {
         if(windowRecorder.isAudioOnly())windowRecorder.stop();

@@ -27,6 +27,7 @@
 #include "ToneParameterValue.h"
 #include "EffectChainState.h"
 #include "SwamStringTremolo.h"
+#include "AudioStageTiming.h"
 
 namespace fengyin
 {
@@ -46,6 +47,8 @@ public:
     [[nodiscard]] uint64_t getDroppedMidiEventCount() const noexcept { return midiQueue.droppedCount(); }
     std::atomic<uint64_t> callbackCount { 0 }, callbackOverruns { 0 }, signalBlocks { 0 };
     std::atomic<float> diagnosticSourcePeak { 0 };
+    const bool timingEnabled = juce::SystemStats::getEnvironmentVariable("FENGYIN_AUDIO_TIMING", "0") == "1";
+    AudioStageTiming stageTiming;
     void audioDeviceIOCallbackWithContext(const float* const* inputs, int numInputs, float* const* outputs,
                                           int numOutputs, int numSamples,
                                           const juce::AudioIODeviceCallbackContext& context) override;
@@ -117,6 +120,8 @@ public:
                          double sampleRate, int bufferSize, LoadCallback callback);
     void unloadEffect();
     void setRecordingService(RecordingService* service) noexcept { player.setRecordingService(service); }
+    juce::String takeStageTimingReport();
+    bool isStageTimingEnabled() const noexcept {return player.timingEnabled;}
     void setAccompanimentService(AccompanimentAudioService* service) noexcept { player.setAccompanimentService(service); }
     void setMasterOutputService(MasterOutputService* service) noexcept { player.setMasterOutputService(service); }
     void setLatencyProbeActive(bool active) noexcept { player.setLatencyProbeActive(active); }

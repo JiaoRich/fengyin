@@ -19,6 +19,7 @@
 #include "ContainerPluginAdapter.h"
 #include "TechniqueAdvisor.h"
 #include "VideoAudioExtractor.h"
+#include "VideoPlaybackCache.h"
 #include "WindowsLowLatencyOptimizer.h"
 #include "VoicePromptService.h"
 
@@ -56,6 +57,8 @@ private:
     std::unique_ptr<juce::FileChooser> studioExportChooser;
     void loadVideoForWebInterface(const juce::File& file);
     void emitVideoAudioState(bool ready, const juce::String& message);
+    void updateIdleVideoPreparation();
+    void interruptIdleVideoPreparation();
     juce::Rectangle<int> getContentBounds() const;
     void timerCallback() override;
     void startPluginScan();
@@ -210,10 +213,15 @@ private:
     juce::Array<juce::PluginDescription> cachedEffectPlugins;
     fengyin::VideoPlayerPanel videoPlayer;
     fengyin::VideoAudioExtractor webVideoAudioExtractor;
+    fengyin::VideoPlaybackCache webVideoPlaybackCache;
+    bool webVideoProxyAttempted = false;
+    juce::File webVideoProxyReady;
+    double webVideoPrepareAfterMs = 0;
     std::unique_ptr<juce::FileChooser> webVideoChooser;
     std::unique_ptr<juce::FileChooser> pluginFolderChooser;
     juce::File webVideoFile;
     int webVideoGeneration = 0;
+    int webVideoSeekRevision = 0;
     bool webVideoAudioReady = false;
     double webVideoPosition = 0.0;
     float webVideoVolume = 1.0f;

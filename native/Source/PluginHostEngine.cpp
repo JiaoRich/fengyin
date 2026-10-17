@@ -248,6 +248,7 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
         addLatencyProbeMessages(numSamples, nowSeconds);
 
     juce::AudioProcessorPlayer::audioDeviceIOCallbackWithContext(inputs, numInputs, outputs, numOutputs, numSamples, context);
+    const auto afterGraph = timingEnabled ? juce::Time::getMillisecondCounterHiRes()*.001 : 0.0;
     bool signal = false;
     for (int channel = 0; channel < numOutputs; ++channel)
         if (outputs[channel] != nullptr)
@@ -263,10 +264,20 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
     while (previousPeak < peak && ! diagnosticSourcePeak.compare_exchange_weak(previousPeak, peak)) {}
     if (masterOutput != nullptr)
         masterOutput->processInstrument(outputs, numOutputs, numSamples);
+    const auto afterInstrument = timingEnabled ? juce::Time::getMillisecondCounterHiRes()*.001 : 0.0;
     if (accompaniment != nullptr)
         accompaniment->mixInto(outputs, numOutputs, numSamples);
+    const auto afterAccompaniment = timingEnabled ? juce::Time::getMillisecondCounterHiRes()*.001 : 0.0;
     if (masterOutput != nullptr)
         masterOutput->processMaster(outputs, numOutputs, numSamples);
+    if(timingEnabled){
+        const auto end=juce::Time::getMillisecondCounterHiRes()*.001;
+        const double budget=static_cast<double>(numSamples)/currentSampleRate;
+        stageTiming.record(AudioStageTiming::graph,afterGraph-nowSeconds,budget);
+        stageTiming.record(AudioStageTiming::instrumentEffects,afterInstrument-afterGraph,budget);
+        stageTiming.record(AudioStageTiming::accompaniment,afterAccompaniment-afterInstrument,budget);
+        stageTiming.record(AudioStageTiming::master,end-afterAccompaniment,budget);
+    }
     if (probing)
         for (int channel = 0; channel < numOutputs; ++channel)
             if (outputs[channel] != nullptr)
@@ -277,6 +288,20 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
     if (juce::Time::getMillisecondCounterHiRes() * 0.001 - nowSeconds
         > static_cast<double>(numSamples) / currentSampleRate)
         callbackOverruns.fetch_add(1, std::memory_order_relaxed);
+}
+
+juce::String PluginHostEngine::takeStageTimingReport()
+{
+    if(!player.timingEnabled)return {};
+    const auto measurements=player.stageTiming.take();
+    const char* names[]{"graphAndMidi","instrumentPost","accompaniment","master"};
+    juce::String result;
+    for(size_t i=0;i<measurements.size();++i){const auto& m=measurements[i];
+        result+=" "+juce::String(names[i])+"[blocks="+juce::String(m.blocks)
+            +",meanUs="+juce::String(m.blocks?static_cast<double>(m.totalUs)/m.blocks:0.0,2)
+            +",maxUs="+juce::String(m.maxUs)+",over="+juce::String(m.overBudget)+"]";
+    }
+    return result;
 }
 
 void RecordingAudioProcessorPlayer::audioDeviceAboutToStart(juce::AudioIODevice* device)

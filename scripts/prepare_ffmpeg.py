@@ -66,6 +66,8 @@ def prepare(destination):
                     files = [i for i in package.infolist() if not i.is_dir()]
                     if not any(i.filename.endswith("/bin/ffmpeg.exe") for i in files):
                         raise ValueError("FFmpeg executable missing from archive")
+                    if not any(i.filename.endswith("/bin/ffprobe.exe") for i in files):
+                        raise ValueError("FFprobe metadata reader missing from archive")
                     for item in files:
                         path = Path(item.filename)
                         if path.parent.name == "bin" or path.name.upper().startswith(("LICENSE", "COPYING", "README")):

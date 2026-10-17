@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.20 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.21 LANGUAGES C CXX)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
 set(CMAKE_CXX_STANDARD 20)
@@ -176,6 +176,8 @@ target_sources(FengYin PRIVATE
     native/Source/AccompanimentAudioService.h
     native/Source/VideoAudioExtractor.cpp
     native/Source/VideoAudioExtractor.h
+    native/Source/VideoPlaybackCache.cpp
+    native/Source/VideoPlaybackCache.h
     native/Source/MasterOutputService.h
     native/Source/MasterOutputService.cpp
     native/Source/ToneStyleCatalog.h
@@ -414,10 +416,12 @@ if(BUILD_TESTING)
     target_link_libraries(FengYinActivationRecordTests PRIVATE juce::juce_core juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
     add_test(NAME activation_record_roundtrip COMMAND FengYinActivationRecordTests)
 
-    add_executable(FengYinRecordingTests tests/test_recording_service.cpp native/Source/RecordingService.cpp native/Source/AccompanimentAudioService.cpp native/Source/VideoAudioExtractor.cpp native/Source/MasterOutputService.cpp)
+    add_executable(FengYinRecordingTests tests/test_recording_service.cpp native/Source/RecordingService.cpp native/Source/AccompanimentAudioService.cpp native/Source/VideoAudioExtractor.cpp native/Source/VideoPlaybackCache.cpp native/Source/MasterOutputService.cpp)
     target_include_directories(FengYinRecordingTests PRIVATE native/Source)
     target_link_libraries(FengYinRecordingTests PRIVATE juce::juce_audio_formats juce::juce_audio_utils juce::juce_cryptography juce::juce_events juce::juce_dsp juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
     add_test(NAME wav_recording COMMAND FengYinRecordingTests)
+    add_executable(FengYinAudioStageTimingTests tests/test_audio_stage_timing.cpp)
+    add_test(NAME audio_stage_timing COMMAND FengYinAudioStageTimingTests)
 
     add_executable(FengYinSwamClassifierTests tests/test_swam_classifier.cpp)
     target_include_directories(FengYinSwamClassifierTests PRIVATE native/Source)

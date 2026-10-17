@@ -1,0 +1,74 @@
+[
+  {
+    "id": "REC_AUDIO",
+    "text": "准备开始录音。",
+    "speechText": "准备开始录音。",
+    "voice": "x6_wuyediantai_mini",
+    "status": "success",
+    "sha256": "c1dffddd7096ee2aeda8ac28fa2f8f54daa879c5cdab72203da884ee32e92ed7",
+    "seconds": 1.7
+  },
+  {
+    "id": "REC_VIDEO",
+    "text": "准备开始录视频。",
+    "speechText": "准备开始录视频。",
+    "voice": "x6_wuyediantai_mini",
+    "status": "success",
+    "sha256": "6258930aa701147f674775594ec1a442b3e6961ed50d479ba847ab53ca274fdc",
+    "seconds": 2.1
+  },
+  {
+    "id": "GUIDE_OUTPUT",
+    "text": "请确认声音输出是您正在使用的扬声器或耳机。",
+    "speechText": "请确认声音输出是您正在使用的扬声器或耳机。",
+    "voice": "x6_wuyediantai_mini",
+    "status": "success",
+    "sha256": "f2b2d9fb173ad4531b473cbf32a2aedcd0dedf50789ba9437dc878a32ee2acc4",
+    "seconds": 4.82
+  },
+  {
+    "id": "GUIDE_MATCH",
+    "text": "点击开始匹配。保持管身不动，不咬嘴，吹一个气息由弱到强的长音。",
+    "speechText": "点击开始匹配。保持管身不动，不咬嘴，吹一个气息由弱到强的长音。",
+    "voice": "x6_wuyediantai_mini",
+    "status": "success",
+    "sha256": "216e1c091f013d8be4c3cfcdf503c143b79fef2c773d871f1fb3db28addddbcb",
+    "seconds": 7.38
+  },
+  {
+    "id": "GUIDE_TRY",
+    "text": "请吹几个音，试试轻吹和强吹。能听到声音后，就可以开始演奏了。",
+    "speechText": "请吹几个音，试试轻吹和强吹。能听到声音后，就可以开始演奏了。",
+    "voice": "x6_wuyediantai_mini",
+    "status": "success",
+    "sha256": "b2a90c3719f4ac939448990971e92db754101b404e94404e106d8cf46bcf1b92",
+    "seconds": 6.98
+  },
+  {
+    "id": "GUIDE_TECH",
+    "text": "选择咬嘴控制或按键控制，再点击映射。需要移除时，点击清除映射。",
+    "speechText": "选择咬嘴控制或按键控制，再点击映射。需要移除时，点击清除映射。",
+    "voice": "x6_wuyediantai_mini",
+    "status": "success",
+    "sha256": "50c92af9fb7982b741d397bd454a86dac14b8d75a5ebff0159814edb1c45acb5",
+    "seconds": 7.22
+  },
+  {
+    "id": "GUIDE_KEY",
+    "text": "根据歌曲需要选择演奏调。调整后，吹几个音确认调性。",
+    "speechText": "根据歌曲需要选择演奏调。调整后，吹几个音确认调性。",
+    "voice": "x6_wuyediantai_mini",
+    "status": "success",
+    "sha256": "f402d6e114b926084161d2befd16096c13e9c08a4cbafba70d365505a38102c6",
+    "seconds": 5.98
+  },
+  {
+    "id": "GUIDE_RECORD",
+    "text": "点击开始录制旁的小箭头，选择录音或录视频。结束后，在我的录制中查看文件。",
+    "speechText": "点击开始录制旁的小箭头，选择录音或录视频。结束后，在我的录制中查看文件。",
+    "voice": "x6_wuyediantai_mini",
+    "status": "success",
+    "sha256": "7b98c2a5a33f549a03e20171f844fb4f7ca1482d065eec2fd463a48b5c7b0c1c",
+    "seconds": 8.22
+  }
+]

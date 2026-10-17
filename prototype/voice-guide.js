@@ -1,6 +1,15 @@
 /* Offline, reviewed speech. No browser/cloud TTS in the installed application. */
 (() => {
-  const catalog=window.FENGYIN_VOICE_CATALOG?.items || [];
+  const updates=[
+    ['REC_AUDIO','准备开始录音。'],['REC_VIDEO','准备开始录视频。'],
+    ['GUIDE_OUTPUT','请确认声音输出是您正在使用的扬声器或耳机。'],
+    ['GUIDE_MATCH','点击开始匹配。保持管身不动，不咬嘴，吹一个气息由弱到强的长音。'],
+    ['GUIDE_TRY','请吹几个音，试试轻吹和强吹。能听到声音后，就可以开始演奏了。'],
+    ['GUIDE_TECH','选择咬嘴控制或按键控制，再点击映射。需要移除时，点击清除映射。'],
+    ['GUIDE_KEY','根据歌曲需要选择演奏调。调整后，吹几个音确认调性。'],
+    ['GUIDE_RECORD','点击开始录制旁的小箭头，选择录音或录视频。结束后，在我的录制中查看文件。']
+  ].map(([id,text])=>({id,text}));
+  const catalog=[...(window.FENGYIN_VOICE_CATALOG?.items || []),...updates];
   const clips=new Map(catalog.map(x=>[x.id,x]));
   const backend=window.__JUCE__?.backend;
   let enabled=localStorage.getItem('fy-voice-enabled')==='yes';
@@ -9,7 +18,7 @@
   let token=0, pending=null, state={}, connected=null, connectionTimer, noToneAt=0;
   let guiding=false, step=-1, guideTimer, countdown=false, learnedName='', wasCompact=false, videoReady=false;
   const emit=(name,value={})=>backend?.emitEvent(name,value);
-  const busy=()=>!!state.recording || !!state.screenRecordingBusy || Number(state.breath)>0.015 || !video.paused;
+  const busy=()=>!!state.recording || !!state.screenRecordingBusy || Number(state.breath)>0.015 || videoWantsPlaying || !video.paused;
   function stop(){emit('stopVoice');if(pending){clearTimeout(pending.timeout);pending.resolve(false);pending=null;}}
   function say(id,{force=false}={}){
     if(!enabled || !clips.has(id) || (busy()&&!force) || state.recording || state.screenRecordingBusy)return Promise.resolve(false);
@@ -30,11 +39,11 @@
     learning(name){learnedName=controlName(name);say(/咬嘴|颤音|揉弦/.test(name)?'V047':'NEW_MAP_START');},
     cleared(){say('NEW_MAP_CLEAR');},
     tone(name){if(!toneEnabled)return;const spoken=name.replace('次中萨','次中音萨克斯').replace('上低萨','上低音萨克斯').replace('高萨','高音萨克斯').replace('中萨','中音萨克斯').replaceAll('-', '，');const match=catalog.find(x=>x.text.replace(/[。～]/g,'')===spoken);return say(match?.id || 'NEW_TONE_GENERIC');},
-    async beforeRecording(){
+    async beforeRecording(kind='audio'){
       if(countdown)return false;if(!enabled)return true;
       countdown=true;const button=document.querySelector('#record');button.disabled=true;
-      button.textContent='准备录音…';
-      try{return await say('V041',{force:true});}
+      const isVideo=kind==='video';button.textContent=isVideo?'准备录视频…':'准备录音…';
+      try{return await say(isVideo?'REC_VIDEO':'REC_AUDIO',{force:true});}
       finally{countdown=false;button.disabled=false;button.textContent='● 开始录制';}
     }
   };
@@ -48,7 +57,7 @@
   #fy-guide[hidden],#fy-guide-spot[hidden],#fy-guide-hand[hidden]{display:none}
   `;document.head.append(style);
   const settings=document.createElement('div');settings.className='voice-settings';
-  settings.innerHTML='<label><input type="checkbox" id="fy-voice-enabled">语音提示</label><label><input type="checkbox" id="fy-voice-tones">音色播报</label><label>提示音量<input type="range" id="fy-voice-volume" min="0" max="70" aria-label="语音音量"></label><button id="fy-guide-restart">重新开始引导</button>';
+  settings.innerHTML='<label><input type="checkbox" id="fy-voice-enabled">语音提示</label><label><input type="checkbox" id="fy-voice-tones">音色播报</label><label>提示音量<input type="range" id="fy-voice-volume" min="0" max="70" aria-label="语音音量"></label><button id="fy-guide-restart">首次演奏引导</button><button id="fy-guide-advanced">进阶功能引导</button>';
   document.querySelector('#page-settings .panel').append(settings);
   document.querySelector('#fy-voice-enabled').checked=enabled;document.querySelector('#fy-voice-tones').checked=toneEnabled;
   document.querySelector('#fy-voice-volume').value=Math.round(volume*100);
@@ -59,33 +68,33 @@
   const spot=document.createElement('div');spot.id='fy-guide-spot';spot.hidden=true;
   const hand=document.createElement('div');hand.id='fy-guide-hand';hand.textContent='👆';hand.hidden=true;hand.setAttribute('aria-hidden','true');
   document.body.append(spot,hand,panel);
-  const steps=[
-    ['欢迎使用风吟','V001','.nav-item[data-page="play"]','play'],
-    ['连接电吹管','V002','.sidebar-status','play'],
-    ['电吹管调性','T001','.sidebar-status','play'],
-    ['检测气息','V005','#adapter-match','wind'],
-    ['选择音色','V011','#preset-grid','sounds'],
-    ['试着吹奏','G002','#sound-name','play'],
-    ['演奏调','T001','#transpose-key','play'],
-    ['弯音范围','G004','#bend-range-button','play'],
-    ['演奏音量','V028','#master-volume','play'],
-    ['混响','V029','#performance-reverb','play'],
-    ['演奏技巧','V034','#technique-settings','play'],
-    ['气息技巧','G005','#adapter-technique-grid','wind'],
-    ['硬件映射','G006','#adapter-technique-grid','wind','hardware'],
-    ['取消映射','G007','#adapter-technique-grid','wind','hardware'],
-    ['视频伴奏','V035','#choose-video','play'],
-    ['播放与暂停','G008','#play-button','play'],
-    ['伴奏音量','G009','#video-volume','play'],
-    ['开始录音','V040','#record','play'],
-    ['停止并保存','G010','#record','play'],
-    ['我的录音','G011','#recording-manager','play'],
-    ['精简模式','V030','#window-mode-toggle','play'],
-    ['更换主题','G013','#theme','play'],
-    ['声音设置','G014','.audio-settings-grid','audio'],
-    ['语音与重看引导','G015','.voice-settings','settings'],
-    ['引导完成','V012','.nav-item[data-page="play"]','play']
+  const basicSteps=[
+    ['连接电吹管','V002','.sidebar-status','play',null,'connected'],
+    ['确认声音输出','GUIDE_OUTPUT','.audio-output-control','audio'],
+    ['匹配气息','GUIDE_MATCH','#adapter-match','wind',null,'matched'],
+    ['选择音色','V011','#preset-grid','sounds',null,'loaded'],
+    ['试着吹奏','GUIDE_TRY','#sound-name','play',null,'played'],
+    ['可以开始演奏了','V012','.nav-item[data-page="play"]','play']
   ];
+  const advancedSteps=[
+    ['技巧控制与映射','GUIDE_TECH','#adapter-technique-grid','wind'],
+    ['乐曲速度','MT_GUIDE','#music-tempo','play'],
+    ['演奏调','GUIDE_KEY','#transpose-key','play'],
+    ['弯音范围','G004','#bend-range-button','play'],
+    ['视频伴奏','V035','#choose-video','play'],
+    ['录音与录视频','GUIDE_RECORD','.record-control','play'],
+    ['精简模式','V030','#window-mode-toggle','play'],
+    ['更换主题','G013','#theme-button','play']
+  ];
+  let steps=basicSteps,trialPerformed=false;
+  function updateGuideProgress(){
+    if(!guiding)return;
+    const guard=steps[step]?.[5];
+    const allowed=!guard || (guard==='connected'&&state.deviceConnected)
+      || (guard==='matched'&&(state.deviceMatched||state.breathMatched))
+      || (guard==='loaded'&&state.pluginLoaded) || (guard==='played'&&trialPerformed);
+    const next=panel.querySelector('[data-guide=next]');if(next)next.disabled=!allowed;
+  }
   function place(){
     if(!guiding)return;
     const target=document.querySelector(steps[step][2]);const r=target?.getBoundingClientRect();
@@ -106,20 +115,23 @@
     for(const id of ['technique-learning-dialog','technique-dialog','transpose-dialog','bend-range-dialog']){const dialog=document.getElementById(id);if(dialog)dialog.hidden=true;}
     if(compactMode && page!=='play'){nativeEvent('setCompactMode',{compact:false});applyWindowMode(false);}
     showPage(page);
-    if(page==='wind'){document.querySelector(`[data-adapter-mode="${mode||'breath'}"]`)?.click();}
+    trialPerformed=false;
     panel.innerHTML=`<small>${step+1} / ${steps.length}</small><h3></h3><p></p><button data-guide="back">上一步</button><button data-guide="repeat">重听</button><button data-guide="next">${step===steps.length-1?'完成':'下一步'}</button><button data-guide="skip">跳过</button><button data-guide="end">结束引导</button>`;
-    panel.querySelector('h3').textContent=title;panel.querySelector('p').textContent=id==='T001' ? '0表示跟随电吹管，不需要将电吹管设为C调。点击减号或加号，每次降低或升高一个半音。电吹管自身的快速换调仍然有效。' : clips.get(id)?.text || '';
+    panel.querySelector('h3').textContent=title;panel.querySelector('p').textContent=clips.get(id)?.text || '';
     panel.querySelector('[data-guide=repeat]').disabled=!clips.has(id);
     panel.querySelector('[data-guide=back]').disabled=step===0;panel.hidden=false;
-    document.querySelector(selector)?.scrollIntoView({block:'nearest'});place();say(id);
+    document.querySelector(selector)?.scrollIntoView({block:'nearest'});place();updateGuideProgress();say(id);
   }
-  function start(){if(busy())return toast('请先停止吹奏、伴奏和录音，再开始引导');guiding=true;show(0);clearInterval(guideTimer);guideTimer=setInterval(place,150);}
+  function start(kind='basic'){if(busy())return toast('请先停止吹奏、伴奏和录音，再开始引导');steps=kind==='advanced'?advancedSteps:basicSteps;guiding=true;panel.style.right=panel.style.bottom='auto';show(0);clearInterval(guideTimer);guideTimer=setInterval(place,150);}
   panel.onclick=e=>{const action=e.target.dataset.guide;if(action==='next'||action==='skip')show(step+1);if(action==='back')show(step-1);if(action==='repeat')say(steps[step][1]);if(action==='end')end();};
-  document.querySelector('#fy-guide-restart').onclick=start;
+  document.querySelector('#fy-guide-restart').onclick=()=>start();
+  document.querySelector('#fy-guide-advanced').onclick=()=>start('advanced');
   window.fengyinVoice.guide={start,end,get active(){return guiding;},get step(){return step;}};
   document.addEventListener('keydown',e=>{if(e.key==='Escape' && guiding){end();e.stopImmediatePropagation();}},true);
   backend?.addEventListener('backendState',next=>{
     state=next;
+    if(guiding&&steps[step]?.[5]==='played'&&Number(next.breath)>.02&&(next.noteReceived||Number(next.note)>=0))trialPerformed=true;
+    updateGuideProgress();
     if(busy() && pending && !countdown)stop();
     const value=!!next.deviceConnected;
     if(value!==connected){const previous=connected;connected=value;clearTimeout(connectionTimer);if(value||previous===true)connectionTimer=setTimeout(()=>{if(!guiding)say(value?'V003':'V060');},900);}

@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.1.20",
+    [string]$Version = "1.1.21",
     [switch]$SkipInstaller
 )
 
@@ -15,6 +15,7 @@ $NugetPackageDir = Join-Path $ProjectRoot "third_party\nuget-packages"
 $WebViewOfflineInstallerPath = Join-Path $PackageDir "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
 $PreparedFfmpeg = Join-Path $env:TEMP ("fengyin-ffmpeg-" + [guid]::NewGuid().ToString("N"))
 $PreparedWebView = Join-Path $env:TEMP ("fengyin-webview-" + [guid]::NewGuid().ToString("N") + ".exe")
+$UsePreparedFfmpeg = -not ((Test-Path $FfmpegPath) -and (Test-Path (Join-Path (Split-Path $FfmpegPath) "ffprobe.exe")))
 
 function Invoke-Checked([string]$StepName, [scriptblock]$Command) {
     & $Command
@@ -58,7 +59,7 @@ for ($attempt = 1; $attempt -le 4; $attempt++) {
         Start-Sleep -Seconds (3 * $attempt)
     }
 }
-if (-not (Test-Path $FfmpegPath)) {
+if ($UsePreparedFfmpeg) {
     Write-Host "预检并校验 FFmpeg 发布依赖..." -ForegroundColor Cyan
     Invoke-Checked "FFmpeg 下载与校验" { python (Join-Path $PSScriptRoot "prepare_ffmpeg.py") $PreparedFfmpeg }
     Invoke-Checked "FFmpeg 可执行性检查" { & (Join-Path $PreparedFfmpeg "ffmpeg.exe") -version }
@@ -95,7 +96,7 @@ Invoke-Checked "Screen recorder MP4 encoding selftest" {
     if ($LASTEXITCODE -ne 0 -and (Test-Path "$RecorderCheck.error.txt")) { Get-Content "$RecorderCheck.error.txt" }
     if ($LASTEXITCODE -eq 0 -and -not (Test-Path $RecorderCheck)) { throw "Recorder exited without producing MP4" }
 }
-$RecorderFfmpeg = if (Test-Path $FfmpegPath) { $FfmpegPath } else { Join-Path $PreparedFfmpeg "ffmpeg.exe" }
+$RecorderFfmpeg = if (-not $UsePreparedFfmpeg) { $FfmpegPath } else { Join-Path $PreparedFfmpeg "ffmpeg.exe" }
 Invoke-Checked "Screen recorder decoded audio/video check" { python (Join-Path $PSScriptRoot "verify_screen_recording.py") $RecorderFfmpeg $RecorderCheck }
 $AudioCheck = Join-Path $BuildDir "system-audio-selftest.wav"
 Invoke-Checked "System recording WAV selftest" {
@@ -114,6 +115,17 @@ Invoke-Checked "激活工具编译" { cmake --build $BuildDir --config Release -
 
 Write-Host "[3/5] 运行自动测试..." -ForegroundColor Cyan
 Invoke-Checked "自动测试" { ctest --test-dir $BuildDir -C Release --output-on-failure }
+$ProxyInput = Join-Path $BuildDir "video-proxy-input.mp4"
+$ProxyOutput = Join-Path $BuildDir "verified-proxy.mp4"
+Invoke-Checked "Video proxy 60fps input preparation" {
+    & $RecorderFfmpeg -hide_banner -loglevel error -nostdin -y -i $RecorderCheck -an -r 60 -c:v mpeg4 -q:v 4 $ProxyInput
+}
+Invoke-Checked "Native idle video preparation and cache reuse" {
+    & (Join-Path $BuildDir "Release\FengYinRecordingTests.exe") $RecorderFfmpeg $ProxyInput
+}
+Invoke-Checked "Video proxy decoded frame and duration check" {
+    python (Join-Path $PSScriptRoot "verify_video_proxy.py") $RecorderFfmpeg $ProxyOutput
+}
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
     throw "没有找到 Python，无法执行发布回归检查。"
 }
@@ -148,8 +160,9 @@ if ((Get-FileHash (Join-Path $ProjectRoot "assets\components\magic.CURVE-1.0.2-W
 New-Item -ItemType Directory -Path $MagicDestination -Force | Out-Null
 Copy-Item (Join-Path $ProjectRoot "assets\components\magic.CURVE-1.0.2-Windows-Setup.exe") (Join-Path $MagicDestination "magic.CURVE-1.0.2-Windows-Setup.exe") -Force
 Copy-Item (Join-Path $ProjectRoot "installer\AudioComponents.txt") $PackageDir -Force
-if (Test-Path $FfmpegPath) {
+if (-not $UsePreparedFfmpeg) {
     Copy-Item $FfmpegPath (Join-Path $PackageDir "ffmpeg.exe") -Force
+    Copy-Item (Join-Path (Split-Path $FfmpegPath) "ffprobe.exe") (Join-Path $PackageDir "ffprobe.exe") -Force
 } else {
     Write-Host "正在准备视频伴奏混录组件（FFmpeg LGPL）..." -ForegroundColor Cyan
     New-Item -ItemType Directory -Force -Path $FfmpegPackageDir | Out-Null
