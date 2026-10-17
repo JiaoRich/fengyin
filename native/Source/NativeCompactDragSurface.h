@@ -12,6 +12,7 @@ class NativeCompactDragSurface {
     UINT32 pointer=0;
     bool mouse=false;
     RECT region{};
+    DWORD creationError=ERROR_SUCCESS;
     void begin(POINT point) {
         GetWindowRect(host,&initial);start=point;
         SetForegroundWindow(host);
@@ -27,10 +28,10 @@ class NativeCompactDragSurface {
     static LRESULT CALLBACK proc(HWND hwnd,UINT message,WPARAM w,LPARAM l) {
         auto* self=reinterpret_cast<NativeCompactDragSurface*>(GetWindowLongPtr(hwnd,GWLP_USERDATA));
         if(message==WM_NCCREATE) {
-            self=static_cast<NativeCompactDragSurface*>(reinterpret_cast<CREATESTRUCT*>(l)->lpCreateParams);
+            self=static_cast<NativeCompactDragSurface*>(reinterpret_cast<CREATESTRUCTW*>(l)->lpCreateParams);
             SetWindowLongPtr(hwnd,GWLP_USERDATA,reinterpret_cast<LONG_PTR>(self));
         }
-        if(!self)return DefWindowProc(hwnd,message,w,l);
+        if(!self)return DefWindowProcW(hwnd,message,w,l);
         switch(message) {
             case WM_ERASEBKGND:return 1;
             case WM_PAINT:{PAINTSTRUCT ps;auto dc=BeginPaint(hwnd,&ps);FillRect(dc,&ps.rcPaint,static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));EndPaint(hwnd,&ps);return 0;}
@@ -56,10 +57,11 @@ class NativeCompactDragSurface {
             case WM_POINTERCAPTURECHANGED:if(GET_POINTERID_WPARAM(w)==self->pointer)self->cancel();return 0;
             case WM_CAPTURECHANGED:self->mouse=false;return 0;
             case WM_CANCELMODE:self->cancel();return 0;
-            default:return DefWindowProc(hwnd,message,w,l);
+            default:return DefWindowProcW(hwnd,message,w,l);
         }
     }
 public:
+    DWORD lastCreationError() const {return creationError;}
     ~NativeCompactDragSurface(){if(surface)DestroyWindow(surface);}
     void update(HWND parent,int x,int y,int width,int height,bool enabled) {
         host=parent;
@@ -70,11 +72,14 @@ public:
                 wc.lpszClassName=L"FengYinCompactDragSurface";wc.hCursor=LoadCursor(nullptr,IDC_SIZEALL);
                 return RegisterClassW(&wc);
             }();
-            if(!registered)return;
+            if(!registered){creationError=GetLastError();return;}
             surface=CreateWindowExW(WS_EX_LAYERED|WS_EX_NOACTIVATE,L"FengYinCompactDragSurface",L"",
                                     WS_CHILD,x,y,width,height,host,nullptr,GetModuleHandle(nullptr),this);
-            if(!surface)return;
-            SetLayeredWindowAttributes(surface,0,1,LWA_ALPHA);
+            if(!surface){creationError=GetLastError();return;}
+            if(!SetLayeredWindowAttributes(surface,0,1,LWA_ALPHA)) {
+                creationError=GetLastError();DestroyWindow(surface);surface=nullptr;return;
+            }
+            creationError=ERROR_SUCCESS;
         }
         const RECT next{x,y,x+width,y+height};
         if(!EqualRect(&region,&next)||!IsWindowVisible(surface)) {

@@ -3,6 +3,13 @@ import unittest
 ROOT=Path(__file__).resolve().parents[1]
 
 class Recording120(unittest.TestCase):
+    def test_layered_child_windows_have_embedded_compatibility_contract(self):
+        manifest=(ROOT/'native/Source/WindowsCompatibility.manifest').read_text(encoding='utf-8')
+        self.assertIn('8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a',manifest)
+        cmake=(ROOT/'CMakeLists.txt').read_text(encoding='utf-8')
+        for target in ['FengYin','FengYinCompactGlowTests']:
+            self.assertIn(f'target_sources({target} PRIVATE native/Source/WindowsCompatibility.manifest)',cmake)
+
     def test_diagnostic_entry_and_bridge_removed_not_package_export(self):
         main=(ROOT/'native/Source/MainComponent.cpp').read_text(encoding='utf-8')
         js=(ROOT/'prototype/app.js').read_text(encoding='utf-8')

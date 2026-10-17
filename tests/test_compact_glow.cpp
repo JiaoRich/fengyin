@@ -73,7 +73,7 @@ int main(int argc, char** argv)
         const auto host=static_cast<HWND>(owner.getPeer()->getNativeHandle());
         drag.update(host,10,10,140,30,true);
         const auto surface=FindWindowExW(host,nullptr,L"FengYinCompactDragSurface",nullptr);
-        if(!surface){std::cerr<<"Native title drag surface missing\n";return 1;}
+        if(!surface){std::cerr<<"Native title drag surface missing, creation error="<<drag.lastCreationError()<<"\n";return 1;}
         struct RestoreCursor {POINT old{};RestoreCursor(){GetCursorPos(&old);}~RestoreCursor(){SetCursorPos(old.x,old.y);}} restore;
         RECT before{},after{};GetWindowRect(host,&before);
         SetCursorPos(before.left+20,before.top+20);
