@@ -1,8 +1,13 @@
 name: Windows 编译与安装包
+run-name: ${{ inputs.native_window_test && 'Windows native input diagnostic' || 'Windows build and installer' }}
 
 on:
   workflow_dispatch:
     inputs:
+      native_window_test:
+        description: Run only native title mouse/touch desktop checks
+        type: boolean
+        default: false
       kong_test:
         description: Build independent Qin sustained-note technique test only
         type: boolean
@@ -28,6 +33,29 @@ permissions:
   contents: read
 
 jobs:
+  native-window-test:
+    if: ${{ inputs.native_window_test }}
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          lfs: false
+      - name: Build only the native window input test
+        shell: powershell
+        run: |
+          cmake -S tools/window-input-check -B build-window-input -G "Visual Studio 17 2022" -A x64
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cmake --build build-window-input --config Release --parallel 4
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ctest --test-dir build-window-input -C Release -V --output-on-failure
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: native-window-input-logs
+          path: build-window-input/Testing/Temporary/*.log
+          if-no-files-found: warn
   kong-test:
     if: ${{ inputs.kong_test }}
     uses: ./.github/workflows/kong-technique-test.yml
@@ -93,7 +121,7 @@ jobs:
           name: FengYin-Crash-Capture
           path: diagnostic/FengYin-Crash-Capture.zip
   windows-release:
-    if: ${{ !inputs.diagnostic_only && !inputs.startup_comparison && !inputs.kong_test }}
+    if: ${{ !inputs.diagnostic_only && !inputs.startup_comparison && !inputs.kong_test && !inputs.native_window_test }}
     name: Windows x64 Release
     runs-on: windows-2022
     timeout-minutes: 45

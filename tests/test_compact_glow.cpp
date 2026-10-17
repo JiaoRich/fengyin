@@ -92,6 +92,9 @@ int main(int argc, char** argv)
             std::cerr<<"Cannot initialize Windows native touch injection: "<<GetLastError()<<"\n";return 1;
         }
         RECT touchStart{};GetWindowRect(host,&touchStart);
+        std::cout<<"Touch test: host="<<touchStart.left<<","<<touchStart.top
+                 <<" virtualDesktop="<<GetSystemMetrics(SM_XVIRTUALSCREEN)<<","<<GetSystemMetrics(SM_YVIRTUALSCREEN)
+                 <<" size="<<GetSystemMetrics(SM_CXVIRTUALSCREEN)<<"x"<<GetSystemMetrics(SM_CYVIRTUALSCREEN)<<std::endl;
         POINTER_TOUCH_INFO contact{};
         contact.pointerInfo.pointerType=PT_TOUCH;contact.pointerInfo.pointerId=1;
         contact.touchMask=TOUCH_MASK_CONTACTAREA|TOUCH_MASK_ORIENTATION|TOUCH_MASK_PRESSURE;
@@ -101,7 +104,8 @@ int main(int argc, char** argv)
             contact.pointerInfo.pointerFlags=flags;
             const auto p=contact.pointerInfo.ptPixelLocation;
             contact.rcContact={p.x-2,p.y-2,p.x+2,p.y+2};
-            if(!InjectTouchInput(1,&contact)){std::cerr<<"Touch injection failed: "<<GetLastError()<<"\n";return false;}
+            std::cout<<"Inject flags="<<flags<<" point="<<p.x<<","<<p.y<<std::endl;
+            if(!InjectTouchInput(1,&contact)){std::cerr<<"Touch injection failed: "<<GetLastError()<<" flags="<<flags<<" point="<<p.x<<","<<p.y<<"\n";return false;}
             juce::MessageManager::getInstance()->runDispatchLoopUntil(25);return true;
         };
         if(!inject(0,0,POINTER_FLAG_DOWN|POINTER_FLAG_INRANGE|POINTER_FLAG_INCONTACT))return 1;
