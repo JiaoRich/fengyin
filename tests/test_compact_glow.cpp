@@ -60,8 +60,13 @@ int main(int argc, char** argv)
             if(halo.left!=host.left-pad||halo.top!=host.top-pad||halo.right!=host.right+pad||halo.bottom!=host.bottom+pad) {
                 std::cerr<<"Halo does not follow the physical owner rectangle\n";return 1;
             }
-            const auto style=GetWindowLongPtr(static_cast<HWND>(glow.getPeer()->getNativeHandle()),GWL_EXSTYLE);
-            if((style&WS_EX_TRANSPARENT)==0){std::cerr<<"Halo must remain input-transparent\n";return 1;}
+            // JUCE implements windowIgnoresMouseClicks through WM_NCHITTEST,
+            // not WS_EX_TRANSPARENT. Verify the actual input contract.
+            const auto haloWindow=static_cast<HWND>(glow.getPeer()->getNativeHandle());
+            for(const auto point:{POINT{host.left+10,host.top+10},POINT{host.left-2,host.top+20}}) {
+                const auto hit=SendMessage(haloWindow,WM_NCHITTEST,0,MAKELPARAM(point.x,point.y));
+                if(hit!=HTTRANSPARENT){std::cerr<<"Halo must return HTTRANSPARENT\n";return 1;}
+            }
         }
         std::cout<<"Windows desktop halo changed with breath; software layered peer verified\n";
         return 0;
