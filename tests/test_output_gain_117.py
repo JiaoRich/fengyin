@@ -4,6 +4,8 @@ import math
 from pathlib import Path
 import unittest
 import zipfile
+from io import BytesIO
+from tone_baseline_118 import historical_bytes
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -23,9 +25,9 @@ class FixedOutputGain117(unittest.TestCase):
         self.assertEqual({Path(x['file']).stem for x in audit['targets']}, expected)
         for row in audit['targets']:
             path = ROOT/'assets/tone-packages'/row['file']
-            self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), row['afterPackageSha256'])
+            self.assertEqual(hashlib.sha256(historical_bytes(path)).hexdigest(), row['afterPackageSha256'])
             self.assertAlmostEqual(20*math.log10(float(row['afterGainText'])/float(row['beforeGainText'])),6,places=10)
-            with zipfile.ZipFile(path) as z:
+            with zipfile.ZipFile(BytesIO(historical_bytes(path))) as z:
                 self.assertIsNone(z.testzip())
                 tone = z.read('tone.xml')
                 restored = tone.replace(('outputGain="'+row['afterGainText']+'"').encode(),

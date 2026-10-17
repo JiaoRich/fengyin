@@ -1,0 +1,19 @@
+{
+  "source": "assets/incoming-tones/20261017/肯萨-肯萨1017.fytonepack",
+  "sourceSha256": "2a59c0501fb62fd8544dc3d990081b23edecd956dd6de2fe00f752a2af28d187",
+  "packageSha256": "dcc34f9c6fa30bc6d7ec4fcf90e07cbb603b5d5cc5d45bd1e5228c8c0bf73a96",
+  "previousPackageSha256": "01d075365c9b1f940eea4a0f3e3619763d5fa9df6b5d2093ab5a51853e7863be",
+  "originalOpaqueStatePreserved": true,
+  "originalEffectsPreserved": true,
+  "allParameterSnapshotsPreserved": true,
+  "metadataChanges": [
+    "PRESET name: 肯萨1017 -> 肯萨",
+    "manifest style -> 肯萨",
+    "manifest file bytes/hash refreshed"
+  ],
+  "defaultPercent": 100,
+  "hostAutomationSlot": 1,
+  "actualPitchEndpointsVerified": false,
+  "dynamicsCC11NotIndependentlyReadBack": true,
+  "bendRuntimeLogicUnchanged": true
+}

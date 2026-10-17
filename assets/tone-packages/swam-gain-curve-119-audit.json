@@ -1,0 +1,159 @@
+{
+  "db": 5,
+  "absoluteNotAdditional": true,
+  "baseline": "assets/incoming-tones/20261017/swam-before-gain-119.zip",
+  "targets": [
+    {
+      "file": "soprano-kenny.fytonepack",
+      "beforeSha256": "f731f16cb0e683cb16949ecb38c30ad6b8d13a2e0059b82ff81187839f5a968c",
+      "oldOutputGain": "1.0",
+      "newOutputGain": 1.7782794100389228,
+      "mainVolumeCurveChanged": false,
+      "afterSha256": "d021cacda0757e640db48df05ec1674e01c9b69beb20507cebf3ca45c438ca43"
+    },
+    {
+      "file": "soprano-pop.fytonepack",
+      "beforeSha256": "0b7ba45cb975ac33cd220b7edc0fd768f7a20a2356e346bd0afa7e2ab6749f9f",
+      "oldOutputGain": "1.0",
+      "newOutputGain": 1.7782794100389228,
+      "mainVolumeCurveChanged": false,
+      "afterSha256": "5a9ec683ddf7f95306f6b2accfd6c663cbffbe62140674f80534433daaecee44"
+    },
+    {
+      "file": "alto-jazz.fytonepack",
+      "beforeSha256": "129ca35b6e550eee3b7d5f473224535d7f41c97f23767c2df1c9fb348191de93",
+      "oldOutputGain": "1.0",
+      "newOutputGain": 1.7782794100389228,
+      "mainVolumeCurveChanged": false,
+      "afterSha256": "d8d79a3b1bb608c71849eedcffc1eaaa6adde5aaaf5a5692328cfa9d7f48a19f"
+    },
+    {
+      "file": "alto-deep.fytonepack",
+      "beforeSha256": "46e7f70ffe0fae6a0cf8b22332735a3c9b3e8aafa6009269a16884a9fee2c6d0",
+      "oldOutputGain": "1.0",
+      "newOutputGain": 1.7782794100389228,
+      "mainVolumeCurveChanged": false,
+      "afterSha256": "bc8369276703b79b3da8fbdc8798ec6aa1fe2f286f04f3a77f61290d12d0d1d2"
+    },
+    {
+      "file": "alto-pop.fytonepack",
+      "beforeSha256": "d2ae1ab1ba11d6b14bfd4aa8ae49ff1d0c6e4a947823202240e99409c206f268",
+      "oldOutputGain": "1.0",
+      "newOutputGain": 1.7782794100389228,
+      "mainVolumeCurveChanged": false,
+      "afterSha256": "23dfbb1b5bec2150cbed41f02b99d1d5fc7edef39151b0f645c9d1090a93e49e"
+    },
+    {
+      "file": "tenor-mellow.fytonepack",
+      "beforeSha256": "24ab27cb336d817622b7e20b7c20bbf47ea1050a125bc9aa674fe803de23b2cf",
+      "oldOutputGain": "1.0",
+      "newOutputGain": 1.7782794100389228,
+      "mainVolumeCurveChanged": false,
+      "afterSha256": "2e030da470553383072f0880723e1de846a2dfc886e07ac8ed5bfd87bc35f42e"
+    },
+    {
+      "file": "tenor-warm.fytonepack",
+      "beforeSha256": "804767dcf515dea3e57dde83b4dbc47d7d8740667f093cfe37b4773ecda0a1d0",
+      "oldOutputGain": "1.0",
+      "newOutputGain": 1.7782794100389228,
+      "mainVolumeCurveChanged": false,
+      "afterSha256": "5970e217e46f38657e865a27610570c3e01168b47401bcb52e8376a4fed6d5c7"
+    },
+    {
+      "file": "tenor-air-pocket.fytonepack",
+      "beforeSha256": "fb6f7caa91982439955265abeef8a8ecfc72fe8b7b36a4cdc8d2ee258b683d23",
+      "oldOutputGain": "1.0",
+      "newOutputGain": 1.7782794100389228,
+      "mainVolumeCurveChanged": false,
+      "afterSha256": "1d9712419f7aa05fbda836423002e2fa29904bd84ba3d27772d5a853a76741f2"
+    },
+    {
+      "file": "trumpet.fytonepack",
+      "beforeSha256": "1f2a444100b4e9f8f70ceb70b45231d93141cf3d71c1c6642ea63a6b26058ba3",
+      "oldOutputGain": "1.0",
+      "newOutputGain": 1.7782794100389228,
+      "mainVolumeCurveChanged": false,
+      "afterSha256": "e684cc85a1acdcc7f4ee2e5ff0cb55d306a6ca82776a271a25eaa2ee83130f4f"
+    },
+    {
+      "file": "piccolo-trumpet.fytonepack",
+      "beforeSha256": "dbd9b5a8ff4c0486721ffe0afe0ded582669c2ac06ec2549945504c8a4c6954e",
+      "oldOutputGain": "1.0",
+      "newOutputGain": 1.7782794100389228,
+      "mainVolumeCurveChanged": false,
+      "afterSha256": "0aa5dc9c6acf4c96d0d7b5d863295783b422dd751eab108c8f50682f1fe1ef80"
+    },
+    {
+      "file": "alto-trombone.fytonepack",
+      "beforeSha256": "5436e8ebbd5606b20c7a673486ff4aeb7a9e1069aaf2ee0ebb1fa892836b14a6",
+      "oldOutputGain": "1.0",
+      "newOutputGain": 1.7782794100389228,
+      "mainVolumeCurveChanged": false,
+      "afterSha256": "7fce4e536c89c770628c58a097cd9e1e6dc31ca34bf9cf97289701d5e8bb7978"
+    },
+    {
+      "file": "bass-trombone.fytonepack",
+      "beforeSha256": "3d245694319a24b30062d475ddcf0f593402889a9a1c362a2f2fbd1318fb5bca",
+      "oldOutputGain": "1.0",
+      "newOutputGain": 1.7782794100389228,
+      "mainVolumeCurveChanged": false,
+      "afterSha256": "64b0787263e8caa4013201e9d73e70d9e03de2965491a147b77822cfa3b2623a"
+    },
+    {
+      "file": "flute.fytonepack",
+      "beforeSha256": "1164b7acffe5bd7d2bcf7d6ec3f45833bf0105df5a81f01a389df8a739032bc8",
+      "oldOutputGain": "1.9952623149688795",
+      "newOutputGain": 1.7782794100389228,
+      "mainVolumeCurveChanged": false,
+      "afterSha256": "e85210cae1c17187f76702b35f7fe7ccb7a08732a669668b58fa209f33b3bf73"
+    },
+    {
+      "file": "piccolo.fytonepack",
+      "beforeSha256": "600eb9b524d12e83b4893acb51ff51af649ddf0792ba56d129c08f0f333295d5",
+      "oldOutputGain": "1.9952623149688795",
+      "newOutputGain": 1.7782794100389228,
+      "mainVolumeCurveChanged": false,
+      "afterSha256": "ed4530b597c77f2e5786429ffdc7031f8ae2c2f7d1ca88fe5fa5957b752e59a3"
+    },
+    {
+      "file": "clarinet.fytonepack",
+      "beforeSha256": "23d54efb1d9f4733a1125d4f439e9e7b4a886aec4a6b6850c796fb6679f201e3",
+      "oldOutputGain": "1.9952623149688795",
+      "newOutputGain": 1.7782794100389228,
+      "mainVolumeCurveChanged": false,
+      "afterSha256": "c167a309037e11ce4c0745caae8750883f17923c149fdf435e4d7d368c55d9b8"
+    },
+    {
+      "file": "oboe.fytonepack",
+      "beforeSha256": "0718f16650aca8a225a9a26308602888ac83ebcce1e8076df8555e45d40db9a5",
+      "oldOutputGain": "1.9952623149688795",
+      "newOutputGain": 1.7782794100389228,
+      "mainVolumeCurveChanged": false,
+      "afterSha256": "52549a06da40994e61b9ffe377ab5e95af44990bc0ce371db730f2cb29981934"
+    },
+    {
+      "file": "violin-bright.fytonepack",
+      "beforeSha256": "c1a493e4ab34b32d736dc538f47ad093e03e7f2f29600548c38133f16aa59d2c",
+      "oldOutputGain": "1.0",
+      "newOutputGain": 1.7782794100389228,
+      "mainVolumeCurveChanged": false,
+      "afterSha256": "7ae59adc00fc5f3f6af573818987a56af93ca02ed7e9d2912ed5931bf07ee501"
+    },
+    {
+      "file": "violin-soft.fytonepack",
+      "beforeSha256": "4bfd99486713f7bd7306a9ba64765db483e6366788354b86f46797e99b3f82d4",
+      "oldOutputGain": "1.9952623149688795",
+      "newOutputGain": 1.7782794100389228,
+      "mainVolumeCurveChanged": true,
+      "afterSha256": "1d733103ed4f36863f9fa7e31a7c3696ccccb15277cb4a24a63369a47786acae"
+    },
+    {
+      "file": "cello.fytonepack",
+      "beforeSha256": "719cafb3667a2a555ea3a8c2a4fb78e99105111ec08da399cb6805cfa1e7fdcf",
+      "oldOutputGain": "1.0",
+      "newOutputGain": 1.7782794100389228,
+      "mainVolumeCurveChanged": false,
+      "afterSha256": "d790e492d885cbde61d9ee21a1a481847a91a95d32c9c84c9776382c73764af9"
+    }
+  ]
+}

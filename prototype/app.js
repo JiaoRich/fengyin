@@ -13,10 +13,15 @@ function flushWindowGestureMove() {
 }
 function beginTouchWindowGesture(e, action) {
   if (e.isPrimary === false || touchWindowGesture) return true;
-  // One captured-pointer path for mouse, pen and touch. Do not simultaneously
-  // run the native mouse polling path for synthetic touch mouse messages.
+  // Mouse movement belongs to the native desktop, not WebView IPC. A moving
+  // WebView must not own mouse capture or feed CSS screen deltas back to itself.
+  if(e.pointerType==='mouse') {
+    nativeEvent('windowAction',{action});
+    return true;
+  }
   touchWindowGesture = {id:e.pointerId,x:e.screenX,y:e.screenY,target:e.currentTarget};
-  e.currentTarget.setPointerCapture(e.pointerId);
+  try { e.currentTarget.setPointerCapture(e.pointerId); }
+  catch { touchWindowGesture=null; return true; }
   nativeEvent('windowAction',{action:`pointer-begin:${action}`});
   return true;
 }
@@ -24,12 +29,13 @@ document.addEventListener('pointermove',e=>{
   if (!touchWindowGesture || e.pointerId!==touchWindowGesture.id) return;
   e.preventDefault();
   touchWindowGesture.delta=[Math.round(e.screenX-touchWindowGesture.x),Math.round(e.screenY-touchWindowGesture.y)];
-  if(windowGestureMoveTimer===null)windowGestureMoveTimer=setTimeout(flushWindowGestureMove,1000/24);
+  if(windowGestureMoveTimer===null)windowGestureMoveTimer=setTimeout(flushWindowGestureMove,1000/60);
 },{passive:false});
-for(const event of ['pointerup','pointercancel','lostpointercapture']) document.addEventListener(event,e=>{
+for(const event of ['pointerup','pointercancel','lostpointercapture']) window.addEventListener(event,e=>{
   if (!touchWindowGesture || e.pointerId!==touchWindowGesture.id) return;
-  flushWindowGestureMove();touchWindowGesture=null;nativeEvent('windowAction',{action:'pointer-end'});
-});
+  if(event==='pointerup')flushWindowGestureMove();
+  cancelWindowGesture();
+},true);
 function cancelWindowGesture() {
   const gesture=touchWindowGesture;
   if(!gesture)return;
@@ -1674,7 +1680,7 @@ $('#cancel-technique-learning').addEventListener('click', () => {
   renderTechniqueMappings();
 });
 
-$('#record').addEventListener('click', async event => {
+async function toggleAudioRecording() {
   if(screenRecordingBusy){nativeEvent('toggleWindowRecording',{});return;}
   if (!recording && video.src && window.__JUCE__?.backend?.emitEvent && !nativeAccompanimentReady) {
     return toast('伴奏音轨尚未准备好，请稍候再开始录音');
@@ -1683,18 +1689,25 @@ $('#record').addEventListener('click', async event => {
   nativeEvent('toggleRecording');
   if(window.__JUCE__?.backend)return;
   recording = !recording;
-  event.target.textContent = recording ? '■ 停止录音' : '● 开始录音';
-  event.target.style.color = recording ? 'var(--danger)' : '';
+  $('#record').textContent = recording ? '■ 停止录音' : '● 开始录制';
+  $('#record').style.color = recording ? 'var(--danger)' : '';
   toast(recording ? '已开始模拟录音' : '模拟录音已保存');
-});
+}
 const recordMenu=$('#record-menu'),recordOptions=$('#record-options');
 function closeRecordMenu(){recordMenu.hidden=true;recordOptions.setAttribute('aria-expanded','false');}
-recordOptions.addEventListener('click',()=>{
+function toggleRecordMenu(){
+  if(recording||screenRecordingBusy)return;
   if(!recordMenu.hidden)return closeRecordMenu();
   recordMenu.hidden=false;recordOptions.setAttribute('aria-expanded','true');positionChoice(recordMenu,recordOptions);
+}
+recordOptions.addEventListener('click',toggleRecordMenu);
+$('#record').addEventListener('click',()=>{
+  if(screenRecordingBusy){nativeEvent('toggleWindowRecording',{});return;}
+  if(recording){toggleAudioRecording();return;}
+  toggleRecordMenu();
 });
 $('#record-audio-choice').onclick=()=>{
-  closeRecordMenu();if(screenRecordingBusy)return toast('请先停止并保存录屏');$('#record').click();
+  closeRecordMenu();if(screenRecordingBusy)return toast('请先停止并保存录屏');toggleAudioRecording();
 };
 $('#record-video-choice').onclick=async()=>{
   closeRecordMenu();if(recording)return toast('请先停止录音');
@@ -1705,8 +1718,7 @@ $('#record-video-choice').onclick=async()=>{
   const background='ff'+rgb.slice(0,3).map(n=>Math.max(0,Math.min(255,Math.round(n))).toString(16).padStart(2,'0')).join('');
   nativeEvent('toggleWindowRecording',{background});
 };
-$('#screen-recordings').onclick=()=>{closeRecordMenu();nativeEvent('showScreenRecordings');};
-document.addEventListener('pointerdown',e=>{if(!recordMenu.contains(e.target)&&!recordOptions.contains(e.target))closeRecordMenu();});
+document.addEventListener('pointerdown',e=>{if(!recordMenu.contains(e.target)&&!recordOptions.contains(e.target)&&!$('#record').contains(e.target))closeRecordMenu();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeRecordMenu();});
 window.addEventListener('resize',closeRecordMenu);
 window.__JUCE__?.backend?.addEventListener('screenRecordingMessage',message=>toast(String(message)));
@@ -2130,7 +2142,7 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   }
   recording = !!state.recording;
   screenRecordingBusy=!!state.screenRecordingBusy;
-  $('#record').textContent = screenRecordingBusy ? (state.screenRecordingStopping?'正在保存…':state.screenRecording?'■ 停止录屏':'录屏启动中…') : recording ? '■ 停止录音' : '● 开始录音';
+  $('#record').textContent = screenRecordingBusy ? (state.screenRecordingStopping?'正在保存…':state.screenRecording?'■ 停止录屏':'录屏启动中…') : recording ? '■ 停止录音' : '● 开始录制';
   $('#record').style.color = recording||screenRecordingBusy ? 'var(--danger)' : '';
   $('#record').disabled=!!state.screenRecordingStopping;
 });
@@ -2365,7 +2377,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.18 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.19 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

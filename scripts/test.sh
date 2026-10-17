@@ -16,5 +16,7 @@ clang++ -std=c++20 -Wall -Wextra -Werror "$project_dir/tests/test_controller_det
 "$detector_test_binary"
 clang++ -std=c++20 -Wall -Wextra -Werror "$project_dir/tests/test_swam_classifier.cpp" -o "$swam_test_binary"
 "$swam_test_binary"
+clang++ -std=c++20 -Wall -Wextra -Werror "$project_dir/tests/test_capture_audio_timeline.cpp" -o "${TMPDIR:-/tmp}/fengyin-capture-timeline-test"
+"${TMPDIR:-/tmp}/fengyin-capture-timeline-test"
 
 echo "All FengYin tests passed."

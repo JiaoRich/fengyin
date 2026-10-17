@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "RecordingPaths.h"
 #include "SimpleTechniquePolicy.h"
 #include "ToneDiagnostic.h"
 #include "TonePackage.h"
@@ -820,15 +821,9 @@ void MainComponent::setupWebInterface()
             else if(isActivated || recorder.isRecording())toggleRecording();
         })
         .withEventListener("toggleWindowRecording", [this](juce::var payload) {toggleWindowRecording(payload);})
-        .withEventListener("showScreenRecordings", [](juce::var) {
-            const auto folder=juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile(utf8("风吟录屏"));
-            folder.createDirectory();folder.revealToUser();
-        })
         .withEventListener("showRecordings", [](juce::var)
         {
-            const auto folder = fengyin::RecordingService::getRecordingsFolder();
-            folder.createDirectory();
-            folder.revealToUser();
+            if(fengyin::RecordingPaths::ensureFolders())fengyin::RecordingPaths::root().revealToUser();
         })
         .withEventListener("activate", [this](juce::var payload)
         {

@@ -35,7 +35,7 @@
       countdown=true;const button=document.querySelector('#record');button.disabled=true;
       button.textContent='准备录音…';
       try{return await say('V041',{force:true});}
-      finally{countdown=false;button.disabled=false;button.textContent='● 开始录音';}
+      finally{countdown=false;button.disabled=false;button.textContent='● 开始录制';}
     }
   };
   const style=document.createElement('style');style.textContent=`

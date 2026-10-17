@@ -5,6 +5,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #if JUCE_WINDOWS
  #include <windows.h>
+ #include <dwmapi.h>
 #endif
 #include <cmath>
 #include <vector>
@@ -35,6 +36,34 @@ public:
         }
         const bool shapeChanged = cornerRadius != radius;
         cornerRadius = radius;
+       #if JUCE_WINDOWS
+        if(owner.getPeer()!=nullptr&&getPeer()!=nullptr) {
+            const auto host=static_cast<HWND>(owner.getPeer()->getNativeHandle());
+            const auto halo=static_cast<HWND>(getPeer()->getNativeHandle());
+            // Assign the owner before positioning, and align physical HWND
+            // rectangles. Expanded JUCE logical bounds may select a different
+            // monitor/DPI and are not a reliable halo origin on Windows.
+            if(GetWindowLongPtr(halo,GWLP_HWNDPARENT)!=reinterpret_cast<LONG_PTR>(host))
+                SetWindowLongPtr(halo,GWLP_HWNDPARENT,reinterpret_cast<LONG_PTR>(host));
+            RECT hostRect{};
+            if(GetWindowRect(host,&hostRect)) {
+                const double scale=owner.getPeer()->getPlatformScaleFactor();
+                const int pad=juce::roundToInt(padding*scale);
+                const int w=hostRect.right-hostRect.left+pad*2,h=hostRect.bottom-hostRect.top+pad*2;
+                RECT haloRect{};GetWindowRect(halo,&haloRect);
+                if(haloRect.left!=hostRect.left-pad||haloRect.top!=hostRect.top-pad
+                   ||haloRect.right-haloRect.left!=w||haloRect.bottom-haloRect.top!=h)
+                    SetWindowPos(halo,nullptr,hostRect.left-pad,hostRect.top-pad,w,h,SWP_NOZORDER|SWP_NOACTIVATE);
+                const auto sx=static_cast<float>(getWidth())/juce::jmax(1,w);
+                const auto sy=static_cast<float>(getHeight())/juce::jmax(1,h);
+                const juce::Rectangle<float> inner(pad*sx,pad*sy,(hostRect.right-hostRect.left)*sx,(hostRect.bottom-hostRect.top)*sy);
+                const auto localRadius=static_cast<float>(radius*scale)*juce::jmin(sx,sy);
+                if(inner!=innerBounds||cornerRadius!=localRadius||frame.getWidth()!=getWidth()||frame.getHeight()!=getHeight()||frame.isNull()) {
+                    innerBounds=inner;cornerRadius=localRadius;rebuild();
+                }
+            }
+        }
+       #else
         const auto bounds = owner.getScreenBounds().expanded(padding);
         if (getBounds() != bounds || shapeChanged || frame.isNull())
         {
@@ -42,6 +71,7 @@ public:
             setBounds(bounds);
             if (sizeChanged || shapeChanged || frame.isNull()) rebuild();
         }
+       #endif
        #if JUCE_WINDOWS
         if (owner.getPeer() != nullptr && getPeer() != nullptr)
         {
@@ -78,12 +108,14 @@ private:
     juce::Image frame;
     double energy = 0, phase = 0, last = 0;
     float cornerRadius = 28.0f;
+    juce::Rectangle<float> innerBounds;
     void rebuild()
     {
         frame = juce::Image(juce::Image::ARGB, getWidth(), getHeight(), true);
         pixels.clear();
-        const auto cx = getWidth() * .5f, cy = getHeight() * .5f;
-        const auto hx = cx - padding, hy = cy - padding;
+        const auto inner=innerBounds.isEmpty()?getLocalBounds().toFloat().reduced(padding):innerBounds;
+        const auto cx = inner.getCentreX(), cy = inner.getCentreY();
+        const auto hx = inner.getWidth()*.5f, hy = inner.getHeight()*.5f;
         const float radius = cornerRadius;
         for (int y = 0; y < getHeight(); ++y)
             for (int x = 0; x < getWidth(); ++x)

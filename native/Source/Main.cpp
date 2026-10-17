@@ -66,6 +66,7 @@ private:
                 {
                     windowGesture = action.fromFirstOccurrenceOf(":", false, false);
                     pointerGesture = true; gestureBounds = getBounds();
+                    capturePhysicalGesture();
                 }
                 else if (pointerGesture && content->compactMode && action.startsWith("pointer-move:"))
                 {
@@ -80,6 +81,7 @@ private:
                     pointerGesture = false;
                     gestureStart = juce::Desktop::getMousePosition();
                     gestureBounds = getBounds();
+                    capturePhysicalGesture();
                 }
             };
             setResizable(false, false);
@@ -91,7 +93,7 @@ private:
                            juce::jmin(900, juce::jmax(700, available.getHeight() - 32)));
             setVisible(true);
             setFullScreen(true);
-            startTimerHz(24); // Visual companion window only; audio/MIDI clocks are unchanged.
+            startTimerHz(60); // Input polling only; the visual companion remains capped at 24 Hz.
         }
 
         void maximiseButtonPressed() override { content->requestCompactMode(!content->compactMode); }
@@ -130,18 +132,49 @@ private:
         bool pointerGesture = false;
         juce::Point<int> gestureStart;
         juce::Rectangle<int> gestureBounds;
+       #if JUCE_WINDOWS
+        RECT gesturePhysicalBounds {};
+        POINT gesturePhysicalStart {};
+        double gestureScale = 1.0;
+       #endif
+        void capturePhysicalGesture()
+        {
+           #if JUCE_WINDOWS
+            if (auto* peer=getPeer())
+            {
+                auto hwnd=static_cast<HWND>(peer->getNativeHandle());
+                GetWindowRect(hwnd,&gesturePhysicalBounds);
+                GetCursorPos(&gesturePhysicalStart);
+                gestureScale=peer->getPlatformScaleFactor();
+            }
+           #endif
+        }
         void updateWindowGesture()
         {
             if (windowGesture.isEmpty()) return;
-            if (pointerGesture) return; // Touch/pen uses captured WebView pointer deltas, not mouse buttons.
-            if (!content->compactMode || isFullScreen()
-                || !juce::ModifierKeys::getCurrentModifiersRealtime().isLeftButtonDown())
+            if (!content->compactMode || isFullScreen() || isMinimised() || !isActiveWindow())
+            { pointerGesture=false; windowGesture.clear(); return; }
+            if (pointerGesture) return; // Touch/pen uses captured WebView pointer deltas.
+           #if JUCE_WINDOWS
+            if ((GetAsyncKeyState(VK_LBUTTON)&0x8000)==0)
+            {windowGesture.clear();return;}
+            POINT position{};
+            if(GetCursorPos(&position))applyPhysicalGestureDelta(position.x-gesturePhysicalStart.x,position.y-gesturePhysicalStart.y);
+            return;
+           #endif
+            if (!juce::ModifierKeys::getCurrentModifiersRealtime().isLeftButtonDown())
             { windowGesture.clear(); return; }
             const auto delta = juce::Desktop::getMousePosition() - gestureStart;
             applyWindowGestureDelta(delta);
         }
         void applyWindowGestureDelta(juce::Point<int> delta)
         {
+           #if JUCE_WINDOWS
+            // CSS screen coordinates are DIPs; the HWND rectangle is physical.
+            // Keep the start monitor's scale throughout a gesture.
+            applyPhysicalGestureDelta(juce::roundToInt(delta.x*gestureScale),juce::roundToInt(delta.y*gestureScale));
+            return;
+           #endif
             if (windowGesture == "drag")
             { setBounds(gestureBounds.translated(delta.x, delta.y)); return; }
             const auto edge = windowGesture.fromFirstOccurrenceOf("resize-", false, false);
@@ -152,6 +185,26 @@ private:
             if (edge.contains("n")) bounds.setTop(gestureBounds.getBottom() - juce::jlimit(560, 2160, gestureBounds.getHeight() - delta.y));
             setBounds(bounds);
         }
+       #if JUCE_WINDOWS
+        void applyPhysicalGestureDelta(int dx,int dy)
+        {
+            auto* peer=getPeer();if(!peer||windowGesture.isEmpty())return;
+            auto bounds=gesturePhysicalBounds;
+            const auto edge=windowGesture.fromFirstOccurrenceOf("resize-",false,false);
+            if(windowGesture=="drag") {bounds.left+=dx;bounds.right+=dx;bounds.top+=dy;bounds.bottom+=dy;}
+            else {
+                const int minW=juce::roundToInt(480*gestureScale),maxW=juce::roundToInt(960*gestureScale);
+                const int minH=juce::roundToInt(560*gestureScale),maxH=juce::roundToInt(2160*gestureScale);
+                if(edge.contains("e"))bounds.right=bounds.left+juce::jlimit<int>(minW,maxW,gesturePhysicalBounds.right-gesturePhysicalBounds.left+dx);
+                if(edge.contains("s"))bounds.bottom=bounds.top+juce::jlimit<int>(minH,maxH,gesturePhysicalBounds.bottom-gesturePhysicalBounds.top+dy);
+                if(edge.contains("w"))bounds.left=bounds.right-juce::jlimit<int>(minW,maxW,gesturePhysicalBounds.right-gesturePhysicalBounds.left-dx);
+                if(edge.contains("n"))bounds.top=bounds.bottom-juce::jlimit<int>(minH,maxH,gesturePhysicalBounds.bottom-gesturePhysicalBounds.top-dy);
+            }
+            auto hwnd=static_cast<HWND>(peer->getNativeHandle());RECT current{};
+            if(GetWindowRect(hwnd,&current)&&EqualRect(&current,&bounds))return;
+            SetWindowPos(hwnd,nullptr,bounds.left,bounds.top,bounds.right-bounds.left,bounds.bottom-bounds.top,SWP_NOZORDER|SWP_NOACTIVATE);
+        }
+       #endif
         void updateRoundedWindow(bool rounded)
         {
            #if JUCE_WINDOWS
@@ -192,9 +245,13 @@ private:
         bool smoothNativeCorners = false;
         bool borderless = false;
         int roundedWidth = -1, roundedHeight = -1, roundedRadius = -1;
+        double lastVisualUpdate=0;
         void timerCallback() override
         {
             updateWindowGesture();
+            const auto now=juce::Time::getMillisecondCounterHiRes();
+            if(now-lastVisualUpdate<1000.0/24.0)return;
+            lastVisualUpdate=now;
             content->setWebPresentationVisible(isVisible() && !isMinimised());
             if (!isMinimised()) updateRoundedWindow(content->compactMode && !isFullScreen());
             glow.update(*this, content->compactMode && !isFullScreen() && !isMinimised()

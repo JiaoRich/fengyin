@@ -1,4 +1,5 @@
 #include "RecordingService.h"
+#include "RecordingPaths.h"
 
 namespace fengyin
 {
@@ -10,14 +11,7 @@ juce::File RecordingService::nextRecordingFile(const juce::File& folder,
                                                 const juce::String& date)
 {
     juce::ignoreUnused(instrumentChineseName);
-    const auto safeName = juce::String::fromUTF8("风吟演奏录音");
-    const auto day = date.isNotEmpty() ? date.substring(juce::jmax(0, date.length() - 6)) : juce::Time::getCurrentTime().formatted("%y%m%d");
-    for (int sequence = 1; sequence < 10000; ++sequence)
-    {
-        const auto candidate = folder.getChildFile(safeName + "-" + day + "-" + juce::String(sequence) + ".wav");
-        if (! candidate.exists()) return candidate;
-    }
-    return folder.getChildFile(safeName + "-" + day + "-" + juce::Uuid().toString() + ".wav");
+    return RecordingPaths::next(folder,"wav",date);
 }
 
 bool RecordingService::start(double sampleRate, int channelCount, const juce::String& instrumentChineseName)
@@ -26,7 +20,7 @@ bool RecordingService::start(double sampleRate, int channelCount, const juce::St
     if (! folder.createDirectory())
     {
         const juce::ScopedLock lock(stateLock);
-        lastError = juce::String::fromUTF8("无法创建“风吟录音”文件夹");
+        lastError = juce::String::fromUTF8("无法创建“风吟录制/录音”文件夹");
         return false;
     }
     return startToFile(nextRecordingFile(folder, instrumentChineseName), sampleRate, channelCount);
@@ -99,8 +93,7 @@ juce::String RecordingService::getLastError() const { const juce::ScopedLock loc
 
 juce::File RecordingService::getRecordingsFolder()
 {
-    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
-        .getChildFile(juce::String::fromUTF8("风吟录音"));
+    return RecordingPaths::audio();
 }
 
 juce::Array<juce::File> RecordingService::getRecordings()

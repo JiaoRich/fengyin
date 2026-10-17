@@ -29,7 +29,15 @@ def verify(executable, path):
     rms = math.sqrt(sum(v*v for v in pcm)/len(pcm))
     if not 1000 < rms < 3000:
         raise ValueError(f'Encoded audio is silent/corrupt: RMS={rms}')
-    print('Native MP4: H264 image orientation, 48 frames, stereo audio duration and non-silence passed')
+    # Ignore encoder priming/tail, then reject intermittent silent blocks that
+    # a global RMS check would miss. This remains an encoder/timeline selftest,
+    # not a claim that live WGC/WASAPI passed on the target computer.
+    interior=pcm[8192:-8192]
+    for start in range(0,len(interior)-1920,1920):
+        block=interior[start:start+1920]
+        local_rms=math.sqrt(sum(v*v for v in block)/len(block))
+        if local_rms<1000:raise ValueError(f'Audio discontinuity near sample {start}: RMS={local_rms}')
+    print('Native MP4: H264 orientation, 48 frames, stereo duration and continuous audio passed')
 
 
 if __name__ == '__main__':

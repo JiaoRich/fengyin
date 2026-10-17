@@ -22,7 +22,8 @@ class WindowInput118Tests(unittest.TestCase):
         self.assertNotIn("e.pointerType !== 'touch'", begin)
         self.assertIn("window.addEventListener('blur',cancelWindowGesture)", begin)
         self.assertIn('releasePointerCapture', begin)
-        self.assertIn('1000/24', begin)
+        self.assertIn('1000/60', begin)
+        self.assertIn("e.pointerType==='mouse'",begin)
 
     def test_bend_picker_is_five_choices_not_a_modal(self):
         html = (ROOT / 'prototype/index.html').read_text(encoding='utf-8')

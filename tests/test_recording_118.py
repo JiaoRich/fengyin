@@ -37,7 +37,7 @@ class Recording118Tests(unittest.TestCase):
         js=(ROOT/'prototype/app.js').read_text(encoding='utf-8')
         self.assertIn('id="record-options"',html)
         self.assertIn('id="record-video-choice"',html)
-        video=js.split("$('#record-video-choice').onclick",1)[1].split("$('#screen-recordings')",1)[0]
+        video=js.split("$('#record-video-choice').onclick",1)[1].split("document.addEventListener('pointerdown'",1)[0]
         self.assertIn("nativeEvent('toggleWindowRecording'",video)
         self.assertIn('Windows版风吟',video)
         self.assertIn('screenRecordingStopping',js)

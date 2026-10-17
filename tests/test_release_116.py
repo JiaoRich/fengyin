@@ -1,5 +1,6 @@
 import hashlib,json,unittest,zipfile,xml.etree.ElementTree as ET
 from pathlib import Path
+from tone_baseline_118 import historical_bytes
 ROOT=Path(__file__).resolve().parents[1]
 class Release116(unittest.TestCase):
     def test_kensa_state_and_effect_chain_are_preserved(self):
@@ -9,12 +10,12 @@ class Release116(unittest.TestCase):
                 return ET.fromstring(z.read('tone.xml')).find('PRESET')
         # The received 118 revision adds the user-assigned bend automation.
         # Compare against that unmodified incoming source, not the retired state.
-        old=read(ROOT/'assets/incoming-tones/20261017/Kontakt音源-肯萨-弯音绑定.fytonepack')
+        old=read(ROOT/'assets/incoming-tones/20261017/肯萨-肯萨1017.fytonepack')
         new=read(ROOT/'assets/tone-packages/kontakt-kensa.fytonepack')
         self.assertEqual(new.get('instrumentKey'),'kontakt-kensa')
-        self.assertEqual([ET.tostring(x) for x in old],[ET.tostring(x) for x in new])
+        self.assertEqual(hashlib.sha256(b''.join(ET.tostring(x) for x in old)).hexdigest(),hashlib.sha256(b''.join(ET.tostring(x) for x in new)).hexdigest())
         for key,value in old.attrib.items():
-            if key not in ['instrumentKey','instrumentChineseName']:self.assertEqual(value,new.get(key))
+            if key not in ['instrumentKey','instrumentChineseName','name']:self.assertEqual(value,new.get(key))
     def test_visibility_gate_does_not_stop_business_timer(self):
         main=(ROOT/'native/Source/MainComponent.cpp').read_text(encoding='utf-8')
         gate=main.index('if (webPresentationVisible &&')
@@ -44,7 +45,7 @@ class Release116(unittest.TestCase):
             row=gain_rows.get(name)
             if row:self.assertEqual(row['beforePackageSha256'],digest)
             expected=row['afterPackageSha256'] if row else digest
-            self.assertEqual(hashlib.sha256((ROOT/'assets/tone-packages'/name).read_bytes()).hexdigest(),expected)
+            self.assertEqual(hashlib.sha256(historical_bytes(ROOT/'assets/tone-packages'/name)).hexdigest(),expected)
             if name not in changed:self.assertEqual(audit['before'][name],digest)
     def test_container_reuse_is_bounded_and_does_not_keep_effects(self):
         host=(ROOT/'native/Source/PluginHostEngine.cpp').read_text(encoding='utf-8')

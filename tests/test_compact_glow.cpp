@@ -51,6 +51,18 @@ int main(int argc, char** argv)
         if(idlePixel==CLR_INVALID || strongPixel==CLR_INVALID || idlePixel==strongPixel) {
             std::cerr<<"Layered halo did not change on the actual Windows desktop\n";return 1;
         }
+        for(const auto bounds:{juce::Rectangle<int>(240,120,400,420),juce::Rectangle<int>(80,180,320,360)}) {
+            owner.setBounds(bounds);pump(1);
+            RECT host{},halo{};
+            GetWindowRect(static_cast<HWND>(owner.getPeer()->getNativeHandle()),&host);
+            GetWindowRect(static_cast<HWND>(glow.getPeer()->getNativeHandle()),&halo);
+            const auto pad=juce::roundToInt(48*owner.getPeer()->getPlatformScaleFactor());
+            if(halo.left!=host.left-pad||halo.top!=host.top-pad||halo.right!=host.right+pad||halo.bottom!=host.bottom+pad) {
+                std::cerr<<"Halo does not follow the physical owner rectangle\n";return 1;
+            }
+            const auto style=GetWindowLongPtr(static_cast<HWND>(glow.getPeer()->getNativeHandle()),GWL_EXSTYLE);
+            if((style&WS_EX_TRANSPARENT)==0){std::cerr<<"Halo must remain input-transparent\n";return 1;}
+        }
         std::cout<<"Windows desktop halo changed with breath; software layered peer verified\n";
         return 0;
     }

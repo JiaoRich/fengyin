@@ -201,7 +201,7 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
             self.assertTrue(asset.is_file() and asset.stat().st_size > 300, asset)
         self.assertEqual(
             hashlib.sha256((ROOT / "assets/tone-packages/soprano-kenny.fytonepack").read_bytes()).hexdigest(),
-            "f731f16cb0e683cb16949ecb38c30ad6b8d13a2e0059b82ff81187839f5a968c",
+            "d021cacda0757e640db48df05ec1674e01c9b69beb20507cebf3ca45c438ca43",
         )
 
     def test_kong_release_routes_multichannel_techniques(self):

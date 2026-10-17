@@ -1,4 +1,5 @@
 #include "WindowRecordingService.h"
+#include "RecordingPaths.h"
 namespace fengyin {
 WindowRecordingService::~WindowRecordingService() {
     stop();
@@ -11,13 +12,11 @@ bool WindowRecordingService::start(void* window,juce::Colour background,bool rou
    #if JUCE_WINDOWS
     const auto executable=juce::File::getSpecialLocation(juce::File::currentApplicationFile)
         .getSiblingFile("FengYinScreenRecorder.exe");
-    const auto folder=juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
-        .getChildFile(juce::String::fromUTF8("风吟录屏"));
+    const auto folder=RecordingPaths::video();
     if(!window || !executable.existsAsFile() || !folder.createDirectory()) {
         lastError=juce::String::fromUTF8("录屏组件不可用，或无法创建录屏目录");return false;
     }
-    destination=folder.getNonexistentChildFile(juce::String::fromUTF8("风吟录屏-")
-        +juce::Time::getCurrentTime().formatted("%Y%m%d-%H%M%S")+"-"+juce::Uuid().toString().substring(0,8),".mp4");
+    destination=RecordingPaths::next(folder,"mp4");
     partialFile=destination.withFileExtension(".partial.mp4");
     stopFile=destination.withFileExtension(".stop");stateFile=destination.withFileExtension(".status");
     juce::StringArray args {executable.getFullPathName(),

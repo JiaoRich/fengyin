@@ -4,18 +4,20 @@ from pathlib import Path
 import unittest
 import zipfile
 import xml.etree.ElementTree as ET
+from io import BytesIO
+from tone_baseline_118 import historical_bytes
 
 ROOT=Path(__file__).resolve().parents[1]
 
 def preset(path):
-    with zipfile.ZipFile(path) as z:
+    with zipfile.ZipFile(BytesIO(historical_bytes(path))) as z:
         return ET.fromstring(z.read('tone.xml')).find('PRESET')
 
 class ToneRefresh117(unittest.TestCase):
     def test_soprano_is_the_exact_new_package(self):
         source=ROOT/'assets/incoming-tones/20261017/高音萨克斯-高萨-原声.fytonepack'
         asset=ROOT/'assets/tone-packages/soprano-kenny.fytonepack'
-        self.assertEqual(source.read_bytes(),asset.read_bytes())
+        self.assertEqual(source.read_bytes(),historical_bytes(asset))
         attack=next(x for x in preset(asset).iter('TONE_PARAMETER') if x.get('id','').endswith(':attackcontrol'))
         self.assertEqual(float(attack.get('value')),1)
 

@@ -1,0 +1,138 @@
+{
+  "nativeGain": 6,
+  "nativeSlotFXAUX": 50,
+  "hostSettingsUnchanged": true,
+  "baseline": "assets/incoming-tones/20261017/folk-before-engine-levels-119.zip",
+  "targets": [
+    {
+      "file": "folk-erhu.fytonepack",
+      "beforeSha256": "83a8b1d74ec935111522bb24ad64d4ef83c1f183e5cfed2b34f9157e38bc4e57",
+      "nativeVerification": {
+        "SAMPLER_STATE": "Gain 8.940696716308594e-8 -> 6; slots 2\nFXAUX 20.0 -> 50\nFXAUX 20.0 -> 50",
+        "KAM_PROJECT": "Gain 0.0 -> 6; slots 2\nFXAUX 20.0 -> 50\nFXAUX 20.0 -> 50"
+      },
+      "hostOutputGainUnchanged": "1.9952623149688795",
+      "afterSha256": "83d0580a474301e5848b34d036bc1d70181822864a256eb4756f628465f8d275"
+    },
+    {
+      "file": "folk-hulusi.fytonepack",
+      "beforeSha256": "52c5f6436c6dae271be8809e9f721209f529c0f6ca6e9d1993f3806d40ef0916",
+      "nativeVerification": {
+        "SAMPLER_STATE": "Gain 8.940696716308594e-8 -> 6; slots 1\nFXAUX 20.0 -> 50",
+        "KAM_PROJECT": "Gain 0.0 -> 6; slots 1\nFXAUX 20.0 -> 50"
+      },
+      "hostOutputGainUnchanged": "1.9952623149688795",
+      "afterSha256": "c7891ba44239100f1ae57b0d815304b597c0630b9a7dd25650b248e11144bf2a"
+    },
+    {
+      "file": "folk-liuqin.fytonepack",
+      "beforeSha256": "8bcbf4f968612c50bc5f15b52a8976f901bd607926b20daf0872166e42ebdd40",
+      "nativeVerification": {
+        "SAMPLER_STATE": "Gain 8.940696716308594e-8 -> 6; slots 1\nFXAUX 20.0 -> 50",
+        "KAM_PROJECT": "Gain 0.0 -> 6; slots 1\nFXAUX 20.0 -> 50"
+      },
+      "hostOutputGainUnchanged": "1.9952623149688795",
+      "afterSha256": "57cce14cd9ee8af99509a42b87429320aae88707bab624f6128391879e44f1f6"
+    },
+    {
+      "file": "folk-matouqin.fytonepack",
+      "beforeSha256": "5a126d5b5bb737701152c76f5c97d99d636a80063cf54e6fd27675d201028900",
+      "nativeVerification": {
+        "SAMPLER_STATE": "Gain 8.940696716308594e-8 -> 6; slots 1\nFXAUX 20.0 -> 50",
+        "KAM_PROJECT": "Gain 0.0 -> 6; slots 1\nFXAUX 20.0 -> 50"
+      },
+      "hostOutputGainUnchanged": "1.9952623149688795",
+      "afterSha256": "50f38a4653ba328bc7d6fd3ea95156784719abc66a961ee6866df6c442973641"
+    },
+    {
+      "file": "folk-qudi.fytonepack",
+      "beforeSha256": "7ccb7c5ae947cc66db27620bb30118d116224ba52639913717905eff0c73522c",
+      "nativeVerification": {
+        "SAMPLER_STATE": "Gain 8.940696716308594e-8 -> 6; slots 2\nFXAUX 20.0 -> 50\nFXAUX 20.0 -> 50",
+        "KAM_PROJECT": "Gain 0.0 -> 6; slots 2\nFXAUX 20.0 -> 50\nFXAUX 20.0 -> 50"
+      },
+      "hostOutputGainUnchanged": "1.9952623149688795",
+      "afterSha256": "7bee01d06ab1cd3e02b956d0396837a4b1714152f6cb4fe7ec0d00aa69be81f3"
+    },
+    {
+      "file": "folk-xun.fytonepack",
+      "beforeSha256": "29b74c4208720d449a52b84712d8b82d5a1f6776b71033ecc639c2b233a2fb33",
+      "nativeVerification": {
+        "SAMPLER_STATE": "Gain 8.940696716308594e-8 -> 6; slots 1\nFXAUX 20.0 -> 50",
+        "KAM_PROJECT": "Gain 0.0 -> 6; slots 1\nFXAUX 20.0 -> 50"
+      },
+      "hostOutputGainUnchanged": "1.9952623149688795",
+      "afterSha256": "d1cbe0d61f29038c9157baffb9504f937292f3bd82ea18abf8a322314d6f0de6"
+    },
+    {
+      "file": "folk-suona.fytonepack",
+      "beforeSha256": "25659a2bcee7ef5857a8fd21c403a4c3a1dc75a3dbefb13bebde3e5f039d49ad",
+      "nativeVerification": {
+        "SAMPLER_STATE": "Gain 8.940696716308594e-8 -> 6; slots 2\nFXAUX 20.0 -> 50\nFXAUX 20.0 -> 50",
+        "KAM_PROJECT": "Gain 0.0 -> 6; slots 2\nFXAUX 20.0 -> 50\nFXAUX 20.0 -> 50"
+      },
+      "hostOutputGainUnchanged": "1.9952623149688795",
+      "afterSha256": "06d6865cd971bf4c508e440d985081ceaa70804c8fdc6ed4f001b17f16b92574"
+    },
+    {
+      "file": "folk-sanxian.fytonepack",
+      "beforeSha256": "8d4be1833cd6c839837097ddc1f9686eaf67a5bc04e620e3fa2d8df22f4deda0",
+      "nativeVerification": {
+        "SAMPLER_STATE": "Gain 8.940696716308594e-8 -> 6; slots 2\nFXAUX 20.0 -> 50\nFXAUX 20.0 -> 50",
+        "KAM_PROJECT": "Gain 0.0 -> 6; slots 2\nFXAUX 20.0 -> 50\nFXAUX 20.0 -> 50"
+      },
+      "hostOutputGainUnchanged": "1.9952623149688795",
+      "afterSha256": "2f5bb4fa33a108820e65921ac44d976a38897362be98567c841219d04944fed1"
+    },
+    {
+      "file": "folk-pipa.fytonepack",
+      "beforeSha256": "0791dd59dfca81d2ec9b51f600bf5a9d8fdc7a3b6050924677b1c0fce0fe59f1",
+      "nativeVerification": {
+        "SAMPLER_STATE": "Gain 8.940696716308594e-8 -> 6; slots 1\nFXAUX 20.0 -> 50",
+        "KAM_PROJECT": "Gain 0.0 -> 6; slots 1\nFXAUX 20.0 -> 50"
+      },
+      "hostOutputGainUnchanged": "1.9952623149688795",
+      "afterSha256": "20a65fe3a43e9209aef607b2da5fd880ea8e10c11cd0b37c70bebf0fe23cadec"
+    },
+    {
+      "file": "folk-nanxiao.fytonepack",
+      "beforeSha256": "a7b61b38107e5413c7245b8be26dafe13e5af139b85742db84aa1013faaeb395",
+      "nativeVerification": {
+        "SAMPLER_STATE": "Gain 8.940696716308594e-8 -> 6; slots 1\nFXAUX 20.0 -> 50",
+        "KAM_PROJECT": "Gain 0.0 -> 6; slots 1\nFXAUX 20.0 -> 50"
+      },
+      "hostOutputGainUnchanged": "1.9952623149688795",
+      "afterSha256": "4912425545cd8b720f2e0822a6704dae7b245bb23cc6b4b0e2ab77dc5b9b0257"
+    },
+    {
+      "file": "folk-dongxiao.fytonepack",
+      "beforeSha256": "80f255b6608ef49bfea0251f093708f023f73f2a4087271635ac0e66173b0f59",
+      "nativeVerification": {
+        "SAMPLER_STATE": "Gain 8.940696716308594e-8 -> 6; slots 1\nFXAUX 20.0 -> 50",
+        "KAM_PROJECT": "Gain 0.0 -> 6; slots 1\nFXAUX 20.0 -> 50"
+      },
+      "hostOutputGainUnchanged": "1.9952623149688795",
+      "afterSha256": "09eace54847034229018ce749a342c6b248a3abefcd05139760cbddd214f5b57"
+    },
+    {
+      "file": "folk-bangdi.fytonepack",
+      "beforeSha256": "7bfe1c2ccf48283ec347ba0545710927d0abe4ad0d1878c14819e09f4450b94f",
+      "nativeVerification": {
+        "SAMPLER_STATE": "Gain 8.940696716308594e-8 -> 6; slots 2\nFXAUX 20.0 -> 50\nFXAUX 20.0 -> 50",
+        "KAM_PROJECT": "Gain 0.0 -> 6; slots 2\nFXAUX 20.0 -> 50\nFXAUX 20.0 -> 50"
+      },
+      "hostOutputGainUnchanged": "1.9952623149688795",
+      "afterSha256": "c1893cf49d74c048f3593930d9aea569eaff4fd3068e46fdf12767222e20544b"
+    },
+    {
+      "file": "folk-jinghu.fytonepack",
+      "beforeSha256": "45a5f6c00deef9ab0ed2ddc60bee09b134d40a055887a0d53cedcd2eb222152a",
+      "nativeVerification": {
+        "SAMPLER_STATE": "Gain 8.940696716308594e-8 -> 6; slots 1\nFXAUX 20.0 -> 50",
+        "KAM_PROJECT": "Gain 0.0 -> 6; slots 1\nFXAUX 20.0 -> 50"
+      },
+      "hostOutputGainUnchanged": "1.9952623149688795",
+      "afterSha256": "937500855e124af3b77f9658ae18cb9b15d87112a2ad62e1957d9a5a0d679d0d"
+    }
+  ]
+}

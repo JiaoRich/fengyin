@@ -28,6 +28,12 @@
 #include <cmath>
 #include <chrono>
 #include <string>
+#include <thread>
+#include <mutex>
+#include <deque>
+#include <atomic>
+#include <future>
+#include "AudioTimeline.h"
 using Microsoft::WRL::ComPtr;
 using namespace winrt;
 using namespace winrt::Windows::Graphics::Capture;
@@ -109,6 +115,7 @@ public:
     void close(){if(writer){check(writer->Finalize());writer.Reset();}}
 };
 
+struct AudioPacket {LONGLONG first=0;std::vector<int16_t> pcm;};
 class Loopback {
     ComPtr<IMMDeviceEnumerator> enumerator;
     ComPtr<IMMDevice> device;
@@ -116,7 +123,8 @@ class Loopback {
     ComPtr<IAudioCaptureClient> capture;
     std::wstring endpoint;
 public:
-    LONGLONG written=0,startQpc=0;
+    LONGLONG startQpc=0;
+    CaptureAudioTimeline timeline;
     void open() {
         check(CoCreateInstance(__uuidof(MMDeviceEnumerator),nullptr,CLSCTX_ALL,IID_PPV_ARGS(&enumerator)));
         check(enumerator->GetDefaultAudioEndpoint(eRender,eMultimedia,&device));
@@ -129,13 +137,8 @@ public:
         check(client->GetService(IID_PPV_ARGS(&capture)));
     }
     void start(LONGLONG qpc){startQpc=qpc;check(client->Start());}
-    void silence(Writer& writer,LONGLONG target) {
-        while(written<target) {
-            const auto count=static_cast<size_t>(std::min<LONGLONG>(target-written,4800));
-            writer.sound(std::vector<int16_t>(count*2,0),written);written+=count;
-        }
-    }
-    void drain(Writer& writer) {
+    std::vector<AudioPacket> drain() {
+        std::vector<AudioPacket> packets;
         UINT32 available=0;check(capture->GetNextPacketSize(&available));
         while(available) {
             BYTE* data=nullptr;UINT32 frames=0;DWORD flags=0;UINT64 devicePosition=0,qpc=0;
@@ -144,27 +147,105 @@ public:
             const auto packetQpc=static_cast<LONGLONG>(qpc);
             const bool validTime=!(flags&AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR)
                 && std::abs(packetQpc-ticks())<20000000;
-            const LONGLONG first=validTime?(packetQpc-startQpc)*48000/10000000:written;
-            const auto skip=static_cast<UINT32>(std::clamp<LONGLONG>(written-first,0,frames));
-            std::vector<int16_t> pcm(static_cast<size_t>(frames-skip)*2,0);
+            const LONGLONG first=timeline.packet(devicePosition,packetQpc,startQpc,validTime,frames);
+            std::vector<int16_t> pcm(static_cast<size_t>(frames)*2,0);
             if(!(flags&AUDCLNT_BUFFERFLAGS_SILENT) && data) {
                 const auto* f=reinterpret_cast<const float*>(data);
                 for(size_t i=0;i<pcm.size();++i) {
-                    const auto v=f[static_cast<size_t>(skip)*2+i];
+                    const auto v=f[i];
                     pcm[i]=static_cast<int16_t>(std::lround(std::clamp(std::isfinite(v)?v:0.f,-1.f,1.f)*32767.f));
                 }
             }
             check(capture->ReleaseBuffer(frames));
-            if(first>written)silence(writer,first);
-            if(!pcm.empty()){writer.sound(pcm,written);written+=pcm.size()/2;}
+            packets.push_back({first,std::move(pcm)});
             check(capture->GetNextPacketSize(&available));
         }
+        return packets;
     }
     bool sameEndpoint() {
         ComPtr<IMMDevice> now;check(enumerator->GetDefaultAudioEndpoint(eRender,eMultimedia,&now));
         LPWSTR id=nullptr;check(now->GetId(&id));const bool same=endpoint==id;CoTaskMemFree(id);return same;
     }
     ~Loopback(){if(client)client->Stop();}
+};
+
+// Capture owns its COM interfaces on one dedicated thread. GPU readback and
+// encoder back-pressure must never hold an IAudioCaptureClient packet open.
+class SpeakerCapture {
+    std::thread worker;
+    std::atomic<bool> stopping{false};
+    std::mutex mutex;
+    std::deque<AudioPacket> queue;
+    size_t queuedFrames=0;
+    std::exception_ptr failure;
+    LONGLONG capturedThrough=0,written=0;
+    void append(std::vector<AudioPacket> packets,LONGLONG watermark) {
+        std::lock_guard<std::mutex> lock(mutex);
+        for(auto& packet:packets) {
+            queuedFrames+=packet.pcm.size()/2;
+            if(queuedFrames>48000*10)throw hresult_error(E_FAIL,L"Audio encoder cannot keep up; capture queue exceeded ten seconds");
+            queue.push_back(std::move(packet));
+        }
+        capturedThrough=watermark;
+    }
+    void silence(Writer& writer,LONGLONG target) {
+        while(written<target) {
+            const auto n=static_cast<size_t>(std::min<LONGLONG>(target-written,4800));
+            writer.sound(std::vector<int16_t>(n*2,0),written);written+=n;
+        }
+    }
+public:
+    void start(LONGLONG origin) {
+        std::promise<void> ready;auto future=ready.get_future();
+        worker=std::thread([this,origin,ready=std::move(ready)]() mutable {
+            bool announced=false;
+            try {
+                struct Apartment {
+                    Apartment(){winrt::init_apartment(winrt::apartment_type::multi_threaded);}
+                    ~Apartment(){winrt::uninit_apartment();}
+                } apartment;
+                {
+                    Loopback loop;loop.open();loop.start(origin);
+                    ready.set_value();announced=true;
+                    auto endpointCheck=steady_clock::now();
+                    while(!stopping.load()) {
+                        auto packets=loop.drain();
+                        // Only advance silence behind a successfully drained
+                        // capture worker, never from a stalled video/main loop.
+                        append(std::move(packets),std::max<LONGLONG>(0,(ticks()-origin-2000000)*48000/10000000));
+                        if(steady_clock::now()-endpointCheck>seconds(1)) {
+                            if(!loop.sameEndpoint())throw hresult_error(AUDCLNT_E_DEVICE_INVALIDATED,L"Speaker changed; recording stopped");
+                            endpointCheck=steady_clock::now();
+                        }
+                        Sleep(3);
+                    }
+                    append(loop.drain(),std::max<LONGLONG>(0,(ticks()-origin)*48000/10000000));
+                }
+            } catch(...) {
+                auto error=std::current_exception();
+                {std::lock_guard<std::mutex> lock(mutex);failure=error;}
+                if(!announced)ready.set_exception(error);
+            }
+        });
+        future.get();
+    }
+    void drain(Writer& writer) {
+        std::deque<AudioPacket> packets;LONGLONG watermark=0;std::exception_ptr error;
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            packets.swap(queue);queuedFrames=0;watermark=capturedThrough;error=failure;
+        }
+        if(error)std::rethrow_exception(error);
+        for(auto& p:packets) {
+            if(p.first>written)silence(writer,p.first);
+            const auto skip=static_cast<size_t>(std::clamp<LONGLONG>(written-p.first,0,p.pcm.size()/2));
+            if(skip)p.pcm.erase(p.pcm.begin(),p.pcm.begin()+static_cast<ptrdiff_t>(skip*2));
+            if(!p.pcm.empty()){writer.sound(p.pcm,written);written+=p.pcm.size()/2;}
+        }
+        silence(writer,watermark);
+    }
+    void stop(){stopping.store(true);if(worker.joinable())worker.join();}
+    ~SpeakerCapture(){stop();}
 };
 
 class WindowFrames {
@@ -250,11 +331,15 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int) {
             Writer writer;writer.open(output.c_str(),320,240);
             std::vector<uint32_t> image(320*240);
             for(int y=0;y<240;++y)for(int x=0;x<320;++x)image[y*320+x]=y<120?0xffff0000:0xff0000ff;
+            CaptureAudioTimeline timeline;
             for(int frame=0;frame<48;++frame) {
                 writer.image(image,frame*10000000LL/24,10000000/24);
                 std::vector<int16_t> audio(2000*2);
                 for(int i=0;i<2000;++i)audio[i*2]=audio[i*2+1]=static_cast<int16_t>(3000*std::sin((frame*2000+i)*6.283185307179586*440/48000));
-                writer.sound(audio,frame*2000);
+                const auto jitter=frame?((frame%3)-1)*20000LL:0;
+                const auto first=timeline.packet(static_cast<uint64_t>(frame)*2000,frame*2000LL*10000000/48000+jitter,0,true,2000);
+                if(first!=frame*2000LL)throw hresult_error(E_FAIL,L"Audio timeline inserted a discontinuity");
+                writer.sound(audio,first);
             }
             writer.close();MFShutdown();return 0;
         }catch(const winrt::hresult_error& e){
@@ -272,7 +357,7 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int) {
         winrt::init_apartment(winrt::apartment_type::multi_threaded);
         check(MFStartup(MF_VERSION));mfStarted=true;
         if(!IsWindow(hwnd))throw hresult_error(E_INVALIDARG,L"FengYin window unavailable");
-        WindowFrames frames;frames.open(hwnd);Loopback sound;sound.open();
+        WindowFrames frames;frames.open(hwnd);SpeakerCapture sound;
         RECT rect{};GetClientRect(hwnd,&rect);
         const double scale=std::min({1.0,1280.0/std::max<LONG>(2,rect.right),720.0/std::max<LONG>(2,rect.bottom)});
         const int w=std::max(2,int(rect.right*scale)/2*2),h=std::max(2,int(rect.bottom*scale)/2*2);
@@ -284,7 +369,7 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int) {
         }
         const auto origin=ticks();sound.start(origin);
         if(!status(state,"recording"))throw hresult_error(E_ACCESSDENIED,L"Cannot write recording status");
-        LONGLONG next=0,frameCount=0;auto endpointCheck=steady_clock::now();
+        LONGLONG next=0,frameCount=0;
         while(!std::filesystem::exists(stop)) {
             if(!IsWindow(hwnd)||IsIconic(hwnd)||!IsWindowVisible(hwnd))break;
             sound.drain(writer);
@@ -294,15 +379,9 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int) {
                 // Do not queue unbounded video frames if encoding falls behind.
                 writer.image(pixels,now,10000000/24);++frameCount;next=now+10000000/24;
             }
-            if(steady_clock::now()-endpointCheck>seconds(1)) {
-                if(!sound.sameEndpoint())throw hresult_error(AUDCLNT_E_DEVICE_INVALIDATED,L"Speaker changed; recording stopped");
-                endpointCheck=steady_clock::now();
-            }
-            // Loopback may have no packets during system-wide silence.
-            sound.silence(writer,std::max<LONGLONG>(0,(now-1000000)*48000/10000000));
             Sleep(4);
         }
-        sound.drain(writer);sound.silence(writer,(ticks()-origin)*48000/10000000);
+        sound.stop();sound.drain(writer);
         writer.close();const bool reported=status(state,frameCount>0?"saved":"No encoded video frames");
         MFShutdown();return frameCount>0&&reported?0:3;
     } catch(const winrt::hresult_error& e) {

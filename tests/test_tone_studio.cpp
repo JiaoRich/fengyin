@@ -7,6 +7,7 @@
 #include "KensaBendRange.h"
 #include <cassert>
 #include <cmath>
+#include <iostream>
 
 class TestEffect final : public juce::AudioProcessor
 {
@@ -259,11 +260,14 @@ int main()
     assert(files.size()==34);
     int routedFolkPackages=0, boostedPackages=0;
     for(const auto& file:files){
-        juce::String error;const auto imported=fengyin::TonePackage::read(file,error);assert(imported && error.isEmpty());
+        juce::String error;const auto imported=fengyin::TonePackage::read(file,error);
+        if(!imported){std::cerr<<file.getFileName()<<": "<<error<<std::endl;return 1;}
+        assert(error.isEmpty());
         if (imported->outputGain > 1.5f)
         {
             ++boostedPackages;
-            assert(std::abs(imported->outputGain - std::pow(10.f,6.f/20.f)) < 1e-6f);
+            const float expectedDb=imported->pluginBrand=="swam"?5.f:6.f;
+            assert(std::abs(imported->outputGain - std::pow(10.f,expectedDb/20.f)) < 1e-6f);
             const auto copy=directory.getChildFile("gain-roundtrip-"+file.getFileName());
             assert(fengyin::TonePackage::write(*imported,copy));
             const auto restored=fengyin::TonePackage::read(copy,error);assert(restored);
@@ -279,6 +283,6 @@ int main()
         }
     }
     assert(routedFolkPackages==13);
-    assert(boostedPackages==18);
+    assert(boostedPackages==32);
     assert(directory.deleteRecursively());
 }

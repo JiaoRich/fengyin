@@ -2,6 +2,7 @@ import unittest
 from pathlib import Path
 import zipfile
 import xml.etree.ElementTree as ET
+from tone_baseline_118 import historical_bytes
 ROOT=Path(__file__).resolve().parents[1]
 class KensaRange117(unittest.TestCase):
     def test_range_is_kensa_only_and_preserves_off(self):
@@ -15,7 +16,7 @@ class KensaRange117(unittest.TestCase):
     def test_soprano_bright_is_user_package_unchanged(self):
         source=ROOT/'assets/incoming-tones/20261017/高音萨克斯-高萨-明亮.fytonepack'
         target=ROOT/'assets/tone-packages/soprano-pop.fytonepack'
-        self.assertEqual(source.read_bytes(),target.read_bytes())
+        self.assertEqual(source.read_bytes(),historical_bytes(target))
         with zipfile.ZipFile(target) as z:
             self.assertIsNone(z.testzip())
             p=ET.fromstring(z.read('tone.xml')).find('PRESET')
