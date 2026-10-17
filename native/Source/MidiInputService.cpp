@@ -54,22 +54,8 @@ bool MidiInputService::connect(const juce::String& identifier)
         connectedName = device.name;
         connectedIdentifier = device.identifier;
         activeProfile = DeviceProfileMatcher::match(device.name.toStdString());
-        auto savedController = activeProfile.breathController;
-        if (auto* settingsFile = properties.getUserSettings())
-        {
-            savedController = settingsFile->getIntValue(controllerSettingKey(), savedController);
-            // 0.5.x 曾把 Yamaha YDS 的出厂气息控制误存为 CC2。
-            // 首次升级时迁移到官方默认 CC11；之后仍允许用户手动修改并记忆。
-            const auto profileRevisionKey = controllerSettingKey() + ".profileRevision";
-            if (activeProfile.id == "yamaha-yds" && settingsFile->getIntValue(profileRevisionKey, 0) < 1)
-            {
-                savedController = 11;
-                settingsFile->setValue(profileRevisionKey, 1);
-            }
-        }
+        restoreBreathController();
         updateEffectiveTranspose();
-        breathController.store(juce::jlimit(0, 127, savedController));
-        activeProfile.breathController = breathController.load();
         if (auto* settingsFile = properties.getUserSettings())
         {
             pitchSensitivity.store(static_cast<float>(settingsFile->getDoubleValue(controllerSettingKey() + ".pitch", 1.0)));
@@ -97,6 +83,8 @@ void MidiInputService::disconnect()
     if (input != nullptr)
         input->stop();
     input.reset();
+    cancelBreathDetection();
+    ++connectionGeneration;
     {
         const juce::SpinLock::ScopedLockType lock(noteMapLock);
         if (auto* sink = performanceSink.load(std::memory_order_acquire))
@@ -189,6 +177,24 @@ bool MidiInputService::hasCompletedBreathMatch()
     return properties.getUserSettings()->getBoolValue(controllerSettingKey() + ".matched", false);
 }
 
+void MidiInputService::restoreBreathController()
+{
+    auto savedController = activeProfile.breathController;
+    if (auto* settingsFile = properties.getUserSettings())
+    {
+        savedController = settingsFile->getIntValue(controllerSettingKey(), savedController);
+        // Preserve the existing one-time migration for pre-0.5 Yamaha profiles.
+        const auto profileRevisionKey = controllerSettingKey() + ".profileRevision";
+        if (activeProfile.id == "yamaha-yds" && settingsFile->getIntValue(profileRevisionKey, 0) < 1)
+        {
+            savedController = 11;
+            settingsFile->setValue(profileRevisionKey, 1);
+        }
+    }
+    breathController.store(juce::jlimit(0, 127, savedController));
+    activeProfile.breathController = breathController.load();
+}
+
 DeviceProfile MidiInputService::getActiveProfile() const
 {
     return activeProfile;
@@ -256,10 +262,24 @@ void MidiInputService::beginBreathDetection() noexcept
     detectingBreath.store(true, std::memory_order_release);
 }
 
+void MidiInputService::cancelBreathDetection() noexcept
+{
+    const juce::SpinLock::ScopedLockType lock(detectorLock);
+    detectingBreath.store(false, std::memory_order_release);
+    controllerDetector.reset();
+}
+
 int MidiInputService::finishBreathDetection(bool markCompleted) noexcept
 {
-    detectingBreath.store(false, std::memory_order_release);
     const juce::SpinLock::ScopedLockType lock(detectorLock);
+    const auto wasDetecting = detectingBreath.exchange(false, std::memory_order_acq_rel);
+    // Only an explicit, still-active user match may replace the saved controller.
+    // A cancelled/disconnected or background observation must never commit.
+    if (!wasDetecting || !markCompleted)
+    {
+        controllerDetector.reset();
+        return -1;
+    }
     const auto detected = controllerDetector.bestContinuousController();
     if (detected >= 0)
     {
@@ -696,7 +716,7 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
     if (message.isController() && detectingBreath.load(std::memory_order_acquire))
     {
         const juce::SpinLock::ScopedTryLockType lock(detectorLock);
-        if (lock.isLocked())
+        if (lock.isLocked() && detectingBreath.load(std::memory_order_acquire))
             controllerDetector.observe(message.getControllerNumber(), message.getControllerValue());
     }
 }

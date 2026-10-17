@@ -1438,42 +1438,27 @@ void MainComponent::timerCallback()
             webInterface->emitEventIfBrowserIsVisible("audioOptimisationResult", *tuningResult);
         emitAudioSettingsState(! tuningResult->contains(utf8("未")), *tuningResult);
     }
-    if (snapshot.deviceConnected && ! wasMidiConnected)
+    const auto midiConnectionGeneration = midi.getConnectionGeneration();
+    if (breathDetectionActive && (!snapshot.deviceConnected
+        || midiConnectionGeneration != breathDetectionConnectionGeneration))
     {
-        // 已知型号先使用档案中的推荐值，同时静默观察真实连续控制器；
-        // 可兼容用户在吹管 App 中改过 MIDI 输出的情况。
-        midi.beginBreathDetection();
-        automaticBreathDetectionActive = true;
-        automaticBreathDetectionEndsAtMs = 0.0;
-        configureTechniqueDefaults();
-    }
-    else if (! snapshot.deviceConnected && wasMidiConnected)
-    {
-        if (breathDetectionActive)
+        midi.cancelBreathDetection();
+        breathDetectionActive = false;
+        webBreathDetectionActive = false;
+        if (webInterface != nullptr)
         {
-            (void) midi.finishBreathDetection(false);
-            breathDetectionActive = false;
-            webBreathDetectionActive = false;
-            if (webInterface != nullptr)
-            {
-                auto result = std::make_unique<juce::DynamicObject>();
-                result->setProperty("success", false);
-                result->setProperty("message", utf8("电吹管已断开，请重新连接后再匹配"));
-                webInterface->emitEventIfBrowserIsVisible("breathMatchResult", juce::var(result.release()));
-            }
+            auto result = std::make_unique<juce::DynamicObject>();
+            result->setProperty("success", false);
+            result->setProperty("message", utf8("电吹管连接已变化，请重新匹配"));
+            webInterface->emitEventIfBrowserIsVisible("breathMatchResult", juce::var(result.release()));
         }
-        automaticBreathDetectionActive = false;
-        automaticBreathDetectionEndsAtMs = 0.0;
     }
-    wasMidiConnected = snapshot.deviceConnected;
-    if (automaticBreathDetectionActive && automaticBreathDetectionEndsAtMs <= 0.0)
-        automaticBreathDetectionEndsAtMs = juce::Time::getMillisecondCounterHiRes() + 1800.0;
-    if (automaticBreathDetectionActive && automaticBreathDetectionEndsAtMs > 0.0
-        && juce::Time::getMillisecondCounterHiRes() >= automaticBreathDetectionEndsAtMs)
+    if (midiConnectionGeneration != lastMidiConnectionGeneration)
     {
-        (void) midi.finishBreathDetection();
-        automaticBreathDetectionActive = false;
-        automaticBreathDetectionEndsAtMs = 0.0;
+        lastMidiConnectionGeneration = midiConnectionGeneration;
+        // connect() restores this device's saved settings. Never re-learn from
+        // unsolicited motion/lip CCs, even on the first connection of this run.
+        if (snapshot.deviceConnected) configureTechniqueDefaults();
     }
     // Automatic technique timing is independent of browser visual frame rate.
     if (activeTechniqueLearn >= 0)
@@ -1617,7 +1602,7 @@ void MainComponent::timerCallback()
         state->setProperty("transposeSemitones", midi.getTransposeSemitones());
         state->setProperty("targetKey", midi.getTargetKey());
         state->setProperty("growlSensitivity", midi.getGrowlSensitivity());
-        state->setProperty("automaticBreathDetection", automaticBreathDetectionActive);
+        state->setProperty("automaticBreathDetection", false);
         state->setProperty("reverbMix", masterOutput.getReverbMix());
         const auto tempo=fengyin::MusicTempoPolicy::forMode(midi.getMusicTempoMode());
         state->setProperty("musicTempoMode",midi.getMusicTempoMode());state->setProperty("musicTempoBpm",tempo.bpm);
@@ -4156,8 +4141,8 @@ void MainComponent::showMidiSetup()
 
 void MainComponent::startBreathDetection(const juce::String&, bool webOnly)
 {
-    automaticBreathDetectionActive = false;
-    automaticBreathDetectionEndsAtMs = 0.0;
+    if (!midi.getSnapshot().deviceConnected) return;
+    breathDetectionConnectionGeneration = midi.getConnectionGeneration();
     midi.beginBreathDetection();
     breathDetectionActive = true;
     webBreathDetectionActive = webOnly;

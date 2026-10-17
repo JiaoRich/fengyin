@@ -270,11 +270,14 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("currentLicenseStatus.canUseFeatures()", MAIN)
         self.assertIn("midi.setPerformanceSink(nullptr)", MAIN)
 
-    def test_connection_runs_automatic_breath_adaptation(self):
-        self.assertIn("automaticBreathDetectionActive = true", MAIN)
-        self.assertIn("midi.beginBreathDetection()", MAIN)
-        self.assertIn("midi.finishBreathDetection()", MAIN)
-        self.assertIn("automaticBreathDetection", MAIN)
+    def test_connection_never_silently_relearns_breath(self):
+        self.assertNotIn("automaticBreathDetectionActive", MAIN)
+        self.assertEqual(MAIN.count("midi.beginBreathDetection()"), 1)
+        explicit = MAIN.split("void MainComponent::startBreathDetection(", 1)[1].split("void MainComponent::showExpressionSettings", 1)[0]
+        self.assertIn("midi.beginBreathDetection()", explicit)
+        self.assertIn('state->setProperty("automaticBreathDetection", false)', MAIN)
+        self.assertIn("midi.cancelBreathDetection()", MAIN)
+        self.assertIn("midiConnectionGeneration != breathDetectionConnectionGeneration", MAIN)
 
     def test_inline_breath_match_is_persisted_without_a_modal(self):
         self.assertIn('withEventListener("beginBreathMatch"', MAIN)

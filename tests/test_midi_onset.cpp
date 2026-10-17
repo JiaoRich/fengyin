@@ -12,6 +12,18 @@
 
 namespace fengyin {
 struct MidiInputServiceTestAccess {
+    static void useTestSettings(MidiInputService& service, const juce::File& folder) {
+        juce::PropertiesFile::Options options;
+        options.applicationName="ReconnectTests";options.filenameSuffix=".settings";
+        options.folderName=folder.getFullPathName();options.osxLibrarySubFolder="Application Support";
+        service.properties.setStorageParameters(options);
+        assert(service.properties.getUserSettings()->getFile().getParentDirectory()==folder);
+    }
+    static void restoreDevice(MidiInputService& service, const juce::String& identifier) {
+        service.connectedIdentifier=identifier;
+        service.activeProfile=DeviceProfileMatcher::match("");
+        service.restoreBreathController();service.loadTechniqueMappings();
+    }
     static void wheelWhileMappingBusy(MidiInputService& service) {
         const juce::SpinLock::ScopedLockType lock(service.techniqueLock);
         service.handleIncomingMidiMessage(nullptr, juce::MidiMessage::pitchWheel(1, 16383));
@@ -38,6 +50,66 @@ struct Sink : fengyin::MidiPerformanceSink {
     void techniqueChanged(fengyin::PerformanceTechnique, float v) noexcept override { events.push_back({'T',v,0}); }
 };
 int main() {
+    // Real persisted preferences, isolated from the user's settings. Reconnection
+    // restores breath/mouthpiece independently; motion must never replace breath.
+    const auto reconnectSettings=juce::File::getSpecialLocation(juce::File::tempDirectory)
+        .getNonexistentChildFile("fengyin-reconnect-tests","",false);
+    assert(reconnectSettings.createDirectory().wasOk());
+    {
+        fengyin::MidiInputService input(false);
+        fengyin::MidiInputServiceTestAccess::useTestSettings(input,reconnectSettings);
+        fengyin::MidiInputServiceTestAccess::restoreDevice(input,"device-a");
+        input.setBreathController(11);
+        fengyin::TechniqueMapping mouth;
+        mouth.technique=fengyin::PerformanceTechnique::vibrato;
+        mouth.mode=fengyin::TechniqueControlMode::hardware;
+        mouth.sourceType=fengyin::TechniqueSourceType::controller;mouth.sourceNumber=74;
+        input.setTechniqueMappings({mouth});
+        for(int cycle=0;cycle<50;++cycle) {
+            const auto generation=input.getConnectionGeneration();
+            input.disconnect();assert(input.getConnectionGeneration()!=generation);
+            fengyin::MidiInputServiceTestAccess::restoreDevice(input,"device-a");
+            assert(input.getBreathController()==11 && input.hasCompletedBreathMatch());
+            for(int v:{0,30,65,90,127,0})
+                fengyin::MidiInputServiceTestAccess::send(input,juce::MidiMessage::controllerEvent(1,26,v),1);
+            assert(input.getBreathController()==11 && input.getSnapshot().breath==0);
+            fengyin::MidiInputServiceTestAccess::send(input,juce::MidiMessage::controllerEvent(1,11,100),1);
+            assert(std::abs(input.getSnapshot().breath-100.f/127)<.001f);
+            const auto mappings=input.getTechniqueMappings();
+            assert(mappings.size()==1 && mappings[0].sourceNumber==74
+                && mappings[0].mode==fengyin::TechniqueControlMode::hardware);
+        }
+        // A partial manual match interrupted by disconnect is discarded even
+        // when the same device returns before the UI's next timer tick.
+        input.beginBreathDetection();
+        for(int v:{0,30,65,90})fengyin::MidiInputServiceTestAccess::send(input,juce::MidiMessage::controllerEvent(1,26,v),1);
+        input.disconnect();
+        fengyin::MidiInputServiceTestAccess::restoreDevice(input,"device-a");
+        assert(input.finishBreathDetection(true)==-1 && input.getBreathController()==11);
+        input.beginBreathDetection();
+        for(int v:{0,30,65,90})fengyin::MidiInputServiceTestAccess::send(input,juce::MidiMessage::controllerEvent(1,26,v),1);
+        assert(input.finishBreathDetection(false)==-1 && input.getBreathController()==11);
+        // Explicit matching can still change the selected controller.
+        input.beginBreathDetection();
+        for(int v:{0,20,50,90,127,0})fengyin::MidiInputServiceTestAccess::send(input,juce::MidiMessage::controllerEvent(1,2,v),1);
+        assert(input.finishBreathDetection(true)==2 && input.getBreathController()==2);
+        assert(input.finishBreathDetection(true)==-1);
+        input.setBreathController(11);
+        input.disconnect();fengyin::MidiInputServiceTestAccess::restoreDevice(input,"device-b");
+        assert(!input.hasCompletedBreathMatch() && input.getBreathController()==2);
+        input.setBreathController(7);
+        input.disconnect();fengyin::MidiInputServiceTestAccess::restoreDevice(input,"device-a");
+        assert(input.hasCompletedBreathMatch() && input.getBreathController()==11);
+    }
+    {
+        fengyin::MidiInputService restarted(false);
+        fengyin::MidiInputServiceTestAccess::useTestSettings(restarted,reconnectSettings);
+        fengyin::MidiInputServiceTestAccess::restoreDevice(restarted,"device-a");
+        assert(restarted.getBreathController()==11 && restarted.hasCompletedBreathMatch());
+        assert(restarted.getTechniqueMappings()[0].sourceNumber==74);
+    }
+    assert(reconnectSettings.deleteRecursively());
+    std::cout << "Reconnect: 50 saved-CC restores, motion isolation, cancelled/explicit matches, device separation and restart persistence passed\n";
     assert(fengyin::kensaVibratoController(0)==0);
     assert(fengyin::kensaVibratoController(-1)==0);
     assert(fengyin::kensaVibratoController(1)==70);

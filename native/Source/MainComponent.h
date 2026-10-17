@@ -241,9 +241,8 @@ private:
     bool breathDetectionActive = false;
     bool webBreathDetectionActive = false;
     double breathDetectionEndsAtMs = 0.0;
-    bool automaticBreathDetectionActive = false;
-    bool wasMidiConnected = false;
-    double automaticBreathDetectionEndsAtMs = 0.0;
+    uint64_t lastMidiConnectionGeneration = 0;
+    uint64_t breathDetectionConnectionGeneration = 0;
     double autoGuideAtMs = 0.0;
     bool autoGuideShown = false;
     float simulatedPhase = 0.0f;

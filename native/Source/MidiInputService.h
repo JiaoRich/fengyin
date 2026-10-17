@@ -56,6 +56,7 @@ public:
     [[nodiscard]] MidiSnapshot getSnapshot() const noexcept;
     [[nodiscard]] juce::String getConnectedDeviceName() const;
     [[nodiscard]] juce::String getConnectedDeviceIdentifier() const;
+    [[nodiscard]] uint64_t getConnectionGeneration() const noexcept { return connectionGeneration; }
     [[nodiscard]] bool hasCompletedBreathMatch();
     [[nodiscard]] DeviceProfile getActiveProfile() const;
     [[nodiscard]] int getBreathController() const noexcept { return breathController.load(std::memory_order_relaxed); }
@@ -64,6 +65,7 @@ public:
     void setBreathController(int controllerNumber);
     void setPerformanceSink(MidiPerformanceSink* sink) noexcept;
     void beginBreathDetection() noexcept;
+    void cancelBreathDetection() noexcept;
     [[nodiscard]] int finishBreathDetection(bool markCompleted = false) noexcept;
     void setTargetKey(int pitchClass);
     void setMusicTempoMode(int mode);
@@ -90,6 +92,7 @@ private:
     juce::String controllerSettingKey() const;
     juce::String techniqueSettingKey() const;
     void savePreferences();
+    void restoreBreathController();
     void saveTechniqueMappings();
     void loadTechniqueMappings();
     bool handleTechniqueMessage(const juce::MidiMessage& message, MidiPerformanceSink* sink);
@@ -101,6 +104,7 @@ private:
     std::unique_ptr<juce::MidiInput> input;
     juce::String connectedName;
     juce::String connectedIdentifier;
+    uint64_t connectionGeneration = 0; // Message-thread connection lifecycle, including same-ID reconnects.
     juce::ApplicationProperties properties;
     DeviceProfile activeProfile = DeviceProfileMatcher::match("");
     ControllerDetector controllerDetector;

@@ -1562,7 +1562,7 @@ function setAdapterMatchPhase(phase, state = latestBackendState) {
   } else if (phase === 'matching') {
     badge.textContent = '正在匹配'; badge.classList.remove('ready'); button.textContent = '正在匹配…';
     $('#adapter-guide-title').textContent = '正在自动匹配呼吸信号';
-    $('#adapter-guide-detail').textContent = '请保持自然吹气，风吟正在识别气息控制器与有效范围。';
+    $('#adapter-guide-detail').textContent = '请保持管身姿态固定，不咬嘴、不抬管，吹一个气息由弱到强的长音。';
   } else if (phase === 'ready') {
     badge.textContent = '匹配完成'; badge.classList.add('ready'); button.textContent = '重新匹配';
     $('#adapter-guide-title').textContent = '匹配完成，可以开始吹奏';
