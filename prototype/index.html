@@ -374,12 +374,12 @@ body.compact-mode #music-tempo{grid-column:1/-1;justify-content:center;flex-wrap
       <section class="page" id="page-wind"><div class="panel glass adapter-panel adapter-v2">
         <section class="adapter-primary-section">
           <div class="adapter-section-title"><div><span>第一步</span><h2>电吹管匹配</h2></div><b id="adapter-match-badge">等待连接</b></div>
-          <div class="adapter-match-body"><div class="adapter-device"><div class="adapter-device-icon">♬</div><div><p id="adapter-kicker">等待连接设备</p><h3 id="adapter-device-name">尚未连接电吹管</h3><small id="adapter-summary">首次连接新设备时，风吟会自动带您完成匹配</small></div></div><button class="primary-button" id="adapter-match" type="button">开始匹配</button></div>
-          <div class="adapter-inline-guide" id="adapter-inline-guide"><i></i><div><strong id="adapter-guide-title">连接电吹管后即可开始</strong><p id="adapter-guide-detail">匹配时只需按照提示长吹一口气，全程不会弹出其他窗口。</p></div><div class="adapter-match-progress"><span class="active"></span><span></span><span></span></div></div>
+          <div class="adapter-match-body"><div class="adapter-device"><div class="adapter-device-icon">♬</div><div><p id="adapter-kicker">等待连接设备</p><h3 id="adapter-device-name">尚未连接电吹管</h3><small id="adapter-summary" hidden></small></div></div><button class="primary-button" id="adapter-match" type="button">开始匹配</button></div>
+          <div class="adapter-inline-guide" id="adapter-inline-guide"><i></i><div><strong id="adapter-guide-title">连接电吹管后即可开始</strong><p id="adapter-guide-detail" hidden></p></div><div class="adapter-match-progress"><span class="active"></span><span></span><span></span></div></div>
         </section>
         <section class="adapter-primary-section adapter-technique-section">
           <div class="adapter-section-title"><div><span>第二步</span><h2>技巧设置</h2></div><div class="adapter-mode-inline"><button class="active" type="button" data-adapter-mode="hardware">硬件优先</button><button type="button" data-adapter-mode="breath">气息控制</button></div></div>
-          <p class="adapter-inline-hint" id="adapter-inline-hint">映射一次即可用于所有音源；请选择一项技巧后操作对应按键、摇杆或吹嘴。</p>
+          <p class="adapter-inline-hint" id="adapter-inline-hint" hidden></p>
           <div class="adapter-technique-grid" id="adapter-technique-grid"></div>
         </section>
       </div></section>

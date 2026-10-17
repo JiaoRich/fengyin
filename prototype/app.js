@@ -1398,11 +1398,11 @@ function renderTechniqueMappings(force = false) {
   list.innerHTML = techniquePlan.map(item => {
     const hardware = item.mode === 'hardware';
     const mapped = sourceDescription(item) !== '未设置';
-    const modeLabels = item.id === 'mute' ? {off:'关闭',hardware:'按键触发'} : item.id === 'vibrato' ? {off:'关闭',hardware:'咬嘴控制',breath:'自动颤音'} : {off:'关闭',hardware:'按键触发',breath:'自动嘶吼'};
+    const modeLabels = item.id === 'mute' ? {off:'关闭',hardware:'按键控制'} : item.id === 'vibrato' ? {off:'关闭',breath:'自动',hardware:'咬嘴控制'} : {off:'关闭',breath:'自动',hardware:'按键控制'};
+    const heading = item.id === 'vibrato' ? '颤音' : item.id === 'growl' ? '嘶吼音' : '其他技巧';
     return `<article class="technique-card ${item.featured ? '' : 'secondary'}" data-technique-id="${item.id}">
-      <div class="technique-card-head"><div class="technique-card-title"><span class="technique-card-icon">${item.icon}</span><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.description)}</p></div></div><span class="technique-card-state">${item.mode === 'off' ? '已关闭' : hardware ? (mapped ? '✓ 已映射' : '待映射') : '✓ 已配置'}</span></div>
-      <div class="technique-control"><div class="technique-mode-buttons">${Object.entries(modeLabels).map(([value,label]) => `<button type="button" data-technique-mode="${value}" aria-pressed="${item.mode === value}" ${!item.routeMissing ? '' : 'disabled'}>${label}</button>`).join('')}</div><button class="learn-source" ${hardware && !item.routeMissing ? '' : 'hidden'}>${Number(window.fengyinTechniqueLearning) === item.index ? '等待操作…' : mapped ? '重新映射' : '点击映射'}</button><button class="clear-source" ${mapped?'':'hidden'}>取消映射</button></div>
-      <p class="recommendation">${item.routeMissing ? '风吟未能验证此音源的自动技巧映射，请导出诊断供排查；不会绕过曲线写深度参数。' : !item.pluginSupported ? '全局映射会保留；当前音色不使用此项' : hardware ? escapeHtml(sourceDescription(item)) : '曲线与深度使用音源方案预设'}</p>
+      <div class="technique-card-head"><div class="technique-card-title"><h3>${heading}</h3></div><span class="technique-card-state">${item.mode === 'off' ? '已关闭' : hardware ? (mapped ? '已映射' : '待映射') : '自动控制'}</span></div>
+      <div class="technique-control"><div class="technique-mode-buttons" role="group" aria-label="${heading}控制方式">${Object.entries(modeLabels).map(([value,label]) => `<button type="button" data-technique-mode="${value}" aria-pressed="${item.mode === value}" ${!item.routeMissing ? '' : 'disabled'}>${label}</button>`).join('')}</div><div class="technique-map-actions" aria-label="${item.id === 'vibrato' ? '咬嘴控制' : '按键控制'}的映射设置" ${hardware ? '' : 'hidden'}><button type="button" class="learn-source" ${item.routeMissing ? 'disabled' : ''}>${Number(window.fengyinTechniqueLearning) === item.index ? '等待操作…' : mapped ? '重新映射' : '点击映射'}</button><button type="button" class="clear-source" ${mapped?'':'hidden'}>清除映射</button></div></div>
     </article>`;
   }).join('');
   $$('#technique-list .learn-source').forEach(button => button.addEventListener('click', event => {
@@ -1547,11 +1547,12 @@ function setAdapterMatchPhase(phase, state = latestBackendState) {
   const progress = $$('.adapter-match-progress span');
   guide.classList.toggle('matching', phase === 'waiting' || phase === 'matching');
   guide.classList.toggle('ready', phase === 'ready');
+  $('#adapter-guide-detail').hidden = phase !== 'waiting' && phase !== 'matching';
   progress.forEach((item,index) => item.classList.toggle('active', index <= ({idle:0,waiting:0,matching:1,ready:2}[phase] ?? 0)));
   if (!connected) {
     badge.textContent = '等待连接'; badge.classList.remove('ready'); button.disabled = true; button.textContent = '开始匹配';
     $('#adapter-guide-title').textContent = '请先连接电吹管';
-    $('#adapter-guide-detail').textContent = '检测到新设备后，风吟会自动打开本页面。';
+    $('#adapter-guide-detail').textContent = '';
     return;
   }
   button.disabled = false;
@@ -1566,11 +1567,11 @@ function setAdapterMatchPhase(phase, state = latestBackendState) {
   } else if (phase === 'ready') {
     badge.textContent = '匹配完成'; badge.classList.add('ready'); button.textContent = '重新匹配';
     $('#adapter-guide-title').textContent = '匹配完成，可以开始吹奏';
-    $('#adapter-guide-detail').textContent = '气息信号已保存；技巧映射只需设置一次。';
+    $('#adapter-guide-detail').textContent = '';
   } else {
     badge.textContent = '尚未匹配'; badge.classList.remove('ready'); button.textContent = '开始匹配';
     $('#adapter-guide-title').textContent = '点击“开始匹配”';
-    $('#adapter-guide-detail').textContent = '随后按照提示长吹一口气即可。';
+    $('#adapter-guide-detail').textContent = '';
   }
 }
 
@@ -1636,7 +1637,6 @@ $('#technique-list').addEventListener('click',event=>{
   window.fengyinVoice?.say(item.id==='vibrato' ? (item.mode==='off'?'V058_01':item.mode==='hardware'?'NEW_VIB_HARDWARE':'V057_01')
     :item.id==='growl'?(item.mode==='off'?'V058_02':item.mode==='hardware'?'NEW_GROWL_HARDWARE':'V057_02')
     :item.mode==='off'?'NEW_OTHER_OFF':'NEW_OTHER_ON');
-  if(item.mode==='hardware' && sourceDescription(item)==='未设置')startTechniqueLearning(item,false);
   renderTechniqueMappings(true);
 });
 window.__JUCE__?.backend?.addEventListener('techniqueConfigurationResult',result=>{
@@ -1974,9 +1974,7 @@ function renderSmartAdapter(state) {
     : matched ? '已完成设备匹配'
     : state.deviceRecognized ? '已识别型号，等待匹配' : '发现新的电吹管';
   $('#adapter-device-name').textContent = connected ? (state.deviceName || state.deviceProfileName || '电吹管已连接') : '尚未连接电吹管';
-  $('#adapter-summary').textContent = !connected ? '首次连接新设备时，风吟会自动带您完成匹配'
-    : matched ? '气息信号已经保存，可直接开始吹奏或重新匹配'
-    : state.deviceRecognized ? '已识别电吹管型号，请完成一次气息匹配' : '这是尚未匹配过的新设备，请完成一次气息匹配';
+  $('#adapter-summary').textContent = '';
   if (!connected) setAdapterMatchPhase('idle',state);
   else if (state.breathMatching) setAdapterMatchPhase('matching',state);
   else if (matched) setAdapterMatchPhase('ready',state);

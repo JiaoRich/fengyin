@@ -69,12 +69,22 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
 #transpose-key small { font-size: 11px; color: var(--muted); }
 /* Global technique controls stay expanded on the adapter page. */
 #adapter-technique-grid { display:block; }
-#adapter-technique-grid #technique-list { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px; }
-.technique-mode-buttons { display:flex;flex-wrap:wrap;gap:6px; }
-.technique-mode-buttons button[aria-pressed="true"] { border-color:var(--accent);background:var(--accent-soft);color:var(--accent); }
-.technique-control .clear-source { grid-column:2;color:var(--muted); }
+#adapter-technique-grid #technique-list { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start; }
+#technique-list .technique-card{min-width:0;padding:15px}
+#technique-list .technique-card-head{align-items:center;gap:8px}
+#technique-list .technique-card-title{min-width:0}
+#technique-list .technique-card-state{font-size:11px}
+#technique-list .technique-control{display:block;grid-template-columns:none!important}
+#technique-list .technique-mode-buttons{display:grid;grid-template-columns:minmax(0,.7fr) minmax(0,.7fr) minmax(0,1.4fr);gap:6px}
+#technique-list [data-technique-id="mute"] .technique-mode-buttons{grid-template-columns:minmax(0,.7fr) minmax(0,1.4fr)}
+#technique-list .technique-mode-buttons button{padding:9px 4px;min-width:0;font-size:12px;white-space:nowrap;background:var(--accent-soft);color:var(--text)}
+#technique-list .technique-mode-buttons button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+#technique-list .technique-map-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:12px 0 0 6px;padding-left:9px;border-left:2px solid var(--line)}
+#technique-list .technique-map-actions button{grid-column:auto;width:100%;min-width:0;min-height:36px;padding:7px 5px;font-size:12px;white-space:nowrap;background:var(--accent-soft);border-color:var(--line);color:var(--muted)}
+#technique-list [hidden],#adapter-summary[hidden],#adapter-inline-hint[hidden],#adapter-guide-detail[hidden]{display:none!important}
+@media(pointer:coarse){#technique-list .technique-map-actions button{min-height:44px}}
 #technique-settings { display:none!important; }
-@media(max-width:900px){#adapter-technique-grid #technique-list{grid-template-columns:1fr;}}
+@media(max-width:1050px){#adapter-technique-grid #technique-list{grid-template-columns:1fr;}}
 /* One small shared recording control; does not add a compact-layout column. */
 .record-control{display:flex;min-width:0;gap:0}
 .record-control #record{flex:1;min-width:0;border-top-right-radius:0;border-bottom-right-radius:0}
