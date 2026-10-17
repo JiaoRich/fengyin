@@ -89,7 +89,10 @@ public:
         check(out->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS,2));
         check(out->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND,48000));
         check(out->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE,16));
-        check(out->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND,32000));
+        // Microsoft AAC's documented stereo rates top out at 24000 bytes/s.
+        // Keep the portable 192kbps mode; continuity fixes must not depend on
+        // an undocumented 256kbps encoder type being accepted by this machine.
+        check(out->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND,24000));
         check(out->SetUINT32(MF_MT_AAC_PAYLOAD_TYPE,0));
         check(writer->AddStream(out.Get(),&audio));
         check(MFCreateMediaType(&in));check(in->SetGUID(MF_MT_MAJOR_TYPE,MFMediaType_Audio));

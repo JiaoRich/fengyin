@@ -27,6 +27,8 @@ class Recording120(unittest.TestCase):
 
     def test_system_audio_has_no_window_capture_dependency(self):
         source=(ROOT/'native/ScreenRecorder/main.cpp').read_text(encoding='utf-8')
+        self.assertIn('MF_MT_AUDIO_AVG_BYTES_PER_SECOND,24000',source)
+        self.assertNotIn('MF_MT_AUDIO_AVG_BYTES_PER_SECOND,32000',source)
         audio=source.split('if(audioOnly) {',1)[1].split('check(MFStartup',1)[0]
         self.assertIn('writer.openWave(output)',audio)
         self.assertIn('sound.start(ticks())',audio)
