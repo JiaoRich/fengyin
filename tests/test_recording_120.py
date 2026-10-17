@@ -3,6 +3,12 @@ import unittest
 ROOT=Path(__file__).resolve().parents[1]
 
 class Recording120(unittest.TestCase):
+    def test_actual_encoder_checks_run_before_full_build(self):
+        build=(ROOT/'scripts/build-windows.ps1').read_text(encoding='utf-8-sig')
+        self.assertIn('--target FengYinScreenRecorder --parallel 4',build)
+        self.assertLess(build.index('Screen recorder MP4 encoding selftest'),build.index('Invoke-Checked "主程序编译"'))
+        self.assertLess(build.index('System recording PCM continuity check'),build.index('Invoke-Checked "主程序编译"'))
+
     def test_layered_child_windows_have_embedded_compatibility_contract(self):
         manifest=(ROOT/'native/Source/WindowsCompatibility.manifest').read_text(encoding='utf-8')
         self.assertIn('8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a',manifest)
@@ -37,6 +43,8 @@ class Recording120(unittest.TestCase):
         for item in ['WM_POINTERDOWN','WM_POINTERUPDATE','WM_POINTERUP','WM_POINTERCAPTURECHANGED','WM_CANCELMODE','info.ptPixelLocation','GetCursorPos','ReleaseCapture']:
             self.assertIn(item,source)
         self.assertNotIn('screenX',source)
+        desktop=(ROOT/'tests/test_compact_glow.cpp').read_text(encoding='utf-8')
+        self.assertIn('pointerId=0',desktop)
         self.assertIn('!EqualRect(&region,&next)',source)
         js=(ROOT/'prototype/app.js').read_text(encoding='utf-8')
         self.assertIn('reportNativeDragRegion',js)

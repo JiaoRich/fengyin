@@ -79,6 +79,35 @@ Invoke-Checked "CMake 配置" {
         "-DJUCE_WEBVIEW2_PACKAGE_LOCATION=$NugetPackageDir"
 }
 
+Invoke-Checked "Recording helper preflight build" { cmake --build $BuildDir --config Release --target FengYinScreenRecorder --parallel 4 }
+$ScreenRecorderExe = Join-Path $BuildDir "Release\FengYinScreenRecorder.exe"
+$RecorderCheck = Join-Path $BuildDir "screen-recorder-selftest.mp4"
+Invoke-Checked "Screen recorder MP4 encoding selftest" {
+    # This is a GUI-subsystem executable. Do not let PowerShell start the
+    # decoder before native finalization has completed.
+    $RecorderProcess = Start-Process -FilePath $ScreenRecorderExe -ArgumentList @('--selftest', ('"{0}"' -f $RecorderCheck)) -PassThru
+    if (-not $RecorderProcess.WaitForExit(60000)) {
+        $RecorderProcess.Kill()
+        throw "Screen recorder encoding selftest timed out"
+    }
+    $RecorderProcess.Refresh()
+    $global:LASTEXITCODE = $RecorderProcess.ExitCode
+    if ($LASTEXITCODE -ne 0 -and (Test-Path "$RecorderCheck.error.txt")) { Get-Content "$RecorderCheck.error.txt" }
+    if ($LASTEXITCODE -eq 0 -and -not (Test-Path $RecorderCheck)) { throw "Recorder exited without producing MP4" }
+}
+$RecorderFfmpeg = if (Test-Path $FfmpegPath) { $FfmpegPath } else { Join-Path $PreparedFfmpeg "ffmpeg.exe" }
+Invoke-Checked "Screen recorder decoded audio/video check" { python (Join-Path $PSScriptRoot "verify_screen_recording.py") $RecorderFfmpeg $RecorderCheck }
+$AudioCheck = Join-Path $BuildDir "system-audio-selftest.wav"
+Invoke-Checked "System recording WAV selftest" {
+    $AudioProcess = Start-Process -FilePath $ScreenRecorderExe -ArgumentList @('--audio-selftest', ('"{0}"' -f $AudioCheck)) -PassThru
+    if (-not $AudioProcess.WaitForExit(60000)) { $AudioProcess.Kill(); throw "System recording selftest timed out" }
+    $AudioProcess.Refresh()
+    $global:LASTEXITCODE = $AudioProcess.ExitCode
+    if ($LASTEXITCODE -ne 0 -and (Test-Path "$AudioCheck.error.txt")) { Get-Content "$AudioCheck.error.txt" }
+    if ($LASTEXITCODE -eq 0 -and -not (Test-Path $AudioCheck)) { throw "Recorder exited without producing WAV" }
+}
+Invoke-Checked "System recording PCM continuity check" { python (Join-Path $PSScriptRoot "verify_system_recording.py") $AudioCheck }
+
 Write-Host "[2/5] 编译风吟和自动测试..." -ForegroundColor Cyan
 Invoke-Checked "主程序编译" { cmake --build $BuildDir --config Release --parallel }
 Invoke-Checked "激活工具编译" { cmake --build $BuildDir --config Release --target FengYinActivator --parallel }
@@ -107,32 +136,6 @@ Copy-Item $AudioWatchdogExe (Join-Path $PackageDir "FengYinAudioWatchdog.exe") -
 $ScreenRecorderExe = Join-Path $BuildDir "Release\FengYinScreenRecorder.exe"
 if (-not (Test-Path $ScreenRecorderExe)) { throw "Screen recording component missing: $ScreenRecorderExe" }
 Copy-Item $ScreenRecorderExe (Join-Path $PackageDir "FengYinScreenRecorder.exe") -Force
-$RecorderCheck = Join-Path $BuildDir "screen-recorder-selftest.mp4"
-Invoke-Checked "Screen recorder MP4 encoding selftest" {
-    # This is a GUI-subsystem executable. Do not let PowerShell start the
-    # decoder before native finalization has completed.
-    $RecorderProcess = Start-Process -FilePath $ScreenRecorderExe -ArgumentList @('--selftest', ('"{0}"' -f $RecorderCheck)) -PassThru
-    if (-not $RecorderProcess.WaitForExit(60000)) {
-        $RecorderProcess.Kill()
-        throw "Screen recorder encoding selftest timed out"
-    }
-    $RecorderProcess.Refresh()
-    $global:LASTEXITCODE = $RecorderProcess.ExitCode
-    if ($LASTEXITCODE -ne 0 -and (Test-Path "$RecorderCheck.error.txt")) { Get-Content "$RecorderCheck.error.txt" }
-    if ($LASTEXITCODE -eq 0 -and -not (Test-Path $RecorderCheck)) { throw "Recorder exited without producing MP4" }
-}
-$RecorderFfmpeg = if (Test-Path $FfmpegPath) { $FfmpegPath } else { Join-Path $PreparedFfmpeg "ffmpeg.exe" }
-Invoke-Checked "Screen recorder decoded audio/video check" { python (Join-Path $PSScriptRoot "verify_screen_recording.py") $RecorderFfmpeg $RecorderCheck }
-$AudioCheck = Join-Path $BuildDir "system-audio-selftest.wav"
-Invoke-Checked "System recording WAV selftest" {
-    $AudioProcess = Start-Process -FilePath $ScreenRecorderExe -ArgumentList @('--audio-selftest', ('"{0}"' -f $AudioCheck)) -PassThru
-    if (-not $AudioProcess.WaitForExit(60000)) { $AudioProcess.Kill(); throw "System recording selftest timed out" }
-    $AudioProcess.Refresh()
-    $global:LASTEXITCODE = $AudioProcess.ExitCode
-    if ($LASTEXITCODE -ne 0 -and (Test-Path "$AudioCheck.error.txt")) { Get-Content "$AudioCheck.error.txt" }
-    if ($LASTEXITCODE -eq 0 -and -not (Test-Path $AudioCheck)) { throw "Recorder exited without producing WAV" }
-}
-Invoke-Checked "System recording PCM continuity check" { python (Join-Path $PSScriptRoot "verify_system_recording.py") $AudioCheck }
 # The public installer uses VB-CABLE. Never package or invoke the experimental driver.
 Copy-Item (Join-Path $ProjectRoot "README.md") $PackageDir -Force
 Copy-Item (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES.md") $PackageDir -Force
