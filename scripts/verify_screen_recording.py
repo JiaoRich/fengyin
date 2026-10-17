@@ -14,14 +14,15 @@ def verify(executable, path):
     if Path(path).stat().st_size < 4096:
         raise ValueError('MP4 is empty')
     frame = decode('-frames:v', '1', '-an', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-')
-    if len(frame) != 320*240*3:
+    width,height=1920,1080
+    if len(frame) != width*height*3:
         raise ValueError('Unexpected encoded frame dimensions')
-    top = frame[(40*320+160)*3: (40*320+160)*3+3]
-    bottom = frame[(200*320+160)*3: (200*320+160)*3+3]
+    top = frame[(100*width+width//2)*3: (100*width+width//2)*3+3]
+    bottom = frame[(900*width+width//2)*3: (900*width+width//2)*3+3]
     if not (top[0] > 180 and top[2] < 60 and bottom[2] > 180 and bottom[0] < 60):
         raise ValueError(f'Video orientation or colour wrong: top={list(top)}, bottom={list(bottom)}')
     all_frames = decode('-an', '-f', 'rawvideo', '-pix_fmt', 'gray', '-')
-    if len(all_frames)//(320*240) != 48:
+    if len(all_frames)//(width*height) != 48:
         raise ValueError('MP4 frame count is not 48')
     pcm = array.array('h', decode('-vn', '-f', 's16le', '-ac', '2', '-ar', '48000', '-'))
     if not (1.95 <= len(pcm)/(48000*2) <= 2.1):
@@ -37,7 +38,7 @@ def verify(executable, path):
         block=interior[start:start+1920]
         local_rms=math.sqrt(sum(v*v for v in block)/len(block))
         if local_rms<1000:raise ValueError(f'Audio discontinuity near sample {start}: RMS={local_rms}')
-    print('Native MP4: H264 orientation, 48 frames, stereo duration and continuous audio passed')
+    print('Native MP4: 1920x1080 H264 orientation, 48 frames, stereo duration and continuous audio passed')
 
 
 if __name__ == '__main__':

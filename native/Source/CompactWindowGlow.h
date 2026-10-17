@@ -34,8 +34,6 @@ public:
             if (auto* peer = getPeer()) peer->setCurrentRenderingEngine(0);
            #endif
         }
-        const bool shapeChanged = cornerRadius != radius;
-        cornerRadius = radius;
        #if JUCE_WINDOWS
         if(owner.getPeer()!=nullptr&&getPeer()!=nullptr) {
             const auto host=static_cast<HWND>(owner.getPeer()->getNativeHandle());
@@ -64,6 +62,8 @@ public:
             }
         }
        #else
+        const bool shapeChanged = cornerRadius != radius;
+        cornerRadius = radius;
         const auto bounds = owner.getScreenBounds().expanded(padding);
         if (getBounds() != bounds || shapeChanged || frame.isNull())
         {

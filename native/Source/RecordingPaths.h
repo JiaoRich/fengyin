@@ -15,6 +15,7 @@ struct RecordingPaths {
         for(int sequence=1;sequence<10000;++sequence) {
             const auto file=folder.getChildFile(prefix+juce::String(sequence)+"."+extension);
             if(!file.exists() && !file.withFileExtension(".partial.mp4").exists()
+                && !file.withFileExtension(".partial.wav").exists()
                 && !file.withFileExtension(".status").exists() && !file.withFileExtension(".stop").exists())return file;
         }
         return folder.getChildFile(prefix+juce::Uuid().toString()+"."+extension);

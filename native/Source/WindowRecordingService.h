@@ -6,7 +6,9 @@ namespace fengyin {
 class WindowRecordingService {
 public:
     ~WindowRecordingService();
-    bool start(void* window, juce::Colour background, bool rounded);
+    bool start(void* window, juce::Colour background, bool rounded, bool audioOnly=false);
+    bool isAudioOnly() const noexcept {return audioMode;}
+    double elapsedSeconds() const noexcept {return running?(juce::Time::getMillisecondCounterHiRes()-startedAt)/1000.0:0.0;}
     void stop();
     void poll();
     bool busy() const noexcept {return running;}
@@ -19,7 +21,7 @@ private:
     juce::ChildProcess process;
     juce::File destination, stopFile, stateFile, partialFile;
     juce::String lastError;
-    bool running=false,finishing=false,ready=false,completed=false;
+    bool running=false,finishing=false,ready=false,completed=false,audioMode=false;
     double startedAt=0,stoppedAt=0;
 };
 }

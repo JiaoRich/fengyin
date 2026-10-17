@@ -89,7 +89,15 @@ function applyWindowMode(compact) {
   closeQuickTones();
   if (compactMode) showPage('play');
   requestVisualFrame();
+  requestAnimationFrame(reportNativeDragRegion);
 }
+function reportNativeDragRegion() {
+  const bar=$('.window-mode-bar'),r=bar.getBoundingClientRect();
+  const buttons=[...bar.querySelectorAll('button')].map(b=>b.getBoundingClientRect()).filter(b=>b.width>0);
+  const right=Math.min(r.right,...buttons.map(b=>b.left))-4;
+  nativeEvent('windowDragRegion',{x:Math.ceil(r.left),y:Math.ceil(r.top),width:compactMode?Math.max(0,Math.floor(right-r.left)):0,height:Math.floor(r.height)});
+}
+new ResizeObserver(reportNativeDragRegion).observe($('.window-mode-bar'));
 $('#window-mode-toggle').onclick = () => nativeEvent('setCompactMode', {compact:!compactMode});
 $('.system-pills').appendChild($('#window-mode-toggle'));
 $('.system-pills').appendChild(windowControls);
@@ -1682,7 +1690,7 @@ $('#cancel-technique-learning').addEventListener('click', () => {
 
 async function toggleAudioRecording() {
   if(screenRecordingBusy){nativeEvent('toggleWindowRecording',{});return;}
-  if (!recording && video.src && window.__JUCE__?.backend?.emitEvent && !nativeAccompanimentReady) {
+  if (!recording && !latestBackendState.systemOutputRecordingSupported && video.src && window.__JUCE__?.backend?.emitEvent && !nativeAccompanimentReady) {
     return toast('伴奏音轨尚未准备好，请稍候再开始录音');
   }
   if(!recording && window.fengyinVoice && !await window.fengyinVoice.beforeRecording())return;
@@ -1977,7 +1985,6 @@ function renderSmartAdapter(state) {
 }
 
 window.__JUCE__?.backend?.addEventListener('backendState', state => {
-  $('#export-current-tone').disabled = !state.pluginLoaded || !!state.pluginLoading || state.pluginBrand !== 'swam';
   renderBendRange(state);
   const visualSignature = value=>JSON.stringify([Math.round(Number(value.breath||0)*127),Math.round(Number(value.instrumentPeak||0)*200),Math.round(Number(value.outputLeftPeak||0)*200),Math.round(Number(value.outputRightPeak||0)*200),!!value.pluginLoaded]);
   const visualChanged = visualSignature(state) !== visualSignature(latestBackendState);
@@ -2142,23 +2149,9 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   }
   recording = !!state.recording;
   screenRecordingBusy=!!state.screenRecordingBusy;
-  $('#record').textContent = screenRecordingBusy ? (state.screenRecordingStopping?'正在保存…':state.screenRecording?'■ 停止录屏':'录屏启动中…') : recording ? '■ 停止录音' : '● 开始录制';
+  $('#record').textContent = screenRecordingBusy ? (state.screenRecordingStopping?'正在保存…':state.screenRecording?'■ 停止录屏':'录屏启动中…') : recording ? (state.audioRecordingStopping?'正在保存…':state.systemOutputRecordingSupported&&!state.audioRecordingReady?'录音启动中…':'■ 停止录音') : '● 开始录制';
   $('#record').style.color = recording||screenRecordingBusy ? 'var(--danger)' : '';
-  $('#record').disabled=!!state.screenRecordingStopping;
-});
-const toneDiagnosticButton = $('#export-current-tone');
-const toneDiagnosticStatus = $('#tone-diagnostic-status');
-let toneDiagnosticBusy = false;
-toneDiagnosticButton.addEventListener('click', () => {
-  if (toneDiagnosticBusy) return;
-  if (!window.confirm('请先停止吹奏。导出会短暂读取插件状态，不会修改当前音色。\n文件可能包含插件保存的本地路径等信息，请仅发给可信的技术支持。\n\n是否导出当前已加载音色的参数？')) return;
-  toneDiagnosticBusy = true;
-  toneDiagnosticStatus.textContent = '正在读取当前音色，请选择保存位置…';
-  nativeEvent('exportCurrentToneDiagnostic');
-});
-window.__JUCE__?.backend?.addEventListener('toneDiagnosticResult', message => {
-  toneDiagnosticBusy = false;
-  toneDiagnosticStatus.textContent = String(message);
+  $('#record').disabled=!!state.screenRecordingStopping || !!state.audioRecordingStopping;
 });
 
 $('#copy-machine-code').addEventListener('click', () => {
@@ -2377,7 +2370,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.19 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.20 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

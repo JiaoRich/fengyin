@@ -55,7 +55,7 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('normal("air", result.air)', MAIN)
         self.assertGreaterEqual(MAIN.count('preset.air = settings.air;'), 2)
         self.assertIn('style.settings.air = preset.air;', MAIN)
-        self.assertIn('effect->setProperty("air", fx.air);', MAIN)
+        self.assertNotIn('export-current-tone', JS)
         self.assertIn('child->setAttribute("air", static_cast<double>(preset.air));', PRESET)
         self.assertIn('getDoubleAttribute("air", 0.0)', PRESET)
         self.assertIn("['air','空气感 · Air',0]", JS)
@@ -64,7 +64,7 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn('airProcessor.process(outputs, channels, samples', instrument)
         self.assertNotIn('airProcessor.process', master)
         self.assertIn("nativeEvent('cancelCustomTone')", JS)
-        self.assertIn('exportCurrentToneDiagnostic', MAIN)
+        self.assertNotIn('exportCurrentToneDiagnostic', MAIN)
 
     def test_endpoint_switch_does_not_start_or_invalidate_tuning(self):
         follow = AUDIO.split("bool AudioDeviceService::followSystemDefaultOutput()", 1)[1].split(

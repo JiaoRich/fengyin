@@ -20,6 +20,7 @@
 #include <mferror.h>
 #include <mmdeviceapi.h>
 #include <audioclient.h>
+#include <avrt.h>
 #include <wrl/client.h>
 #include <filesystem>
 #include <fstream>
@@ -34,6 +35,8 @@
 #include <atomic>
 #include <future>
 #include "AudioTimeline.h"
+#include "AudioPacketAssembler.h"
+#include "PcmWaveWriter.h"
 using Microsoft::WRL::ComPtr;
 using namespace winrt;
 using namespace winrt::Windows::Graphics::Capture;
@@ -50,9 +53,11 @@ static LONGLONG ticks(){LARGE_INTEGER q,f;QueryPerformanceCounter(&q);QueryPerfo
 
 class Writer {
     ComPtr<IMFSinkWriter> writer;
+    std::unique_ptr<PcmWaveWriter> wave;
     DWORD video=0,audio=0;
 public:
     int width=0,height=0;
+    void openWave(const std::filesystem::path& path){wave=std::make_unique<PcmWaveWriter>(path);}
     void open(const wchar_t* path,int w,int h) {
         width=w;height=h;
         ComPtr<IMFAttributes> attributes;check(MFCreateAttributes(&attributes,3));
@@ -64,7 +69,7 @@ public:
         ComPtr<IMFMediaType> out,in;
         check(MFCreateMediaType(&out));check(out->SetGUID(MF_MT_MAJOR_TYPE,MFMediaType_Video));
         check(out->SetGUID(MF_MT_SUBTYPE,MFVideoFormat_H264));
-        check(out->SetUINT32(MF_MT_AVG_BITRATE,4000000));
+        check(out->SetUINT32(MF_MT_AVG_BITRATE,8000000));
         check(out->SetUINT32(MF_MT_INTERLACE_MODE,MFVideoInterlace_Progressive));
         check(MFSetAttributeSize(out.Get(),MF_MT_FRAME_SIZE,w,h));
         check(MFSetAttributeRatio(out.Get(),MF_MT_FRAME_RATE,24,1));
@@ -84,7 +89,7 @@ public:
         check(out->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS,2));
         check(out->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND,48000));
         check(out->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE,16));
-        check(out->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND,24000));
+        check(out->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND,32000));
         check(out->SetUINT32(MF_MT_AAC_PAYLOAD_TYPE,0));
         check(writer->AddStream(out.Get(),&audio));
         check(MFCreateMediaType(&in));check(in->SetGUID(MF_MT_MAJOR_TYPE,MFMediaType_Audio));
@@ -109,10 +114,11 @@ public:
         sample(video,data.data(),static_cast<DWORD>(data.size()*4),time,duration);
     }
     void sound(const std::vector<int16_t>& data,LONGLONG frame) {
+        if(wave){wave->append(data);return;}
         sample(audio,data.data(),static_cast<DWORD>(data.size()*2),frame*10000000/48000,
                static_cast<LONGLONG>(data.size()/2)*10000000/48000);
     }
-    void close(){if(writer){check(writer->Finalize());writer.Reset();}}
+    void close(){if(wave){wave->close();wave.reset();}if(writer){check(writer->Finalize());writer.Reset();}}
 };
 
 struct AudioPacket {LONGLONG first=0;std::vector<int16_t> pcm;};
@@ -178,7 +184,8 @@ class SpeakerCapture {
     std::deque<AudioPacket> queue;
     size_t queuedFrames=0;
     std::exception_ptr failure;
-    LONGLONG capturedThrough=0,written=0;
+    LONGLONG capturedThrough=0;
+    CaptureAudioAssembler assembler;
     void append(std::vector<AudioPacket> packets,LONGLONG watermark) {
         std::lock_guard<std::mutex> lock(mutex);
         for(auto& packet:packets) {
@@ -187,12 +194,6 @@ class SpeakerCapture {
             queue.push_back(std::move(packet));
         }
         capturedThrough=watermark;
-    }
-    void silence(Writer& writer,LONGLONG target) {
-        while(written<target) {
-            const auto n=static_cast<size_t>(std::min<LONGLONG>(target-written,4800));
-            writer.sound(std::vector<int16_t>(n*2,0),written);written+=n;
-        }
     }
 public:
     void start(LONGLONG origin) {
@@ -204,15 +205,20 @@ public:
                     Apartment(){winrt::init_apartment(winrt::apartment_type::multi_threaded);}
                     ~Apartment(){winrt::uninit_apartment();}
                 } apartment;
+                struct AudioPriority {
+                    DWORD task=0;HANDLE handle=AvSetMmThreadCharacteristicsW(L"Audio",&task);
+                    ~AudioPriority(){if(handle)AvRevertMmThreadCharacteristics(handle);}
+                } priority;
                 {
                     Loopback loop;loop.open();loop.start(origin);
                     ready.set_value();announced=true;
                     auto endpointCheck=steady_clock::now();
                     while(!stopping.load()) {
                         auto packets=loop.drain();
-                        // Only advance silence behind a successfully drained
-                        // capture worker, never from a stalled video/main loop.
-                        append(std::move(packets),std::max<LONGLONG>(0,(ticks()-origin-2000000)*48000/10000000));
+                        // Never speculate that a late packet is silence. Only
+                        // the next real device position proves an actual gap.
+                        // Wall-clock padding here could overwrite delayed audio.
+                        append(std::move(packets),0);
                         if(steady_clock::now()-endpointCheck>seconds(1)) {
                             if(!loop.sameEndpoint())throw hresult_error(AUDCLNT_E_DEVICE_INVALIDATED,L"Speaker changed; recording stopped");
                             endpointCheck=steady_clock::now();
@@ -236,13 +242,9 @@ public:
             packets.swap(queue);queuedFrames=0;watermark=capturedThrough;error=failure;
         }
         if(error)std::rethrow_exception(error);
-        for(auto& p:packets) {
-            if(p.first>written)silence(writer,p.first);
-            const auto skip=static_cast<size_t>(std::clamp<LONGLONG>(written-p.first,0,p.pcm.size()/2));
-            if(skip)p.pcm.erase(p.pcm.begin(),p.pcm.begin()+static_cast<ptrdiff_t>(skip*2));
-            if(!p.pcm.empty()){writer.sound(p.pcm,written);written+=p.pcm.size()/2;}
-        }
-        silence(writer,watermark);
+        const auto write=[&writer](const auto& pcm,int64_t first){writer.sound(pcm,first);};
+        for(auto& p:packets)assembler.packet(p.first,std::move(p.pcm),write);
+        assembler.padTo(watermark,write);
     }
     void stop(){stopping.store(true);if(worker.joinable())worker.join();}
     ~SpeakerCapture(){stop();}
@@ -301,13 +303,23 @@ public:
             const int dw=std::max(1,int(cw*scale)),dh=std::max(1,int(ch*scale));
             const int ox=(w-dw)/2,oy=(h-dh)/2;
             const double radius=rounded?28.0*GetDpiForWindow(hwnd)/96.0*scale:0;
-            for(int y=0;y<dh;++y)for(int x=0;x<dw;++x) {
-                const double dx=std::max({radius-x-.5,0.0,x+.5-(dw-radius)});
-                const double dy=std::max({radius-y-.5,0.0,y+.5-(dh-radius)});
-                if(rounded&&dx*dx+dy*dy>radius*radius)continue;
-                const int sy=top+std::min(ch-1,int(y/scale)),sx=left+std::min(cw-1,int(x/scale));
+            std::vector<int> sourceX(static_cast<size_t>(dw));
+            for(int x=0;x<dw;++x)sourceX[x]=left+std::min(cw-1,int(x/scale));
+            for(int y=0;y<dh;++y) {
+                const int sy=top+std::min(ch-1,int(y/scale));
                 const auto* row=reinterpret_cast<const uint32_t*>(static_cast<const BYTE*>(mapped.pData)+sy*mapped.RowPitch);
-                pixels[static_cast<size_t>(oy+y)*w+ox+x]=row[sx]|0xff000000;
+                auto* destination=pixels.data()+static_cast<size_t>(oy+y)*w+ox;
+                if(dw==cw)memcpy(destination,row+left,static_cast<size_t>(dw)*4);
+                else for(int x=0;x<dw;++x)destination[x]=row[sourceX[x]];
+                if(rounded&&(y<radius||y>=dh-radius)) {
+                    const auto corner=std::min(dw,static_cast<int>(std::ceil(radius)));
+                    for(int side=0;side<2;++side)for(int i=0;i<corner;++i) {
+                        const int x=side?dw-1-i:i;
+                        const double dx=std::max({radius-x-.5,0.0,x+.5-(dw-radius)});
+                        const double dy=std::max({radius-y-.5,0.0,y+.5-(dh-radius)});
+                        if(dx*dx+dy*dy>radius*radius)destination[x]=bg;
+                    }
+                }
             }
         }
         context->Unmap(staging.Get(),0);frame.Close();
@@ -324,16 +336,18 @@ public:
 int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int) {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     int argc=0;auto argv=CommandLineToArgvW(GetCommandLineW(),&argc);
-    if(argc==3 && std::wstring(argv[1])==L"--selftest") {
+    if(argc==3 && (std::wstring(argv[1])==L"--selftest" || std::wstring(argv[1])==L"--audio-selftest")) {
+        const bool waveTest=std::wstring(argv[1])==L"--audio-selftest";
         const std::filesystem::path output(argv[2]);LocalFree(argv);
         try {
             winrt::init_apartment(winrt::apartment_type::multi_threaded);check(MFStartup(MF_VERSION));
-            Writer writer;writer.open(output.c_str(),320,240);
-            std::vector<uint32_t> image(320*240);
-            for(int y=0;y<240;++y)for(int x=0;x<320;++x)image[y*320+x]=y<120?0xffff0000:0xff0000ff;
+            constexpr int testWidth=1920,testHeight=1080;
+            Writer writer;if(waveTest)writer.openWave(output);else writer.open(output.c_str(),testWidth,testHeight);
+            std::vector<uint32_t> image(testWidth*testHeight);
+            for(int y=0;y<testHeight;++y)for(int x=0;x<testWidth;++x)image[y*testWidth+x]=y<testHeight/2?0xffff0000:0xff0000ff;
             CaptureAudioTimeline timeline;
             for(int frame=0;frame<48;++frame) {
-                writer.image(image,frame*10000000LL/24,10000000/24);
+                if(!waveTest)writer.image(image,frame*10000000LL/24,10000000/24);
                 std::vector<int16_t> audio(2000*2);
                 for(int i=0;i<2000;++i)audio[i*2]=audio[i*2+1]=static_cast<int16_t>(3000*std::sin((frame*2000+i)*6.283185307179586*440/48000));
                 const auto jitter=frame?((frame%3)-1)*20000LL:0;
@@ -348,18 +362,27 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int) {
         }catch(const std::exception& e){status(output.wstring()+L".error.txt",e.what());MFShutdown();return 4;}
     }
     if(argc!=7){if(argv)LocalFree(argv);return 2;}
-    const auto hwnd=reinterpret_cast<HWND>(static_cast<uintptr_t>(std::stoull(argv[1],nullptr,16)));
+    const bool audioOnly=std::wstring(argv[1])==L"audio";
+    const auto hwnd=audioOnly?nullptr:reinterpret_cast<HWND>(static_cast<uintptr_t>(std::stoull(argv[1],nullptr,16)));
     const std::filesystem::path output(argv[2]),stop(argv[3]),state(argv[4]);
     const auto color=static_cast<uint32_t>(std::stoul(argv[5],nullptr,16));const bool rounded=std::wstring(argv[6])==L"1";
     LocalFree(argv);bool mfStarted=false;
     Writer writer;
     try {
         winrt::init_apartment(winrt::apartment_type::multi_threaded);
+        if(audioOnly) {
+            // No WGC, window handle, video frames or MF encoder for WAV.
+            writer.openWave(output);SpeakerCapture sound;sound.start(ticks());
+            if(!status(state,"recording"))throw hresult_error(E_ACCESSDENIED,L"Cannot write recording status");
+            while(!std::filesystem::exists(stop)){sound.drain(writer);Sleep(4);}
+            sound.stop();sound.drain(writer);writer.close();
+            return status(state,"saved")?0:3;
+        }
         check(MFStartup(MF_VERSION));mfStarted=true;
         if(!IsWindow(hwnd))throw hresult_error(E_INVALIDARG,L"FengYin window unavailable");
         WindowFrames frames;frames.open(hwnd);SpeakerCapture sound;
         RECT rect{};GetClientRect(hwnd,&rect);
-        const double scale=std::min({1.0,1280.0/std::max<LONG>(2,rect.right),720.0/std::max<LONG>(2,rect.bottom)});
+        const double scale=std::min({1.0,1920.0/std::max<LONG>(2,rect.right),1080.0/std::max<LONG>(2,rect.bottom)});
         const int w=std::max(2,int(rect.right*scale)/2*2),h=std::max(2,int(rect.bottom*scale)/2*2);
         writer.open(output.c_str(),w,h);
         std::vector<uint32_t> pixels;const auto timeout=steady_clock::now()+seconds(8);

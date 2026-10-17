@@ -29,8 +29,8 @@ class Recording118Tests(unittest.TestCase):
         self.assertIn('writer->Finalize()',helper)
         self.assertIn('MFAudioFormat_AAC',helper)
         self.assertIn('MFVideoFormat_H264',helper)
-        self.assertIn('1280.0',helper)
-        self.assertIn('720.0',helper)
+        self.assertIn('1920.0',helper)
+        self.assertIn('1080.0',helper)
 
     def test_ui_exposes_real_video_event_not_fake_save(self):
         html=(ROOT/'prototype/index.html').read_text(encoding='utf-8')

@@ -33,6 +33,7 @@ public:
     void requestCompactMode(bool compact);
     std::function<void(bool)> onWindowModeChanged;
     std::function<void(juce::String)> onWindowAction;
+    std::function<void(juce::Rectangle<int>)> onWindowDragRegionChanged;
     bool compactMode = false;
     float getWindowBreath() const noexcept { return midi.getSnapshot().breath; }
 
@@ -47,7 +48,6 @@ private:
     static std::optional<juce::WebBrowserComponent::Resource> getWebResource(const juce::String& path);
     static juce::File prepareLocalWebInterface();
     void chooseVideoForWebInterface();
-    void exportCurrentToneDiagnostic();
     void exportStudioDraft(const juce::String& id);
     void importStudioPackage();
     std::unique_ptr<juce::FileChooser> studioImportChooser;
@@ -212,8 +212,6 @@ private:
     fengyin::VideoAudioExtractor webVideoAudioExtractor;
     std::unique_ptr<juce::FileChooser> webVideoChooser;
     std::unique_ptr<juce::FileChooser> pluginFolderChooser;
-    std::unique_ptr<juce::FileChooser> toneDiagnosticChooser;
-    bool toneDiagnosticExportPending = false;
     juce::File webVideoFile;
     int webVideoGeneration = 0;
     bool webVideoAudioReady = false;

@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.1.19",
+    [string]$Version = "1.1.20",
     [switch]$SkipInstaller
 )
 
@@ -123,6 +123,16 @@ Invoke-Checked "Screen recorder MP4 encoding selftest" {
 }
 $RecorderFfmpeg = if (Test-Path $FfmpegPath) { $FfmpegPath } else { Join-Path $PreparedFfmpeg "ffmpeg.exe" }
 Invoke-Checked "Screen recorder decoded audio/video check" { python (Join-Path $PSScriptRoot "verify_screen_recording.py") $RecorderFfmpeg $RecorderCheck }
+$AudioCheck = Join-Path $BuildDir "system-audio-selftest.wav"
+Invoke-Checked "System recording WAV selftest" {
+    $AudioProcess = Start-Process -FilePath $ScreenRecorderExe -ArgumentList @('--audio-selftest', ('"{0}"' -f $AudioCheck)) -PassThru
+    if (-not $AudioProcess.WaitForExit(60000)) { $AudioProcess.Kill(); throw "System recording selftest timed out" }
+    $AudioProcess.Refresh()
+    $global:LASTEXITCODE = $AudioProcess.ExitCode
+    if ($LASTEXITCODE -ne 0 -and (Test-Path "$AudioCheck.error.txt")) { Get-Content "$AudioCheck.error.txt" }
+    if ($LASTEXITCODE -eq 0 -and -not (Test-Path $AudioCheck)) { throw "Recorder exited without producing WAV" }
+}
+Invoke-Checked "System recording PCM continuity check" { python (Join-Path $PSScriptRoot "verify_system_recording.py") $AudioCheck }
 # The public installer uses VB-CABLE. Never package or invoke the experimental driver.
 Copy-Item (Join-Path $ProjectRoot "README.md") $PackageDir -Force
 Copy-Item (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES.md") $PackageDir -Force

@@ -1,7 +1,6 @@
 #include "MainComponent.h"
 #include "RecordingPaths.h"
 #include "SimpleTechniquePolicy.h"
-#include "ToneDiagnostic.h"
 #include "TonePackage.h"
 #include "BinaryData.h"
 #include "KongProjectFile.h"
@@ -266,7 +265,7 @@ MainComponent::~MainComponent()
 
 void MainComponent::setWebPresentationVisible(bool visible)
 {
-    if(!visible)windowRecorder.stop();
+    if(!visible && !windowRecorder.isAudioOnly())windowRecorder.stop();
     if (webPresentationVisible == visible) return;
     webPresentationVisible = visible;
     lastWebStateAtMs = 0; // Restore gets a complete current snapshot, not stale deltas.
@@ -285,6 +284,13 @@ void MainComponent::setupWebInterface()
             .withStatusBarDisabled()
             .withBackgroundColour(juce::Colour(0xff07101d)))
         .withNativeIntegrationEnabled()
+        .withEventListener("windowDragRegion", [this](juce::var payload) {
+            if(onWindowDragRegionChanged)onWindowDragRegionChanged({
+                juce::jlimit(0,getWidth(),static_cast<int>(payload.getProperty("x",0))),
+                juce::jlimit(0,getHeight(),static_cast<int>(payload.getProperty("y",0))),
+                juce::jlimit(0,getWidth(),static_cast<int>(payload.getProperty("width",0))),
+                juce::jlimit(0,80,static_cast<int>(payload.getProperty("height",0)))});
+        })
         .withEventListener("windowAction", [this](juce::var payload)
         {
             if (onWindowAction)
@@ -408,10 +414,6 @@ void MainComponent::setupWebInterface()
             const auto opened = isActivated && studioUnlocked && pluginHost.showPluginEditor(false);
             if (webInterface != nullptr)
                 webInterface->emitEventIfBrowserIsVisible("editorResult", opened ? utf8("音源界面已打开") : utf8("请先加载一个音源"));
-        })
-        .withEventListener("exportCurrentToneDiagnostic", [this](juce::var)
-        {
-            exportCurrentToneDiagnostic();
         })
         .withEventListener("loadEffect", [this](juce::var payload)
         {
@@ -817,8 +819,7 @@ void MainComponent::setupWebInterface()
         .withEventListener("stopVoice", [this](juce::var) {voicePrompts.stop();})
         .withEventListener("toggleRecording", [this](juce::var) {
             voicePrompts.stop();
-            if(windowRecorder.busy())windowRecorder.stop();
-            else if(isActivated || recorder.isRecording())toggleRecording();
+            if(isActivated || recorder.isRecording() || windowRecorder.busy())toggleRecording();
         })
         .withEventListener("toggleWindowRecording", [this](juce::var payload) {toggleWindowRecording(payload);})
         .withEventListener("showRecordings", [](juce::var)
@@ -1222,7 +1223,7 @@ void MainComponent::paint(juce::Graphics& g)
 void MainComponent::requestCompactMode(bool compact)
 {
     if (compact == compactMode || windowModePromptOpen) return;
-    if(windowRecorder.busy()) {
+    if(windowRecorder.busy() && !windowRecorder.isAudioOnly()) {
         windowRecorder.stop();
         if(webInterface)webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",utf8("正在保存录屏，完成后可切换窗口模式"));
         return;
@@ -1345,8 +1346,10 @@ void MainComponent::timerCallback()
     windowRecorder.poll();
     if(windowRecorder.takeCompleted() && webInterface) {
         const auto message=windowRecorder.error().isEmpty()
-            ? utf8("录屏已保存：")+windowRecorder.lastFile().getFullPathName():windowRecorder.error();
+            ? utf8(windowRecorder.isAudioOnly()?"录音已保存：":"录屏已保存：")+windowRecorder.lastFile().getFullPathName():windowRecorder.error();
         webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",message);
+        recordingStatus.setText(message,juce::dontSendNotification);
+        if(windowRecorder.isAudioOnly())webInterface->emitEventIfBrowserIsVisible("recordingSaved",windowRecorder.error().isEmpty());
         lastWebStateAtMs=0;
     }
     midi.tickTechniqueAutomation(); // Restore the established native UI timer path.
@@ -1600,10 +1603,17 @@ void MainComponent::timerCallback()
         state->setProperty("trialRemainingSeconds", currentLicenseStatus.trialRemainingSeconds);
         state->setProperty("licenseMessage", currentLicenseStatus.message);
         state->setProperty("machineCode", machineCode);
-        state->setProperty("recording", recorder.isRecording());
-        state->setProperty("screenRecordingBusy",windowRecorder.busy());
-        state->setProperty("screenRecording",windowRecorder.recording());
-        state->setProperty("screenRecordingStopping",windowRecorder.stopping());
+        state->setProperty("recording", recorder.isRecording() || (windowRecorder.busy() && windowRecorder.isAudioOnly()));
+        state->setProperty("screenRecordingBusy",windowRecorder.busy() && !windowRecorder.isAudioOnly());
+        state->setProperty("screenRecording",windowRecorder.recording() && !windowRecorder.isAudioOnly());
+        state->setProperty("screenRecordingStopping",windowRecorder.stopping() && !windowRecorder.isAudioOnly());
+        state->setProperty("audioRecordingReady",windowRecorder.recording() && windowRecorder.isAudioOnly());
+        state->setProperty("audioRecordingStopping",windowRecorder.stopping() && windowRecorder.isAudioOnly());
+       #if JUCE_WINDOWS
+        state->setProperty("systemOutputRecordingSupported",true);
+       #else
+        state->setProperty("systemOutputRecordingSupported",false);
+       #endif
         state->setProperty("transposeSemitones", midi.getTransposeSemitones());
         state->setProperty("targetKey", midi.getTargetKey());
         state->setProperty("growlSensitivity", midi.getGrowlSensitivity());
@@ -1857,10 +1867,11 @@ void MainComponent::timerCallback()
     pluginEditorButton.setEnabled(isActivated && pluginHost.hasPlugin());
     effectEditorButton.setEnabled(isActivated && pluginHost.hasEffect());
     bypassEffectButton.setEnabled(isActivated && pluginHost.hasEffect());
-    recordButton.setEnabled(isActivated || recorder.isRecording());
-    if (recorder.isRecording())
+    recordButton.setEnabled((isActivated || recorder.isRecording() || windowRecorder.busy()) && !windowRecorder.stopping());
+    if (recorder.isRecording() || (windowRecorder.busy() && windowRecorder.isAudioOnly()))
     {
-        const auto seconds = juce::roundToInt(recorder.getElapsedSeconds());
+        recordButton.setButtonText(utf8(windowRecorder.stopping()?"正在保存…":"■ 停止并保存"));
+        const auto seconds = juce::roundToInt(recorder.isRecording()?recorder.getElapsedSeconds():windowRecorder.elapsedSeconds());
         recordingStatus.setText(utf8("正在录音  ") + juce::String::formatted("%02d:%02d", seconds / 60, seconds % 60),
                                 juce::dontSendNotification);
     }
@@ -3573,85 +3584,6 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName, bool ap
         effectStatus.setText(utf8("效果器：未使用"), juce::dontSendNotification);
 }
 
-void MainComponent::exportCurrentToneDiagnostic()
-{
-    const auto reply = [this](const juce::String& message)
-    {
-        if (webInterface != nullptr)
-            webInterface->emitEventIfBrowserIsVisible("toneDiagnosticResult", message);
-    };
-    if (toneDiagnosticExportPending) return;
-    if (! isActivated || pluginLoading || ! pluginHost.hasPlugin() || currentPluginBrand != "swam")
-    {
-        reply(utf8("请先加载一个 SWAM 音色，加载完成后再导出"));
-        return;
-    }
-    if (recorder.isRecording())
-    {
-        reply(utf8("请先结束录音，再导出参数，避免影响录音"));
-        return;
-    }
-    auto* plugin = pluginHost.getPlugin();
-    auto diagnostic = fengyin::ToneDiagnostic::capture(*plugin);
-    auto* data = diagnostic.getDynamicObject();
-    juce::PluginDescription description;
-    plugin->fillInPluginDescription(description);
-    data->setProperty("appVersion", JUCE_APPLICATION_VERSION_STRING);
-    data->setProperty("pluginName", description.name);
-    data->setProperty("pluginVersion", description.version);
-    data->setProperty("pluginFormat", description.pluginFormatName);
-    data->setProperty("manufacturer", description.manufacturerName);
-    data->setProperty("instrumentKey", currentInstrumentKey);
-    data->setProperty("instrumentName", currentInstrumentChineseName);
-    data->setProperty("instrumentModel", pluginHost.getCurrentInstrumentModelName());
-    data->setProperty("styleId", currentToneStyleId);
-    const auto styleName = currentPresetIsCustom ? currentPresetDisplayName
-        : fengyin::ToneStyleCatalog::find(currentInstrumentKey, currentToneStyleId).name;
-    data->setProperty("styleName", styleName);
-    data->setProperty("customPreset", currentPresetIsCustom);
-    data->setProperty("styleParameterMatchCount", currentSwamToneParameterCount);
-    if (! currentPresetIsCustom && currentInstrumentKey == "soprano-sax")
-        data->setProperty("styleParameterAudit", pluginHost.getSwamToneAudit());
-    const auto fx = masterOutput.getToneStyle();
-    auto effect = std::make_unique<juce::DynamicObject>();
-    effect->setProperty("tone", fx.tone);
-    effect->setProperty("warmth", fx.warmth);
-    effect->setProperty("reverbMix", fx.reverbMix);
-    effect->setProperty("compressionThreshold", fx.compressionThreshold);
-    effect->setProperty("compressionRatio", fx.compressionRatio);
-    effect->setProperty("saturation", fx.saturation);
-    effect->setProperty("harshControl", fx.harshControl);
-    effect->setProperty("reverbRoomSize", fx.reverbRoomSize);
-    effect->setProperty("reverbDamping", fx.reverbDamping);
-    effect->setProperty("reverbWidth", fx.reverbWidth);
-    effect->setProperty("outputGain", fx.outputGain);
-    effect->setProperty("bass", fx.bass);
-    effect->setProperty("air", fx.air);
-    data->setProperty("fengyinEffects", juce::var(effect.release()));
-    const auto json = juce::JSON::toString(diagnostic, false);
-    const auto name = juce::File::createLegalFileName(currentInstrumentChineseName + "-" + styleName
-        + "-" + juce::Time::getCurrentTime().formatted("%Y%m%d-%H%M%S")) + ".fytone.json";
-    toneDiagnosticExportPending = true;
-    toneDiagnosticChooser = std::make_unique<juce::FileChooser>(utf8("保存当前音色参数"),
-        juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile(name), "*.json");
-    const auto safe = juce::Component::SafePointer<MainComponent>(this);
-    const bool stateAvailable = static_cast<bool>(data->getProperty("stateAvailable"));
-    toneDiagnosticChooser->launchAsync(juce::FileBrowserComponent::saveMode
-        | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting,
-        [safe, json, stateAvailable](const juce::FileChooser& chooser)
-        {
-            if (safe == nullptr) return;
-            safe->toneDiagnosticExportPending = false;
-            const auto file = chooser.getResult();
-            const auto message = file == juce::File() ? utf8("已取消导出")
-                : file.replaceWithText(json) ? (stateAvailable
-                    ? utf8("参数和插件状态已导出：") + file.getFullPathName()
-                    : utf8("参数已导出，但插件未返回完整状态：") + file.getFullPathName())
-                : utf8("保存失败，请选择有写入权限的文件夹重试");
-            if (safe->webInterface != nullptr)
-                safe->webInterface->emitEventIfBrowserIsVisible("toneDiagnosticResult", message);
-        });
-}
 
 void MainComponent::applyCurrentSwamToneStyle()
 {
@@ -3805,6 +3737,7 @@ void MainComponent::refreshLicenseUi()
         if (! isActivated)
         {
             if (recorder.isRecording()) recorder.stop();
+            windowRecorder.stop();
             accompaniment.pause();
             videoPlaybackActive = false;
             midi.setPerformanceSink(nullptr);
@@ -3904,6 +3837,22 @@ void MainComponent::toggleWindowRecording(const juce::var& payload)
 
 void MainComponent::toggleRecording()
 {
+   #if JUCE_WINDOWS
+    if(windowRecorder.busy()) {
+        if(windowRecorder.isAudioOnly())windowRecorder.stop();
+        lastWebStateAtMs=0;return;
+    }
+    auto tell=[this](const juce::String& message){if(webInterface)webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",message);};
+    if(!isActivated){tell(utf8("请先激活或开启试用"));return;}
+    const auto type=audio.getStatus().deviceType;
+    if(superLowLatencyRunning || type.containsIgnoreCase("ASIO") || type.containsIgnoreCase("Exclusive")) {
+        tell(utf8("录音固定采集系统扬声器，请先切换Windows共享或共享低延迟模式，并让伴奏从同一默认扬声器播放"));return;
+    }
+    voicePrompts.stop();
+    if(!windowRecorder.start(nullptr,juce::Colours::black,false,true))tell(windowRecorder.error());
+    lastWebStateAtMs=0;
+    return;
+   #endif
     if(windowRecorder.busy())return;
     if (recorder.isRecording())
     {
@@ -3981,7 +3930,7 @@ void MainComponent::emitAudioSettingsState(bool success, const juce::String& mes
 void MainComponent::applyAudioSettingsFromWeb(const juce::var& payload)
 {
     if(windowRecorder.busy()) {
-        emitAudioSettingsState(false,utf8("请先停止并保存录屏，再更改音频设备"));return;
+        emitAudioSettingsState(false,utf8("请先停止并保存录制，再更改音频设备"));return;
     }
     pluginHost.setLatencyProbeActive(false);
     const auto previous = audio.getStatus();

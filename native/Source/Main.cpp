@@ -9,6 +9,7 @@
  #include <dwmapi.h>
 #endif
 #include "CompactWindowGlow.h"
+#include "NativeCompactDragSurface.h"
 
 class FengYinApplication final : public juce::JUCEApplication
 {
@@ -57,6 +58,13 @@ private:
             content = new MainComponent();
             setContentOwned(content, true);
             content->onWindowModeChanged = [this](bool compact) { applyMode(compact); };
+            content->onWindowDragRegionChanged = [this](juce::Rectangle<int> region) {
+               #if JUCE_WINDOWS
+                dragRegion=region;updateNativeDragSurface();
+               #else
+                juce::ignoreUnused(region);
+               #endif
+            };
             content->onWindowAction = [this](const juce::String& action)
             {
                 if (action == "close") closeButtonPressed();
@@ -128,6 +136,19 @@ private:
             juce::JUCEApplication::getInstance()->systemRequestedQuit();
         }
     private:
+       #if JUCE_WINDOWS
+        NativeCompactDragSurface nativeDrag;
+        juce::Rectangle<int> dragRegion;
+        void updateNativeDragSurface() {
+            if(auto* peer=getPeer()) {
+                const auto scale=peer->getPlatformScaleFactor();
+                nativeDrag.update(static_cast<HWND>(peer->getNativeHandle()),
+                    juce::roundToInt(dragRegion.getX()*scale),juce::roundToInt(dragRegion.getY()*scale),
+                    juce::roundToInt(dragRegion.getWidth()*scale),juce::roundToInt(dragRegion.getHeight()*scale),
+                    content->compactMode&&!isFullScreen()&&!isMinimised()&&isVisible());
+            }
+        }
+       #endif
         juce::String windowGesture;
         bool pointerGesture = false;
         juce::Point<int> gestureStart;
@@ -248,6 +269,9 @@ private:
         double lastVisualUpdate=0;
         void timerCallback() override
         {
+           #if JUCE_WINDOWS
+            updateNativeDragSurface();
+           #endif
             updateWindowGesture();
             const auto now=juce::Time::getMillisecondCounterHiRes();
             if(now-lastVisualUpdate<1000.0/24.0)return;
