@@ -422,6 +422,8 @@ if(BUILD_TESTING)
     add_test(NAME wav_recording COMMAND FengYinRecordingTests)
     add_executable(FengYinAudioStageTimingTests tests/test_audio_stage_timing.cpp)
     add_test(NAME audio_stage_timing COMMAND FengYinAudioStageTimingTests)
+    add_executable(FengYinCaptureFrameComposerTests tests/test_capture_frame_composer.cpp)
+    add_test(NAME capture_frame_composer COMMAND FengYinCaptureFrameComposerTests)
 
     add_executable(FengYinSwamClassifierTests tests/test_swam_classifier.cpp)
     target_include_directories(FengYinSwamClassifierTests PRIVATE native/Source)

@@ -18,6 +18,7 @@
 #include <mfidl.h>
 #include <mfreadwrite.h>
 #include <mferror.h>
+#include <mftransform.h>
 #include <mmdeviceapi.h>
 #include <audioclient.h>
 #include <avrt.h>
@@ -37,6 +38,8 @@
 #include "AudioTimeline.h"
 #include "AudioPacketAssembler.h"
 #include "PcmWaveWriter.h"
+#include "FrameComposer.h"
+#include "CapturePerformance.h"
 using Microsoft::WRL::ComPtr;
 using namespace winrt;
 using namespace winrt::Windows::Graphics::Capture;
@@ -115,6 +118,27 @@ public:
     }
     void image(const std::vector<uint32_t>& data,LONGLONG time,LONGLONG duration) {
         sample(video,data.data(),static_cast<DWORD>(data.size()*4),time,duration);
+    }
+    std::string describeVideoEncoder() const {
+      try {
+        // Enabling hardware transforms is only a request, not proof. Inspect
+        // the selected video encoder without exposing device symbolic links.
+        ComPtr<IMFSinkWriterEx> extended;
+        if(!writer||FAILED(writer.As(&extended)))return "encoder=unknown";
+        for(DWORD i=0;i<16;++i){
+            GUID category{};ComPtr<IMFTransform> transform;
+            if(FAILED(extended->GetTransformForStream(video,i,&category,&transform)))break;
+            if(!IsEqualGUID(category,MFT_CATEGORY_VIDEO_ENCODER))continue;
+            ComPtr<IMFAttributes> attrs;
+            if(FAILED(transform->GetAttributes(&attrs)))return "encoder=unknown";
+            MF_ATTRIBUTE_TYPE type{};
+            const bool isHardware=SUCCEEDED(attrs->GetItemType(MFT_ENUM_HARDWARE_URL_Attribute,&type));
+            WCHAR name[256]{};UINT32 length=0;
+            const auto named=SUCCEEDED(attrs->GetString(MFT_FRIENDLY_NAME_Attribute,name,256,&length));
+            return std::string("encoder=")+(isHardware?"hardware":"software")+(named?" name="+winrt::to_string(name):"");
+        }
+        return "encoder=unknown";
+      } catch(...) { return "encoder=unknown"; }
     }
     void sound(const std::vector<int16_t>& data,LONGLONG frame) {
         if(wave){wave->append(data);return;}
@@ -254,6 +278,7 @@ public:
 };
 
 class WindowFrames {
+    CaptureFrameComposer composer;
     ComPtr<ID3D11Device> device;
     ComPtr<ID3D11DeviceContext> context;
     ComPtr<ID3D11Texture2D> staging;
@@ -281,7 +306,7 @@ public:
             L"Windows.Graphics.Capture.GraphicsCaptureSession",L"IsCursorCaptureEnabled"))session.IsCursorCaptureEnabled(false);
         session.StartCapture();
     }
-    bool read(HWND hwnd,std::vector<uint32_t>& pixels,int w,int h,uint32_t bg,bool rounded) {
+    bool read(HWND hwnd,std::vector<uint32_t>& pixels,int w,int h,uint32_t bg,bool rounded,CapturePerformance* timing=nullptr) {
         auto frame=pool.TryGetNextFrame();if(!frame)return false;
         const auto size=frame.ContentSize();if(size.Width<=0||size.Height<=0)return false;
         auto access=frame.Surface().as<::Windows::Graphics::DirectX::Direct3D11::IDirect3DDxgiInterfaceAccess>();
@@ -292,38 +317,22 @@ public:
             desc.BindFlags=0;desc.CPUAccessFlags=D3D11_CPU_ACCESS_READ;desc.MiscFlags=0;
             staging.Reset();check(device->CreateTexture2D(&desc,nullptr,&staging));
         }
-        context->CopyResource(staging.Get(),texture.Get());
-        D3D11_MAPPED_SUBRESOURCE mapped{};check(context->Map(staging.Get(),0,D3D11_MAP_READ,0,&mapped));
+        D3D11_MAPPED_SUBRESOURCE mapped{};
+        {
+            CapturePerformance::Scope measure(timing,CapturePerformance::readback);
+            context->CopyResource(staging.Get(),texture.Get());
+            check(context->Map(staging.Get(),0,D3D11_MAP_READ,0,&mapped));
+        }
         RECT bounds{},client{};GetClientRect(hwnd,&client);POINT origin{0,0};ClientToScreen(hwnd,&origin);
         if(FAILED(DwmGetWindowAttribute(hwnd,DWMWA_EXTENDED_FRAME_BOUNDS,&bounds,sizeof(bounds))))GetWindowRect(hwnd,&bounds);
         const int left=std::clamp(static_cast<int>(origin.x-bounds.left),0,sourceW-1);
         const int top=std::clamp(static_cast<int>(origin.y-bounds.top),0,sourceH-1);
         const int cw=std::min({static_cast<int>(client.right),size.Width-left,sourceW-left});
         const int ch=std::min({static_cast<int>(client.bottom),size.Height-top,sourceH-top});
-        pixels.assign(static_cast<size_t>(w)*h,bg);
-        if(cw>0&&ch>0) {
-            const double scale=std::min(double(w)/cw,double(h)/ch);
-            const int dw=std::max(1,int(cw*scale)),dh=std::max(1,int(ch*scale));
-            const int ox=(w-dw)/2,oy=(h-dh)/2;
-            const double radius=rounded?28.0*GetDpiForWindow(hwnd)/96.0*scale:0;
-            std::vector<int> sourceX(static_cast<size_t>(dw));
-            for(int x=0;x<dw;++x)sourceX[x]=left+std::min(cw-1,int(x/scale));
-            for(int y=0;y<dh;++y) {
-                const int sy=top+std::min(ch-1,int(y/scale));
-                const auto* row=reinterpret_cast<const uint32_t*>(static_cast<const BYTE*>(mapped.pData)+sy*mapped.RowPitch);
-                auto* destination=pixels.data()+static_cast<size_t>(oy+y)*w+ox;
-                if(dw==cw)memcpy(destination,row+left,static_cast<size_t>(dw)*4);
-                else for(int x=0;x<dw;++x)destination[x]=row[sourceX[x]];
-                if(rounded&&(y<radius||y>=dh-radius)) {
-                    const auto corner=std::min(dw,static_cast<int>(std::ceil(radius)));
-                    for(int side=0;side<2;++side)for(int i=0;i<corner;++i) {
-                        const int x=side?dw-1-i:i;
-                        const double dx=std::max({radius-x-.5,0.0,x+.5-(dw-radius)});
-                        const double dy=std::max({radius-y-.5,0.0,y+.5-(dh-radius)});
-                        if(dx*dx+dy*dy>radius*radius)destination[x]=bg;
-                    }
-                }
-            }
+        {
+            CapturePerformance::Scope measure(timing,CapturePerformance::compose);
+            composer.render(mapped.pData,mapped.RowPitch,pixels,w,h,left,top,cw,ch,bg,
+                            rounded?28.0*GetDpiForWindow(hwnd)/96.0:0);
         }
         context->Unmap(staging.Get(),0);frame.Close();
         // Capture surface size can change during resize, output canvas stays fixed.
@@ -388,6 +397,15 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int) {
         const double scale=std::min({1.0,1920.0/std::max<LONG>(2,rect.right),1080.0/std::max<LONG>(2,rect.bottom)});
         const int w=std::max(2,int(rect.right*scale)/2*2),h=std::max(2,int(rect.bottom*scale)/2*2);
         writer.open(output.c_str(),w,h);
+        WCHAR diagnostic[2]{};
+        CapturePerformance timing(GetEnvironmentVariableW(L"FENGYIN_AUDIO_TIMING",diagnostic,2)==1&&diagnostic[0]==L'1');
+        const auto encoder=timing.active()?writer.describeVideoEncoder():std::string();
+        const auto report=[&]{if(timing.active()){
+            std::ofstream out(output.wstring()+L".performance.txt",std::ios::trunc);
+            out<<encoder<<" canvas="<<w<<"x"<<h<<" fps=24 bitrate=8000000\n";timing.write(out);
+        }};
+        report();
+        auto reportAt=steady_clock::now();
         std::vector<uint32_t> pixels;const auto timeout=steady_clock::now()+seconds(8);
         while(!frames.read(hwnd,pixels,w,h,color,rounded)) {
             if(std::filesystem::exists(stop))throw hresult_error(E_ABORT,L"Recording cancelled during startup");
@@ -398,17 +416,20 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int) {
         LONGLONG next=0,frameCount=0;
         while(!std::filesystem::exists(stop)) {
             if(!IsWindow(hwnd)||IsIconic(hwnd)||!IsWindowVisible(hwnd))break;
-            sound.drain(writer);
+            {CapturePerformance::Scope measure(&timing,CapturePerformance::audioWrite);sound.drain(writer);}
             const auto now=ticks()-origin;
             if(now>=next) {
-                frames.read(hwnd,pixels,w,h,color,rounded);
+                frames.read(hwnd,pixels,w,h,color,rounded,&timing);
                 // Do not queue unbounded video frames if encoding falls behind.
-                writer.image(pixels,now,10000000/24);++frameCount;next=now+10000000/24;
+                {CapturePerformance::Scope measure(&timing,CapturePerformance::videoWrite);writer.image(pixels,now,10000000/24);}
+                ++frameCount;next=now+10000000/24;
             }
+            if(timing.active()&&steady_clock::now()-reportAt>seconds(5)){report();reportAt=steady_clock::now();}
             Sleep(4);
         }
         sound.stop();sound.drain(writer);
-        writer.close();const bool reported=status(state,frameCount>0?"saved":"No encoded video frames");
+        {CapturePerformance::Scope measure(&timing,CapturePerformance::finalize);writer.close();}
+        report();const bool reported=status(state,frameCount>0?"saved":"No encoded video frames");
         MFShutdown();return frameCount>0&&reported?0:3;
     } catch(const winrt::hresult_error& e) {
         try{writer.close();}catch(...){}

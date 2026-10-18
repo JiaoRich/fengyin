@@ -233,6 +233,9 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
                                                                      int numSamples,
                                                                      const juce::AudioIODeviceCallbackContext& context)
 {
+    // Prevent subnormal filter/reverb tails from taking the CPU's slow path.
+    // Scoped to this callback; does not change plugin parameters or buffering.
+    const juce::ScopedNoDenormals noDenormals;
     const auto nowSeconds = juce::Time::getMillisecondCounterHiRes() * 0.001;
     if (resetRequested.exchange(false, std::memory_order_acq_rel))
         addResetMessages(nowSeconds);

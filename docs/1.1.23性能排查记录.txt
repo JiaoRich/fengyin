@@ -1,0 +1,50 @@
+风吟性能排查：build185之后的工作记录（尚未发布）
+
+用户最新反馈和范围
+- build185伴奏中切音色不卡顿；明亮小提琴+伴奏基本顺畅，柔美小提琴和大提琴仍卡。
+- 伴奏+吹奏+录屏仍有性能不足。继续优化，录屏如果代价过大可讨论取消，但目前没有授权直接删除。
+- 用户自行测试内部房间/混响的影响，本轮不修改这些音色参数。
+- 保留全部方案状态、增益、正常抖弓、气息/音高及128默认缓冲，不改设备路由/驱动/许可。
+- 2026-10-18约19:42远程画面显示电池82%、电源滑块“节电模式”。用户明确选择保持当前设置测试，不擅自修改电源模式。须记录这一对照限制，不因此认定硬件根因。
+
+包状态只读对照（不是当前Windows加载后的参数回读）
+- 明亮和柔美均为SWAM Violin 3；包中描述版本分别3.9.4、3.8.2，不能据此推断当前实际加载的是两个插件版本。
+- 明亮额外含Fresh Air和magic.CURVE串联效果；柔美和大提琴不含这两项。不能以“效果器更多”解释后两者更卡。
+- 完整状态按PARAM ID解析，不以跨乐器参数索引比较：
+  roomEnabled：明亮0、柔美1、大提琴0；reverbMix：18、0、18。
+  stringsModel：明亮1、柔美0、大提琴0。
+  EQenabled：明亮0、柔美1、大提琴0；stringRes：0.5、约0.65、0.5。
+- 主奏模型/弓压/弓噪/动态过渡等也有差异，未证明各自的DSP代价。内部房间不是能够单独解释两种音色卡顿的充分证据。
+- build185原包已按用户请求复制交付：交付包/风吟-1.1.22-build185-弦乐对照方案/。
+  柔美SHA256 1d733103ed4f36863f9fa7e31a7c3696ccccb15277cb4a24a63369a47786acae
+  大提琴SHA256 d790e492d885cbde61d9ee21a1a481847a91a95d32c9c84c9776382c73764af9
+
+参考成熟实现的方法
+- OBS硬件编码及编码过载指南强调区分GPU渲染/读回与编码瓶颈，不以总CPU或一个“启用硬件”选项判断实际路径。
+  https://obsproject.com/kb/hardware-encoding
+  https://obsproject.com/kb/encoding-performance-troubleshooting
+- 微软MF_SINK_WRITER_D3D_MANAGER用于向编码器提供D3D设备；目前录屏是GPU读回到CPU后RGB32提交，尚未改成纹理直通。
+  https://learn.microsoft.com/en-us/windows/win32/medfound/mf-sink-writer-d3d-manager
+- 实际硬件MFT应有MFT_ENUM_HARDWARE_URL_Attribute；只检查是否存在，不记录设备符号链接。
+  https://learn.microsoft.com/en-us/windows/win32/medfound/hardware-mfts
+
+本轮候选改动（未作为性能闭环发布）
+1. CaptureFrameComposer缓存裁切/缩放/圆角几何，稳定尺寸不重复分配x坐标表；只填补背景区域，不预先填满即将被画面覆盖的整个画布。保留原nearest-neighbour算法、原圆角公式和颜色，动态画面及主题不缓存。
+2. 录屏诊断仅在FENGYIN_AUDIO_TIMING=1时启用：识别实际选中的视频编码器，记录GPU读回、画面合成、音频写入、视频写入及Finalize耗时。每五秒在本次MP4旁写performance.txt，不在音频采集线程写日志；正常使用不生成此文件。识别失败明确unknown，不猜硬件编码。
+3. 音频回调增加作用域ScopedNoDenormals，防止极微小滤波/混响尾部触发慢速浮点路径，退出回调恢复浮点模式。不改变音色参数、效果规格和设备缓冲。尚未证明这是用户故障根因。
+4. 录屏仍最高1920x1080/24fps、H264 8Mbps、AAC192kbps；系统录音保持48k立体声PCM16。不降低清晰度或改变音频时间轴。
+
+本轮验证
+- 1132组逐像素新旧对照通过，含极小窗口、DPI圆角、随机尺寸/裁切/行跨度、动态像素和主题更新；稳定几何不重建/不扩容。
+- AddressSanitizer及UndefinedBehaviorSanitizer运行同一组测试通过。
+- 局部CPU处理基准受并行编译负载影响，只能作为局部数据，不能换算成整机录屏收益；待空闲重测及Windows实测。
+- 251项Python、scripts/test.sh独立C++通过；完整Mac全目标编译通过：/private/tmp/fy123-build.log、fy123-independent.log。
+- 27项本机CTest通过，包含新增逐像素对照、作用域浮点模式恢复及正常幅度计算断言：/private/tmp/fy123-ctest.log。尚待Windows编译/编码验证。
+- 本机临时SWAM独立探针未完成初始化/渲染，超时已终止，不当作发声或性能测试通过。该未验证探针保存在/private/tmp/fy-string-bench，不纳入生产提交。
+
+发布与实机待完成
+- build185 run39096993582已成功，不是queued。Windows27CTest、实际MP4/WAV连续性及720P24原生代理解码均过，日志/private/tmp/fy185-ci.log。
+- build185安装包已SHA/ZIP核验并按用户要求交付，不重复下载、不把它当本轮新改动。
+- 本轮仍为候选，不能以本机/CI测试替代实机组合负载闭环。需Windows组件编译和实际编码校验，再在目标电脑用相同路由/音符/视频分别比较不录制、录音、录视频。
+- 目标电脑用户已拔掉电吹管并授权鼠标，但本机ToDesk输入通道有间歇noWindowsAvailable、TextEdit启动超时；画面可见不代表操作成功。恢复后验证实际动作结果，不能凭点击发出就声称开始自动试音。
+- 用户自行做房间/混响测试；不要占用其当前吹奏或保存实验状态。继续其他性能路径，不擅自更换音色。

@@ -17,6 +17,19 @@
 int main(int argc,char** argv)
 {
     {
+        const auto previous=juce::FloatVectorOperations::areDenormalsDisabled();
+        juce::FloatVectorOperations::disableDenormalisedNumberSupport(false);
+        {
+            const juce::ScopedNoDenormals guard;
+            assert(juce::FloatVectorOperations::areDenormalsDisabled());
+            volatile float a=.125f,b=1e-12f;
+            const float normal=a*b;
+            assert(normal==.125f*1e-12f);
+        }
+        assert(!juce::FloatVectorOperations::areDenormalsDisabled());
+        juce::FloatVectorOperations::disableDenormalisedNumberSupport(previous);
+    }
+    {
         fengyin::ProcessorChangeGate gate;std::atomic<bool> changing{false};
         std::thread loader([&]{gate.change([&]{changing.store(true);juce::Thread::sleep(400);});});
         for(int i=0;i<1000&&!changing.load();++i)juce::Thread::sleep(1);
