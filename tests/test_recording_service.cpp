@@ -4,6 +4,7 @@
 #include "VideoAudioExtractor.h"
 #include "VideoPlaybackCache.h"
 #include "MasterOutputService.h"
+#include "ProcessorChangeGate.h"
 #include <cassert>
 #include <algorithm>
 #include <cmath>
@@ -15,6 +16,44 @@
 
 int main(int argc,char** argv)
 {
+    {
+        fengyin::ProcessorChangeGate gate;std::atomic<bool> changing{false};
+        std::thread loader([&]{gate.change([&]{changing.store(true);juce::Thread::sleep(400);});});
+        for(int i=0;i<1000&&!changing.load();++i)juce::Thread::sleep(1);
+        assert(changing.load());
+        const auto started=juce::Time::getMillisecondCounterHiRes();
+        bool called=false;
+        assert(!gate.processIfAvailable([&]{called=true;}));
+        assert(!called && juce::Time::getMillisecondCounterHiRes()-started<150);
+        loader.join();
+        assert(gate.processIfAvailable([&]{called=true;}) && called);
+    }
+    // The producer deliberately stalls on disk/decoder work. The consumer must
+    // return a silent cache miss instead of waiting behind that work.
+    struct SlowReader final:juce::AudioFormatReader {
+        std::atomic<bool> entered{false};
+        SlowReader():AudioFormatReader(nullptr,"slow-test") {
+            sampleRate=48000;numChannels=2;lengthInSamples=480000;
+            usesFloatingPointData=true;bitsPerSample=32;
+        }
+        bool readSamples(int* const* dest,int channels,int offset,juce::int64,int count) override {
+            entered.store(true);juce::Thread::sleep(400);
+            for(int c=0;c<channels;++c)if(dest[c])juce::FloatVectorOperations::clear(reinterpret_cast<float*>(dest[c])+offset,count);
+            return true;
+        }
+    };
+    {
+        juce::TimeSliceThread thread("slow-reader-test");thread.startThread();
+        auto* slow=new SlowReader;
+        juce::BufferingAudioReader buffered(slow,thread,262144);buffered.setReadTimeout(0);
+        for(int i=0;i<1000&&!slow->entered.load();++i)juce::Thread::sleep(1);
+        assert(slow->entered.load());
+        juce::AudioBuffer<float> missed(2,128);missed.clear();
+        const auto begin=juce::Time::getMillisecondCounterHiRes();
+        assert(!buffered.read(&missed,0,128,0,true,true));
+        assert(juce::Time::getMillisecondCounterHiRes()-begin<150);
+        assert(missed.getMagnitude(0,128)==0);
+    }
     struct TestLogger:juce::Logger {
         void logMessage(const juce::String& text) override {std::cerr<<text<<std::endl;}
         ~TestLogger() override {juce::Logger::setCurrentLogger(nullptr);}
@@ -111,7 +150,8 @@ int main(int argc,char** argv)
     assert(fengyin::VideoPlaybackCache::worthwhile(info));
     auto hdr=metadata;hdr=juce::JSON::parse(R"({"streams":[{"codec_name":"hevc","width":3840,"height":2160,"avg_frame_rate":"60/1","color_transfer":"smpte2084","color_primaries":"bt2020","pix_fmt":"yuv420p10le"}],"format":{"duration":"120"}})");
     assert(!fengyin::VideoPlaybackCache::worthwhile(fengyin::VideoPlaybackCache::readInfo(hdr)));
-    info.width=1920;info.height=1080;info.fps=24;assert(!fengyin::VideoPlaybackCache::worthwhile(info));
+    info.width=1920;info.height=1080;info.fps=24;assert(fengyin::VideoPlaybackCache::worthwhile(info));
+    info.width=1280;info.height=720;assert(!fengyin::VideoPlaybackCache::worthwhile(info));
     info.fps=60;info.duration=3600;assert(!fengyin::VideoPlaybackCache::worthwhile(info));
     info=fengyin::VideoPlaybackCache::readInfo(juce::JSON::parse("{}"));
     assert(!fengyin::VideoPlaybackCache::worthwhile(info));
@@ -121,7 +161,12 @@ int main(int argc,char** argv)
     const auto sidecar = folder.getChildFile("score.wav");
     assert(file.copyFileTo(sidecar));
     fengyin::AccompanimentAudioService accompaniment;
+    // A readable WAV disguised as a video must not bypass PCM preparation.
+    const auto disguisedVideo=folder.getChildFile("native-readable.mp4");
+    assert(file.copyFileTo(disguisedVideo));
+    assert(!accompaniment.loadForVideo(disguisedVideo));
     assert(accompaniment.loadForVideo(video));
+    assert(accompaniment.getAudioFile()==sidecar);
     accompaniment.prepare(48000.0, 512);
     accompaniment.play();
     juce::AudioBuffer<float> mixed(2, 512);
@@ -132,6 +177,7 @@ int main(int argc,char** argv)
         accompaniment.mixInto(mixed.getArrayOfWritePointers(), 2, mixed.getNumSamples());
     }
     assert(mixed.getMagnitude(0, mixed.getNumSamples()) > 0.0f);
+    assert(accompaniment.getReadMissCount()==0);
 
     accompaniment.release();
     accompaniment.unload();

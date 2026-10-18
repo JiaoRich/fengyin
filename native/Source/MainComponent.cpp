@@ -573,7 +573,8 @@ void MainComponent::setupWebInterface()
                 +" dropped="+juce::String(static_cast<int>(payload.getProperty("dropped",0)))
                 +" width="+juce::String(static_cast<int>(payload.getProperty("width",0)))
                 +" height="+juce::String(static_cast<int>(payload.getProperty("height",0)))
-                +" proxy="+juce::String(static_cast<bool>(payload.getProperty("proxy",false))?1:0));
+                +" proxy="+juce::String(static_cast<bool>(payload.getProperty("proxy",false))?1:0)
+                +" corrections="+juce::String(static_cast<int>(payload.getProperty("clockCorrections",0))));
         })
         .withEventListener("seekVideo", [this](juce::var payload)
         {
@@ -1412,6 +1413,29 @@ void MainComponent::resized()
 
 void MainComponent::timerCallback()
 {
+    if(performanceNotesEnabled) {
+        const auto now=juce::Time::getMillisecondCounterHiRes()*.001;
+        const bool allowed=isActivated && videoPlaybackActive && pluginHost.hasPlugin() && !pluginLoading
+            && !midi.getSnapshot().deviceConnected;
+        const bool running=performanceNotesStarted>0 && now-performanceNotesStarted<180;
+        if(performanceNote>=0 && (!allowed || !running || now>=performanceNotesNext)) {
+            pluginHost.noteOff(performanceNote,now);performanceNote=-1;
+            pluginHost.breathChanged(0,now);
+            performanceNotesNext=now+.15;
+        }
+        if(allowed && performanceNotesStarted==0) {
+            performanceNotesStarted=now;performanceNotesNext=now;
+            juce::Logger::writeToLog("Performance notes: explicit diagnostic started; 180 seconds maximum");
+        }
+        if(allowed && now-performanceNotesStarted<180 && performanceNote<0 && now>=performanceNotesNext) {
+            static constexpr int notes[]{55,60,64,67,72,76};
+            performanceNote=notes[performanceNoteStep++%6];
+            const int breath=60+(performanceNoteStep%4)*20;
+            pluginHost.breathChanged(static_cast<float>(breath)/127.0f,now);
+            pluginHost.noteOn(performanceNote,90.0f/127.0f,now);
+            performanceNotesNext=now+1.5;
+        }
+    }
     windowRecorder.poll();
     if(windowRecorder.takeCompleted() && webInterface) {
         const auto message=windowRecorder.error().isEmpty()
@@ -1658,7 +1682,8 @@ void MainComponent::timerCallback()
                 + " sourcePeak=" + juce::String(pluginHost.takeDiagnosticSourcePeak(), 6)
                 + " callbacks=" + juce::String(pluginHost.getCallbackCount())
                 + " signalBlocks=" + juce::String(pluginHost.getSignalBlocks())
-                + " device=" + currentAudio.deviceName + pluginHost.takeStageTimingReport() + "\n");
+                + " device=" + currentAudio.deviceName + pluginHost.takeStageTimingReport()
+                + " accompanimentReadMisses="+juce::String(accompaniment.getReadMissCount())+"\n");
         }
         state->setProperty("audioXruns", currentAudio.xRunCount);
         state->setProperty("callbackOverruns", static_cast<juce::int64>(pluginHost.getCallbackOverruns()));

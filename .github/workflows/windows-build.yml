@@ -203,6 +203,15 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: 保存实机性能复核主程序
+        if: success()
+        uses: actions/upload-artifact@v5
+        with:
+          name: FengYin-performance-runtime
+          path: dist/FengYin/FengYin.exe
+          if-no-files-found: error
+          retention-days: 7
+
       - name: 上传失败诊断资料
         if: failure()
         uses: actions/upload-artifact@v5

@@ -223,6 +223,11 @@ private:
     int webVideoGeneration = 0;
     int webVideoSeekRevision = 0;
     bool webVideoAudioReady = false;
+    // Explicit opt-in, bounded real-machine DSP test; never enabled by settings.
+    const bool performanceNotesEnabled = juce::SystemStats::getEnvironmentVariable("FENGYIN_AUDIO_TIMING", "0")=="1"
+        && juce::SystemStats::getEnvironmentVariable("FENGYIN_PERFORMANCE_NOTES", "0")=="1";
+    double performanceNotesStarted=0,performanceNotesNext=0;
+    int performanceNote=-1,performanceNoteStep=0;
     double webVideoPosition = 0.0;
     float webVideoVolume = 1.0f;
     bool pluginChoicesLoaded = false;

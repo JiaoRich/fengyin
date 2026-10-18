@@ -24,6 +24,7 @@ public:
     [[nodiscard]] double getPosition() const;
     [[nodiscard]] bool hasFinished() const noexcept { return transport.hasStreamFinished(); }
     [[nodiscard]] juce::File getAudioFile() const;
+    [[nodiscard]] uint64_t getReadMissCount() const noexcept { return readMissCount.load(std::memory_order_relaxed); }
 private:
     juce::File findDecodableFile(const juce::File& videoFile);
     juce::AudioFormatManager formats;
@@ -33,6 +34,7 @@ private:
     juce::AudioBuffer<float> mixBuffer;
     juce::File loadedFile;
     std::atomic<bool> ready { false };
+    std::atomic<uint64_t> readMissCount {0};
     juce::CriticalSection stateLock;
 };
 }

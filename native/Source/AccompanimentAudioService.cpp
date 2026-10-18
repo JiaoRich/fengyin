@@ -2,12 +2,29 @@
 #include "../../audio-engine/common/PerformanceMixPolicy.h"
 namespace fengyin
 {
+namespace {
+class NonWaitingAudioReader final:public juce::BufferingAudioReader {
+public:
+    NonWaitingAudioReader(juce::AudioFormatReader* reader,juce::TimeSliceThread& thread,int samples,std::atomic<uint64_t>& misses)
+        :BufferingAudioReader(reader,thread,samples),readMisses(misses){}
+    bool readSamples(int* const* dest,int channels,int offset,juce::int64 position,int samples) override {
+        const bool ok=juce::BufferingAudioReader::readSamples(dest,channels,offset,position,samples);
+        if(!ok)readMisses.fetch_add(1,std::memory_order_relaxed);
+        return ok;
+    }
+private:
+    std::atomic<uint64_t>& readMisses;
+};
+}
 AccompanimentAudioService::AccompanimentAudioService() { formats.registerBasicFormats(); readAheadThread.startThread(); }
 AccompanimentAudioService::~AccompanimentAudioService() { unload(); readAheadThread.stopThread(2000); }
 juce::File AccompanimentAudioService::findDecodableFile(const juce::File& videoFile)
 {
-    if (std::unique_ptr<juce::AudioFormatReader> probe(formats.createReaderFor(videoFile)); probe != nullptr)
-        return videoFile;
+    // Windows can expose an MP4 through its native audio reader. That reader
+    // may synchronously decode for tens of milliseconds while JUCE's read-ahead
+    // source holds the callback lock. A larger read-ahead buffer does not remove
+    // this lock contention. Video containers must go through the asynchronous
+    // PCM extractor instead, even when the OS claims they are decodable.
     static constexpr const char* extensions[] { ".wav", ".mp3", ".flac", ".aif", ".aiff" };
     for (const auto* extension : extensions)
     {
@@ -29,15 +46,24 @@ bool AccompanimentAudioService::loadAudioFile(const juce::File& audioFile)
     unload();
     auto reader = std::unique_ptr<juce::AudioFormatReader>(formats.createReaderFor(audioFile));
     if (reader == nullptr) return false;
-    const juce::ScopedLock lock(stateLock);
-    readerSource = std::make_unique<juce::AudioFormatReaderSource>(reader.release(), true);
-    // 约 5 秒的预读余量可隔离视频解码、磁盘瞬时繁忙和界面动画造成的抖动。
-    // 旧值只有 32768 个采样，播放高码率视频时很容易被耗尽并让实时音频线程等待。
+    const auto sourceRate=reader->sampleRate;
+    const auto formatName=reader->getFormatName();
+    // BufferingAudioReader decodes outside its short cache-publication lock.
+    // BufferingAudioSource instead holds its callback lock across source reads,
+    // so even a large read-ahead can stall the whole instrument callback.
     constexpr int accompanimentReadAheadSamples = 262144;
-    transport.setSource(readerSource.get(), accompanimentReadAheadSamples, &readAheadThread,
-                        readerSource->getAudioFormatReader()->sampleRate);
+    auto buffered=std::make_unique<NonWaitingAudioReader>(reader.release(),readAheadThread,accompanimentReadAheadSamples,readMissCount);
+    buffered->setReadTimeout(1000);
+    juce::AudioBuffer<float> initial(2,512);
+    if(!buffered->read(&initial,0,512,0,true,true))return false;
+    buffered->setReadTimeout(0); // Never wait for a cache miss in the audio callback.
+    readMissCount.store(0,std::memory_order_relaxed);
+    const juce::ScopedLock lock(stateLock);
+    readerSource = std::make_unique<juce::AudioFormatReaderSource>(buffered.release(), true);
+    transport.setSource(readerSource.get(),0,nullptr,sourceRate);
     loadedFile = audioFile;
     ready.store(true, std::memory_order_release);
+    juce::Logger::writeToLog("Accompaniment prepared: "+audioFile.getFullPathName()+" reader="+formatName+" nonwaiting=1");
     return true;
 }
 void AccompanimentAudioService::unload()

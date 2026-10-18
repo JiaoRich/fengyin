@@ -183,6 +183,7 @@ let restoringVideoPosition=null;
 let originalVideoSource='';
 let usingPreparedVideo=false;
 let videoMetricsBaseline=null;
+let videoClockCorrections=0;
 let availableInstruments = [];
 let availableEffects = [];
 let pluginListSignature = '';
@@ -1240,7 +1241,7 @@ video.addEventListener('timeupdate', () => {
     if(videoMetricsBaseline?.generation!==videoGeneration)videoMetricsBaseline={generation:videoGeneration,time:now,frames:quality.totalVideoFrames,dropped:quality.droppedVideoFrames};
     if(now-videoMetricsBaseline.time>=5000) {
       const frames=quality.totalVideoFrames-videoMetricsBaseline.frames,dropped=quality.droppedVideoFrames-videoMetricsBaseline.dropped;
-      nativeEvent('videoPlaybackMetrics',{generation:videoGeneration,fps:Math.max(0,frames-dropped)*1000/(now-videoMetricsBaseline.time),dropped:Math.max(0,dropped),width:video.videoWidth,height:video.videoHeight,proxy:usingPreparedVideo});
+      nativeEvent('videoPlaybackMetrics',{generation:videoGeneration,fps:Math.max(0,frames-dropped)*1000/(now-videoMetricsBaseline.time),dropped:Math.max(0,dropped),width:video.videoWidth,height:video.videoHeight,proxy:usingPreparedVideo,clockCorrections:videoClockCorrections});
       videoMetricsBaseline={generation:videoGeneration,time:now,frames:quality.totalVideoFrames,dropped:quality.droppedVideoFrames};
     }
   } else videoMetricsBaseline=null;
@@ -1291,8 +1292,9 @@ function applyVideoPlaybackClock(clock) {
   const position=Number(clock.position);
   if(document.hidden || document.body.classList.contains('presentation-hidden')
       || !document.querySelector('#page-play')?.classList.contains('active') || !$('.video-card')?.getClientRects().length)return;
-  if(Number.isFinite(position) && !video.seeking && Math.abs(video.currentTime-position)>.35)
-    video.currentTime=position;
+  if(Number.isFinite(position) && !video.seeking && Math.abs(video.currentTime-position)>.35) {
+    ++videoClockCorrections;video.currentTime=position;
+  }
   if(video.paused && !video.ended)video.play().catch(()=>{});
 }
 window.__JUCE__?.backend?.addEventListener('videoPlaybackClock',applyVideoPlaybackClock);
@@ -2467,7 +2469,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.21 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.22 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

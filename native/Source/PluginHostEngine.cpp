@@ -247,7 +247,14 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
     if (probing)
         addLatencyProbeMessages(numSamples, nowSeconds);
 
-    juce::AudioProcessorPlayer::audioDeviceIOCallbackWithContext(inputs, numInputs, outputs, numOutputs, numSamples, context);
+    {
+        const bool processed=processorChangeGate.processIfAvailable([&]{
+            juce::AudioProcessorPlayer::audioDeviceIOCallbackWithContext(inputs, numInputs, outputs, numOutputs, numSamples, context);
+        });
+        if(!processed)
+            for(int channel=0;channel<numOutputs;++channel)
+                if(outputs[channel])juce::FloatVectorOperations::clear(outputs[channel],numSamples);
+    }
     const auto afterGraph = timingEnabled ? juce::Time::getMillisecondCounterHiRes()*.001 : 0.0;
     bool signal = false;
     for (int channel = 0; channel < numOutputs; ++channel)

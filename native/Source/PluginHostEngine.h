@@ -28,6 +28,7 @@
 #include "EffectChainState.h"
 #include "SwamStringTremolo.h"
 #include "AudioStageTiming.h"
+#include "ProcessorChangeGate.h"
 
 namespace fengyin
 {
@@ -35,6 +36,11 @@ class RecordingAudioProcessorPlayer final : public juce::AudioProcessorPlayer
 {
     friend struct PluginHostEngineTestAccess;
 public:
+    // Preparing/releasing a third-party processor may take hundreds of ms.
+    // Let the callback skip only the changing instrument, not accompaniment.
+    void setProcessor(juce::AudioProcessor* processor) {
+        processorChangeGate.change([&]{juce::AudioProcessorPlayer::setProcessor(processor);});
+    }
     void setRecordingService(RecordingService* service) noexcept { recorder = service; }
     void setAccompanimentService(AccompanimentAudioService* service) noexcept { accompaniment = service; }
     void setMasterOutputService(MasterOutputService* service) noexcept { masterOutput = service; }
@@ -55,6 +61,7 @@ public:
     void audioDeviceAboutToStart(juce::AudioIODevice* device) override;
     void audioDeviceStopped() override;
 private:
+    ProcessorChangeGate processorChangeGate;
     static constexpr std::size_t midiQueueSize = 8192;
     MidiOnsetTrace onsetTrace;
     void addResetMessages(double timestampSeconds);

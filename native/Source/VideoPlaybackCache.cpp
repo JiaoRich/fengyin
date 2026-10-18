@@ -72,7 +72,11 @@ public:
         // machine-specific; failure must not affect normal video playback.
         for(const bool hardware:{true,false}) {
             if(shouldExit())break;
-            const auto result=run(VideoPlaybackCache::encodeArguments(ffmpeg,source,partial,hardware),120000);
+            // Preparation is idle-only and cancelled on activity. A fixed two
+            // minute deadline can discard a healthy full-length software encode
+            // on older CPUs. Keep a finite, duration-aware upper bound.
+            const int timeout=hardware?120000:static_cast<int>(juce::jlimit(120000.0,1800000.0,inputInfo.duration*4000.0+30000.0));
+            const auto result=run(VideoPlaybackCache::encodeArguments(ffmpeg,source,partial,hardware),timeout);
             if(result.first && !shouldExit() && partial.getSize()>64 && partial.getSize()<=singleBudget
                 && valid(info(probe,partial),inputInfo)) {encoded=true;break;}
             if(!shouldExit())juce::Logger::writeToLog("Video cache encoder attempt failed: "+result.second.substring(0,256));
@@ -86,13 +90,16 @@ public:
 private:
     std::pair<bool,juce::String> run(const juce::StringArray& args,int timeout) {
         juce::ChildProcess process;
-        if(shouldExit()||!process.start(args,juce::ChildProcess::wantStdOut|juce::ChildProcess::wantStdErr))return {};
+        if(shouldExit())return {false,"cancelled"};
+        if(!process.start(args,juce::ChildProcess::wantStdOut|juce::ChildProcess::wantStdErr))return {false,"process start failed"};
         const auto started=juce::Time::getMillisecondCounterHiRes();
         // ffprobe JSON and -loglevel error output are small; no per-frame pipe.
         while(process.isRunning()&&!shouldExit()&&juce::Time::getMillisecondCounterHiRes()-started<timeout)
             process.waitForProcessToFinish(50);
-        if(process.isRunning()){process.kill();return {};}
-        const auto text=process.readAllProcessOutput();return {process.getExitCode()==0,text};
+        if(process.isRunning()){process.kill();return {false,shouldExit()?"cancelled":"timeout after "+juce::String(timeout)+" ms"};}
+        const auto text=process.readAllProcessOutput();
+        const auto code=process.getExitCode();
+        return {code==0,code==0?text:"exit="+juce::String(code)+" "+text};
     }
     VideoPlaybackCache::Info info(const juce::File& probe,const juce::File& file) {
         const auto result=run({probe.getFullPathName(),"-v","error","-select_streams","v:0",
@@ -101,7 +108,7 @@ private:
         return result.first?VideoPlaybackCache::readInfo(juce::JSON::parse(result.second)):VideoPlaybackCache::Info{};
     }
     static bool valid(const VideoPlaybackCache::Info& out,const VideoPlaybackCache::Info& in) {
-        return out.codec=="h264" && out.width>0 && out.height>0 && out.width<=1920 && out.height<=1080
+        return out.codec=="h264" && out.width>0 && out.height>0 && out.width<=1280 && out.height<=720
             && out.fps>0 && out.fps<=24.01 && std::abs(out.duration-in.duration)<.15;
     }
     JobStatus finish(const juce::File& file) {
@@ -125,7 +132,7 @@ bool VideoPlaybackCache::prepare(const juce::File& ffmpeg,const juce::File& sour
 }
 juce::File VideoPlaybackCache::cacheFileFor(const juce::File& source,const juce::File& directory) {
     const auto identity=source.getFullPathName()+"|"+juce::String(source.getSize())+"|"
-        +juce::String(source.getLastModificationTime().toMilliseconds())+"|1080p24-h264-v1";
+        +juce::String(source.getLastModificationTime().toMilliseconds())+"|720p24-h264-v2";
     const auto hash=juce::SHA256(identity.toRawUTF8(),static_cast<size_t>(identity.getNumBytesAsUTF8())).toHexString().substring(0,24);
     return directory.getChildFile("v1-"+hash+".mp4");
 }
@@ -150,13 +157,13 @@ VideoPlaybackCache::Info VideoPlaybackCache::readInfo(const juce::var& json) {
 bool VideoPlaybackCache::worthwhile(const Info& info) {
     // Avoid unbounded preparation of films/streams or guessing malformed media.
     return info.standardDynamicRange && info.width>0 && info.height>0 && info.fps>0 && std::isfinite(info.duration)
-        && info.duration>.2 && info.duration<=500 && (info.width>1920||info.height>1080||info.fps>24.1||info.codec!="h264");
+        && info.duration>.2 && info.duration<=500 && (info.width>1280||info.height>720||info.fps>24.1||info.codec!="h264");
 }
 juce::StringArray VideoPlaybackCache::encodeArguments(const juce::File& ffmpeg,const juce::File& source,
                                                        const juce::File& destination,bool hardware) {
     juce::StringArray args{ffmpeg.getFullPathName(),"-hide_banner","-loglevel","error","-nostdin","-y","-threads","1",
         "-i",source.getFullPathName(),"-map","0:v:0","-an","-sn","-dn","-filter_threads","1","-vf",
-        "fps=fps='min(source_fps,24)',scale=w='min(iw,1920)':h='min(ih,1080)':force_original_aspect_ratio=decrease:force_divisible_by=2",
+        "fps=fps='min(source_fps,24)',scale=w='min(iw,1280)':h='min(ih,720)':force_original_aspect_ratio=decrease:force_divisible_by=2",
         "-c:v",
        #if JUCE_WINDOWS
         "h264_mf","-hw_encoding",hardware?"1":"0",
@@ -165,7 +172,7 @@ juce::StringArray VideoPlaybackCache::encodeArguments(const juce::File& ffmpeg,c
        #else
         "libx264","-preset","veryfast",
        #endif
-        "-threads","1","-pix_fmt","yuv420p","-b:v","8M","-g","48","-movflags","+faststart",
+        "-threads","1","-pix_fmt","yuv420p","-b:v","3M","-g","48","-movflags","+faststart",
         "-fs",juce::String(singleBudget),destination.getFullPathName()};
     juce::ignoreUnused(hardware);return args;
 }
