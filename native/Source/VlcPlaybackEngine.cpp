@@ -70,7 +70,7 @@ struct VlcApi
 {
     HMODULE core = nullptr, library = nullptr;
 #define FY_VLC_FUNCTIONS(X) \
- X(libvlc_new) X(libvlc_release) X(libvlc_media_new_path) X(libvlc_media_release) \
+ X(libvlc_new) X(libvlc_release) X(libvlc_media_new_path) X(libvlc_media_release) X(libvlc_media_add_option) \
  X(libvlc_media_parse_with_options) X(libvlc_media_parse_stop) X(libvlc_media_get_duration) \
  X(libvlc_media_get_stats) X(libvlc_media_tracks_get) X(libvlc_media_tracks_release) \
  X(libvlc_media_player_new) X(libvlc_media_player_release) \
@@ -209,16 +209,19 @@ void VlcPlaybackEngine::run()
                     if (media)
                     {
                         api.libvlc_media_player_set_media(player,media);
-                        // Metadata only, no full-file extraction/transcoding and
-                        // no playback to obtain a preview. Never fetch network art.
+                        // VLC's own start-paused input buffers the first picture
+                        // without advancing playback or emitting accompaniment.
+                        // No second decoder, snapshot file or full-file work.
+                        api.libvlc_media_add_option(media,":start-paused");
                         api.libvlc_media_parse_with_options(media,libvlc_media_parse_local,2500);
+                        started=api.libvlc_media_player_play(player)==0;
+                        if(!started)playbackError="视频无法打开，请检查文件是否完整";
                     }
                 }
                 applied=next; applied.playRevision=-1; applied.seekRevision=-1; applied.volume=-1;
             }
             if (media)
             {
-                result.ready=true;
                 if(next.volume!=applied.volume)
                     api.libvlc_audio_set_volume(player,static_cast<int>(std::lround(next.volume*100)));
                 if(next.seekRevision!=applied.seekRevision && next.seekRevision>0) pendingSeek=next.position;
@@ -238,6 +241,10 @@ void VlcPlaybackEngine::run()
                     else if(started) api.libvlc_media_player_set_pause(player,1);
                 }
                 playbackState=api.libvlc_media_player_get_state(player);
+                // start-paused is applied asynchronously by the input thread,
+                // including EOF replay. Resume only for explicit user intent.
+                if(next.playing && playbackState==libvlc_Paused)
+                    api.libvlc_media_player_set_pause(player,0);
                 if(!next.playing && playbackState==libvlc_Playing)
                     api.libvlc_media_player_set_pause(player,1);
                 if(pendingSeek>=0 && (playbackState==libvlc_Playing || playbackState==libvlc_Paused))
@@ -254,6 +261,8 @@ void VlcPlaybackEngine::run()
                     result.decodedVideo=stats.i_decoded_video; result.displayedVideo=stats.i_displayed_pictures;
                     result.lostVideo=stats.i_lost_pictures; result.decodedAudio=stats.i_decoded_audio;
                 }
+                result.ready=started && (playbackState==libvlc_Paused || playbackState==libvlc_Playing
+                    || playbackState==libvlc_Ended);
                 // Some demuxers accept non-media input then return ordinary
                 // EOF, without EncounteredError. Only inspect tracks at the
                 // terminal state: missing metadata during opening is normal.

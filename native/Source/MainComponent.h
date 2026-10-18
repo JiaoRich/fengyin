@@ -224,6 +224,7 @@ private:
     juce::Rectangle<int> vlcViewport;
     bool vlcViewportVisible = false;
     double lastVlcStateAtMs = 0;
+    juce::String videoWebSession;
     fengyin::VideoAudioExtractor webVideoAudioExtractor;
     fengyin::VideoPlaybackCache webVideoPlaybackCache;
     bool webVideoProxyAttempted = false;

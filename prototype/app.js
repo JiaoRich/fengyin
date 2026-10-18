@@ -1,5 +1,7 @@
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
+// A new document must not inherit a native video window's stale visibility.
+const videoWebSession = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 let studioUnlocked = false, studioSavedId = '', studioExportAfterSave = false;
 let compactMode = false;
 let touchWindowGesture = null;
@@ -579,6 +581,9 @@ function toast(message) {
 function showPage(page) {
   if (compactMode) page = 'play';
   if (page === 'chain' && !studioUnlocked) return openStudioLogin();
+  // Hide synchronously in the same bridge turn, not in a later animation
+  // frame. This also works before a lost selection event has been recovered.
+  if(page!=='play') nativeEvent('nativeVideoViewport',{session:videoWebSession,visible:false});
   for(const id of ['record-menu','bend-range-dialog'])if($('#'+id))$('#'+id).hidden=true;
   $('#record-options')?.setAttribute('aria-expanded','false');
   $$('.nav-item,.page').forEach(el => el.classList.remove('active'));
@@ -1338,7 +1343,7 @@ function reportNativeVideoViewport() {
   const visible=nativeVideoEngine && nativeAccompanimentReady && !blocked && !document.hidden
     && !document.body.classList.contains('presentation-hidden')
     && $('#page-play').classList.contains('active') && rect.width>0 && rect.height>0;
-  const payload={x:Math.round(rect.x),y:Math.round(rect.y),width:Math.round(rect.width),height:Math.round(rect.height),visible};
+  const payload={session:videoWebSession,generation:videoGeneration,x:Math.round(rect.x),y:Math.round(rect.y),width:Math.round(rect.width),height:Math.round(rect.height),visible};
   const key=JSON.stringify(payload);
   if(key!==nativeViewportLast){nativeViewportLast=key;nativeEvent('nativeVideoViewport',payload);}
 }
@@ -1359,6 +1364,12 @@ new MutationObserver(records=>{
   }
 }).observe(document.body,{childList:true});
 window.__JUCE__?.backend?.addEventListener('nativeVideoState',state=>{
+  // Native playback survives a web document reload. Every authoritative
+  // snapshot can repair a missed one-shot videoSelected event without seeking
+  // or restarting the native player, or resetting an in-flight user seek.
+  if(state?.engine==='vlc' && state.url && Number(state.generation)>=videoGeneration
+      && (!nativeVideoEngine || Number(state.generation)!==videoGeneration))
+    receiveVideoSelection({...state,restored:true});
   if(!nativeVideoEngine || Number(state?.generation)!==videoGeneration)return;
   if(Number(state.seekRevision)<videoSeekRevision)return;
   videoSeekRevision=Number(state.seekRevision)||0;
@@ -2426,8 +2437,11 @@ window.__JUCE__?.backend?.addEventListener('licenseStateResult', result => {
   toast(result.message || (result.featuresUnlocked ? '可以开始使用' : '无法继续'));
 });
 window.__JUCE__?.backend?.addEventListener('editorResult', message => toast(String(message || '')));
-window.__JUCE__?.backend?.addEventListener('videoSelected', result => {
+function receiveVideoSelection(result) {
   if (!result?.url) return;
+  if(Number(result.generation)<videoGeneration)return;
+  if(nativeVideoEngine && result.engine==='vlc' && Number(result.generation)===videoGeneration
+      && originalVideoSource===result.url)return;
   videoLoading = true;
   videoWantsPlaying = false;
   ++videoPlayRequest;
@@ -2460,7 +2474,7 @@ window.__JUCE__?.backend?.addEventListener('videoSelected', result => {
     $('#change-video').textContent='更换视频';
     document.body.classList.remove('video-playing');
     nativeViewportLast='';scheduleNativeVideoViewport();
-    toast('视频已选择，正在读取播放信息…');
+    if(!result.restored)toast('视频已选择，正在读取播放信息…');
     return;
   }
   video.src = result.url;
@@ -2468,7 +2482,8 @@ window.__JUCE__?.backend?.addEventListener('videoSelected', result => {
   $('#video-name').textContent = result.name || '伴奏视频';
   $('#change-video').textContent = '更换视频';
   toast('正在载入视频并准备伴奏音轨…');
-});
+}
+window.__JUCE__?.backend?.addEventListener('videoSelected',receiveVideoSelection);
 window.__JUCE__?.backend?.addEventListener('videoAudioState', result => {
   if (Number(result?.generation) !== videoGeneration) return;
   nativeAccompanimentReady = !!result?.ready;
@@ -2565,7 +2580,7 @@ window.__JUCE__?.backend?.addEventListener('breathMatchResult', result => {
   }
   if (result?.message) toast(result.message);
 });
-nativeEvent('webReady');
+nativeEvent('webReady',{videoSession:videoWebSession});
 nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();

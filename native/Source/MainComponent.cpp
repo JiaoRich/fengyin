@@ -305,9 +305,14 @@ void MainComponent::setupWebInterface()
         {
             requestCompactMode(static_cast<bool>(payload.getProperty("compact", false)));
         })
-        .withEventListener("webReady", [this](juce::var)
+        .withEventListener("webReady", [this](juce::var payload)
         {
             webInterfaceReady = true;
+            videoWebSession=payload.getProperty("videoSession","").toString();
+            vlcViewportVisible=false;
+            vlcVideo.updateViewport(vlcViewport,false);
+            lastVlcStateAtMs=0;
+            updateVlcPlayback();
             emitAudioSettingsState(true, audio.isAutomaticLatencyTuning()
                 ? utf8("正在自动优化声音，无需操作…") : juce::String());
             emitSuperLowLatencyState();
@@ -532,6 +537,13 @@ void MainComponent::setupWebInterface()
         .withEventListener("nativeVideoViewport", [this](juce::var payload)
         {
             if (!fengyin::VlcVideoSurface::supported()) return;
+            if(payload.getProperty("session","").toString()!=videoWebSession || videoWebSession.isEmpty())return;
+            if(!static_cast<bool>(payload.getProperty("visible",false))) {
+                vlcViewportVisible=false;
+                vlcVideo.updateViewport(vlcViewport,false);
+                return;
+            }
+            if(static_cast<int>(payload.getProperty("generation",-1))!=webVideoGeneration)return;
             // Browser CSS pixels are JUCE logical coordinates (zoom is locked).
             vlcViewport=juce::Rectangle<int>(
                 static_cast<int>(payload.getProperty("x",0)),static_cast<int>(payload.getProperty("y",0)),
@@ -1092,6 +1104,9 @@ void MainComponent::updateVlcPlayback()
     if(webInterface && webPresentationVisible && webInterfaceReady) {
         auto result=std::make_unique<juce::DynamicObject>();
         result->setProperty("generation",status.generation);
+        result->setProperty("engine","vlc");
+        result->setProperty("url",juce::URL(webVideoFile).toString(false));
+        result->setProperty("name",webVideoFile.getFileName());
         result->setProperty("seekRevision",status.seekRevision);
         result->setProperty("ready",webVideoAudioReady);
         result->setProperty("playing",videoPlaybackActive);

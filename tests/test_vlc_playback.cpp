@@ -39,11 +39,13 @@ int wmain(int argc,wchar_t** argv) {
         std::string file(reinterpret_cast<const char*>(bytes.data()),bytes.size());
         std::replace(file.begin(),file.end(),'\\','/');
         p.load(file,1);
-        waitFor([&]{auto s=p.getState();if(!s.error.empty())throw std::runtime_error(s.error);return s.ready && s.duration>10;},15000,"metadata not ready");
-        const auto before=p.getState();
+        waitFor([&]{auto s=p.getState();if(!s.error.empty())throw std::runtime_error(s.error);return s.ready && s.duration>10 && s.displayedVideo>0;},15000,"paused first frame not ready");
         const auto idleEnd=GetTickCount64()+700;while(GetTickCount64()<idleEnd)pump();
-        if(p.getState().playing || p.getState().decodedVideo>before.decodedVideo || p.testPcmSamples>0)
-            throw std::runtime_error("Loading started playback or background decoding");
+        if(p.getState().playing || p.getState().position>.15 || p.testPcmSamples>0)
+            throw std::runtime_error("First-frame preview advanced playback or emitted audio");
+        const auto stablePreview=p.getState().decodedVideo;
+        const auto previewEnd=GetTickCount64()+700;while(GetTickCount64()<previewEnd)pump();
+        if(p.getState().decodedVideo!=stablePreview)throw std::runtime_error("Paused preview kept decoding");
         p.setVolume(.45f);p.setPlaying(true);
         waitFor([&]{auto s=p.getState();return s.position>.6 && s.decodedVideo>0 && s.displayedVideo>0 && p.testPcmNonzero>1000;},15000,"No decoded video/nonzero PCM");
         std::cout<<"PASS real LibVLC H264 frames="<<p.getState().displayedVideo<<" nonzero PCM="<<p.testPcmNonzero.load()<<"\n";
@@ -97,7 +99,7 @@ int wmain(int argc,wchar_t** argv) {
         waitFor([&]{auto s=p.getState();if(!s.error.empty())throw std::runtime_error(s.error);return s.generation==14 && s.finished;},6000,"Silent audio-only EOF missing");
         p.load(file,15);p.setPlaying(true);
         waitFor([&]{auto s=p.getState();return s.generation==15 && s.error.empty() && s.position>.2;},6000,"Audio-only recovery failed");
-        std::cout<<"PASS load-without-play, pause, explicit/stale seek, EOF replay, replace, unload, failure recovery; shutdown pending\n";
+        std::cout<<"PASS silent first-frame preview, pause, explicit/stale seek, EOF replay, replace, unload, failure recovery; shutdown pending\n";
     } catch(const std::exception& e){std::cerr<<"FAIL "<<e.what()<<"\n";code=1;}
     DestroyWindow(window);
     if(!code)std::cout<<"PASS shutdown. Decoded PCM sink is CI-only; physical speakers/SWAM load remain hardware acceptance.\n";
