@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <functional>
 #include <algorithm>
+#include <fstream>
 
 using fengyin::VlcPlaybackEngine;
 void pump() { MSG m{}; while(PeekMessageW(&m,nullptr,0,0,PM_REMOVE)){TranslateMessage(&m);DispatchMessageW(&m);} Sleep(5); }
@@ -71,8 +72,18 @@ int wmain(int argc,wchar_t** argv) {
         p.unload();waitFor([&]{return p.getState().generation==9 && !p.getState().ready;},6000,"Unload failed");
         p.load(file+".missing",10);p.setPlaying(true);
         waitFor([&]{return !p.getState().error.empty();},6000,"Invalid media error missing");
+        const auto errorEnd=GetTickCount64()+600;while(GetTickCount64()<errorEnd)pump();
+        if(p.getState().error.empty() || p.getState().finished || p.getState().ready)
+            throw std::runtime_error("Transient error was lost or misreported as EOF");
         p.load(file,11);p.setPlaying(true);
         waitFor([&]{auto s=p.getState();return s.generation==11 && s.error.empty() && s.position>.2;},6000,"Error recovery failed");
+        const auto corrupt=fixture.parent_path()/L"corrupt-media.mp4";
+        {std::ofstream bad(corrupt,std::ios::binary);bad<<"not a media file";}
+        const auto corruptBytes=corrupt.u8string();
+        p.load(std::string(reinterpret_cast<const char*>(corruptBytes.data()),corruptBytes.size()),12);p.setPlaying(true);
+        waitFor([&]{return !p.getState().error.empty();},6000,"Corrupt media error missing");
+        p.load(file,13);p.setPlaying(true);
+        waitFor([&]{auto s=p.getState();return s.generation==13 && s.error.empty() && s.position>.2;},6000,"Corrupt media recovery failed");
         std::cout<<"PASS load-without-play, pause, explicit/stale seek, EOF replay, replace, unload, failure recovery; shutdown pending\n";
     } catch(const std::exception& e){std::cerr<<"FAIL "<<e.what()<<"\n";code=1;}
     DestroyWindow(window);

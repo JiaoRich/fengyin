@@ -88,6 +88,24 @@ class Recording123(unittest.TestCase):
         for name in ['FengYinRecorder.exe','FengYinScreenRecorder.exe','ScreenRecorderLib-MIT.txt','miniaudio-0.11.23.h']:
             self.assertIn(name,release)
 
+    def test_frame_validator_counts_real_pictures_and_rejects_extra_missing_or_partial(self):
+        spec=importlib.util.spec_from_file_location('video_verify',ROOT/'scripts/verify_screen_recording.py')
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        module.verify_frame_count(bytes(48*12),4,3)
+        for size in [47*12,49*12,48*12+1]:
+            with self.assertRaisesRegex(ValueError,'MP4 frame count'):
+                module.verify_frame_count(bytes(size),4,3)
+        self.assertIn("'-fps_mode', 'passthrough'",read('scripts/verify_screen_recording.py'))
+
+    def test_vlc_error_is_latched_across_transient_dead_state(self):
+        source=read('native/Source/VlcPlaybackEngine.cpp')
+        self.assertIn('libvlc_MediaPlayerEncounteredError',source)
+        self.assertIn('errorEvents.failed.load()',source)
+        cleanup=source[source.rindex('api.libvlc_media_player_stop(player);'):]
+        self.assertLess(cleanup.index('errorEvents.detach()'),cleanup.index('api.libvlc_media_player_release(player)'))
+        self.assertIn('Transient error was lost',read('tests/test_vlc_playback.cpp'))
+        self.assertIn('Corrupt media recovery failed',read('tests/test_vlc_playback.cpp'))
+
     def test_dependency_verifier_rejects_unverified_bytes(self):
         spec=importlib.util.spec_from_file_location('record_deps',ROOT/'scripts/prepare_recording.py')
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)

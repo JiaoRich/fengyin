@@ -74,3 +74,8 @@ prepare_recording.py从SHA校验的上游vcxproj解析明确ClCompile清单，�
 新增独立Windows媒体诊断短流程，不编主程序/安装依赖。一次采集新旧视频/WAV真实生成文件、ffprobe逐流帧数/时长、严格解码结果及中文VLC完整生命周期；失败仍继续收集独立检查，最终任一失败则整体失败。
 另一个不随安装包交付的诊断目标只比较SRL的FixedFramerate输入类型分支；正式录制配置尚未改动。必须依据实际结果判断，不能把这个开关风险直接当根因。
 失败产物保留实际合成MP4/WAV，避免仅靠一个断言猜测。用户要求值守由30分钟改为5分钟，已更新。
+
+192短流程实际证据（/private/tmp/fy123-media192）：
+原SRL与ExplicitRate对照均实际48帧、24fps、约2秒；B帧视频首PTS=1/24秒。FFmpeg默认输出同步补首帧，rawvideo输出49帧；同一原文件加-fps_mode passthrough实际48帧。旧组件两种解码均48帧。错误在计帧校验，不是已证明丢帧；保持录屏参数不变，仅改校验计实际帧，仍严格48且拒绝半帧/少帧/多帧，方向/尺寸/音频检查保留。
+新miniaudio实际WAV与旧WAV均精确96000帧/48k立体声PCM、分段连续性通过。
+VLC真实中文路径已显示画面15帧/非零PCM68242，随后失败于不存在文件未报错。上游lib/media_player.c的INPUT_EVENT_STATE发送EncounteredError，但INPUT_EVENT_DEAD很快将状态置为Ended；100ms轮询可能漏掉错误。改为事件回调只写atomic锁存，停止旧输入后重置，退出先detach再释放，错误不误报正常EOF。扩展不存在文件错误保持、损坏文件及两次重新加载恢复。须新Windows短流程实证通过，不能以本机源码测试当完成。

@@ -6,6 +6,13 @@ import subprocess
 import sys
 
 
+def verify_frame_count(decoded, width, height, expected=48):
+    size = width * height
+    frames, remainder = divmod(len(decoded), size)
+    if remainder or frames != expected:
+        raise ValueError(f'MP4 frame count is not {expected}: decoded={frames}, partial_bytes={remainder}')
+
+
 def verify(executable, path):
     def decode(*args):
         return subprocess.run([str(executable), '-v', 'error', '-i', str(path), *args],
@@ -21,9 +28,12 @@ def verify(executable, path):
     bottom = frame[(900*width+width//2)*3: (900*width+width//2)*3+3]
     if not (top[0] > 180 and top[2] < 60 and bottom[2] > 180 and bottom[0] < 60):
         raise ValueError(f'Video orientation or colour wrong: top={list(top)}, bottom={list(bottom)}')
-    all_frames = decode('-an', '-f', 'rawvideo', '-pix_fmt', 'gray', '-')
-    if len(all_frames)//(width*height) != 48:
-        raise ValueError('MP4 frame count is not 48')
+    # Count actual decoded pictures, not ffmpeg's output-sync duplicates.
+    # SRL's B-frame stream starts at 1/24s: default sync adds a first picture
+    # to bridge this offset (49 raw frames for 48 stored/decoded frames).
+    all_frames = decode('-map', '0:v:0', '-an', '-fps_mode', 'passthrough',
+                        '-f', 'rawvideo', '-pix_fmt', 'gray', '-')
+    verify_frame_count(all_frames, width, height)
     pcm = array.array('h', decode('-vn', '-f', 's16le', '-ac', '2', '-ar', '48000', '-'))
     if not (1.95 <= len(pcm)/(48000*2) <= 2.1):
         raise ValueError('Encoded audio duration is not two seconds')

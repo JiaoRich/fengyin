@@ -74,7 +74,8 @@ struct VlcApi
  X(libvlc_media_player_play) X(libvlc_media_player_set_pause) X(libvlc_media_player_stop) \
  X(libvlc_media_player_get_state) X(libvlc_media_player_get_time) X(libvlc_media_player_get_length) \
  X(libvlc_media_player_set_time) X(libvlc_audio_set_volume) \
- X(libvlc_video_set_mouse_input) X(libvlc_video_set_key_input)
+ X(libvlc_video_set_mouse_input) X(libvlc_video_set_key_input) \
+ X(libvlc_media_player_event_manager) X(libvlc_event_attach) X(libvlc_event_detach)
 #if defined(FENGYIN_VLC_TEST_PCM)
     decltype(&::libvlc_audio_set_callbacks) libvlc_audio_set_callbacks=nullptr;
     decltype(&::libvlc_audio_set_format) libvlc_audio_set_format=nullptr;
@@ -106,6 +107,30 @@ struct VlcApi
     void close() { if(library)FreeLibrary(library); if(core)FreeLibrary(core); library=nullptr;core=nullptr; }
     ~VlcApi() { close(); }
 };
+// VLC 3 input_event_changed emits EncounteredError, then INPUT_EVENT_DEAD
+// replaces the observable player state with Ended. Polling every 100ms can
+// miss that error entirely. Latch it on the event thread without calling VLC
+// or the UI from the callback. Reset only after the old input has stopped.
+struct VlcErrorEvents
+{
+    VlcApi& api;
+    libvlc_event_manager_t* manager;
+    std::atomic<bool> failed{false};
+    bool attached=false;
+    static void callback(const libvlc_event_t*, void* context) noexcept
+    { static_cast<VlcErrorEvents*>(context)->failed.store(true); }
+    VlcErrorEvents(VlcApi& functions, libvlc_media_player_t* player)
+        : api(functions), manager(api.libvlc_media_player_event_manager(player))
+    {
+        attached=manager && api.libvlc_event_attach(manager,libvlc_MediaPlayerEncounteredError,callback,this)==0;
+    }
+    void detach() noexcept
+    {
+        if(attached)api.libvlc_event_detach(manager,libvlc_MediaPlayerEncounteredError,callback,this);
+        attached=false;
+    }
+    ~VlcErrorEvents(){detach();}
+};
 }
 #endif
 
@@ -121,6 +146,11 @@ void VlcPlaybackEngine::run()
         if (!instance) throw std::runtime_error("无法初始化 VLC 播放组件");
         auto* player = api.libvlc_media_player_new(instance);
         if (!player) { api.libvlc_release(instance); throw std::runtime_error("无法创建 VLC 播放器"); }
+        VlcErrorEvents errorEvents(api,player);
+        if(!errorEvents.attached) {
+            api.libvlc_media_player_release(player);api.libvlc_release(instance);
+            throw std::runtime_error("无法监听 VLC 播放状态");
+        }
         api.libvlc_media_player_set_hwnd(player, window);
         api.libvlc_video_set_mouse_input(player, 0);
         api.libvlc_video_set_key_input(player, 0);
@@ -159,6 +189,7 @@ void VlcPlaybackEngine::run()
             if (next.generation != applied.generation)
             {
                 api.libvlc_media_player_stop(player);
+                errorEvents.failed.store(false);
                 api.libvlc_media_player_set_media(player, nullptr);
                 if(media) { api.libvlc_media_parse_stop(media); api.libvlc_media_release(media); media=nullptr; }
                 started=false; pendingSeek=-1;playbackError.clear();
@@ -193,7 +224,8 @@ void VlcPlaybackEngine::run()
                     {
                         playbackError.clear();
                         if(playbackState==libvlc_Ended || playbackState==libvlc_Error)
-                        { api.libvlc_media_player_stop(player); started=false; if(pendingSeek<0)pendingSeek=0; }
+                        { api.libvlc_media_player_stop(player); errorEvents.failed.store(false);
+                          started=false; if(pendingSeek<0)pendingSeek=0; }
                         if(!started) { started=api.libvlc_media_player_play(player)==0; }
                         else api.libvlc_media_player_set_pause(player,0);
                         if(!started) playbackError="视频无法播放，请检查文件是否完整";
@@ -207,8 +239,10 @@ void VlcPlaybackEngine::run()
                 { api.libvlc_media_player_set_time(player,static_cast<int64_t>(pendingSeek*1000)); pendingSeek=-1; }
                 result.playing=playbackState==libvlc_Playing || (next.playing && (playbackState==libvlc_Opening || playbackState==libvlc_Buffering));
                 result.finished=playbackState==libvlc_Ended;
-                if(playbackState==libvlc_Error) playbackError="VLC 无法播放这个文件，请重新选择视频";
+                if(playbackState==libvlc_Error || errorEvents.failed.load())
+                    playbackError="VLC 无法播放这个文件，请重新选择视频";
                 result.error=playbackError;
+                if(!result.error.empty()){result.ready=false;result.playing=false;result.finished=false;}
                 result.duration=std::max<int64_t>(0,api.libvlc_media_player_get_length(player))/1000.0;
                 if(result.duration==0)result.duration=std::max<int64_t>(0,api.libvlc_media_get_duration(media))/1000.0;
                 result.position=pendingSeek>=0 ? pendingSeek : std::max<int64_t>(0,api.libvlc_media_player_get_time(player))/1000.0;
@@ -225,6 +259,7 @@ void VlcPlaybackEngine::run()
                  && request.playRevision==next.playRevision) state=std::move(result); }
         }
         api.libvlc_media_player_stop(player);
+        errorEvents.detach();
         api.libvlc_media_player_release(player);
         if(media) { api.libvlc_media_parse_stop(media); api.libvlc_media_release(media); }
         api.libvlc_release(instance);
