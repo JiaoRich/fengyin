@@ -4,7 +4,9 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <mmdeviceapi.h>
-#include <d3d10.h>
+// SRL includes D3D10.1 transitively. The Windows SDK requires this superset
+// before d3d10.h; it also declares the ID3D10Multithread self-test interface.
+#include <d3d10_1.h>
 #include <wrl/client.h>
 #include <winrt/base.h>
 #include <filesystem>

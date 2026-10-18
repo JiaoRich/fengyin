@@ -47,6 +47,13 @@ class Recording123(unittest.TestCase):
         self.assertIn('noAutoStreamRouting=MA_TRUE',source)
         self.assertIn('std::memset(out,0,count*4)',source)
 
+    def test_recorder_d3d_header_order_190_regression(self):
+        source=read('native/Recorder/main.cpp')
+        self.assertIn('#include <d3d10_1.h>',source)
+        self.assertNotIn('#include <d3d10.h>',source)
+        self.assertLess(source.index('#include <d3d10_1.h>'),source.index('#include "RecordingManager.h"'))
+        self.assertIn('ComPtr<ID3D10Multithread>',source)
+
     def test_real_new_and_legacy_encoding_checked_before_main(self):
         build=read('scripts/build-windows.ps1')
         for marker in ['ScreenRecorderLib actual decoded video/audio','Miniaudio actual PCM continuity','System recording PCM continuity check']:
