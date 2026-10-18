@@ -47,6 +47,8 @@ class VlcReleaseTests(unittest.TestCase):
         self.assertNotIn('libvlc_video_set_callbacks',player)
         self.assertIn('libvlc_media_parse_local',player)
         self.assertIn('request.playRevision==next.playRevision',player)
+        self.assertIn('"S16N",48000,2',player)
+        self.assertIn('static_cast<const int16_t*>(samples)',player)
 
     def test_packaging_verifies_real_decoder(self):
         script=(ROOT/'scripts/build-windows.ps1').read_text(encoding='utf-8-sig')

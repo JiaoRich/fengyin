@@ -78,6 +78,7 @@ struct VlcApi
 #if defined(FENGYIN_VLC_TEST_PCM)
     decltype(&::libvlc_audio_set_callbacks) libvlc_audio_set_callbacks=nullptr;
     decltype(&::libvlc_audio_set_format) libvlc_audio_set_format=nullptr;
+    decltype(&::libvlc_clock) libvlc_clock=nullptr;
 #endif
 #define FY_DECLARE(name) decltype(&::name) name = nullptr;
     FY_VLC_FUNCTIONS(FY_DECLARE)
@@ -97,6 +98,7 @@ struct VlcApi
 #if defined(FENGYIN_VLC_TEST_PCM)
             FY_RESOLVE(libvlc_audio_set_callbacks)
             FY_RESOLVE(libvlc_audio_set_format)
+            FY_RESOLVE(libvlc_clock)
 #endif
 #undef FY_RESOLVE
         } catch (...) { close(); throw; }
@@ -125,14 +127,21 @@ void VlcPlaybackEngine::run()
 #if defined(FENGYIN_VLC_TEST_PCM)
         // CI-only decoded PCM sink: runners need no speaker endpoint. Never
         // compiled into FengYin; production uses VLC's normal audio output.
-        api.libvlc_audio_set_format(player,"FL32",48000,2);
-        api.libvlc_audio_set_callbacks(player,[](void* opaque,const void* samples,unsigned count,int64_t){
-            auto& engine=*static_cast<VlcPlaybackEngine*>(opaque);
-            const auto* data=static_cast<const float*>(samples);
+        // VLC 3.0 amem.c supports S16N, not FL32. Respect its delivery timestamp
+        // rather than draining decoded audio faster than real-time in CI.
+        struct TestAudio {VlcPlaybackEngine* owner;decltype(api.libvlc_clock) clock;};
+        TestAudio testAudio{this,api.libvlc_clock};
+        api.libvlc_audio_set_format(player,"S16N",48000,2);
+        api.libvlc_audio_set_callbacks(player,[](void* opaque,const void* samples,unsigned count,int64_t pts){
+            auto& context=*static_cast<TestAudio*>(opaque);
+            auto& engine=*context.owner;
+            const auto delay=pts-context.clock();
+            if(delay>0)Sleep(static_cast<DWORD>(std::min<int64_t>(delay/1000,500)));
+            const auto* data=static_cast<const int16_t*>(samples);
             uint64_t nonzero=0;
-            for(unsigned i=0;i<count*2;++i) if(std::isfinite(data[i]) && std::abs(data[i])>.001f)++nonzero;
+            for(unsigned i=0;i<count*2;++i) if(std::abs(static_cast<int>(data[i]))>32)++nonzero;
             engine.testPcmSamples.fetch_add(count*2);engine.testPcmNonzero.fetch_add(nonzero);
-        },nullptr,nullptr,nullptr,nullptr,this);
+        },nullptr,nullptr,nullptr,nullptr,&testAudio);
 #endif
         libvlc_media_t* media = nullptr;
         Request applied;
