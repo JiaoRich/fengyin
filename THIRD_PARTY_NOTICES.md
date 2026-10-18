@@ -25,3 +25,11 @@ the bundled “次中萨-气包音” tone scheme.
 ## 用户自行安装的插件
 
 SWAM 和其他 VST3 音源、效果器不随风吟提供。用户必须自行获得相应插件授权。
+
+## LibVLC 3.0.24 (VideoLAN)
+
+- Windows 伴奏由 LibVLC 直接播放原始文件；不再经网页解码、WAV 提取或后台视频转码。
+- 使用 VideoLAN 官方 `VideoLAN.LibVLC.Windows` 3.0.24 LGPL-2.1-or-later 包，非另行发布的 `.GPL` 插件包；以独立 DLL 动态加载，未修改 LibVLC。
+- 官方项目：https://code.videolan.org/videolan/libvlc-nuget ；API：https://www.videolan.org/vlc/libvlc.html
+- `components/VLC/COPYING.txt` 保留 LGPL 文本，`components/VLC/sdk/` 保留上游许可及公开头文件，`components/VLC/source/` 随附对应上游 VLC 源码；下载来源与校验值记录在 `fengyin-source.json`。
+- 可替换兼容 ABI 的 LibVLC DLL/插件。风吟许可不限制为修改、调试这些 LGPL 组件而进行的替换及必要逆向工程。第三方组件以其自身许可为准，不提供额外保证。

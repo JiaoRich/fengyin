@@ -1,0 +1,21 @@
+{
+  "baseline": "assets/incoming-tones/20261018/violin-room-before-123.zip",
+  "targets": [
+    {
+      "file": "violin-soft.fytonepack",
+      "changed": true,
+      "roomBefore": "1.0",
+      "roomAfter": "0.0",
+      "beforeSha256": "1d733103ed4f36863f9fa7e31a7c3696ccccb15277cb4a24a63369a47786acae",
+      "afterSha256": "13b335a663669a7fb05ef7512906249f548c79b6d38995e5edb63e2d9b6536ed"
+    },
+    {
+      "file": "violin-bright.fytonepack",
+      "changed": false,
+      "roomBefore": "0.0",
+      "roomAfter": "0.0",
+      "beforeSha256": "7ae59adc00fc5f3f6af573818987a56af93ca02ed7e9d2912ed5931bf07ee501",
+      "afterSha256": "7ae59adc00fc5f3f6af573818987a56af93ca02ed7e9d2912ed5931bf07ee501"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.1.22",
+    [string]$Version = "1.1.23",
     [switch]$SkipInstaller
 )
 
@@ -12,6 +12,7 @@ $InstallerDir = Join-Path $ProjectRoot "dist\installer"
 $FfmpegPath = Join-Path $ProjectRoot "third_party\ffmpeg\windows\ffmpeg.exe"
 $FfmpegPackageDir = Join-Path $PackageDir "tools\ffmpeg"
 $NugetPackageDir = Join-Path $ProjectRoot "third_party\nuget-packages"
+$VlcRoot = Join-Path $ProjectRoot "third_party\vlc"
 $WebViewOfflineInstallerPath = Join-Path $PackageDir "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
 $PreparedFfmpeg = Join-Path $env:TEMP ("fengyin-ffmpeg-" + [guid]::NewGuid().ToString("N"))
 $PreparedWebView = Join-Path $env:TEMP ("fengyin-webview-" + [guid]::NewGuid().ToString("N") + ".exe")
@@ -37,6 +38,7 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
 }
 # Fail inexpensive source regressions before the native build, not after it.
 Invoke-Checked "发布源码预检" { python -m unittest discover -s (Join-Path $ProjectRoot "tests") -p "test_*.py" }
+Invoke-Checked "LibVLC official runtime and source verification" { python (Join-Path $PSScriptRoot "prepare_vlc.py") $VlcRoot }
 # Download before compilation. Never package a partial or unsigned dependency.
 for ($attempt = 1; $attempt -le 4; $attempt++) {
     try {
@@ -77,7 +79,7 @@ if (-not (Get-ChildItem $NugetPackageDir -Directory -Filter "*Microsoft.Web.WebV
 }
 Invoke-Checked "CMake 配置" {
     cmake -S $ProjectRoot -B $BuildDir -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTING=ON `
-        "-DJUCE_WEBVIEW2_PACKAGE_LOCATION=$NugetPackageDir"
+        "-DJUCE_WEBVIEW2_PACKAGE_LOCATION=$NugetPackageDir" "-DFENGYIN_VLC_ROOT=$VlcRoot"
 }
 
 Invoke-Checked "Recording helper preflight build" { cmake --build $BuildDir --config Release --target FengYinScreenRecorder --parallel 4 }
@@ -108,6 +110,15 @@ Invoke-Checked "System recording WAV selftest" {
     if ($LASTEXITCODE -eq 0 -and -not (Test-Path $AudioCheck)) { throw "Recorder exited without producing WAV" }
 }
 Invoke-Checked "System recording PCM continuity check" { python (Join-Path $PSScriptRoot "verify_system_recording.py") $AudioCheck }
+
+$VlcFixture = Join-Path $BuildDir "vlc-playback-fixture.mp4"
+Invoke-Checked "LibVLC fixture preparation" {
+    & $RecorderFfmpeg -hide_banner -loglevel error -nostdin -y -stream_loop 5 -i $RecorderCheck -c copy $VlcFixture
+}
+Invoke-Checked "LibVLC integration preflight build" { cmake --build $BuildDir --config Release --target FengYinVlcTests --parallel 4 }
+Invoke-Checked "LibVLC real playback and lifecycle check" {
+    ctest --test-dir $BuildDir -C Release -R '^vlc_real_playback$' -V --output-on-failure
+}
 
 Write-Host "[2/5] 编译风吟和自动测试..." -ForegroundColor Cyan
 Invoke-Checked "主程序编译" { cmake --build $BuildDir --config Release --parallel }
@@ -155,6 +166,7 @@ Copy-Item (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES.md") $PackageDir -Force
 & (Join-Path $PSScriptRoot "prepare-asio4all.ps1") -Destination (Join-Path $PackageDir "components\ASIO4ALL")
 & (Join-Path $PSScriptRoot "prepare-fresh-air.ps1") -Destination (Join-Path $PackageDir "components\Fresh Air")
 $MagicDestination = Join-Path $PackageDir "components\magic.CURVE"
+Copy-Item -LiteralPath $VlcRoot -Destination (Join-Path $PackageDir "components\VLC") -Recurse -Force
 Copy-Item (Join-Path $ProjectRoot "installer\InstallNotice.txt") (Join-Path $PackageDir "InstallNotice.txt") -Force
 if ((Get-FileHash (Join-Path $ProjectRoot "assets\components\magic.CURVE-1.0.2-Windows-Setup.exe") -Algorithm SHA256).Hash -ne '5AEBF446018D5F8FCE87F332E9D8A01194A98E02536DE132BF1C64939417BDBD') { throw 'magic.CURVE installer SHA-256 mismatch' }
 New-Item -ItemType Directory -Path $MagicDestination -Force | Out-Null

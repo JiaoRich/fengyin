@@ -16,6 +16,39 @@
 
 int main(int argc,char** argv)
 {
+    // The host post-FX must not change its sound merely because the device
+    // delivers the same samples in 128-, 256-, or irregular-sized blocks.
+    {
+        constexpr int length=48000;
+        auto render=[](const std::vector<int>& blocks) {
+            fengyin::MasterOutputService output;
+            fengyin::ToneStyleSettings style;
+            style.reverbMix=.13f;style.outputGain=1.778279f;
+            style.air=.35f;style.bass=.2f;
+            output.setToneStyle(style);output.setSampleRate(48000);
+            juce::AudioBuffer<float> audio(2,length);
+            for(int i=0;i<length;++i) {
+                const float sample=i<24000?.15f*std::sin(i*.057f):0.f;
+                audio.setSample(0,i,sample);audio.setSample(1,i,sample*.8f);
+            }
+            int position=0;size_t index=0;
+            while(position<length) {
+                const int count=std::min(blocks[index++%blocks.size()],length-position);
+                float* channels[]{audio.getWritePointer(0,position),audio.getWritePointer(1,position)};
+                output.processInstrument(channels,2,count);
+                output.processMaster(channels,2,count);position+=count;
+            }
+            return audio;
+        };
+        const auto reference=render({128});
+        for(const auto& blocks:std::vector<std::vector<int>>{{256},{512},{128,256,128,512},{31,144,240,257}}) {
+            const auto actual=render(blocks);
+            for(int c=0;c<2;++c)for(int i=0;i<length;++i) {
+                assert(std::isfinite(actual.getSample(c,i)));
+                assert(std::abs(actual.getSample(c,i)-reference.getSample(c,i))<1e-6f);
+            }
+        }
+    }
     {
         const auto previous=juce::FloatVectorOperations::areDenormalsDisabled();
         juce::FloatVectorOperations::disableDenormalisedNumberSupport(false);

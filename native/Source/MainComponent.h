@@ -20,6 +20,7 @@
 #include "TechniqueAdvisor.h"
 #include "VideoAudioExtractor.h"
 #include "VideoPlaybackCache.h"
+#include "VlcVideoSurface.h"
 #include "WindowsLowLatencyOptimizer.h"
 #include "VoicePromptService.h"
 
@@ -59,6 +60,12 @@ private:
     void emitVideoAudioState(bool ready, const juce::String& message);
     void updateIdleVideoPreparation();
     void interruptIdleVideoPreparation();
+    void pauseAccompaniment();
+    void playAccompaniment();
+    double accompanimentPosition() const;
+    bool accompanimentFinished() const;
+    void seekAccompaniment(double);
+    void updateVlcPlayback();
     juce::Rectangle<int> getContentBounds() const;
     void timerCallback() override;
     void startPluginScan();
@@ -106,6 +113,7 @@ private:
     void toggleRecording();
     void showDeviceSettings();
     void emitAudioSettingsState(bool success = true, const juce::String& message = {});
+    void logAudioDiagnostic(const fengyin::AudioDeviceStatus& status);
     void applyAudioSettingsFromWeb(const juce::var& payload);
     void emitSuperLowLatencyState(const juce::String& overrideMessage = {});
     void startSuperLowLatencyOptimisation(bool restore);
@@ -212,6 +220,10 @@ private:
     juce::Array<juce::PluginDescription> cachedInstrumentPlugins;
     juce::Array<juce::PluginDescription> cachedEffectPlugins;
     fengyin::VideoPlayerPanel videoPlayer;
+    fengyin::VlcVideoSurface vlcVideo;
+    juce::Rectangle<int> vlcViewport;
+    bool vlcViewportVisible = false;
+    double lastVlcStateAtMs = 0;
     fengyin::VideoAudioExtractor webVideoAudioExtractor;
     fengyin::VideoPlaybackCache webVideoPlaybackCache;
     bool webVideoProxyAttempted = false;
@@ -275,6 +287,7 @@ private:
     int webUpdateCounter = 0;
     bool webPresentationVisible = true;
     double lastWebStateAtMs = 0;
+    double nextAudioDiagnosticMs = 0;
 public:
     // Presentation only: audio/MIDI timers and business callbacks keep running.
     void setWebPresentationVisible(bool visible);

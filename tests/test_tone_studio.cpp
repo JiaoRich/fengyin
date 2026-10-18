@@ -5,9 +5,11 @@
 #include "SuonaDualVoiceRouter.h"
 #include "SwamStringTremolo.h"
 #include "KensaBendRange.h"
+#include "AudioCallbackTrace.h"
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <thread>
 
 class TestEffect final : public juce::AudioProcessor
 {
@@ -17,7 +19,10 @@ public:
         gain(multiplier), bias(offset) {}
     const juce::String getName() const override { return "TestEffect"; }
     int prepareCount = 0, releaseCount = 0;
-    void prepareToPlay(double, int) override { ++prepareCount; }
+    int preparedBlockSize = 0;
+    double preparedRate = 0;
+    void prepareToPlay(double rate, int blockSize) override
+    { ++prepareCount;preparedRate=rate;preparedBlockSize=blockSize; }
     void releaseResources() override { ++releaseCount; }
     void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) override
     { for(int c=0;c<buffer.getNumChannels();++c) for(int i=0;i<buffer.getNumSamples();++i) buffer.setSample(c,i,buffer.getSample(c,i)*gain+bias); }
@@ -148,7 +153,65 @@ int main()
     verify({offset,gain},0.70f);
     gain->setBypassed(true);verify({gain,offset},0.35f);
     verify({},0.1f);
+    // Follow device restart ordering with the same graph/nodes, not new
+    // processors. Every node must receive the new period and keep its order.
+    {
+        for(const auto& connection:graph.getConnections())graph.removeConnection(connection);
+        gain->setBypassed(false);
+        assert(fengyin::connectSerialEffects(graph,input,{gain,offset},output));
+        for(int cycle=0;cycle<50;++cycle)for(int size:{128,256,512,128}) {
+            graph.releaseResources();
+            graph.setPlayConfigDetails(2,2,48000,size);
+            graph.prepareToPlay(48000,size);
+            juce::AudioBuffer<float> block(2,size);juce::MidiBuffer midi;
+            for(int iteration=0;iteration<3;++iteration) {
+                for(int c=0;c<2;++c)for(int i=0;i<size;++i)block.setSample(c,i,.1f);
+                graph.processBlock(block,midi);
+            }
+            for(auto node:{gain,offset}) {
+                auto* effect=static_cast<TestEffect*>(node->getProcessor());
+                assert(effect->preparedBlockSize==size && effect->preparedRate==48000);
+            }
+            for(int c=0;c<2;++c)for(int i=0;i<size;++i) {
+                if(std::abs(block.getSample(c,i)-.45f)>=1e-6f)
+                    std::cerr<<"restart cycle="<<cycle<<" size="<<size<<" sample="<<i<<" value="<<block.getSample(c,i)<<std::endl;
+                assert(std::abs(block.getSample(c,i)-.45f)<1e-6f);
+            }
+        }
+    }
     auto* instrument = static_cast<TestEffect*>(offset->getProcessor());
+    // Exercise JUCE's actual node callback lock. The injected lock stall must
+    // be attributed to waiting, not to the fake plug-in's trivial DSP body.
+    {
+        using namespace fengyin::audioTrace;
+        struct Context {
+            Accumulator timing;
+            std::atomic<bool> waiting{false},done{false};
+        } context;
+        context.timing.instrument.store(instrument);
+        Sink sink{&context,[](void* p,Event event,const void* owner,uint64_t ns){
+            static_cast<Context*>(p)->timing.record(event,owner,ns);
+        },[](void* p,Event event,const void* owner){
+            auto* ctx=static_cast<Context*>(p);
+            if(event==Event::nodeLock&&owner==ctx->timing.instrument.load())ctx->waiting.store(true);
+        }};
+        juce::AudioBuffer<float> block(2,128);block.clear();juce::MidiBuffer messages;
+        instrument->getCallbackLock().enter();
+        std::thread worker([&]{Session trace(&sink);graph.processBlock(block,messages);context.done.store(true);});
+        for(int n=0;n<2000&&!context.waiting.load();++n)juce::Thread::sleep(1);
+        assert(context.waiting.load()&&!context.done.load());
+        juce::Thread::sleep(30);
+        assert(!context.done.load());
+        instrument->getCallbackLock().exit();worker.join();
+        const auto metrics=context.timing.take();
+        const auto& wait=metrics[static_cast<unsigned>(Event::nodeLock)*3+1];
+        const auto& body=metrics[static_cast<unsigned>(Event::nodeBody)*3+1];
+        assert(wait.calls==1&&wait.totalNs>=20000000);
+        assert(body.calls==1&&body.totalNs<wait.totalNs);
+        for(int c=0;c<2;++c)for(int i=0;i<128;++i)
+            assert(std::abs(block.getSample(c,i)-.25f)<1e-6f);
+        assert(current==nullptr);
+    }
     const auto preparations = instrument->prepareCount, releases = instrument->releaseCount;
     {
         const fengyin::ScopedGraphPause pause(&graph);

@@ -48,3 +48,44 @@
 - 本轮仍为候选，不能以本机/CI测试替代实机组合负载闭环。需Windows组件编译和实际编码校验，再在目标电脑用相同路由/音符/视频分别比较不录制、录音、录视频。
 - 目标电脑用户已拔掉电吹管并授权鼠标，但本机ToDesk输入通道有间歇noWindowsAvailable、TextEdit启动超时；画面可见不代表操作成功。恢复后验证实际动作结果，不能凭点击发出就声称开始自动试音。
 - 用户自行做房间/混响测试；不要占用其当前吹奏或保存实验状态。继续其他性能路径，不擅自更换音色。
+
+2026-10-18 缓冲异常：代码优先排查（尚未闭环）
+- 用户确认在风吟设置内从128改256后更容易爆音，且提琴无伴奏亦异常。随后要求代码/本机测试优先，只将必要问题集中实机验证；停止远程操作，不再反复要求试吹或电源模式变更。
+- 远程只读画面确认当前Windows Audio (Low Latency Mode)、耳机、48k、128。已看到自定义“小提琴-柔美2”，不可假定等于内置原包或替换其未保存状态。未执行新的自动发声、未改驱动或音色。
+- JUCE9.0.2 WASAPI run已注册Pro Audio MMCSS；当前路线不是“尚未提升音频线程调度”。此前UI的audioCpu来自AudioDeviceManager音频负载预算比例，不是Windows全机CPU利用率，不能据此推断所有核心满载。
+- 设备重开经AudioProcessorPlayer::audioDeviceAboutToStart重设当前采样率/块大小并重新prepare图；本机新增50轮128/256/512/128同图重准备，验证节点收到新块大小和48k、串行连接输出正确，已通过。模拟节点不替代真实SWAM内部生命周期验证。
+- 新增后级MasterOutputService 48k样本序列对照，含混响、Air、低频和+5dB，分别按128/256/512、混合及不规则块分割，逐样本误差<1e-6、无非有限值，通过。未改生产效果算法、参数或增益。wav_recording和tone_studio_chain_package两测试通过。
+- 新测试仍未提交；没有找到可据此认定“256更差”已修复的证据。继续关注VST3重准备/回调锁、实际WASAPI周期与申请块差异、持续运行资源和负载增长；不盲加缓冲/限幅或修改音色。
+
+代码复核第二轮（用户要求原因确认后才修复）
+- 没有修改生产逻辑、音色包或缓冲默认值；本轮仅继续源码追踪与临时诊断。
+- attachTo对同一AudioDeviceManager提前返回，detach先removeAudioCallback；未见切音色反复注册player的路径。SWAM不进入Qin/Kontakt容器缓存，unload清理编辑器、效果节点和图；不能把插件自身潜在泄漏据此排除，但尚无宿主实例无界累积的证据。
+- 设备重开将prepare沿AudioProcessorPlayer->AudioProcessorGraph->VST3传递。JUCE图在设置变化时先release节点，VST3 deactivate后重新setupProcessing；当前没有发现简单的128硬编码使256仍按128准备。上述50轮假节点测试仅覆盖宿主生命周期契约。
+- 常驻音频回调不调用音色包读写或完整状态保存。保存、调音师编辑、弯音范围变更可获取回调锁/暂停图，但调用点来自明确UI操作，不是每次timer定时完整重载；不能将其当作无操作单吹持续异常的已证根因。
+- 确有需进一步量化的路径：TechniqueProcessingGraph经JUCE获取每个节点的callbackLock；VST3 processBlock另有processMutex；技巧OFF可以重复提交相同参数值；第三方编辑器窗口点X仅隐藏，未立即释放。它们都是风险/开销路径，不等于本机故障根因，未擅自改动，避免用“跳过音频块”冒充无爆音。
+- 本机StringBench分阶段日志证明创建和状态写入返回，但之后进入SWAM自己的NSAlert模态循环，尚未进入prepare/render。sample报告/private/tmp/fy-string-stage-sample.txt；75秒有界进程已终止。不能将该超时当DSP卡顿，也不能输出三音色性能排名。未处理/绕过插件许可或弹窗，未开启物理音频设备。
+- 后续证据应区分音频线程实际计算、节点锁等待、输出供数间隔和削波；仅凭graphAndMidi总时间或UI负载百分比无法断言SWAM算法本身超预算。若需实机，只做代码/离线无法覆盖的集中对照。
+
+第三轮：仅本机未提交诊断（用户要求确认有效才提交构建）
+- 新增AudioCallbackTrace.h和scripts/patch-juce-audio-trace.cmake，沿既有JUCE补丁接入观察点；不删除/替换锁，不改为try-lock、不新增跳帧，不更改插件调用次序或缓冲。FENGYIN_AUDIO_TIMING=1时建立线程局部诊断Session；关闭时无取时/统计/日志。主程序和Studio测试编译启用观察点，其余未启用宏的目标保留原路径。
+- 分开记录player锁、graph锁、节点锁、VST3 processMutex等待；节点处理与VST适配为inclusive指标，插件process调用为wall time（包括库内部未知等待，不冒称纯CPU时间）。按宿主/音源/串联效果汇总，嵌套inclusive项不能相加，跨5秒窗口的各原子统计可能存在边界偏差，应以长区间总量和最大等待作证。
+- 同时记录MIDI排队/技巧分发、后级/伴奏/总输出/回调尾部与总耗时、实际回调min/max帧数与最大开始间隔、设备重启epoch、原有change gate跳过计数、真实路由/采样率/缓冲、xrun/回调超时/满幅样本计数。
+- 详细日志audio-timing-diagnostic.log仅诊断开关打开时产生，消息线程5秒写一次，隐藏网页仍记录，16MiB有界。不在音频线程读写磁盘、分配容器或输出文本；正常模式原source日志仍按可见网页更新记录。
+- 可控复现：测试线程持有真实JUCE图节点callbackLock，渲染线程进入节点等待观察点后再延迟30ms释放；验证渲染未偷偷跳过、等待归入nodeLock而不是测试DSP、输出仍正确。此测试证明诊断能区分“等待”和“DSP调用”，不是用户真实故障已复现。
+- 254Python通过；新增观察器Session恢复/禁用/计数/设备重启不计停机间隔等单测、原有27本机CTest通过，主程序本机完整编译通过。日志/private/tmp/fy-locktrace-{python,tests,ctest,app-build}.log。尚未Windows编译/运行，不提交、不dispatch新构建。
+- 用户新反馈：仅重启风吟后性能明显恢复。优先提高应用/插件运行状态累积及音频会话异常的调查权重，不直接认定内存泄漏；仅应用重启同时会重建插件、效果、音频输出、MIDI队列、网页与后台任务，须通过逐层重置和同条件长测定位哪一层，不能用重启当最终修复。
+- 用户询问标清视频收益，尚未授权直接改动。视频减负不得替代无伴奏提琴异常排查，也不擅自降低录屏规格。
+
+第四轮：重启恢复专项，本机代码与状态长循环
+- 新增tests/performance_state_soak.cjs，读取正式33项目录，含模拟插件列表/自定义方案，12500次后端状态广播，穿插音色身份及演奏/音色/智能适配页面切换。仅隔离Chrome网页，不加载真实音源或音频设备，不占远程鼠标。
+- 六个2000次批次，DOM节点825、后端监听35、DOM监听540、文档2均保持；每批328到338ms，未出现随次数恶化。主动GC后的JS堆1417804到1492720字节，有小幅变化，不能说零增长或排除所有泄漏。无JS异常。日志/private/tmp/fy-restart-full-state-soak.log。测试最初页面标识写成presets，已修正为正式sounds后重跑通过；不把测试夹具错误当产品故障。
+- 该结果降低“此状态广播/切页路径反复注册监听器造成明显累积”的嫌疑，不能排除真实WebView2进程/视频解码/GPU/原生插件长期状态问题，也不是按真实时间久置的验收。
+- JUCE AudioDeviceManager::setAudioDeviceSetup源码确认：同输入/输出设备名只改buffer时复用AudioIODevice对象；完整重启新建对象。但WASAPI::open内部先close，openClient重新createClient，关闭释放session callback和client并复位事件。因此不能把“设备对象复用”直接等同于“复用旧IAudioClient”或宣称强制重建设备可修复。
+- 当前尚未锁定用户真实重启恢复的原因；未改生产复位策略、未定时重启、未提交/dispatch。后续集中实机应保留恶化现场，先记录各段和锁等待，再分别比较停发音/关闭编辑器、同方案完整重载、同路由音频会话重开及最后整进程重启，避免一次全部重置使证据丢失。重开期间停音属有意对照，不当成正常演奏策略。
+
+第五轮：用户继续授权排查，仍非修复闭环
+- JUCE EditControllerParameterDispatcher在VST3初始化start时启用60Hz定时器，与编辑器是否显示无关；每参数使用CachedParamValues/FlaggedFloatCache覆盖并标记，不是无界事件列表。processAudio每块清input/outputParameterChanges后收集本块变更。因此“每次通知一直排队直到越积越多”不符合该宿主实现；第三方controller的setParamNormalized内部代价仍未知。
+- 宿主PluginEditorWindow关闭只隐藏；卸载才销毁。预热的Qin/Kontakt实例各自也可能保留控制器定时器，但缓存/预热入口有2实例上限。它们是固定/状态相关后台开销的具体路径，不等于已经证明随运行时间累积或就是重启恢复原因；未擅改编辑器生命周期、预热或60Hz同步。
+- 在现有可选详细日志增加hostLifecycle消息线程快照：graphNodes、serialFx、idle/warmingContainers、音源/效果编辑器retained/visible、loadGeneration。不调用第三方状态读取，不在音频线程枚举或取窗口状态，仅FENGYIN_AUDIO_TIMING=1时记录，便于未来同条件冷/热及逐层重置对照。
+- 255Python、主程序Mac增量编译通过，日志/private/tmp/fy-restart-lifecycle-{python,build}.log；diff --check通过。这些是诊断功能本身验证，不是用户性能故障通过。未提交、未dispatch。
+- 当前Windows186不含这些未提交观察点，单凭该包无法进一步区分宿主锁等待与插件内部墙钟耗时。若需集中实机必须先准备仅增加诊断的Windows测试包；用户要求原因确认前不提交构建，故不能擅自将诊断包作为修复发布或触发新构建，应说明必要性并先取得这项例外确认。

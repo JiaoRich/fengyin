@@ -1,4 +1,4 @@
-import importlib.util,json,math,unittest,zipfile
+import importlib.util,json,math,unittest,zipfile,io
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -12,7 +12,14 @@ class SwamGainCurve119(unittest.TestCase):
         self.assertEqual(len(audit['targets']),19)
         with zipfile.ZipFile(m.BASELINE) as baseline:
             for row in audit['targets']:
-                with self.subTest(row['file']),zipfile.ZipFile(m.ASSETS/row['file']) as z:
+                packageBytes=(m.ASSETS/row['file']).read_bytes()
+                # 1.1.23 explicitly disables the soft violin's internal room.
+                # Validate 1.1.19's immutable input here; the new room test proves
+                # that it is exactly the predecessor and permits only that switch.
+                if row['file']=='violin-soft.fytonepack':
+                    with zipfile.ZipFile(ROOT/'assets/incoming-tones/20261018/violin-room-before-123.zip') as r:
+                        packageBytes=r.read(row['file'])
+                with self.subTest(row['file']),zipfile.ZipFile(io.BytesIO(packageBytes)) as z:
                     self.assertIsNone(z.testzip())
                     old=ET.fromstring(zipfile.ZipFile(__import__('io').BytesIO(baseline.read(row['file']))).read('tone.xml'))
                     new=ET.fromstring(z.read('tone.xml'))
@@ -32,7 +39,7 @@ class SwamGainCurve119(unittest.TestCase):
                     for entry in json.loads(z.read('manifest.json'))['files']:
                         data=z.read(entry['path'])
                         self.assertEqual(m.sha(data),entry['sha256']);self.assertEqual(len(data),entry['bytes'])
-                    self.assertEqual(m.sha((m.ASSETS/row['file']).read_bytes()),row['afterSha256'])
+                    self.assertEqual(m.sha(packageBytes),row['afterSha256'])
 
     def test_strings_tremolo_and_attack_preserved(self):
         with zipfile.ZipFile(m.BASELINE) as base:

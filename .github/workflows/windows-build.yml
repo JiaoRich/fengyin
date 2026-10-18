@@ -203,12 +203,15 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: 保存实机性能复核主程序
+      - name: 保存匹配的实机性能复核组件
         if: success()
         uses: actions/upload-artifact@v5
         with:
           name: FengYin-performance-runtime
-          path: dist/FengYin/FengYin.exe
+          path: |
+            dist/FengYin/FengYin.exe
+            dist/FengYin/FengYinScreenRecorder.exe
+            dist/FengYin/components/VLC/
           if-no-files-found: error
           retention-days: 7
 

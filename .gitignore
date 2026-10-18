@@ -11,3 +11,4 @@ private/
 .vs/
 out/
 third_party/ffmpeg/windows/ffmpeg.exe
+third_party/vlc/

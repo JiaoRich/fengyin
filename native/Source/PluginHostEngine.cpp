@@ -96,6 +96,7 @@ public:
     std::function<void(juce::MidiBuffer&,int,double)> transformPerformanceMidi;
     void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& messages) override
     {
+        audioTrace::Scope techniqueTime(audioTrace::Event::techniques);
         if (applyTechniqueValues) applyTechniqueValues();
         if (suppressTechniqueMidi)
         {
@@ -106,6 +107,7 @@ public:
             messages.swapWith(filteredMidi);
         }
         if (transformPerformanceMidi) transformPerformanceMidi(messages,buffer.getNumSamples(),getSampleRate());
+        techniqueTime.finish();
         juce::AudioProcessorGraph::processBlock(buffer, messages);
     }
 private:
@@ -237,6 +239,10 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
     // Scoped to this callback; does not change plugin parameters or buffering.
     const juce::ScopedNoDenormals noDenormals;
     const auto nowSeconds = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    if(timingEnabled)callbackCadence.record(audioTrace::now(),numSamples);
+    auto traceSink=detailedTiming.sink();
+    const audioTrace::Session traceSession(timingEnabled?&traceSink:nullptr);
+    audioTrace::Scope midiTime(audioTrace::Event::midiDrain);
     if (resetRequested.exchange(false, std::memory_order_acq_rel))
         addResetMessages(nowSeconds);
     RealtimeMidiEvent event;
@@ -249,14 +255,17 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
     const auto probing = latencyProbeActive.load(std::memory_order_acquire);
     if (probing)
         addLatencyProbeMessages(numSamples, nowSeconds);
+    midiTime.finish();
 
     {
         const bool processed=processorChangeGate.processIfAvailable([&]{
             juce::AudioProcessorPlayer::audioDeviceIOCallbackWithContext(inputs, numInputs, outputs, numOutputs, numSamples, context);
         });
-        if(!processed)
+        if(!processed) {
+            if(timingEnabled)changeSkippedBlocks.fetch_add(1,std::memory_order_relaxed);
             for(int channel=0;channel<numOutputs;++channel)
                 if(outputs[channel])juce::FloatVectorOperations::clear(outputs[channel],numSamples);
+        }
     }
     const auto afterGraph = timingEnabled ? juce::Time::getMillisecondCounterHiRes()*.001 : 0.0;
     bool signal = false;
@@ -280,13 +289,13 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
     const auto afterAccompaniment = timingEnabled ? juce::Time::getMillisecondCounterHiRes()*.001 : 0.0;
     if (masterOutput != nullptr)
         masterOutput->processMaster(outputs, numOutputs, numSamples);
+    const auto afterMaster=timingEnabled?juce::Time::getMillisecondCounterHiRes()*.001:0.0;
     if(timingEnabled){
-        const auto end=juce::Time::getMillisecondCounterHiRes()*.001;
         const double budget=static_cast<double>(numSamples)/currentSampleRate;
         stageTiming.record(AudioStageTiming::graph,afterGraph-nowSeconds,budget);
         stageTiming.record(AudioStageTiming::instrumentEffects,afterInstrument-afterGraph,budget);
         stageTiming.record(AudioStageTiming::accompaniment,afterAccompaniment-afterInstrument,budget);
-        stageTiming.record(AudioStageTiming::master,end-afterAccompaniment,budget);
+        stageTiming.record(AudioStageTiming::master,afterMaster-afterAccompaniment,budget);
     }
     if (probing)
         for (int channel = 0; channel < numOutputs; ++channel)
@@ -295,7 +304,13 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
     if (recorder != nullptr)
         recorder->push(outputs, numOutputs, numSamples);
     callbackCount.fetch_add(1, std::memory_order_relaxed);
-    if (juce::Time::getMillisecondCounterHiRes() * 0.001 - nowSeconds
+    const auto callbackEnd=juce::Time::getMillisecondCounterHiRes()*.001;
+    if(timingEnabled) {
+        const double budget=static_cast<double>(numSamples)/currentSampleRate;
+        stageTiming.record(AudioStageTiming::callbackTail,callbackEnd-afterMaster,budget);
+        stageTiming.record(AudioStageTiming::callbackTotal,callbackEnd-nowSeconds,budget);
+    }
+    if (callbackEnd - nowSeconds
         > static_cast<double>(numSamples) / currentSampleRate)
         callbackOverruns.fetch_add(1, std::memory_order_relaxed);
 }
@@ -304,18 +319,45 @@ juce::String PluginHostEngine::takeStageTimingReport()
 {
     if(!player.timingEnabled)return {};
     const auto measurements=player.stageTiming.take();
-    const char* names[]{"graphAndMidi","instrumentPost","accompaniment","master"};
-    juce::String result;
+    const char* names[]{"graphAndMidi","instrumentPost","accompaniment","master","callbackTail","callbackTotal"};
+    // Message-thread snapshot only. Do not enumerate graph/editor/container
+    // ownership on the real-time thread or query third-party plug-in state.
+    juce::String result=" hostLifecycle[graphNodes="+juce::String(graph?graph->getNodes().size():0)
+        +",serialFx="+juce::String(static_cast<int>(effectNodes.size()))
+        +",idleContainers="+juce::String(static_cast<int>(containerCache.size()))
+        +",warmingContainers="+juce::String(static_cast<int>(containersWarming.size()))
+        +",instrumentEditorRetained="+juce::String(instrumentEditorWindow!=nullptr?1:0)
+        +",instrumentEditorVisible="+juce::String(instrumentEditorWindow&&instrumentEditorWindow->isVisible()?1:0)
+        +",effectEditorRetained="+juce::String(effectEditorWindow!=nullptr?1:0)
+        +",effectEditorVisible="+juce::String(effectEditorWindow&&effectEditorWindow->isVisible()?1:0)
+        +",loadGeneration="+juce::String(loadGeneration)+"]";
     for(size_t i=0;i<measurements.size();++i){const auto& m=measurements[i];
         result+=" "+juce::String(names[i])+"[blocks="+juce::String(m.blocks)
             +",meanUs="+juce::String(m.blocks?static_cast<double>(m.totalUs)/m.blocks:0.0,2)
             +",maxUs="+juce::String(m.maxUs)+",over="+juce::String(m.overBudget)+"]";
+    }
+    const auto details=player.detailedTiming.take();
+    const auto cadence=player.callbackCadence.take();
+    result+=" callbackCadence[epoch="+juce::String(player.callbackCadence.epoch.load())
+        +",calls="+juce::String(cadence.calls)+",minFrames="+juce::String(cadence.minFrames)
+        +",maxFrames="+juce::String(cadence.maxFrames)+",maxGapUs="
+        +juce::String(static_cast<double>(cadence.maxGapNs)/1000.0,2)
+        +",changeSkipped="+juce::String(player.changeSkippedBlocks.load())+"]";
+    const char* events[]{"playerLockWait","graphLockWait","nodeLockWait","nodeBodyInclusive",
+        "vstLockWait","vstAdapterInclusive","pluginCallWall","techniqueDispatch","midiDrain"};
+    const char* roles[]{"host","instrument","serialFx"};
+    for(unsigned e=0;e<audioTrace::eventCount;++e)for(unsigned role=0;role<audioTrace::Accumulator::roles;++role) {
+        const auto& value=details[e*audioTrace::Accumulator::roles+role];if(!value.calls)continue;
+        result+=" "+juce::String(events[e])+"."+roles[role]+"[calls="+juce::String(value.calls)
+            +",meanUs="+juce::String(static_cast<double>(value.totalNs)/value.calls/1000.0,2)
+            +",maxUs="+juce::String(static_cast<double>(value.maxNs)/1000.0,2)+"]";
     }
     return result;
 }
 
 void RecordingAudioProcessorPlayer::audioDeviceAboutToStart(juce::AudioIODevice* device)
 {
+    callbackCadence.restart();
     juce::AudioProcessorPlayer::audioDeviceAboutToStart(device);
     getMidiMessageCollector().ensureStorageAllocated(256 * 1024);
     currentSampleRate = device != nullptr && device->getCurrentSampleRate() > 0.0
@@ -474,6 +516,7 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
             instrumentNode = graph->addNode(std::move(instance));
             }
             currentDescription = description;
+            player.detailedTiming.instrument.store(instrumentNode->getProcessor());
             resolveTechniqueParameters();
             resolveInstrumentModelParameter();
             releaseBaseline = captureToneParameters();
@@ -591,6 +634,7 @@ void PluginHostEngine::unload()
     ++loadGeneration;
     ++effectLoadGeneration;
     player.setProcessor(nullptr);
+    player.detailedTiming.instrument.store(nullptr);
     // Stop audio before destroying third-party editors and their processors.
     instrumentEditorWindow.reset();
     effectEditorWindow.reset();

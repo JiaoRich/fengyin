@@ -29,6 +29,7 @@
 #include "SwamStringTremolo.h"
 #include "AudioStageTiming.h"
 #include "ProcessorChangeGate.h"
+#include "AudioCallbackTrace.h"
 
 namespace fengyin
 {
@@ -55,6 +56,9 @@ public:
     std::atomic<float> diagnosticSourcePeak { 0 };
     const bool timingEnabled = juce::SystemStats::getEnvironmentVariable("FENGYIN_AUDIO_TIMING", "0") == "1";
     AudioStageTiming stageTiming;
+    audioTrace::Accumulator detailedTiming;
+    audioTrace::Cadence callbackCadence;
+    std::atomic<uint64_t> changeSkippedBlocks{0};
     void audioDeviceIOCallbackWithContext(const float* const* inputs, int numInputs, float* const* outputs,
                                           int numOutputs, int numSamples,
                                           const juce::AudioIODeviceCallbackContext& context) override;

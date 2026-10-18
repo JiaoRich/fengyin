@@ -21,6 +21,7 @@ public:
     void setVolume(float volume);
     void mixInto(float* const* outputs, int outputChannels, int sampleCount) noexcept;
     [[nodiscard]] bool isReady() const noexcept { return ready.load(std::memory_order_acquire); }
+    [[nodiscard]] bool isPlaying() const noexcept { return transport.isPlaying(); }
     [[nodiscard]] double getPosition() const;
     [[nodiscard]] bool hasFinished() const noexcept { return transport.hasStreamFinished(); }
     [[nodiscard]] juce::File getAudioFile() const;

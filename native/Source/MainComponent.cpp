@@ -221,9 +221,9 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
     audio.initialise();
     audio.applyBestInitialSetup();
     testSynth.setRecordingService(&recorder);
-    testSynth.setAccompanimentService(&accompaniment);
+    if (!fengyin::VlcVideoSurface::supported()) testSynth.setAccompanimentService(&accompaniment);
     pluginHost.setRecordingService(&recorder);
-    pluginHost.setAccompanimentService(&accompaniment);
+    if (!fengyin::VlcVideoSurface::supported()) pluginHost.setAccompanimentService(&accompaniment);
     testSynth.setMasterOutputService(&masterOutput);
     pluginHost.setMasterOutputService(&masterOutput);
     videoPlayer.setAccompanimentService(&accompaniment);
@@ -238,6 +238,7 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
     applyTheme(Theme::neon);
     showPage(Page::play);
     setupWebInterface();
+    addChildComponent(vlcVideo);
     // Discover dependencies on a fresh installation, without creating tones.
     // Discover later-installed plugins too; existing unchanged plugins use cache.
     pluginChoicesLoaded = false;
@@ -256,7 +257,8 @@ MainComponent::~MainComponent()
     pluginHost.setLatencyProbeActive(false);
     webVideoAudioExtractor.cancel();
     webVideoPlaybackCache.interrupt();
-    accompaniment.pause();
+    pauseAccompaniment();
+    vlcVideo.shutdown();
     webInterface.reset();
     recorder.stop();
     midi.setPerformanceSink(nullptr);
@@ -269,6 +271,7 @@ void MainComponent::setWebPresentationVisible(bool visible)
     if(!visible && !windowRecorder.isAudioOnly())windowRecorder.stop();
     if (webPresentationVisible == visible) return;
     webPresentationVisible = visible;
+    vlcVideo.updateViewport(vlcViewport, visible && vlcViewportVisible);
     lastWebStateAtMs = 0; // Restore gets a complete current snapshot, not stale deltas.
     if (webInterface && webInterfaceReady)
         webInterface->evaluateJavascript(visible ? "window.fengyinSetPresentationVisible?.(true);"
@@ -525,6 +528,17 @@ void MainComponent::setupWebInterface()
             juce::SystemClipboard::copyTextToClipboard(machineCode);
         })
         .withEventListener("chooseVideo", [this](juce::var) { if (isActivated) chooseVideoForWebInterface(); })
+        .withEventListener("nativeVideoViewport", [this](juce::var payload)
+        {
+            if (!fengyin::VlcVideoSurface::supported()) return;
+            // Browser CSS pixels are JUCE logical coordinates (zoom is locked).
+            vlcViewport=juce::Rectangle<int>(
+                static_cast<int>(payload.getProperty("x",0)),static_cast<int>(payload.getProperty("y",0)),
+                juce::jlimit(0,getWidth(),static_cast<int>(payload.getProperty("width",0))),
+                juce::jlimit(0,getHeight(),static_cast<int>(payload.getProperty("height",0)))).getIntersection(getLocalBounds());
+            vlcViewportVisible=static_cast<bool>(payload.getProperty("visible",false));
+            vlcVideo.updateViewport(vlcViewport,vlcViewportVisible && webPresentationVisible);
+        })
         .withEventListener("setBendRange", [this](juce::var payload)
         {
             if (isActivated && ! pluginLoading) changeInstrumentBendRange(payload);
@@ -534,7 +548,7 @@ void MainComponent::setupWebInterface()
             if (static_cast<int>(payload.getProperty("generation", -1)) != webVideoGeneration) return;
             if (! isActivated)
             {
-                accompaniment.pause();
+                pauseAccompaniment();
                 return;
             }
             const bool wasPlaying = videoPlaybackActive;
@@ -545,14 +559,15 @@ void MainComponent::setupWebInterface()
                 interruptIdleVideoPreparation();
                 if (webVideoAudioReady && !wasPlaying)
                 {
-                    accompaniment.play();
+                    playAccompaniment();
                 }
             }
             else
-                accompaniment.pause();
+                pauseAccompaniment();
         })
         .withEventListener("syncVideoPlayback", [this](juce::var payload)
         {
+            if (fengyin::VlcVideoSurface::supported()) return; // VLC is the only clock.
             if (static_cast<int>(payload.getProperty("generation", -1)) != webVideoGeneration) return;
             if (!webVideoAudioReady || webInterface == nullptr) return;
             // The audio transport is the clock. Browser frame stalls must not
@@ -583,13 +598,14 @@ void MainComponent::setupWebInterface()
             if(revision<webVideoSeekRevision)return;
             webVideoSeekRevision=revision;
             webVideoPosition = static_cast<double>(payload.getProperty("position", 0.0));
-            if (webVideoAudioReady) accompaniment.setPosition(webVideoPosition);
+            if (webVideoAudioReady) seekAccompaniment(webVideoPosition);
         })
         .withEventListener("setVideoVolume", [this](juce::var payload)
         {
             webVideoVolume = juce::jlimit(0.0f, 1.0f,
                 static_cast<float>(static_cast<double>(payload.getProperty("value", 1.0))));
             accompaniment.setVolume(webVideoVolume);
+            if (auto* player=vlcVideo.player()) player->setVolume(webVideoVolume);
         })
         .withEventListener("setPerformanceReverb", [this](juce::var payload)
         {
@@ -951,7 +967,21 @@ void MainComponent::loadVideoForWebInterface(const juce::File& file)
         result->setProperty("url", juce::URL(file).toString(false));
         result->setProperty("name", file.getFileName());
         result->setProperty("generation", generation);
+        result->setProperty("engine", fengyin::VlcVideoSurface::supported() ? "vlc" : "legacy");
         webInterface->emitEventIfBrowserIsVisible("videoSelected", juce::var(result.release()));
+    }
+
+    if (fengyin::VlcVideoSurface::supported())
+    {
+        // Do not extract a WAV, decode in WebView2, or prepare proxy files.
+        // VLC's own audio output remains independent of the live instrument.
+        if (!vlcVideo.initialise())
+        { emitVideoAudioState(false,utf8("无法创建 VLC 播放窗口，请重新启动风吟")); return; }
+        vlcVideo.player()->setVolume(webVideoVolume);
+        vlcVideo.player()->load(file.getFullPathName().toStdString(),generation);
+        vlcVideo.updateViewport(vlcViewport,vlcViewportVisible && webPresentationVisible);
+        lastVlcStateAtMs=0;
+        return;
     }
 
     if (accompaniment.loadForVideo(file))
@@ -993,6 +1023,7 @@ void MainComponent::emitVideoAudioState(bool ready, const juce::String& message)
 
 void MainComponent::updateIdleVideoPreparation()
 {
+    if (fengyin::VlcVideoSurface::supported()) return;
     const auto now=juce::Time::getMillisecondCounterHiRes();
     const bool busy=videoPlaybackActive || recorder.isRecording() || windowRecorder.busy()
         || snapshot.breath>.01f || snapshot.lastNote>=0 || pluginLoading || effectLoading
@@ -1022,6 +1053,53 @@ void MainComponent::updateIdleVideoPreparation()
                 juce::Logger::writeToLog("Idle video playback cache ready (audio unchanged)");
             }
         });
+}
+
+void MainComponent::pauseAccompaniment()
+{
+    if (auto* player=vlcVideo.player()) player->setPlaying(false);
+    else accompaniment.pause();
+}
+void MainComponent::playAccompaniment()
+{
+    if (auto* player=vlcVideo.player()) player->setPlaying(true);
+    else accompaniment.play();
+}
+double MainComponent::accompanimentPosition() const
+{
+    return fengyin::VlcVideoSurface::supported() ? vlcVideo.getState().position : accompaniment.getPosition();
+}
+bool MainComponent::accompanimentFinished() const
+{
+    return fengyin::VlcVideoSurface::supported() ? vlcVideo.getState().finished : accompaniment.hasFinished();
+}
+void MainComponent::seekAccompaniment(double seconds)
+{
+    if(auto* player=vlcVideo.player())player->seek(seconds,webVideoSeekRevision);
+    else accompaniment.setPosition(seconds);
+}
+void MainComponent::updateVlcPlayback()
+{
+    if(!fengyin::VlcVideoSurface::supported() || !vlcVideo.player())return;
+    const auto now=juce::Time::getMillisecondCounterHiRes();
+    if(now-lastVlcStateAtMs<200)return;
+    lastVlcStateAtMs=now;
+    const auto status=vlcVideo.getState();
+    if(status.generation!=webVideoGeneration)return;
+    webVideoAudioReady=status.ready && status.error.empty();
+    if(status.finished || !status.error.empty())videoPlaybackActive=false;
+    if(webInterface && webPresentationVisible && webInterfaceReady) {
+        auto result=std::make_unique<juce::DynamicObject>();
+        result->setProperty("generation",status.generation);
+        result->setProperty("seekRevision",status.seekRevision);
+        result->setProperty("ready",webVideoAudioReady);
+        result->setProperty("playing",videoPlaybackActive);
+        result->setProperty("finished",status.finished);
+        result->setProperty("position",status.position);
+        result->setProperty("duration",status.duration);
+        result->setProperty("error",juce::String::fromUTF8(status.error.c_str()));
+        webInterface->emitEventIfBrowserIsVisible("nativeVideoState",juce::var(result.release()));
+    }
 }
 
 void MainComponent::interruptIdleVideoPreparation()
@@ -1306,7 +1384,8 @@ void MainComponent::requestCompactMode(bool compact)
         if (result == 0) return;
         if (compact)
         {
-            safe->accompaniment.pause();
+            safe->pauseAccompaniment();
+            safe->videoPlaybackActive=false;
             if (safe->webInterface)
                 safe->webInterface->emitEventIfBrowserIsVisible("pauseForDriverChange", juce::var());
         }
@@ -1331,6 +1410,7 @@ void MainComponent::resized()
 {
     if (webInterface != nullptr)
     {
+        vlcVideo.updateViewport(vlcViewport,false); // Re-show only after fresh browser geometry.
         webInterface->setBounds(getLocalBounds());
         return;
     }
@@ -1411,8 +1491,48 @@ void MainComponent::resized()
     }
 }
 
+void MainComponent::logAudioDiagnostic(const fengyin::AudioDeviceStatus& status)
+{
+    const auto now=juce::Time::getMillisecondCounterHiRes();
+    if(now<nextAudioDiagnosticMs)return;
+    nextAudioDiagnosticMs=now+5000;
+    const bool detailed=pluginHost.isStageTimingEnabled();
+    const auto folder=juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("FengYin");
+    folder.createDirectory();
+    const auto log=folder.getChildFile(detailed?"audio-timing-diagnostic.log":"audio-source-diagnostic.log");
+    if(log.getSize()>(detailed?16*1024*1024:256*1024))log.replaceWithText("");
+    log.appendText(juce::Time::getCurrentTime().toISO8601(true)
+        +" sourcePeak="+juce::String(pluginHost.takeDiagnosticSourcePeak(),6)
+        +" callbacks="+juce::String(pluginHost.getCallbackCount())
+        +" signalBlocks="+juce::String(pluginHost.getSignalBlocks())
+        +" device="+status.deviceName+pluginHost.takeStageTimingReport()
+        +" type="+status.deviceType+" rate="+juce::String(status.sampleRate)
+        +" buffer="+juce::String(status.bufferSize)+" xruns="+juce::String(status.xRunCount)
+        +" callbackOverruns="+juce::String(pluginHost.getCallbackOverruns())
+        +" overloadSamples="+juce::String(masterOutput.getOverloadSamples())
+        +" accompanimentReadMisses="+juce::String(accompaniment.getReadMissCount())
+        +(detailed ? " mediaState[generation="+juce::String(webVideoGeneration)
+          +",selected="+juce::String(webVideoFile==juce::File()?0:1)
+          +",audioReady="+juce::String(webVideoAudioReady?1:0)
+          +",requestedPlaying="+juce::String(videoPlaybackActive?1:0)
+          +",transportPlaying="+juce::String((fengyin::VlcVideoSurface::supported()?vlcVideo.getState().playing:accompaniment.isPlaying())?1:0)
+          +",vlcDecodedVideo="+juce::String(vlcVideo.getState().decodedVideo)
+          +",vlcDisplayedVideo="+juce::String(vlcVideo.getState().displayedVideo)
+          +",vlcLostVideo="+juce::String(vlcVideo.getState().lostVideo)
+          +",vlcDecodedAudio="+juce::String(vlcVideo.getState().decodedAudio)
+          +",extractBusy="+juce::String(webVideoAudioExtractor.busy()?1:0)
+          +",proxyBusy="+juce::String(webVideoPlaybackCache.busy()?1:0)
+          +",proxyAttempted="+juce::String(webVideoProxyAttempted?1:0)
+          +",recording="+juce::String(recorder.isRecording()?1:0)
+          +",windowRecorderBusy="+juce::String(windowRecorder.busy()?1:0)
+          +",breath="+juce::String(snapshot.breath,4)+",note="+juce::String(snapshot.lastNote)
+          +",pluginLoading="+juce::String(pluginLoading?1:0)
+          +",effectLoading="+juce::String(effectLoading?1:0)+"]" : juce::String())+"\n");
+}
+
 void MainComponent::timerCallback()
 {
+    updateVlcPlayback();
     if(performanceNotesEnabled) {
         const auto now=juce::Time::getMillisecondCounterHiRes()*.001;
         const bool allowed=isActivated && videoPlaybackActive && pluginHost.hasPlugin() && !pluginLoading
@@ -1474,7 +1594,7 @@ void MainComponent::timerCallback()
         midi.pollConnection();
     }
     snapshot = midi.getSnapshot();
-    if (videoPlaybackActive && webVideoAudioReady && accompaniment.hasFinished())
+    if (videoPlaybackActive && webVideoAudioReady && accompanimentFinished())
         videoPlaybackActive = false;
     if (!containerPrewarmStarted && isActivated && pluginChoicesLoaded && !pluginCatalog.getProgress().scanning && !pluginLoading && !effectLoading
         && !recorder.isRecording() && !windowRecorder.busy() && !videoPlaybackActive && snapshot.breath <= 0.01f
@@ -1616,6 +1736,9 @@ void MainComponent::timerCallback()
         }
     }
     const auto currentAudio = audio.getStatus();
+    // Diagnostic capture must continue while the web presentation is hidden.
+    // Disk IO remains on the message timer, never on the audio callback.
+    if(pluginHost.isStageTimingEnabled())logAudioDiagnostic(currentAudio);
     const auto scanProgress = pluginCatalog.getProgress();
     simulatedPhase += 0.09f;
     displayedLeftPeak = juce::jmax(displayedLeftPeak * 0.88f, juce::jlimit(0.0f, 1.0f, masterOutput.getLeftPeak()));
@@ -1633,7 +1756,7 @@ void MainComponent::timerCallback()
         if (webActive) masterOutput.getSpectrum(spectrumLevels);
         auto state = std::make_unique<juce::DynamicObject>();
         state->setProperty("audioTimingEnabled",pluginHost.isStageTimingEnabled());
-        if (webVideoAudioReady)
+        if (webVideoAudioReady && !fengyin::VlcVideoSurface::supported())
         {
             auto clock = std::make_unique<juce::DynamicObject>();
             clock->setProperty("generation", webVideoGeneration);
@@ -1670,21 +1793,7 @@ void MainComponent::timerCallback()
         state->setProperty("latency", currentAudio.estimatedBufferLatencyMs + pluginLatencyMs);
         state->setProperty("pluginLatency", pluginLatencyMs);
         state->setProperty("audioCpu", currentAudio.cpuUsage);
-        static double nextSourceDiagnostic = 0;
-        if (juce::Time::getMillisecondCounterHiRes() >= nextSourceDiagnostic)
-        {
-            nextSourceDiagnostic = juce::Time::getMillisecondCounterHiRes() + 5000;
-            const auto folder = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("FengYin");
-            folder.createDirectory();
-            const auto log = folder.getChildFile("audio-source-diagnostic.log");
-            if (log.getSize() > 256 * 1024) log.replaceWithText("");
-            log.appendText(juce::Time::getCurrentTime().toISO8601(true)
-                + " sourcePeak=" + juce::String(pluginHost.takeDiagnosticSourcePeak(), 6)
-                + " callbacks=" + juce::String(pluginHost.getCallbackCount())
-                + " signalBlocks=" + juce::String(pluginHost.getSignalBlocks())
-                + " device=" + currentAudio.deviceName + pluginHost.takeStageTimingReport()
-                + " accompanimentReadMisses="+juce::String(accompaniment.getReadMissCount())+"\n");
-        }
+        if(!pluginHost.isStageTimingEnabled())logAudioDiagnostic(currentAudio);
         state->setProperty("audioXruns", currentAudio.xRunCount);
         state->setProperty("callbackOverruns", static_cast<juce::int64>(pluginHost.getCallbackOverruns()));
         state->setProperty("overloadSamples", static_cast<juce::int64>(masterOutput.getOverloadSamples()));
@@ -2056,7 +2165,7 @@ void MainComponent::startSuperLowLatencyOptimisation(bool restore)
     // The user has confirmed the system-driver operation. Quiesce our own
     // playback instead of treating the last MIDI note as an active performer.
     if (recorder.isRecording()) toggleRecording();
-    accompaniment.pause();
+    pauseAccompaniment();
     videoPlaybackActive = false;
     audio.cancelAutomaticLatencyTuning();
     pluginHost.setLatencyProbeActive(false);
@@ -2088,14 +2197,15 @@ void MainComponent::followSystemAudioOutputIfNeeded()
     if (recorder.isRecording()) toggleRecording();
 
     const auto shouldResumeAccompaniment = videoPlaybackActive && webVideoAudioReady;
-    const auto resumePosition = webVideoAudioReady ? accompaniment.getPosition() : webVideoPosition;
-    accompaniment.pause();
+    const auto resumePosition = webVideoAudioReady ? accompanimentPosition() : webVideoPosition;
+    pauseAccompaniment();
     const auto changed = audio.followSystemDefaultOutput();
 
     if (shouldResumeAccompaniment)
     {
-        accompaniment.setPosition(resumePosition);
-        accompaniment.play();
+        if (fengyin::VlcVideoSurface::supported()) ++webVideoSeekRevision;
+        seekAccompaniment(resumePosition);
+        playAccompaniment();
     }
     if (! changed) return;
 
@@ -3834,7 +3944,7 @@ void MainComponent::refreshLicenseUi()
         {
             if (recorder.isRecording()) recorder.stop();
             windowRecorder.stop();
-            accompaniment.pause();
+            pauseAccompaniment();
             videoPlaybackActive = false;
             midi.setPerformanceSink(nullptr);
             pluginHost.detach();

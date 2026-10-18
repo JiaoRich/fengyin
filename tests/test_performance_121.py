@@ -21,7 +21,7 @@ class Performance121(unittest.TestCase):
   self.assertNotIn('appendText',s);self.assertNotIn('writeToLog',s);self.assertIn('if(timingEnabled)',s)
  def test_proxy_work_is_idle_only_and_never_changes_audio(self):
   native=(ROOT/'native/Source/MainComponent.cpp').read_text(encoding='utf-8')
-  block=native.split('void MainComponent::updateIdleVideoPreparation()',1)[1].split('std::optional<juce::WebBrowserComponent::Resource>',1)[0]
+  block=native.split('void MainComponent::updateIdleVideoPreparation()',1)[1].split('void MainComponent::pauseAccompaniment()',1)[0]
   for guard in ['videoPlaybackActive','recorder.isRecording()','windowRecorder.busy()','snapshot.breath','pluginLoading','effectLoading']:
    self.assertIn(guard,block)
   self.assertNotIn('accompaniment.setPosition',block)

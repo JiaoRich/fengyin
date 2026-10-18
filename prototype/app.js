@@ -173,6 +173,8 @@ let videoWantsPlaying = false;
 let videoPlayRequest = 0;
 let triedVideoDataFallback = false;
 let nativeAccompanimentReady = false;
+let nativeVideoEngine = false;
+let nativeVideoDuration = 0, nativeVideoPosition = 0, nativeVideoLastError = '';
 let lastVideoSyncAt = 0;
 let videoSeekDragging = false;
 let pendingVideoSeek = null;
@@ -1122,6 +1124,7 @@ if (previewParams.get('preview') === 'sounds') showPage('sounds');
 const video = $('#video');
 const videoFileInput = $('#video-file');
 function updateVideoPresentation() {
+  if(nativeVideoEngine){scheduleNativeVideoViewport();return;}
   const element=document.querySelector('#video'),card=document.querySelector('.video-card');
   if(!element || !nativeAccompanimentReady || !videoWantsPlaying)return;
   const visible=!document.hidden && !document.body.classList.contains('presentation-hidden')
@@ -1132,6 +1135,7 @@ function updateVideoPresentation() {
 function chooseVideoFile() {
   videoWantsPlaying = false;
   video.pause();
+  if(nativeVideoEngine)nativeEvent('setVideoPlaybackState',{generation:videoGeneration,playing:false});
   if (window.__JUCE__?.backend?.emitEvent) {
     nativeEvent('chooseVideo');
     toast('请选择一个伴奏视频');
@@ -1174,6 +1178,7 @@ videoFileInput.addEventListener('change', event => {
   toast('正在载入视频…');
 });
 video.addEventListener('loadedmetadata', () => {
+  if(nativeVideoEngine)return;
   videoLoading = false;
   if(restoringVideoPosition!==null)video.currentTime=restoringVideoPosition;
   else video.currentTime = 0;
@@ -1184,6 +1189,7 @@ video.addEventListener('loadedmetadata', () => {
   toast('视频已载入，可以播放');
 });
 video.addEventListener('error', () => {
+  if(nativeVideoEngine)return;
   if(usingPreparedVideo && originalVideoSource) {
     usingPreparedVideo=false;restoringVideoPosition=restoringVideoPosition??(Number.isFinite(video.currentTime)?video.currentTime:0);
     videoLoading=true;video.src=originalVideoSource;video.load();return;
@@ -1203,6 +1209,18 @@ video.addEventListener('error', () => {
 });
 
 function toggleVideo() {
+  if(nativeVideoEngine) {
+    if(!originalVideoSource)return toast('请先选择一个本地视频');
+    if(!nativeAccompanimentReady)return toast('视频正在准备，请稍候');
+    videoWantsPlaying=!videoWantsPlaying;
+    if(videoWantsPlaying && nativeVideoFinished) {
+      nativeVideoFinished=false;nativeVideoPosition=0;
+      nativeEvent('seekVideo',{generation:videoGeneration,position:0,seekRevision:++videoSeekRevision});
+    }
+    nativeEvent('setVideoPlaybackState',{generation:videoGeneration,playing:videoWantsPlaying});
+    $('#play-button').textContent=videoWantsPlaying?'Ⅱ':'▶';
+    return;
+  }
   if (!video.src) { window.fengyinVoice?.say('V038'); return toast('请先选择一个本地视频'); }
   if (videoLoading || (window.__JUCE__?.backend?.emitEvent && !nativeAccompanimentReady))
     return toast('视频正在准备，请稍候');
@@ -1225,14 +1243,16 @@ function toggleVideo() {
   }
 }
 $('#play-button').addEventListener('click', toggleVideo);
-video.addEventListener('playing', () => { if (videoLoading || !videoWantsPlaying) { video.pause(); return; } document.body.classList.add('video-playing'); nativeEvent('setVideoPlaybackState',{generation:videoGeneration,playing:true,position:video.currentTime}); $('#play-button').textContent='Ⅱ';updateVideoPresentation(); });
-video.addEventListener('pause', () => { document.body.classList.remove('video-playing'); if (!videoLoading && (!nativeAccompanimentReady || !videoWantsPlaying)) nativeEvent('setVideoPlaybackState',{generation:videoGeneration,playing:false,position:video.currentTime}); $('#play-button').textContent=videoWantsPlaying?'Ⅱ':'▶'; });
+video.addEventListener('playing', () => { if(nativeVideoEngine)return; if (videoLoading || !videoWantsPlaying) { video.pause(); return; } document.body.classList.add('video-playing'); nativeEvent('setVideoPlaybackState',{generation:videoGeneration,playing:true,position:video.currentTime}); $('#play-button').textContent='Ⅱ';updateVideoPresentation(); });
+video.addEventListener('pause', () => { if(nativeVideoEngine)return; document.body.classList.remove('video-playing'); if (!videoLoading && (!nativeAccompanimentReady || !videoWantsPlaying)) nativeEvent('setVideoPlaybackState',{generation:videoGeneration,playing:false,position:video.currentTime}); $('#play-button').textContent=videoWantsPlaying?'Ⅱ':'▶'; });
 video.addEventListener('ended', () => {
+  if(nativeVideoEngine)return;
   document.body.classList.remove('video-playing');
   if(nativeAccompanimentReady)return; // The picture must not truncate the audio tail.
   videoWantsPlaying = false;nativeEvent('setVideoPlaybackState',{generation:videoGeneration,playing:false,position:video.currentTime});
 });
 video.addEventListener('timeupdate', () => {
+  if(nativeVideoEngine)return;
   $('#current-time').textContent = formatTime(video.currentTime);
   if(!videoSeekDragging) $('#seek').value = video.duration ? video.currentTime / video.duration * 100 : 0;
   const now = performance.now();
@@ -1251,6 +1271,7 @@ video.addEventListener('timeupdate', () => {
   }
 });
 function applyPreparedVideoSource() {
+  if(nativeVideoEngine)return;
   if(!preparedVideoSource || videoWantsPlaying || videoLoading || videoSeekDragging
       || recording || screenRecordingBusy || Number(latestBackendState?.breath||0)>.01) return;
   const source=preparedVideoSource;preparedVideoSource=null;
@@ -1263,8 +1284,9 @@ window.__JUCE__?.backend?.addEventListener('videoPlaybackPrepared',source=>{
   preparedVideoSource=source;applyPreparedVideoSource();
 });
 $('#seek').addEventListener('input', event => {
-  if(!video.duration) return;
-  pendingVideoSeek = event.target.value / 100 * video.duration;
+  const duration=nativeVideoEngine?nativeVideoDuration:video.duration;
+  if(!duration) return;
+  pendingVideoSeek = event.target.value / 100 * duration;
   $('#current-time').textContent = formatTime(pendingVideoSeek);
 });
 function commitVideoSeek() {
@@ -1272,7 +1294,9 @@ function commitVideoSeek() {
   if(pendingVideoSeek === null || !Number.isFinite(pendingVideoSeek)) return;
   const position=pendingVideoSeek;pendingVideoSeek=null;
   nativeVideoFinished=false;
-  video.currentTime=position;lastVideoSyncAt=performance.now();
+  if(nativeVideoEngine)nativeVideoPosition=position;
+  else video.currentTime=position;
+  lastVideoSyncAt=performance.now();
   nativeEvent('seekVideo',{generation:videoGeneration,position,seekRevision:++videoSeekRevision});
 }
 $('#seek').addEventListener('pointerdown',()=>{videoSeekDragging=true;});
@@ -1280,6 +1304,7 @@ $('#seek').addEventListener('change',commitVideoSeek);
 $('#seek').addEventListener('pointerup',commitVideoSeek);
 $('#seek').addEventListener('pointercancel',()=>{videoSeekDragging=false;pendingVideoSeek=null;});
 function applyVideoPlaybackClock(clock) {
+  if(nativeVideoEngine)return;
   if(Number(clock?.generation)!==videoGeneration || videoSeekDragging || pendingVideoSeek!==null
       || Number(clock.seekRevision??0)!==videoSeekRevision
       || videoLoading || !nativeAccompanimentReady) return;
@@ -1298,6 +1323,63 @@ function applyVideoPlaybackClock(clock) {
   if(video.paused && !video.ended)video.play().catch(()=>{});
 }
 window.__JUCE__?.backend?.addEventListener('videoPlaybackClock',applyVideoPlaybackClock);
+// The native player owns the single A/V clock. JS never loads or seeks a
+// second decoder, and only sends explicit user commands and viewport changes.
+let nativeViewportFrame=0,nativeViewportLast='';
+function scheduleNativeVideoViewport() {
+  if(nativeViewportFrame || !nativeVideoEngine)return;
+  nativeViewportFrame=requestAnimationFrame(reportNativeVideoViewport);
+}
+function reportNativeVideoViewport() {
+  nativeViewportFrame=0;
+  const surface=$('#native-video-surface'),rect=surface.getBoundingClientRect();
+  const blocked=document.body.classList.contains('quick-tones-open') || Array.from(document.querySelectorAll('.dialog-backdrop,[role="dialog"],[role="menu"],[aria-modal="true"],.guide-overlay,.onboarding-overlay'))
+    .some(e=>e.getClientRects().length>0 && getComputedStyle(e).visibility!=='hidden');
+  const visible=nativeVideoEngine && nativeAccompanimentReady && !blocked && !document.hidden
+    && !document.body.classList.contains('presentation-hidden')
+    && $('#page-play').classList.contains('active') && rect.width>0 && rect.height>0;
+  const payload={x:Math.round(rect.x),y:Math.round(rect.y),width:Math.round(rect.width),height:Math.round(rect.height),visible};
+  const key=JSON.stringify(payload);
+  if(key!==nativeViewportLast){nativeViewportLast=key;nativeEvent('nativeVideoViewport',payload);}
+}
+new ResizeObserver(scheduleNativeVideoViewport).observe($('#native-video-surface'));
+window.addEventListener('resize',()=>{nativeViewportLast='';scheduleNativeVideoViewport();});
+document.addEventListener('scroll',scheduleNativeVideoViewport,true);
+const nativeViewportObserver=new MutationObserver(scheduleNativeVideoViewport);
+nativeViewportObserver.observe(document.body,{attributes:true,attributeFilter:['class']});
+function observeNativeVideoDialogs(root=document) {
+  root.querySelectorAll('.dialog-backdrop,[role="dialog"],[role="menu"],[aria-modal="true"],.guide-overlay,.onboarding-overlay').forEach(e=>
+    nativeViewportObserver.observe(e,{attributes:true,attributeFilter:['hidden','class','style']}));
+}
+observeNativeVideoDialogs();
+// The guide creates its dialog after app.js has finished loading.
+new MutationObserver(records=>{
+  if(records.some(r=>Array.from(r.addedNodes).some(n=>n.nodeType===1))){
+    observeNativeVideoDialogs();scheduleNativeVideoViewport();
+  }
+}).observe(document.body,{childList:true});
+window.__JUCE__?.backend?.addEventListener('nativeVideoState',state=>{
+  if(!nativeVideoEngine || Number(state?.generation)!==videoGeneration)return;
+  if(Number(state.seekRevision)<videoSeekRevision)return;
+  videoSeekRevision=Number(state.seekRevision)||0;
+  nativeAccompanimentReady=!!state.ready;
+  videoLoading=!state.ready && !state.error;
+  nativeVideoDuration=Math.max(0,Number(state.duration)||0);
+  nativeVideoPosition=Math.max(0,Number(state.position)||0);
+  nativeVideoFinished=!!state.finished;
+  videoWantsPlaying=!!state.playing;
+  document.body.classList.toggle('video-playing',videoWantsPlaying);
+  $('#play-button').textContent=videoWantsPlaying?'Ⅱ':'▶';
+  $('#duration').textContent=formatTime(nativeVideoDuration);
+  if(!videoSeekDragging && pendingVideoSeek===null){
+    $('#current-time').textContent=formatTime(nativeVideoPosition);
+    $('#seek').value=nativeVideoDuration?nativeVideoPosition/nativeVideoDuration*100:0;
+  }
+  $('#video-empty').style.display='none';
+  if(state.error && state.error!==nativeVideoLastError)toast(state.error);
+  nativeVideoLastError=state.error||'';
+  scheduleNativeVideoViewport();
+});
 $('#video-volume').addEventListener('input', event => {
   const value = event.target.value / 100;
   video.volume = value;
@@ -1316,6 +1398,7 @@ async function toggleFullscreen() {
 }
 fullscreenButton.addEventListener('click', toggleFullscreen);
 document.addEventListener('fullscreenchange', () => {
+  nativeViewportLast='';scheduleNativeVideoViewport();
   const active = document.fullscreenElement === videoCard;
   fullscreenButton.textContent = active ? '退出全屏' : '全屏';
   fullscreenButton.setAttribute('aria-label', active ? '退出视频全屏' : '视频全屏');
@@ -2367,6 +2450,19 @@ window.__JUCE__?.backend?.addEventListener('videoSelected', result => {
   $('#video-empty').style.display = 'grid';
   if (videoUrl) URL.revokeObjectURL(videoUrl);
   videoUrl = '';
+  nativeVideoEngine=result.engine==='vlc';
+  nativeVideoDuration=0;nativeVideoPosition=0;nativeVideoLastError='';
+  $('.video-card').classList.toggle('native-vlc',nativeVideoEngine);
+  $('#native-video-surface').hidden=!nativeVideoEngine;
+  if(nativeVideoEngine){
+    video.removeAttribute('src');video.load();
+    $('#video-name').textContent=result.name||'伴奏视频';
+    $('#change-video').textContent='更换视频';
+    document.body.classList.remove('video-playing');
+    nativeViewportLast='';scheduleNativeVideoViewport();
+    toast('视频已选择，正在读取播放信息…');
+    return;
+  }
   video.src = result.url;
   video.load();
   $('#video-name').textContent = result.name || '伴奏视频';
@@ -2376,6 +2472,11 @@ window.__JUCE__?.backend?.addEventListener('videoSelected', result => {
 window.__JUCE__?.backend?.addEventListener('videoAudioState', result => {
   if (Number(result?.generation) !== videoGeneration) return;
   nativeAccompanimentReady = !!result?.ready;
+  if(nativeVideoEngine){
+    videoLoading=false;
+    if(result?.message)toast(result.message);
+    scheduleNativeVideoViewport();return;
+  }
   // 后台音轨准备成功后，网页只负责画面，声音统一由风吟输出并进入录音。
   video.muted = true;
   if (result?.message) toast(result.message);
@@ -2469,7 +2570,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.22 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.23 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

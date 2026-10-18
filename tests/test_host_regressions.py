@@ -496,7 +496,7 @@ class HostRegressionTests(unittest.TestCase):
             "void MainComponent::followSystemAudioOutputIfNeeded", 1)[0]
         self.assertNotIn("lastNote", start)
         self.assertIn("if (recorder.isRecording()) toggleRecording();", start)
-        self.assertIn("accompaniment.pause();", start)
+        self.assertIn("pauseAccompaniment();", start)
         self.assertIn('"pauseForDriverChange"', start)
         self.assertIn("midi.setPerformanceSink(nullptr)", start)
 

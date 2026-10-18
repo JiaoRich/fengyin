@@ -191,3 +191,5 @@ replace_exact("${wasapi}"
 replace_exact("${wasapi}"
     "        if (mode == WASAPIDeviceMode::sharedLowLatency)  return \"Windows Audio (Low Latency Mode)\";"
     "        if (mode == WASAPIDeviceMode::sharedLowLatency)  return \"Windows Audio (Low Latency Mode)\";\n        if (mode == WASAPIDeviceMode::sharedLowLatencyRaw) return \"Windows Audio (RAW Test Mode)\";")
+
+include("${CMAKE_CURRENT_LIST_DIR}/patch-juce-audio-trace.cmake")

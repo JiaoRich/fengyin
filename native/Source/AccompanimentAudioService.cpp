@@ -16,7 +16,7 @@ private:
     std::atomic<uint64_t>& readMisses;
 };
 }
-AccompanimentAudioService::AccompanimentAudioService() { formats.registerBasicFormats(); readAheadThread.startThread(); }
+AccompanimentAudioService::AccompanimentAudioService() { formats.registerBasicFormats(); }
 AccompanimentAudioService::~AccompanimentAudioService() { unload(); readAheadThread.stopThread(2000); }
 juce::File AccompanimentAudioService::findDecodableFile(const juce::File& videoFile)
 {
@@ -44,6 +44,7 @@ bool AccompanimentAudioService::loadForVideo(const juce::File& videoFile)
 bool AccompanimentAudioService::loadAudioFile(const juce::File& audioFile)
 {
     unload();
+    if(!readAheadThread.isThreadRunning())readAheadThread.startThread();
     auto reader = std::unique_ptr<juce::AudioFormatReader>(formats.createReaderFor(audioFile));
     if (reader == nullptr) return false;
     const auto sourceRate=reader->sampleRate;

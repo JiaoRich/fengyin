@@ -10,7 +10,7 @@ namespace fengyin {
 class AudioStageTiming {
 public:
     static_assert(std::atomic<uint64_t>::is_always_lock_free);
-    enum Stage { graph, instrumentEffects, accompaniment, master, count };
+    enum Stage { graph, instrumentEffects, accompaniment, master, callbackTail, callbackTotal, count };
     struct Result { uint64_t blocks=0, totalUs=0, maxUs=0, overBudget=0; };
     void record(Stage stage,double seconds,double budgetSeconds) noexcept {
         auto& value=values[stage];

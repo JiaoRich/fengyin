@@ -15,6 +15,7 @@ public:
     void cancel();
     [[nodiscard]] bool isExtractorAvailable() const;
     [[nodiscard]] juce::File getExecutable() const;
+    [[nodiscard]] bool busy() const { return pool.getNumJobs() > 0; }
     static juce::File cacheFileFor(const juce::File& video, const juce::File& cacheDirectory);
 
 private:
