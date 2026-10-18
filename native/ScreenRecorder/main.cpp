@@ -1,5 +1,6 @@
 // Windows-only window capture + default-speaker loopback + MP4 writer.
-// No desktop/screen fallback, microphone, driver installation or audio routing.
+// Legacy rollback. Explicit screen: requests pin a monitor; no implicit fallback,
+// microphone, driver installation or audio routing.
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -288,8 +289,10 @@ class WindowFrames {
     GraphicsCaptureSession session{nullptr};
     winrt::event_token token{};
     int sourceW=0,sourceH=0,poolW=0,poolH=0;
+    bool displayCapture=false;
 public:
-    void open(HWND hwnd) {
+    void open(HWND hwnd,bool display=false) {
+        displayCapture=display;
         if(!GraphicsCaptureSession::IsSupported())throw hresult_error(E_NOTIMPL,L"Windows window capture unavailable");
         check(D3D11CreateDevice(nullptr,D3D_DRIVER_TYPE_HARDWARE,nullptr,D3D11_CREATE_DEVICE_BGRA_SUPPORT,
             nullptr,0,D3D11_SDK_VERSION,&device,nullptr,&context));
@@ -297,13 +300,14 @@ public:
         ComPtr<::IInspectable> inspectable;check(CreateDirect3D11DeviceFromDXGIDevice(dxgi.Get(),&inspectable));
         projected=winrt::com_ptr<::IInspectable>(inspectable.Detach(),winrt::take_ownership_from_abi).as<IDirect3DDevice>();
         auto interop=winrt::get_activation_factory<GraphicsCaptureItem,IGraphicsCaptureItemInterop>();
-        check(interop->CreateForWindow(hwnd,winrt::guid_of<GraphicsCaptureItem>(),winrt::put_abi(item)));
+        if(displayCapture)check(interop->CreateForMonitor(MonitorFromWindow(hwnd,MONITOR_DEFAULTTONEAREST),winrt::guid_of<GraphicsCaptureItem>(),winrt::put_abi(item)));
+        else check(interop->CreateForWindow(hwnd,winrt::guid_of<GraphicsCaptureItem>(),winrt::put_abi(item)));
         pool=Direct3D11CaptureFramePool::CreateFreeThreaded(projected,DirectXPixelFormat::B8G8R8A8UIntNormalized,2,item.Size());
         poolW=item.Size().Width;poolH=item.Size().Height;
         token=pool.FrameArrived([](auto const&,auto const&){});
         session=pool.CreateCaptureSession(item);
         if(winrt::Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(
-            L"Windows.Graphics.Capture.GraphicsCaptureSession",L"IsCursorCaptureEnabled"))session.IsCursorCaptureEnabled(false);
+            L"Windows.Graphics.Capture.GraphicsCaptureSession",L"IsCursorCaptureEnabled"))session.IsCursorCaptureEnabled(displayCapture);
         session.StartCapture();
     }
     bool read(HWND hwnd,std::vector<uint32_t>& pixels,int w,int h,uint32_t bg,bool rounded,CapturePerformance* timing=nullptr) {
@@ -325,14 +329,14 @@ public:
         }
         RECT bounds{},client{};GetClientRect(hwnd,&client);POINT origin{0,0};ClientToScreen(hwnd,&origin);
         if(FAILED(DwmGetWindowAttribute(hwnd,DWMWA_EXTENDED_FRAME_BOUNDS,&bounds,sizeof(bounds))))GetWindowRect(hwnd,&bounds);
-        const int left=std::clamp(static_cast<int>(origin.x-bounds.left),0,sourceW-1);
-        const int top=std::clamp(static_cast<int>(origin.y-bounds.top),0,sourceH-1);
-        const int cw=std::min({static_cast<int>(client.right),size.Width-left,sourceW-left});
-        const int ch=std::min({static_cast<int>(client.bottom),size.Height-top,sourceH-top});
+        const int left=displayCapture?0:std::clamp(static_cast<int>(origin.x-bounds.left),0,sourceW-1);
+        const int top=displayCapture?0:std::clamp(static_cast<int>(origin.y-bounds.top),0,sourceH-1);
+        const int cw=displayCapture?std::min(size.Width,sourceW):std::min({static_cast<int>(client.right),size.Width-left,sourceW-left});
+        const int ch=displayCapture?std::min(size.Height,sourceH):std::min({static_cast<int>(client.bottom),size.Height-top,sourceH-top});
         {
             CapturePerformance::Scope measure(timing,CapturePerformance::compose);
             composer.render(mapped.pData,mapped.RowPitch,pixels,w,h,left,top,cw,ch,bg,
-                            rounded?28.0*GetDpiForWindow(hwnd)/96.0:0);
+                            rounded&&!displayCapture?28.0*GetDpiForWindow(hwnd)/96.0:0);
         }
         context->Unmap(staging.Get(),0);frame.Close();
         // Capture surface size can change during resize, output canvas stays fixed.
@@ -375,7 +379,8 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int) {
     }
     if(argc!=7){if(argv)LocalFree(argv);return 2;}
     const bool audioOnly=std::wstring(argv[1])==L"audio";
-    const auto hwnd=audioOnly?nullptr:reinterpret_cast<HWND>(static_cast<uintptr_t>(std::stoull(argv[1],nullptr,16)));
+    const std::wstring source=argv[1];const bool display=source.rfind(L"screen:",0)==0;
+    const auto hwnd=audioOnly?nullptr:reinterpret_cast<HWND>(static_cast<uintptr_t>(std::stoull(display?source.substr(7):source,nullptr,16)));
     const std::filesystem::path output(argv[2]),stop(argv[3]),state(argv[4]);
     const auto color=static_cast<uint32_t>(std::stoul(argv[5],nullptr,16));const bool rounded=std::wstring(argv[6])==L"1";
     LocalFree(argv);bool mfStarted=false;
@@ -392,8 +397,11 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int) {
         }
         check(MFStartup(MF_VERSION));mfStarted=true;
         if(!IsWindow(hwnd))throw hresult_error(E_INVALIDARG,L"FengYin window unavailable");
-        WindowFrames frames;frames.open(hwnd);SpeakerCapture sound;
+        WindowFrames frames;frames.open(hwnd,display);SpeakerCapture sound;
         RECT rect{};GetClientRect(hwnd,&rect);
+        if(display){MONITORINFO info{};info.cbSize=sizeof(info);
+            if(!GetMonitorInfoW(MonitorFromWindow(hwnd,MONITOR_DEFAULTTONEAREST),&info))throw hresult_error(E_FAIL,L"Recording display unavailable");
+            rect={0,0,info.rcMonitor.right-info.rcMonitor.left,info.rcMonitor.bottom-info.rcMonitor.top};}
         const double scale=std::min({1.0,1920.0/std::max<LONG>(2,rect.right),1080.0/std::max<LONG>(2,rect.bottom)});
         const int w=std::max(2,int(rect.right*scale)/2*2),h=std::max(2,int(rect.bottom*scale)/2*2);
         writer.open(output.c_str(),w,h);
@@ -415,7 +423,7 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int) {
         if(!status(state,"recording"))throw hresult_error(E_ACCESSDENIED,L"Cannot write recording status");
         LONGLONG next=0,frameCount=0;
         while(!std::filesystem::exists(stop)) {
-            if(!IsWindow(hwnd)||IsIconic(hwnd)||!IsWindowVisible(hwnd))break;
+            if(!IsWindow(hwnd)||(!display&&(IsIconic(hwnd)||!IsWindowVisible(hwnd))))break;
             {CapturePerformance::Scope measure(&timing,CapturePerformance::audioWrite);sound.drain(writer);}
             const auto now=ticks()-origin;
             if(now>=next) {

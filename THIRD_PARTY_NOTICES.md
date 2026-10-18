@@ -1,5 +1,12 @@
 # 第三方组件说明
 
+## ScreenRecorderLib 7.0.1 / miniaudio 0.11.23
+
+- 独立 `FengYinRecorder.exe` 使用 ScreenRecorderLib 的未修改原生 C++ 核心录屏、miniaudio 的 WASAPI 回环与 WAV 编码录音；不依赖 .NET UI，不采麦克风。
+- ScreenRecorderLib：MIT，https://github.com/sskodje/ScreenRecorderLib ，固定提交 `646383234187efd3854e6b1069612b80c3ab9981`。
+- miniaudio：Public Domain 或 MIT No Attribution 双许可，https://github.com/mackron/miniaudio/tree/0.11.23 。
+- `components/Recording/` 随附版本/校验记录、完整上游源码和许可证（包括源码附带的第三方声明）。各组件以其自身许可为准。
+
 ## Fresh Air 1.0.8
 
 The Windows installer includes the original Fresh Air 1.0.8 installer supplied

@@ -282,6 +282,7 @@ target_include_directories(FengYinLicenseGenerator PRIVATE native/Source)
 target_link_libraries(FengYinLicenseGenerator PRIVATE juce::juce_cryptography)
 
 if(WIN32)
+    add_subdirectory(native/Recorder)
     target_sources(FengYin PRIVATE native/Source/WindowsCompatibility.manifest)
     target_link_libraries(FengYin PRIVATE setupapi advapi32 shell32 avrt dwmapi)
     add_executable(FengYinScreenRecorder WIN32 native/ScreenRecorder/main.cpp)
@@ -369,6 +370,8 @@ install(FILES
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(FengYinRecorderPolicyTests tests/test_recorder_policy.cpp)
+    add_test(NAME recorder_scope_and_backend COMMAND FengYinRecorderPolicyTests)
     if(WIN32)
         add_executable(FengYinVlcTests tests/test_vlc_playback.cpp native/Source/VlcPlaybackEngine.cpp)
         target_include_directories(FengYinVlcTests PRIVATE native/Source "${FENGYIN_VLC_ROOT}/sdk/include")

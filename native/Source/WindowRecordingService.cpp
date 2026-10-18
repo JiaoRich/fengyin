@@ -1,5 +1,10 @@
 #include "WindowRecordingService.h"
 #include "RecordingPaths.h"
+#include "../Recorder/RecorderPolicy.h"
+#if JUCE_WINDOWS
+#define NOMINMAX
+#include <windows.h>
+#endif
 namespace fengyin {
 WindowRecordingService::~WindowRecordingService() {
     stop();
@@ -11,8 +16,12 @@ bool WindowRecordingService::start(void* window,juce::Colour background,bool rou
     lastError.clear();completed=false;finishing=false;ready=false;
     audioMode=audioOnly;
    #if JUCE_WINDOWS
+    const auto backend=capture::backend(juce::SystemStats::getEnvironmentVariable("FENGYIN_RECORDING_BACKEND","").toStdString());
+    const bool legacy=backend==capture::Backend::legacy;
     const auto executable=juce::File::getSpecialLocation(juce::File::currentApplicationFile)
-        .getSiblingFile("FengYinScreenRecorder.exe");
+        .getSiblingFile(legacy?"FengYinScreenRecorder.exe":"FengYinRecorder.exe");
+    juce::Logger::writeToLog(juce::String("Recording backend=")+(legacy?"legacy":audioOnly?"miniaudio":"ScreenRecorderLib")
+        +" scope="+(audioOnly?"system-output":"selected-display"));
     const auto folder=audioMode?RecordingPaths::audio():RecordingPaths::video();
     if((!audioMode&&!window) || !executable.existsAsFile() || !folder.createDirectory()) {
         lastError=juce::String::fromUTF8("录制组件不可用，或无法创建录制目录");return false;
@@ -21,9 +30,11 @@ bool WindowRecordingService::start(void* window,juce::Colour background,bool rou
     partialFile=destination.withFileExtension(audioMode?".partial.wav":".partial.mp4");
     stopFile=destination.withFileExtension(".stop");stateFile=destination.withFileExtension(".status");
     juce::StringArray args {executable.getFullPathName(),
-        audioMode?juce::String("audio"):juce::String::toHexString(static_cast<juce::int64>(reinterpret_cast<uintptr_t>(window))),
+        audioMode?juce::String("audio"):"screen:"+juce::String::toHexString(static_cast<juce::int64>(reinterpret_cast<uintptr_t>(window))),
         partialFile.getFullPathName(),stopFile.getFullPathName(),stateFile.getFullPathName(),
-        juce::String::toHexString(static_cast<int>(background.getARGB())),rounded?"1":"0"};
+        juce::String::toHexString(static_cast<int>(background.getARGB())),"0"};
+    juce::ignoreUnused(rounded); // Desktop pixels have no FengYin corner mask.
+    if(!legacy)args.add(juce::String(static_cast<juce::int64>(GetCurrentProcessId())));
     running=process.start(args,0);
     startedAt=juce::Time::getMillisecondCounterHiRes();stoppedAt=0;
     if(!running)lastError=juce::String::fromUTF8("无法启动录制组件");

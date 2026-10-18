@@ -6,6 +6,16 @@
 $ErrorActionPreference = "Stop"
 $RequiredFiles = @(
     "FengYin.exe",
+    "FengYinRecorder.exe",
+    "FengYinScreenRecorder.exe",
+    "Use-new-recording.cmd",
+    "Use-legacy-recording.cmd",
+    "Recording-backends.txt",
+    "components\Recording\versions.json",
+    "components\Recording\ScreenRecorderLib-MIT.txt",
+    "components\Recording\ScreenRecorderLib-7.0.1-source.zip",
+    "components\Recording\miniaudio-license.txt",
+    "components\Recording\miniaudio-0.11.23.h",
     "FengYinAudioEngine.exe",
     "FengYinAudioWatchdog.exe",
     "README.md",

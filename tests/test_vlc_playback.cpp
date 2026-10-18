@@ -6,6 +6,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <functional>
+#include <algorithm>
 
 using fengyin::VlcPlaybackEngine;
 void pump() { MSG m{}; while(PeekMessageW(&m,nullptr,0,0,PM_REMOVE)){TranslateMessage(&m);DispatchMessageW(&m);} Sleep(5); }
@@ -28,8 +29,14 @@ int wmain(int argc,wchar_t** argv) {
     int code=0;
     try {
         VlcPlaybackEngine p(std::filesystem::path(argv[1]),window);Shutdown cleanup{p};
-        const auto bytes=std::filesystem::path(argv[2]).u8string();
-        const std::string file(reinterpret_cast<const char*>(bytes.data()),bytes.size());
+        // Exercise the exact failed-188 input: forward slash Windows absolute
+        // path, with Unicode and a space as ordinary user media names contain.
+        const auto fixture=std::filesystem::path(argv[2]);
+        const auto unicode=fixture.parent_path()/L"风吟 VLC 回归.mp4";
+        std::filesystem::copy_file(fixture,unicode,std::filesystem::copy_options::overwrite_existing);
+        const auto bytes=unicode.u8string();
+        std::string file(reinterpret_cast<const char*>(bytes.data()),bytes.size());
+        std::replace(file.begin(),file.end(),'\\','/');
         p.load(file,1);
         waitFor([&]{auto s=p.getState();if(!s.error.empty())throw std::runtime_error(s.error);return s.ready && s.duration>10;},15000,"metadata not ready");
         const auto before=p.getState();

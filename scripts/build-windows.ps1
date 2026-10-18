@@ -13,6 +13,7 @@ $FfmpegPath = Join-Path $ProjectRoot "third_party\ffmpeg\windows\ffmpeg.exe"
 $FfmpegPackageDir = Join-Path $PackageDir "tools\ffmpeg"
 $NugetPackageDir = Join-Path $ProjectRoot "third_party\nuget-packages"
 $VlcRoot = Join-Path $ProjectRoot "third_party\vlc"
+$RecordingRoot = Join-Path $ProjectRoot "third_party\recording"
 $WebViewOfflineInstallerPath = Join-Path $PackageDir "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
 $PreparedFfmpeg = Join-Path $env:TEMP ("fengyin-ffmpeg-" + [guid]::NewGuid().ToString("N"))
 $PreparedWebView = Join-Path $env:TEMP ("fengyin-webview-" + [guid]::NewGuid().ToString("N") + ".exe")
@@ -39,6 +40,7 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
 # Fail inexpensive source regressions before the native build, not after it.
 Invoke-Checked "发布源码预检" { python -m unittest discover -s (Join-Path $ProjectRoot "tests") -p "test_*.py" }
 Invoke-Checked "LibVLC official runtime and source verification" { python (Join-Path $PSScriptRoot "prepare_vlc.py") $VlcRoot }
+Invoke-Checked "Recording dependencies verification" { python (Join-Path $PSScriptRoot "prepare_recording.py") $RecordingRoot }
 # Download before compilation. Never package a partial or unsigned dependency.
 for ($attempt = 1; $attempt -le 4; $attempt++) {
     try {
@@ -79,7 +81,7 @@ if (-not (Get-ChildItem $NugetPackageDir -Directory -Filter "*Microsoft.Web.WebV
 }
 Invoke-Checked "CMake 配置" {
     cmake -S $ProjectRoot -B $BuildDir -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTING=ON `
-        "-DJUCE_WEBVIEW2_PACKAGE_LOCATION=$NugetPackageDir" "-DFENGYIN_VLC_ROOT=$VlcRoot"
+        "-DJUCE_WEBVIEW2_PACKAGE_LOCATION=$NugetPackageDir" "-DFENGYIN_VLC_ROOT=$VlcRoot" "-DFENGYIN_RECORDING_ROOT=$RecordingRoot"
 }
 
 Invoke-Checked "Recording helper preflight build" { cmake --build $BuildDir --config Release --target FengYinScreenRecorder --parallel 4 }
@@ -110,6 +112,25 @@ Invoke-Checked "System recording WAV selftest" {
     if ($LASTEXITCODE -eq 0 -and -not (Test-Path $AudioCheck)) { throw "Recorder exited without producing WAV" }
 }
 Invoke-Checked "System recording PCM continuity check" { python (Join-Path $PSScriptRoot "verify_system_recording.py") $AudioCheck }
+
+# The new library backend must really encode/decode; the legacy checks above
+# remain mandatory because it is an explicitly selectable rollback.
+Invoke-Checked "Third-party recorder preflight build" { cmake --build $BuildDir --config Release --target FengYinRecorder --parallel 4 }
+$ThirdPartyRecorder = Join-Path $BuildDir "Release\FengYinRecorder.exe"
+$ThirdPartyVideo = Join-Path $BuildDir "srl-recorder-selftest.mp4"
+$ThirdPartyAudio = Join-Path $BuildDir "miniaudio-selftest.wav"
+foreach ($Check in @(@('--selftest', $ThirdPartyVideo), @('--audio-selftest', $ThirdPartyAudio))) {
+    Invoke-Checked "Third-party native encoding selftest" {
+        $NativeProcess = Start-Process -FilePath $ThirdPartyRecorder -ArgumentList @($Check[0], ('"{0}"' -f $Check[1])) -PassThru
+        if (-not $NativeProcess.WaitForExit(60000)) { $NativeProcess.Kill(); throw "Third-party encoding timed out" }
+        $NativeProcess.Refresh()
+        $global:LASTEXITCODE = $NativeProcess.ExitCode
+        if ($LASTEXITCODE -ne 0 -and (Test-Path ($Check[1] + '.error.txt'))) { Get-Content ($Check[1] + '.error.txt') }
+        if ($LASTEXITCODE -eq 0 -and -not (Test-Path $Check[1])) { throw "Third-party encoder produced no file" }
+    }
+}
+Invoke-Checked "ScreenRecorderLib actual decoded video/audio" { python (Join-Path $PSScriptRoot "verify_screen_recording.py") $RecorderFfmpeg $ThirdPartyVideo }
+Invoke-Checked "Miniaudio actual PCM continuity" { python (Join-Path $PSScriptRoot "verify_system_recording.py") $ThirdPartyAudio }
 
 $VlcFixture = Join-Path $BuildDir "vlc-playback-fixture.mp4"
 Invoke-Checked "LibVLC fixture preparation" {
@@ -159,6 +180,11 @@ Copy-Item $AudioWatchdogExe (Join-Path $PackageDir "FengYinAudioWatchdog.exe") -
 $ScreenRecorderExe = Join-Path $BuildDir "Release\FengYinScreenRecorder.exe"
 if (-not (Test-Path $ScreenRecorderExe)) { throw "Screen recording component missing: $ScreenRecorderExe" }
 Copy-Item $ScreenRecorderExe (Join-Path $PackageDir "FengYinScreenRecorder.exe") -Force
+Copy-Item $ThirdPartyRecorder (Join-Path $PackageDir "FengYinRecorder.exe") -Force
+Copy-Item (Join-Path $PSScriptRoot "recording-backends\*") $PackageDir -Force
+New-Item -ItemType Directory -Force -Path (Join-Path $PackageDir "components\Recording") | Out-Null
+Copy-Item (Join-Path $RecordingRoot "licenses\*") (Join-Path $PackageDir "components\Recording") -Force
+Copy-Item (Join-Path $RecordingRoot "versions.json") (Join-Path $PackageDir "components\Recording") -Force
 # The public installer uses VB-CABLE. Never package or invoke the experimental driver.
 Copy-Item (Join-Path $ProjectRoot "README.md") $PackageDir -Force
 Copy-Item (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES.md") $PackageDir -Force

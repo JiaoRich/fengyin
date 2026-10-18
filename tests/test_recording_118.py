@@ -5,10 +5,11 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 class Recording118Tests(unittest.TestCase):
-    def test_only_window_and_default_speaker_no_desktop_or_mic(self):
+    def test_explicit_display_and_default_speaker_no_mic(self):
         code=(ROOT/'native/ScreenRecorder/main.cpp').read_text(encoding='utf-8')
         self.assertIn('CreateForWindow(hwnd',code)
-        self.assertNotIn('CreateForMonitor',code)
+        self.assertIn('CreateForMonitor',code)
+        self.assertIn('screen:',code)
         self.assertNotIn('GetDC(',code)
         self.assertIn('GetDefaultAudioEndpoint(eRender,eMultimedia',code)
         self.assertIn('AUDCLNT_STREAMFLAGS_LOOPBACK',code)

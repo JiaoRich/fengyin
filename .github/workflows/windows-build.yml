@@ -211,6 +211,10 @@ jobs:
           path: |
             dist/FengYin/FengYin.exe
             dist/FengYin/FengYinScreenRecorder.exe
+            dist/FengYin/FengYinRecorder.exe
+            dist/FengYin/Use-*-recording.cmd
+            dist/FengYin/Recording-backends.txt
+            dist/FengYin/components/Recording/
             dist/FengYin/components/VLC/
           if-no-files-found: error
           retention-days: 7
@@ -224,5 +228,6 @@ jobs:
             build-windows/CMakeCache.txt
             build-windows/CMakeFiles/CMakeConfigureLog.yaml
             windows-test-results.zip
+            build-windows/*selftest*.error.txt
           if-no-files-found: ignore
           retention-days: 7

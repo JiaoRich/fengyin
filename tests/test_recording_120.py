@@ -37,7 +37,7 @@ class Recording120(unittest.TestCase):
         self.assertIn('append(std::move(packets),0)',worker)
         self.assertNotIn('ticks()-origin-2000000',worker)
         main=(ROOT/'native/Source/MainComponent.cpp').read_text(encoding='utf-8')
-        self.assertIn('if(!visible && !windowRecorder.isAudioOnly())',main)
+        self.assertNotIn('if(!visible && !windowRecorder.isAudioOnly())',main)
         self.assertIn('windowRecorder.start(nullptr,juce::Colours::black,false,true)',main)
 
     def test_native_title_uses_implicit_pointer_capture_not_css_coordinates(self):

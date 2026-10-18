@@ -164,7 +164,12 @@ void VlcPlaybackEngine::run()
                 started=false; pendingSeek=-1;playbackError.clear();
                 if (!next.path.empty())
                 {
-                    media=api.libvlc_media_new_path(instance,next.path.c_str());
+                    // VLC 3 Windows vlc_path2uri rejects drive paths using '/'
+                    // (ENOTSUP). CMake/test paths and imported paths may use it.
+                    // Keep UTF-8 bytes intact; normalise separators, not encoding.
+                    auto nativePath=next.path;
+                    std::replace(nativePath.begin(),nativePath.end(),'/','\\');
+                    media=api.libvlc_media_new_path(instance,nativePath.c_str());
                     if (media)
                     {
                         api.libvlc_media_player_set_media(player,media);

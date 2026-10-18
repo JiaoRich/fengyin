@@ -268,7 +268,8 @@ MainComponent::~MainComponent()
 
 void MainComponent::setWebPresentationVisible(bool visible)
 {
-    if(!visible && !windowRecorder.isAudioOnly())windowRecorder.stop();
+    // Both recording modes capture system output; video pins a whole display.
+    // Hiding/minimising FengYin no longer invalidates the recording source.
     if (webPresentationVisible == visible) return;
     webPresentationVisible = visible;
     vlcVideo.updateViewport(vlcViewport, visible && vlcViewportVisible);
@@ -1371,11 +1372,6 @@ void MainComponent::paint(juce::Graphics& g)
 void MainComponent::requestCompactMode(bool compact)
 {
     if (compact == compactMode || windowModePromptOpen) return;
-    if(windowRecorder.busy() && !windowRecorder.isAudioOnly()) {
-        windowRecorder.stop();
-        if(webInterface)webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",utf8("正在保存录屏，完成后可切换窗口模式"));
-        return;
-    }
     const juce::Component::SafePointer<MainComponent> safe(this);
     auto apply = [safe, compact](int result)
     {
@@ -4038,7 +4034,7 @@ void MainComponent::toggleWindowRecording(const juce::var& payload)
     voicePrompts.stop();
     const auto colour=juce::Colour::fromString(payload.getProperty("background","ff07101d").toString()).withAlpha(1.f);
     if(!windowRecorder.start(getPeer()?getPeer()->getNativeHandle():nullptr,colour,compactMode))tell(windowRecorder.error());
-    else tell(utf8("正在启动录屏：仅录风吟窗口和系统默认扬声器声音；最小化或停止时保存"));
+    else tell(utf8("正在录制整个屏幕和系统声音，包括其他应用与通知；显示器已固定，点击停止后保存"));
     lastWebStateAtMs=0;
 }
 
