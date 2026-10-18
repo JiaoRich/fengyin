@@ -65,6 +65,25 @@ class Recording123(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'SHA256 mismatch'):
                 module.verified(module.MA_URL,path,module.MA_SHA)
 
+    def test_srl_uses_upstream_project_not_orphaned_sources(self):
+        spec=importlib.util.spec_from_file_location('record_deps',ROOT/'scripts/prepare_recording.py')
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            project=root/'ScreenRecorderLibNative.vcxproj'
+            project.write_text('<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003"><ItemGroup>'
+                '<ClCompile Include="RecordingManager.cpp"/><ClCompile Include="Screengrab.cpp"/>'
+                '</ItemGroup></Project>')
+            for name in ['RecordingManager.cpp','screengrab.cpp','Resizer.cpp']:
+                (root/name).write_text('// fixture')
+            self.assertEqual(module.native_sources(root),['RecordingManager.cpp','screengrab.cpp'])
+            (root/'RecordingManager.cpp').unlink()
+            with self.assertRaisesRegex(ValueError,'Missing upstream compile file'):
+                module.native_sources(root)
+        cmake=read('native/Recorder/CMakeLists.txt')
+        self.assertIn('include("${SRL_ROOT}/upstream-sources.cmake")',cmake)
+        self.assertNotIn('file(GLOB SRL_SOURCES',cmake)
+
     def test_vlc_windows_path_188_regression(self):
         source=read('native/Source/VlcPlaybackEngine.cpp')
         self.assertIn("std::replace(nativePath.begin(),nativePath.end(),'/','\\\\');",source)

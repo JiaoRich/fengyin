@@ -59,3 +59,8 @@ miniaudio实际编码2秒48k立体声WAV、精确96000帧及逐段RMS通过；�
 日志/private/tmp/fy123-recording-{all-tests,build,ctest,vlc-ui}.log；实际WAV/private/tmp/fy123-miniaudio.wav。
 Windows发布必须先构建新旧录制组件，分别实际生成MP4/WAV，再解码方向、1080P48帧、时长、逐段音频；随后中文路径LibVLC实际播放及全套测试。任何失败不跳过。
 这些测试不替代目标电脑WGC整屏、系统扬声器loopback、静默间隔、最小化/切模式、提琴+伴奏+录制的实测；交付明确为可回退的测试版，不能宣布性能完全解决。
+
+189号构建失败修复：
+新SRL静态核心编译失败于Resizer.cpp引用不存在的utilities.h；目录通配符误收录了上游vcxproj正式编译清单未使用的遗留文件，属于风吟集成配置错误，不是已证明的新录屏运行故障。
+prepare_recording.py从SHA校验的上游vcxproj解析明确ClCompile清单，核对实际文件存在/重复/安全路径，生成upstream-sources.cmake；CMake不再扫描全部cpp。原源代码及其许可不改，不删除或伪造头文件。
+新增回归覆盖遗留文件排除、Windows大小写文件名匹配和真实缺失源文件拒绝。继续保留新旧编码/解码与VLC真实播放检查；189已通过旧组件MP4/WAV编码连续性，但未执行到新组件编码及VLC播放，不能当其已通过。

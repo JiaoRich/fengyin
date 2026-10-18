@@ -3,7 +3,9 @@ set(SRL_ROOT "${FENGYIN_RECORDING_ROOT}/srl/ScreenRecorderLibNative")
 if(NOT EXISTS "${SRL_ROOT}/RecordingManager.cpp" OR NOT EXISTS "${FENGYIN_RECORDING_ROOT}/miniaudio/miniaudio.h")
     message(FATAL_ERROR "Run scripts/prepare_recording.py before configuring the Windows recorder")
 endif()
-file(GLOB SRL_SOURCES CONFIGURE_DEPENDS "${SRL_ROOT}/*.cpp")
+# The upstream directory also contains retired source (e.g. Resizer.cpp) that
+# is not part of its release project. Use its verified compile list verbatim.
+include("${SRL_ROOT}/upstream-sources.cmake")
 find_program(FENGYIN_FXC fxc HINTS
     "$ENV{WindowsSdkDir}/bin/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/x64"
     "C:/Program Files (x86)/Windows Kits/10/bin/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/x64"
