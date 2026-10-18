@@ -84,6 +84,19 @@ int wmain(int argc,wchar_t** argv) {
         waitFor([&]{return !p.getState().error.empty();},6000,"Corrupt media error missing");
         p.load(file,13);p.setPlaying(true);
         waitFor([&]{auto s=p.getState();return s.generation==13 && s.error.empty() && s.position>.2;},6000,"Corrupt media recovery failed");
+        // A real silent audio-only file must not be mistaken for invalid media.
+        const auto silent=fixture.parent_path()/L"silent-audio.wav";
+        {std::ofstream wav(silent,std::ios::binary);
+            auto le=[&](unsigned v,int n){for(int i=0;i<n;++i)wav.put(static_cast<char>(v>>(i*8)));};
+            wav.write("RIFF",4);le(16036,4);wav.write("WAVEfmt ",8);le(16,4);le(1,2);le(1,2);
+            le(8000,4);le(16000,4);le(2,2);le(16,2);wav.write("data",4);le(16000,4);
+            for(int i=0;i<16000;++i)wav.put(0);
+        }
+        const auto silentBytes=silent.u8string();
+        p.load(std::string(reinterpret_cast<const char*>(silentBytes.data()),silentBytes.size()),14);p.setPlaying(true);
+        waitFor([&]{auto s=p.getState();if(!s.error.empty())throw std::runtime_error(s.error);return s.generation==14 && s.finished;},6000,"Silent audio-only EOF missing");
+        p.load(file,15);p.setPlaying(true);
+        waitFor([&]{auto s=p.getState();return s.generation==15 && s.error.empty() && s.position>.2;},6000,"Audio-only recovery failed");
         std::cout<<"PASS load-without-play, pause, explicit/stale seek, EOF replay, replace, unload, failure recovery; shutdown pending\n";
     } catch(const std::exception& e){std::cerr<<"FAIL "<<e.what()<<"\n";code=1;}
     DestroyWindow(window);

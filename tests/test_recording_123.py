@@ -106,6 +106,13 @@ class Recording123(unittest.TestCase):
         self.assertIn('Transient error was lost',read('tests/test_vlc_playback.cpp'))
         self.assertIn('Corrupt media recovery failed',read('tests/test_vlc_playback.cpp'))
 
+    def test_vlc_empty_stream_validation_only_at_eof(self):
+        source=read('native/Source/VlcPlaybackEngine.cpp')
+        self.assertIn('started && playbackState==libvlc_Ended && !terminalChecked',source)
+        self.assertIn('libvlc_media_tracks_release(tracks,count)',source)
+        self.assertIn('!audiovisual && result.decodedVideo==0 && result.decodedAudio==0',source)
+        self.assertIn('Silent audio-only EOF missing',read('tests/test_vlc_playback.cpp'))
+
     def test_dependency_verifier_rejects_unverified_bytes(self):
         spec=importlib.util.spec_from_file_location('record_deps',ROOT/'scripts/prepare_recording.py')
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)

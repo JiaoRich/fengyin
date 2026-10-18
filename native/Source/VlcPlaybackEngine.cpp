@@ -4,6 +4,9 @@
 #include <cmath>
 #include <iterator>
 #include <stdexcept>
+#if defined(FENGYIN_VLC_TEST_PCM)
+#include <iostream>
+#endif
 #if defined(_WIN32)
 #define NOMINMAX
 #include <windows.h>
@@ -69,7 +72,8 @@ struct VlcApi
 #define FY_VLC_FUNCTIONS(X) \
  X(libvlc_new) X(libvlc_release) X(libvlc_media_new_path) X(libvlc_media_release) \
  X(libvlc_media_parse_with_options) X(libvlc_media_parse_stop) X(libvlc_media_get_duration) \
- X(libvlc_media_get_stats) X(libvlc_media_player_new) X(libvlc_media_player_release) \
+ X(libvlc_media_get_stats) X(libvlc_media_tracks_get) X(libvlc_media_tracks_release) \
+ X(libvlc_media_player_new) X(libvlc_media_player_release) \
  X(libvlc_media_player_set_media) X(libvlc_media_player_set_hwnd) \
  X(libvlc_media_player_play) X(libvlc_media_player_set_pause) X(libvlc_media_player_stop) \
  X(libvlc_media_player_get_state) X(libvlc_media_player_get_time) X(libvlc_media_player_get_length) \
@@ -178,6 +182,7 @@ void VlcPlaybackEngine::run()
         applied.generation = -1; applied.playRevision = -1;
         double pendingSeek = -1;
         bool started = false;
+        bool terminalChecked = false;
         std::string playbackError;
         while (true)
         {
@@ -192,7 +197,7 @@ void VlcPlaybackEngine::run()
                 errorEvents.failed.store(false);
                 api.libvlc_media_player_set_media(player, nullptr);
                 if(media) { api.libvlc_media_parse_stop(media); api.libvlc_media_release(media); media=nullptr; }
-                started=false; pendingSeek=-1;playbackError.clear();
+                started=false; terminalChecked=false; pendingSeek=-1;playbackError.clear();
                 if (!next.path.empty())
                 {
                     // VLC 3 Windows vlc_path2uri rejects drive paths using '/'
@@ -225,7 +230,7 @@ void VlcPlaybackEngine::run()
                         playbackError.clear();
                         if(playbackState==libvlc_Ended || playbackState==libvlc_Error)
                         { api.libvlc_media_player_stop(player); errorEvents.failed.store(false);
-                          started=false; if(pendingSeek<0)pendingSeek=0; }
+                          started=false; terminalChecked=false; if(pendingSeek<0)pendingSeek=0; }
                         if(!started) { started=api.libvlc_media_player_play(player)==0; }
                         else api.libvlc_media_player_set_pause(player,0);
                         if(!started) playbackError="视频无法播放，请检查文件是否完整";
@@ -241,8 +246,6 @@ void VlcPlaybackEngine::run()
                 result.finished=playbackState==libvlc_Ended;
                 if(playbackState==libvlc_Error || errorEvents.failed.load())
                     playbackError="VLC 无法播放这个文件，请重新选择视频";
-                result.error=playbackError;
-                if(!result.error.empty()){result.ready=false;result.playing=false;result.finished=false;}
                 result.duration=std::max<int64_t>(0,api.libvlc_media_player_get_length(player))/1000.0;
                 if(result.duration==0)result.duration=std::max<int64_t>(0,api.libvlc_media_get_duration(media))/1000.0;
                 result.position=pendingSeek>=0 ? pendingSeek : std::max<int64_t>(0,api.libvlc_media_player_get_time(player))/1000.0;
@@ -251,6 +254,31 @@ void VlcPlaybackEngine::run()
                     result.decodedVideo=stats.i_decoded_video; result.displayedVideo=stats.i_displayed_pictures;
                     result.lostVideo=stats.i_lost_pictures; result.decodedAudio=stats.i_decoded_audio;
                 }
+                // Some demuxers accept non-media input then return ordinary
+                // EOF, without EncounteredError. Only inspect tracks at the
+                // terminal state: missing metadata during opening is normal.
+                // Valid audio-only, silent audio, video-only and EOF seeks
+                // remain valid even if this playback decoded no samples.
+                if(started && playbackState==libvlc_Ended && !terminalChecked)
+                {
+                    terminalChecked=true;
+                    libvlc_media_track_t** tracks=nullptr;
+                    const auto count=api.libvlc_media_tracks_get(media,&tracks);
+                    bool audiovisual=false;
+                    for(unsigned i=0;i<count;++i)
+                        if(tracks[i] && (tracks[i]->i_type==libvlc_track_audio || tracks[i]->i_type==libvlc_track_video))
+                            audiovisual=true;
+                    api.libvlc_media_tracks_release(tracks,count);
+#if defined(FENGYIN_VLC_TEST_PCM)
+                    std::cout<<"VLC terminal generation="<<next.generation<<" tracks="<<count
+                             <<" av="<<audiovisual<<" video="<<result.decodedVideo
+                             <<" audio="<<result.decodedAudio<<" errorEvent="<<errorEvents.failed.load()<<"\n";
+#endif
+                    if(!audiovisual && result.decodedVideo==0 && result.decodedAudio==0)
+                        playbackError="这个文件没有可播放的音视频内容，请重新选择";
+                }
+                result.error=playbackError;
+                if(!result.error.empty()){result.ready=false;result.playing=false;result.finished=false;}
             }
             else if(!next.path.empty())result.error="无法打开这个视频文件";
             applied=next;

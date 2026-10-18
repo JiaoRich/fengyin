@@ -79,3 +79,6 @@ prepare_recording.py从SHA校验的上游vcxproj解析明确ClCompile清单，�
 原SRL与ExplicitRate对照均实际48帧、24fps、约2秒；B帧视频首PTS=1/24秒。FFmpeg默认输出同步补首帧，rawvideo输出49帧；同一原文件加-fps_mode passthrough实际48帧。旧组件两种解码均48帧。错误在计帧校验，不是已证明丢帧；保持录屏参数不变，仅改校验计实际帧，仍严格48且拒绝半帧/少帧/多帧，方向/尺寸/音频检查保留。
 新miniaudio实际WAV与旧WAV均精确96000帧/48k立体声PCM、分段连续性通过。
 VLC真实中文路径已显示画面15帧/非零PCM68242，随后失败于不存在文件未报错。上游lib/media_player.c的INPUT_EVENT_STATE发送EncounteredError，但INPUT_EVENT_DEAD很快将状态置为Ended；100ms轮询可能漏掉错误。改为事件回调只写atomic锁存，停止旧输入后重置，退出先detach再释放，错误不误报正常EOF。扩展不存在文件错误保持、损坏文件及两次重新加载恢复。须新Windows短流程实证通过，不能以本机源码测试当完成。
+
+193短流程实际证据（/private/tmp/fy123-media193）：
+新旧三套MP4实际编码/帧数/方向/连续音频及WAV全部通过；VLC不存在文件事件锁存、错误持续和换回有效视频通过。新增纯文本伪MP4未产生可见错误而失败，不能忽略。VLC input.c只在demux返回EGENERIC时发错误，正常EOF本身不保证存在可播放音视频。增加仅在终止状态的一次音视频轨道核对，无轨道且无任何解码才报无内容；不在元数据尚未加载时误判，也不将静音当失败。诊断输出实际轨道数与解码计数，并增加真正1秒静音WAV的正常EOF及恢复测试。仍须Windows实际结果验证，不修改编解码性能配置。
