@@ -4,6 +4,13 @@ import unittest
 ROOT=Path(__file__).resolve().parents[1]
 
 class Performance122(unittest.TestCase):
+    def test_cold_windows_probe_has_bounded_headroom_and_remains_cancellable(self):
+        source=(ROOT/'native/Source/VideoPlaybackCache.cpp').read_text(encoding='utf-8')
+        probe=source.split('VideoPlaybackCache::Info info(',1)[1].split('static bool valid',1)[0]
+        self.assertIn('},60000)',probe)
+        self.assertIn('process.isRunning()&&!shouldExit()',source)
+        self.assertIn('process.kill()',source)
+
     def test_no_video_decoder_or_source_read_lock_in_callback(self):
         source=(ROOT/'native/Source/AccompanimentAudioService.cpp').read_text(encoding='utf-8')
         selection=source.split('findDecodableFile',1)[1].split('bool AccompanimentAudioService::loadForVideo',1)[0]

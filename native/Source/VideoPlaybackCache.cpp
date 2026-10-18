@@ -103,7 +103,10 @@ private:
     }
     VideoPlaybackCache::Info info(const juce::File& probe,const juce::File& file) {
         const auto result=run({probe.getFullPathName(),"-v","error","-select_streams","v:0",
-            "-show_entries","stream=codec_name,width,height,avg_frame_rate,pix_fmt,color_transfer,color_primaries:format=duration","-of","json",file.getFullPathName()},10000);
+            // Cold Windows launches on the target machine took 15.3 seconds
+            // even for valid local MP4 metadata. Keep this idle job bounded,
+            // but do not reject a healthy probe after only ten seconds.
+            "-show_entries","stream=codec_name,width,height,avg_frame_rate,pix_fmt,color_transfer,color_primaries:format=duration","-of","json",file.getFullPathName()},60000);
         if(!result.first && !shouldExit())juce::Logger::writeToLog("Video cache probe failed: "+result.second.substring(0,256));
         return result.first?VideoPlaybackCache::readInfo(juce::JSON::parse(result.second)):VideoPlaybackCache::Info{};
     }
