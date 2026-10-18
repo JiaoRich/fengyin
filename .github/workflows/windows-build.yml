@@ -1,9 +1,13 @@
 name: Windows 编译与安装包
-run-name: ${{ inputs.native_window_test && 'Windows native input diagnostic' || 'Windows build and installer' }}
+run-name: ${{ inputs.media_integration_test && 'Windows media integration diagnostic' || inputs.native_window_test && 'Windows native input diagnostic' || 'Windows build and installer' }}
 
 on:
   workflow_dispatch:
     inputs:
+      media_integration_test:
+        description: Test both media backends and VLC without building the application
+        type: boolean
+        default: false
       native_window_test:
         description: Run only native title mouse/touch desktop checks
         type: boolean
@@ -33,6 +37,40 @@ permissions:
   contents: read
 
 jobs:
+  media-integration-test:
+    if: ${{ inputs.media_integration_test }}
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          lfs: false
+      - name: Prepare verified dependencies and build only media components
+        shell: powershell
+        run: |
+          $env:PYTHONUTF8='1'
+          python scripts/prepare_recording.py third_party/recording
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python scripts/prepare_vlc.py third_party/vlc
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python scripts/prepare_ffmpeg.py third_party/ffmpeg-check
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cmake -S tools/media-integration-check -B build-media-check -G "Visual Studio 17 2022" -A x64
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cmake --build build-media-check --config Release --parallel 4
+          exit $LASTEXITCODE
+      - name: Collect all media encoding, decoding and playback evidence
+        shell: powershell
+        run: |
+          $env:PYTHONUTF8='1'
+          python scripts/check_media_integration.py build-media-check third_party/ffmpeg-check third_party/vlc
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: Windows-media-integration-evidence
+          path: build-media-check/evidence/
+          if-no-files-found: warn
   native-window-test:
     if: ${{ inputs.native_window_test }}
     runs-on: windows-2022
@@ -121,7 +159,7 @@ jobs:
           name: FengYin-Crash-Capture
           path: diagnostic/FengYin-Crash-Capture.zip
   windows-release:
-    if: ${{ !inputs.diagnostic_only && !inputs.startup_comparison && !inputs.kong_test && !inputs.native_window_test }}
+    if: ${{ !inputs.media_integration_test && !inputs.diagnostic_only && !inputs.startup_comparison && !inputs.kong_test && !inputs.native_window_test }}
     name: Windows x64 Release
     runs-on: windows-2022
     timeout-minutes: 45
@@ -229,5 +267,7 @@ jobs:
             build-windows/CMakeFiles/CMakeConfigureLog.yaml
             windows-test-results.zip
             build-windows/*selftest*.error.txt
+            build-windows/*selftest*.mp4
+            build-windows/*selftest*.wav
           if-no-files-found: ignore
           retention-days: 7

@@ -61,6 +61,11 @@ std::unique_ptr<H264_ENCODER_OPTIONS> encoderOptions(){
     options->SetVideoFps(fps);options->SetVideoBitrate(bitrate);
     options->SetVideoBitrateMode(eAVEncCommonRateControlMode_CBR);
     options->SetFixedFramerate(true);options->SetHardwareEncodingEnabled(true);
+#if defined(FENGYIN_RECORDER_EXPLICIT_RATE_PROBE)
+    // Diagnostic target only: compare upstream's explicit input-rate branch.
+    // Never defined for the application recorder or shipped as a replacement.
+    options->SetFixedFramerate(false);
+#endif
     options->SetThrottlingDisabled(false);options->SetFastStartEnabled(false);
     return options;
 }

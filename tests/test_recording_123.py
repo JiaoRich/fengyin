@@ -2,6 +2,9 @@ from pathlib import Path
 import importlib.util
 import tempfile
 import unittest
+from unittest import mock
+import subprocess
+import json
 
 ROOT=Path(__file__).resolve().parents[1]
 def read(path):return (ROOT/path).read_text(encoding='utf-8-sig')
@@ -53,6 +56,27 @@ class Recording123(unittest.TestCase):
         self.assertNotIn('#include <d3d10.h>',source)
         self.assertLess(source.index('#include <d3d10_1.h>'),source.index('#include "RecordingManager.h"'))
         self.assertIn('ComPtr<ID3D10Multithread>',source)
+
+    def test_media_diagnostic_collects_remaining_failures_and_cannot_hide_missing_output(self):
+        spec=importlib.util.spec_from_file_location('media_check',ROOT/'scripts/check_media_integration.py')
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temp:
+            calls=[]
+            def execute(command,**kwargs):
+                calls.append(command)
+                return subprocess.CompletedProcess(command,1 if len(calls)==1 else 0,b'fixture',b'')
+            with mock.patch.object(module.subprocess,'run',side_effect=execute):
+                self.assertEqual(module.check(temp,temp,temp),1)
+            results=json.loads((Path(temp)/'evidence/results.json').read_text(encoding='utf-8'))
+            self.assertEqual(len(results),17)
+            self.assertEqual(results[0]['code'],1)
+            self.assertEqual(results[-1]['name'],'vlc-lifecycle')
+            self.assertIn('srl-decode-video',[r['name'] for r in results])
+            self.assertIn('srl-explicit-rate-decode-audio',[r['name'] for r in results])
+        # Experimental define is only in the small diagnostic target, never
+        # in either production CMake file. It is not a silently applied fix.
+        self.assertNotIn('FENGYIN_RECORDER_EXPLICIT_RATE_PROBE',read('CMakeLists.txt'))
+        self.assertNotIn('FENGYIN_RECORDER_EXPLICIT_RATE_PROBE',read('native/Recorder/CMakeLists.txt'))
 
     def test_real_new_and_legacy_encoding_checked_before_main(self):
         build=read('scripts/build-windows.ps1')
