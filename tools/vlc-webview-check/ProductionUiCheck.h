@@ -7,8 +7,8 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
     juce::File fixture;
     std::atomic<uint64_t> ui{now()},javascript{now()};
     bool failed=false,webOnly=false,ready=false,clickPending=false,expanded=false;
-    int touchPhase=0;
-    POINT touchPoint{};
+    int touchPhase=0,mousePhase=0;
+    POINT touchPoint{},mousePoint{};
     bool controlPlaying=false;
     POINT clickPoint{};
     int phase=0,cycle=0,generation=0,playCommands=0,volumeCommands=0,webReadyGeneration=0;
@@ -153,7 +153,17 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
             if(!injectTouch(flags)){failed=true;return;}
             touchPhase=touchPhase==1?2:0;
         }
-        if(clickPending&&touchPhase==0) {
+        if(mousePhase) {
+            INPUT input{};input.type=INPUT_MOUSE;
+            input.mi.dwFlags=mousePhase==1?MOUSEEVENTF_LEFTDOWN:MOUSEEVENTF_LEFTUP;
+            POINT actual{};
+            if(!GetCursorPos(&actual)||std::abs(actual.x-mousePoint.x)>1||std::abs(actual.y-mousePoint.y)>1) {
+                failed=true;std::cerr<<"FAIL mouse injection cursor moved before button event"<<std::endl;return;
+            }
+            if(SendInput(1,&input,sizeof(INPUT))!=1){failed=true;std::cerr<<"FAIL mouse button injection error="<<GetLastError()<<std::endl;return;}
+            mousePhase=mousePhase==1?2:0;
+        }
+        if(clickPending&&touchPhase==0&&mousePhase==0) {
             clickPending=false;
             const auto scale=getPeer()->getPlatformScaleFactor();
             POINT p{juce::roundToInt(clickPoint.x*scale),juce::roundToInt(clickPoint.y*scale)};
@@ -169,17 +179,18 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
                 touchPoint=p;touchPhase=1;
                 if(!injectTouch(POINTER_FLAG_DOWN|POINTER_FLAG_INRANGE|POINTER_FLAG_INCONTACT)){failed=true;return;}
             } else {
-                POINT actual{};RECT clip{};
-                const bool moved=SetCursorPos(p.x,p.y)!=FALSE;
-                const bool located=GetCursorPos(&actual)!=FALSE;GetClipCursor(&clip);
-                std::cout<<"mouse actual="<<actual.x<<","<<actual.y<<" clip="<<clip.left<<","<<clip.top
-                    <<","<<clip.right<<","<<clip.bottom<<std::endl;
-                if(!moved||!located||std::abs(actual.x-p.x)>1||std::abs(actual.y-p.y)>1) {
-                    failed=true;std::cerr<<"FAIL input injection position mismatch; not an application click failure"<<std::endl;return;
-                }
-                INPUT input[2]{};input[0].type=input[1].type=INPUT_MOUSE;
-                input[0].mi.dwFlags=MOUSEEVENTF_LEFTDOWN;input[1].mi.dwFlags=MOUSEEVENTF_LEFTUP;
-                if(SendInput(2,input,sizeof(INPUT))!=2){failed=true;return;}
+                // Real mouse motion is required to leave Chromium's touch modality.
+                // SetCursorPos alone is not a hardware mouse move. Separate motion,
+                // down and up by message-loop turns, just as for touch injection.
+                const auto left=GetSystemMetrics(SM_XVIRTUALSCREEN),top=GetSystemMetrics(SM_YVIRTUALSCREEN);
+                const auto width=GetSystemMetrics(SM_CXVIRTUALSCREEN),height=GetSystemMetrics(SM_CYVIRTUALSCREEN);
+                if(width<2||height<2){failed=true;return;}
+                INPUT input{};input.type=INPUT_MOUSE;
+                input.mi.dx=LONG((int64_t(p.x-left)*65536)/width+32768/width);
+                input.mi.dy=LONG((int64_t(p.y-top)*65536)/height+32768/height);
+                input.mi.dwFlags=MOUSEEVENTF_MOVE|MOUSEEVENTF_ABSOLUTE|MOUSEEVENTF_VIRTUALDESK;
+                if(SendInput(1,&input,sizeof(INPUT))!=1){failed=true;std::cerr<<"FAIL mouse motion injection error="<<GetLastError()<<std::endl;return;}
+                mousePoint=p;mousePhase=1;
             }
         }
         if(ready&&now()-lastState>=100){lastState=now();sendState();}

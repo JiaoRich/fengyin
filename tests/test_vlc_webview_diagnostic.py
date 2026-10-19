@@ -116,7 +116,7 @@ class VlcWebViewDiagnostic(unittest.TestCase):
         source=(ROOT/'tools/vlc-webview-check/ProductionUiCheck.h').read_text(encoding='utf-8')
         for item in ('FENGYIN_DIAGNOSTIC_FRONTEND','juce::URL(juce::File(',
                      '"#change-video"','"#fullscreen"','"#play-button"','"#video-volume"',
-                     'SendInput(2,input,sizeof(INPUT))','firstPictureVisible()',
+                     'SendInput(1,&input,sizeof(INPUT))','MOUSEEVENTF_VIRTUALDESK','mousePhase==1?2:0','firstPictureVisible()',
                      'backendState','nativeVideoState','if(++cycle==20)',
                      'InitializeTouchInjection','InjectTouchInput','POINTER_FLAG_UP'):
             self.assertIn(item,source)
