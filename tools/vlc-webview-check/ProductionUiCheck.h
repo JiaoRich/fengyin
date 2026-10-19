@@ -29,6 +29,7 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
                 {expanded:document.body.classList.contains('video-expanded')}),100));)JS")
             .withEventListener("testHeartbeat",[this](juce::var p){javascript.store(now());expanded=bool(p["expanded"]);})
             .withEventListener("webReady",[this](juce::var p){session=p["videoSession"].toString();ready=true;javascript.store(now());})
+            .withEventListener("testRuntime",[](juce::var p){std::cout<<"production runtime "<<juce::JSON::toString(p,true)<<std::endl;})
             .withEventListener("requestBackendState",[this](juce::var){lastConfig=0;})
             .withEventListener("testPoint",[this](juce::var p){
                 std::cout<<"web point "<<juce::JSON::toString(p,true)<<std::endl;
@@ -39,21 +40,10 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
                 surface.player()->load(fixture.getFullPathName().toStdString(),++generation);
             })
             .withEventListener("nativeVideoViewport",[this](juce::var p){
-                // Return from WebMessageReceived before native D3D/Win32 work.
-                juce::MessageManager::callAsync([safe=juce::Component::SafePointer<ProductionUiScene>(this),p]{
-                    if(!safe||p["session"].toString()!=safe->session
-                        ||(bool(p["visible"])&&int(p["generation"])!=safe->generation))return;
-                    std::cout<<"production viewport enter "<<juce::JSON::toString(p,true)<<std::endl;
-                    const juce::Rectangle<int> bounds{int(p["x"]),int(p["y"]),int(p["width"]),int(p["height"])};
-                    const bool moved=bool(p["visible"])&&safe->surface.getBounds()!=bounds;
-                    safe->surface.updateViewport(bounds,bool(p["visible"]));
-                    std::cout<<"production viewport returned"<<std::endl;
-                    if(moved) {
-                        safe->web->focusGainedWithDirection(juce::Component::focusChangedDirectly,
-                            juce::Component::FocusChangeDirection::unknown);
-                        std::cout<<"production WebView MoveFocus after geometry change"<<std::endl;
-                    }
-                });
+                if(p["session"].toString()!=session||(bool(p["visible"])&&int(p["generation"])!=generation))return;
+                std::cout<<"production viewport enter "<<juce::JSON::toString(p,true)<<std::endl;
+                surface.updateViewport({int(p["x"]),int(p["y"]),int(p["width"]),int(p["height"])},bool(p["visible"]));
+                std::cout<<"production viewport returned"<<std::endl;
             })
             .withEventListener("setVideoPlaybackState",[this](juce::var p){
                 if(int(p["generation"])==generation){surface.player()->setPlaying(bool(p["playing"]));++playCommands;}
@@ -161,6 +151,7 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
         }
         if(ready&&now()-lastState>=100){lastState=now();sendState();}
         if(phase==0&&ready) {
+            web->evaluateJavascript("window.__JUCE__.backend.emitEvent('testRuntime',{userAgent:navigator.userAgent})");
             if(!surface.initialise()){failed=true;return;}
             phase=1;click("#change-video");deadline=now()+30000;
         } else if(phase==1&&surface.getState().generation==generation&&surface.getState().ready&&firstPictureVisible()) {

@@ -5,6 +5,15 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 class VlcWebViewDiagnostic(unittest.TestCase):
+    def test_ci_uses_verified_current_runtime_not_old_runner_image(self):
+        helper=(ROOT/'scripts/ensure_ci_webview.ps1').read_text(encoding='utf-8')
+        for item in ("$env:GITHUB_ACTIONS -ne 'true'",'Get-AuthenticodeSignature','Microsoft Corporation',
+                     'Start-Process','Version.Major -lt 155','WEBVIEW2_BROWSER_EXECUTABLE_FOLDER',
+                     'installerSha256','ci-webview-runtime.json'):
+            self.assertIn(item,helper)
+        for name in ('scripts/build-windows.ps1','.github/workflows/windows-build.yml'):
+            self.assertIn('ensure_ci_webview.ps1',(ROOT/name).read_text(encoding='utf-8-sig'))
+
     def test_private_vlc_is_staged_for_every_build_entry(self):
         cmake=(ROOT/'tools/vlc-webview-check/CMakeLists.txt').read_text(encoding='utf-8')
         self.assertIn('TARGET FengYinVlcWebViewCheck POST_BUILD',cmake)

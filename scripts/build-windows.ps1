@@ -63,6 +63,11 @@ for ($attempt = 1; $attempt -le 4; $attempt++) {
         Start-Sleep -Seconds (3 * $attempt)
     }
 }
+if ($env:GITHUB_ACTIONS -eq 'true') {
+    & (Join-Path $PSScriptRoot 'ensure_ci_webview.ps1') -Installer $PreparedWebView
+    New-Item -ItemType Directory -Force -Path (Join-Path $BuildDir 'evidence') | Out-Null
+    Copy-Item -LiteralPath 'ci-webview-runtime.json' -Destination (Join-Path $BuildDir 'evidence/ci-webview-runtime.json') -Force
+}
 if ($UsePreparedFfmpeg) {
     Write-Host "预检并校验 FFmpeg 发布依赖..." -ForegroundColor Cyan
     Invoke-Checked "FFmpeg 下载与校验" { python (Join-Path $PSScriptRoot "prepare_ffmpeg.py") $PreparedFfmpeg }
