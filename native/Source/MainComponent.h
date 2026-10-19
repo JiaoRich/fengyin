@@ -131,7 +131,6 @@ private:
     fengyin::AccompanimentAudioService accompaniment;
     fengyin::RecordingService recorder;
     fengyin::WindowRecordingService windowRecorder;
-    void toggleWindowRecording(const juce::var& payload);
     fengyin::MasterOutputService masterOutput;
     fengyin::TestSynthEngine testSynth;
     fengyin::VoicePromptService voicePrompts;

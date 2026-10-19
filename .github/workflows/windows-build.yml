@@ -248,10 +248,7 @@ jobs:
           name: FengYin-performance-runtime
           path: |
             dist/FengYin/FengYin.exe
-            dist/FengYin/FengYinScreenRecorder.exe
             dist/FengYin/FengYinRecorder.exe
-            dist/FengYin/Use-*-recording.cmd
-            dist/FengYin/Recording-backends.txt
             dist/FengYin/components/Recording/
             dist/FengYin/components/VLC/
           if-no-files-found: error

@@ -102,6 +102,43 @@ const path=require('node:path');
  assert.equal(await page.locator('#current-time').innerText(),'00:33','duplicate selection reset transport');
  await page.evaluate(()=>listeners.nativeVideoState({engine:'vlc',url:'file:///C:/old.mp4',name:'旧状态',generation:7,seekRevision:99,ready:true,playing:true,position:50,duration:600}));
  assert.equal(await page.locator('#video-name').innerText(),'仍在播放');
+ // Native VLC must never enter WebView2 DOM fullscreen. Repeated in-window
+ // expansion keeps HTML controls outside the reported HWND rectangle.
+ await page.evaluate(()=>{window.domFullscreenCalls=0;document.querySelector('.video-card').requestFullscreen=()=>{domFullscreenCalls++;return Promise.resolve();};});
+ for(let i=0;i<20;i++) {
+  await page.locator('#fullscreen').click();await page.waitForTimeout(25);
+  assert(await page.evaluate(()=>document.body.classList.contains('video-expanded')));
+  const geometry=await page.evaluate(()=>{
+   const r=document.querySelector('#native-video-surface').getBoundingClientRect();
+   const t=document.querySelector('.video-topline').getBoundingClientRect();
+   const c=document.querySelector('.video-controls').getBoundingClientRect();
+   return {videoTop:r.top,videoBottom:r.bottom,titleBottom:t.bottom,controlsTop:c.top};
+  });
+  assert(geometry.videoTop>=geometry.titleBottom-1,JSON.stringify(geometry));
+  assert(geometry.videoBottom<=geometry.controlsTop+1,JSON.stringify(geometry));
+  if(i%2)await page.keyboard.press('Escape');else await page.locator('#fullscreen').click();
+  assert.equal(await page.evaluate(()=>document.body.classList.contains('video-expanded')),false);
+ }
+ assert.equal(await page.evaluate(()=>domFullscreenCalls),0);
+ await page.locator('#fullscreen').click();
+ await page.evaluate(()=>showPage('sounds'));
+ assert.equal(await page.evaluate(()=>document.body.classList.contains('video-expanded')),false);
+ await page.evaluate(()=>showPage('play'));await page.waitForTimeout(50);
+ // Fine volume: clicking the track does not jump; a short real drag changes
+ // only a small amount; keyboard precision and final bridge value agree.
+ const volume=page.locator('#video-volume');
+ const b=await volume.boundingBox();
+ const before=Number(await volume.inputValue());
+ await page.mouse.move(b.x+5,b.y+b.height/2);await page.mouse.down();
+ assert.equal(Number(await volume.inputValue()),before);
+ await page.mouse.move(b.x+15,b.y+b.height/2,{steps:5});await page.mouse.up();
+ const after=Number(await volume.inputValue());
+ assert(after>before && after-before<3,`volume drag ${before} -> ${after}`);
+ await volume.press('ArrowLeft');await page.waitForTimeout(50);
+ assert(Math.abs(Number(await volume.inputValue())-(after-.1))<.011);
+ assert.equal(await page.locator('#record-video-choice').count(),0);
+ assert.equal(await page.locator('#record-options').count(),0);
+ assert.equal(await page.evaluate(()=>sent.some(x=>x.name==='toggleWindowRecording')),false);
  assert.deepEqual(errors,[]);
  console.log('PASS VLC UI no HTML decoder/audio/clock, viewport avoids controls and hides for pages/dialogs, single explicit seeks, stale rejection, EOF replay and errors');
  } finally {await browser.close();}

@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.1.24",
+    [string]$Version = "1.1.25",
     [switch]$SkipInstaller
 )
 
@@ -13,7 +13,7 @@ $FfmpegPath = Join-Path $ProjectRoot "third_party\ffmpeg\windows\ffmpeg.exe"
 $FfmpegPackageDir = Join-Path $PackageDir "tools\ffmpeg"
 $NugetPackageDir = Join-Path $ProjectRoot "third_party\nuget-packages"
 $VlcRoot = Join-Path $ProjectRoot "third_party\vlc"
-$RecordingRoot = Join-Path $ProjectRoot "third_party\recording"
+$RecordingRoot = Join-Path $ProjectRoot "third_party\recording-audio"
 $WebViewOfflineInstallerPath = Join-Path $PackageDir "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
 $PreparedFfmpeg = Join-Path $env:TEMP ("fengyin-ffmpeg-" + [guid]::NewGuid().ToString("N"))
 $PreparedWebView = Join-Path $env:TEMP ("fengyin-webview-" + [guid]::NewGuid().ToString("N") + ".exe")
@@ -40,7 +40,7 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
 # Fail inexpensive source regressions before the native build, not after it.
 Invoke-Checked "发布源码预检" { python -m unittest discover -s (Join-Path $ProjectRoot "tests") -p "test_*.py" }
 Invoke-Checked "LibVLC official runtime and source verification" { python (Join-Path $PSScriptRoot "prepare_vlc.py") $VlcRoot }
-Invoke-Checked "Recording dependencies verification" { python (Join-Path $PSScriptRoot "prepare_recording.py") $RecordingRoot }
+Invoke-Checked "Audio-only recording dependencies verification" { python (Join-Path $PSScriptRoot "prepare_audio_recording.py") $RecordingRoot }
 # Download before compilation. Never package a partial or unsigned dependency.
 for ($attempt = 1; $attempt -le 4; $attempt++) {
     try {
@@ -81,60 +81,29 @@ if (-not (Get-ChildItem $NugetPackageDir -Directory -Filter "*Microsoft.Web.WebV
 }
 Invoke-Checked "CMake 配置" {
     cmake -S $ProjectRoot -B $BuildDir -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTING=ON `
-        "-DJUCE_WEBVIEW2_PACKAGE_LOCATION=$NugetPackageDir" "-DFENGYIN_VLC_ROOT=$VlcRoot" "-DFENGYIN_RECORDING_ROOT=$RecordingRoot"
+        "-DJUCE_WEBVIEW2_PACKAGE_LOCATION=$NugetPackageDir" "-DFENGYIN_VLC_ROOT=$VlcRoot" "-DFENGYIN_RECORDING_ROOT=$RecordingRoot" -DFENGYIN_ARCHIVED_VIDEO_RECORDING=OFF
 }
 
-Invoke-Checked "Recording helper preflight build" { cmake --build $BuildDir --config Release --target FengYinScreenRecorder --parallel 4 }
-$ScreenRecorderExe = Join-Path $BuildDir "Release\FengYinScreenRecorder.exe"
-$RecorderCheck = Join-Path $BuildDir "screen-recorder-selftest.mp4"
-Invoke-Checked "Screen recorder MP4 encoding selftest" {
-    # This is a GUI-subsystem executable. Do not let PowerShell start the
-    # decoder before native finalization has completed.
-    $RecorderProcess = Start-Process -FilePath $ScreenRecorderExe -ArgumentList @('--selftest', ('"{0}"' -f $RecorderCheck)) -PassThru
-    if (-not $RecorderProcess.WaitForExit(60000)) {
-        $RecorderProcess.Kill()
-        throw "Screen recorder encoding selftest timed out"
-    }
-    $RecorderProcess.Refresh()
-    $global:LASTEXITCODE = $RecorderProcess.ExitCode
-    if ($LASTEXITCODE -ne 0 -and (Test-Path "$RecorderCheck.error.txt")) { Get-Content "$RecorderCheck.error.txt" }
-    if ($LASTEXITCODE -eq 0 -and -not (Test-Path $RecorderCheck)) { throw "Recorder exited without producing MP4" }
-}
+# Release has no video recorder. Archived media diagnostics remain opt-in.
 $RecorderFfmpeg = if (-not $UsePreparedFfmpeg) { $FfmpegPath } else { Join-Path $PreparedFfmpeg "ffmpeg.exe" }
-Invoke-Checked "Screen recorder decoded audio/video check" { python (Join-Path $PSScriptRoot "verify_screen_recording.py") $RecorderFfmpeg $RecorderCheck }
-$AudioCheck = Join-Path $BuildDir "system-audio-selftest.wav"
-Invoke-Checked "System recording WAV selftest" {
-    $AudioProcess = Start-Process -FilePath $ScreenRecorderExe -ArgumentList @('--audio-selftest', ('"{0}"' -f $AudioCheck)) -PassThru
-    if (-not $AudioProcess.WaitForExit(60000)) { $AudioProcess.Kill(); throw "System recording selftest timed out" }
-    $AudioProcess.Refresh()
-    $global:LASTEXITCODE = $AudioProcess.ExitCode
-    if ($LASTEXITCODE -ne 0 -and (Test-Path "$AudioCheck.error.txt")) { Get-Content "$AudioCheck.error.txt" }
-    if ($LASTEXITCODE -eq 0 -and -not (Test-Path $AudioCheck)) { throw "Recorder exited without producing WAV" }
-}
-Invoke-Checked "System recording PCM continuity check" { python (Join-Path $PSScriptRoot "verify_system_recording.py") $AudioCheck }
-
-# The new library backend must really encode/decode; the legacy checks above
-# remain mandatory because it is an explicitly selectable rollback.
-Invoke-Checked "Third-party recorder preflight build" { cmake --build $BuildDir --config Release --target FengYinRecorder --parallel 4 }
+Invoke-Checked "Audio-only recorder preflight build" { cmake --build $BuildDir --config Release --target FengYinRecorder --parallel 4 }
 $ThirdPartyRecorder = Join-Path $BuildDir "Release\FengYinRecorder.exe"
-$ThirdPartyVideo = Join-Path $BuildDir "srl-recorder-selftest.mp4"
 $ThirdPartyAudio = Join-Path $BuildDir "miniaudio-selftest.wav"
-foreach ($Check in @(@('--selftest', $ThirdPartyVideo), @('--audio-selftest', $ThirdPartyAudio))) {
-    Invoke-Checked "Third-party native encoding selftest" {
-        $NativeProcess = Start-Process -FilePath $ThirdPartyRecorder -ArgumentList @($Check[0], ('"{0}"' -f $Check[1])) -PassThru
-        if (-not $NativeProcess.WaitForExit(60000)) { $NativeProcess.Kill(); throw "Third-party encoding timed out" }
-        $NativeProcess.Refresh()
-        $global:LASTEXITCODE = $NativeProcess.ExitCode
-        if ($LASTEXITCODE -ne 0 -and (Test-Path ($Check[1] + '.error.txt'))) { Get-Content ($Check[1] + '.error.txt') }
-        if ($LASTEXITCODE -eq 0 -and -not (Test-Path $Check[1])) { throw "Third-party encoder produced no file" }
-    }
+Invoke-Checked "Miniaudio real WAV encoding selftest" {
+    if (Test-Path $ThirdPartyAudio) { Remove-Item -LiteralPath $ThirdPartyAudio -Force }
+    $NativeProcess = Start-Process -FilePath $ThirdPartyRecorder -ArgumentList @('--audio-selftest', ('"{0}"' -f $ThirdPartyAudio)) -PassThru
+    if (-not $NativeProcess.WaitForExit(60000)) { $NativeProcess.Kill(); throw "Audio encoding timed out" }
+    $NativeProcess.Refresh()
+    $global:LASTEXITCODE = $NativeProcess.ExitCode
+    if ($LASTEXITCODE -ne 0 -and (Test-Path "$ThirdPartyAudio.error.txt")) { Get-Content "$ThirdPartyAudio.error.txt" }
+    if ($LASTEXITCODE -eq 0 -and -not (Test-Path $ThirdPartyAudio)) { throw "Audio recorder produced no WAV" }
 }
-Invoke-Checked "ScreenRecorderLib actual decoded video/audio" { python (Join-Path $PSScriptRoot "verify_screen_recording.py") $RecorderFfmpeg $ThirdPartyVideo }
 Invoke-Checked "Miniaudio actual PCM continuity" { python (Join-Path $PSScriptRoot "verify_system_recording.py") $ThirdPartyAudio }
-
+# Build playback fixtures independently: removing capture must not remove real
+# VLC first-frame / decoded PCM / lifecycle acceptance.
 $VlcFixture = Join-Path $BuildDir "vlc-playback-fixture.mp4"
 Invoke-Checked "LibVLC fixture preparation" {
-    & $RecorderFfmpeg -hide_banner -loglevel error -nostdin -y -stream_loop 5 -i $RecorderCheck -c copy $VlcFixture
+    & $RecorderFfmpeg -hide_banner -loglevel error -nostdin -y -f lavfi -i "color=c=red:s=1920x1080:r=24" -f lavfi -i "sine=frequency=440:sample_rate=48000" -vf "drawbox=x=0:y=540:w=1920:h=540:color=blue:t=fill" -t 12 -c:v mpeg4 -q:v 3 -c:a aac -b:a 192k -ac 2 $VlcFixture
 }
 Invoke-Checked "LibVLC integration preflight build" { cmake --build $BuildDir --config Release --target FengYinVlcTests --parallel 4 }
 Invoke-Checked "LibVLC real playback and lifecycle check" {
@@ -150,7 +119,7 @@ Invoke-Checked "自动测试" { ctest --test-dir $BuildDir -C Release --output-o
 $ProxyInput = Join-Path $BuildDir "video-proxy-input.mp4"
 $ProxyOutput = Join-Path $BuildDir "verified-proxy.mp4"
 Invoke-Checked "Video proxy 60fps input preparation" {
-    & $RecorderFfmpeg -hide_banner -loglevel error -nostdin -y -i $RecorderCheck -an -r 60 -c:v mpeg4 -q:v 4 $ProxyInput
+    & $RecorderFfmpeg -hide_banner -loglevel error -nostdin -y -i $VlcFixture -t 2 -an -r 60 -c:v mpeg4 -q:v 4 $ProxyInput
 }
 Invoke-Checked "Native idle video preparation and cache reuse" {
     & (Join-Path $BuildDir "Release\FengYinRecordingTests.exe") $RecorderFfmpeg $ProxyInput
@@ -177,11 +146,7 @@ if (-not (Test-Path $AudioEngineExe)) { throw "未找到独立音频引擎：$Au
 if (-not (Test-Path $AudioWatchdogExe)) { throw "未找到音频恢复守护程序：$AudioWatchdogExe" }
 Copy-Item $AudioEngineExe (Join-Path $PackageDir "FengYinAudioEngine.exe") -Force
 Copy-Item $AudioWatchdogExe (Join-Path $PackageDir "FengYinAudioWatchdog.exe") -Force
-$ScreenRecorderExe = Join-Path $BuildDir "Release\FengYinScreenRecorder.exe"
-if (-not (Test-Path $ScreenRecorderExe)) { throw "Screen recording component missing: $ScreenRecorderExe" }
-Copy-Item $ScreenRecorderExe (Join-Path $PackageDir "FengYinScreenRecorder.exe") -Force
 Copy-Item $ThirdPartyRecorder (Join-Path $PackageDir "FengYinRecorder.exe") -Force
-Copy-Item (Join-Path $PSScriptRoot "recording-backends\*") $PackageDir -Force
 New-Item -ItemType Directory -Force -Path (Join-Path $PackageDir "components\Recording") | Out-Null
 Copy-Item (Join-Path $RecordingRoot "licenses\*") (Join-Path $PackageDir "components\Recording") -Force
 Copy-Item (Join-Path $RecordingRoot "versions.json") (Join-Path $PackageDir "components\Recording") -Force

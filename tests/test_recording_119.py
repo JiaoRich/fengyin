@@ -7,11 +7,11 @@ class Recording119(unittest.TestCase):
         for text in ['风吟录制','录音','视频录制']:self.assertIn(text,paths)
         html=(ROOT/'prototype/index.html').read_text(encoding='utf-8')
         self.assertIn('我的录制',html)
-        menu=html.split('id="record-menu"',1)[1].split('id="bend-range-dialog"',1)[0]
-        self.assertEqual(menu.count('role="menuitem"'),2)
+        self.assertNotIn('id="record-menu"',html)
+        self.assertIn('● 开始录音',html)
         js=(ROOT/'prototype/app.js').read_text(encoding='utf-8')
         self.assertNotIn('showScreenRecordings',js)
-        self.assertIn("$('#record').addEventListener('click',()=>",js)
+        self.assertIn("$('#record').addEventListener('click',toggleAudioRecording)",js)
     def test_capture_thread_is_independent_of_encoder(self):
         source=(ROOT/'native/ScreenRecorder/main.cpp').read_text(encoding='utf-8')
         thread=source.split('worker=std::thread',1)[1].split('future.get()',1)[0]

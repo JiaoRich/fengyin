@@ -14,10 +14,11 @@ def read(path):return (ROOT/path).read_text(encoding='utf-8-sig')
 class Recording123(unittest.TestCase):
     def test_explicit_backend_and_scope_no_silent_legacy_fallback(self):
         service=read('native/Source/WindowRecordingService.cpp')
-        self.assertIn('FENGYIN_RECORDING_BACKEND',service)
-        self.assertIn('legacy?"FengYinScreenRecorder.exe":"FengYinRecorder.exe"',service)
+        self.assertNotIn('FENGYIN_RECORDING_BACKEND',service)
+        self.assertIn('.getSiblingFile("FengYinRecorder.exe")',service)
+        self.assertNotIn('FengYinScreenRecorder.exe',service)
         self.assertEqual(service.count('process.start('),1)
-        self.assertIn('"screen:"+',service)
+        self.assertNotIn('"screen:"+',service)
         for filename in ['Use-new-recording.cmd','Use-legacy-recording.cmd']:
             cmd=read('scripts/recording-backends/'+filename)
             self.assertIn('tasklist',cmd)
@@ -82,13 +83,14 @@ class Recording123(unittest.TestCase):
 
     def test_real_new_and_legacy_encoding_checked_before_main(self):
         build=read('scripts/build-windows.ps1')
-        for marker in ['ScreenRecorderLib actual decoded video/audio','Miniaudio actual PCM continuity','System recording PCM continuity check']:
+        for marker in ['Miniaudio real WAV encoding selftest','Miniaudio actual PCM continuity']:
             self.assertLess(build.index(marker),build.index('Invoke-Checked "主程序编译"'))
         self.assertIn('$NativeProcess.WaitForExit(60000)',build)
         self.assertIn('$global:LASTEXITCODE = $NativeProcess.ExitCode',build)
         release=read('scripts/check-release.ps1')
-        for name in ['FengYinRecorder.exe','FengYinScreenRecorder.exe','ScreenRecorderLib-MIT.txt','miniaudio-0.11.23.h']:
+        for name in ['FengYinRecorder.exe','miniaudio-0.11.23.h']:
             self.assertIn(name,release)
+        self.assertNotIn('"components\\Recording\\ScreenRecorderLib-MIT.txt"',release)
 
     def test_frame_validator_counts_real_pictures_and_rejects_extra_missing_or_partial(self):
         spec=importlib.util.spec_from_file_location('video_verify',ROOT/'scripts/verify_screen_recording.py')

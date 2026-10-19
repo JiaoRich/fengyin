@@ -7,16 +7,7 @@ $ErrorActionPreference = "Stop"
 $RequiredFiles = @(
     "FengYin.exe",
     "FengYinRecorder.exe",
-    "FengYinScreenRecorder.exe",
-    "Use-new-recording.cmd",
-    "Use-legacy-recording.cmd",
-    "Recording-backends.txt",
     "components\Recording\versions.json",
-    "components\Recording\ScreenRecorderLib-MIT.txt",
-    "components\Recording\ScreenRecorderLib-7.0.1-source.zip",
-    "components\Recording\ScreenRecorderLib-WASAPI-fix.patch",
-    "components\Recording\ScreenRecorderLib-local-patches.json",
-    "components\Recording\FengYinCapturePacketCopy.h",
     "components\Recording\miniaudio-license.txt",
     "components\Recording\miniaudio-0.11.23.h",
     "FengYinAudioEngine.exe",
@@ -41,6 +32,11 @@ foreach ($Name in $RequiredFiles) {
     $Path = Join-Path $PackageDir $Name
     if (-not (Test-Path $Path)) { throw "发布检查失败，缺少：$Name" }
 }
+
+$RetiredCapture = Get-ChildItem $PackageDir -Recurse -File | Where-Object {
+    $_.Name -match '^FengYinScreenRecorder\.exe$|^Use-.*-recording\.cmd$|^ScreenRecorderLib'
+}
+if ($RetiredCapture) { throw "Release must not contain archived video recording components" }
 
 $Forbidden = Get-ChildItem $PackageDir -Recurse -File | Where-Object {
     $_.Name -match "private-key|license-private|\.pfx$|\.pem$"

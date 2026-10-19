@@ -1,4 +1,22 @@
 set(FENGYIN_RECORDING_ROOT "${CMAKE_SOURCE_DIR}/third_party/recording" CACHE PATH "Verified recording dependencies")
+if(NOT FENGYIN_ARCHIVED_VIDEO_RECORDING)
+    if(NOT EXISTS "${FENGYIN_RECORDING_ROOT}/miniaudio/miniaudio.h")
+        message(FATAL_ERROR "Run scripts/prepare_audio_recording.py before configuring the audio recorder")
+    endif()
+    # Release helper contains only system-output PCM capture. No D3D, WGC,
+    # ScreenRecorderLib, Media Foundation, video encoder or legacy backend.
+    add_executable(FengYinRecorder WIN32 AudioMain.cpp MiniAudioRecorder.cpp ../Source/WindowsCompatibility.manifest)
+    set_target_properties(FengYinRecorder PROPERTIES CXX_STANDARD 17
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+    target_include_directories(FengYinRecorder PRIVATE "${FENGYIN_RECORDING_ROOT}/miniaudio")
+    target_compile_definitions(FengYinRecorder PRIVATE NOMINMAX UNICODE _UNICODE)
+    target_compile_options(FengYinRecorder PRIVATE /utf-8 /EHsc)
+    target_link_libraries(FengYinRecorder PRIVATE ole32 uuid shell32 avrt winmm)
+    install(TARGETS FengYinRecorder RUNTIME DESTINATION .)
+    return()
+endif()
+# Archived video recorder: opt-in diagnostics only. Original implementation,
+# upstream revision, source licenses and local patches remain available.
 set(SRL_ROOT "${FENGYIN_RECORDING_ROOT}/srl/ScreenRecorderLibNative")
 if(NOT EXISTS "${SRL_ROOT}/RecordingManager.cpp" OR NOT EXISTS "${FENGYIN_RECORDING_ROOT}/miniaudio/miniaudio.h")
     message(FATAL_ERROR "Run scripts/prepare_recording.py before configuring the Windows recorder")

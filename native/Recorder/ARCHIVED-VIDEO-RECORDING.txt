@@ -1,0 +1,9 @@
+Video recording is withdrawn from release 1.1.25.
+main.cpp (ScreenRecorderLib) and ../ScreenRecorder/main.cpp (legacy WGC/MF)
+are archived implementations, NOT the release helper. Original source,
+version-pinning/patch scripts and diagnostic tests remain in source control.
+FENGYIN_ARCHIVED_VIDEO_RECORDING defaults OFF; only explicitly enabled
+standalone media diagnostics may build the old targets. Never ship them.
+The release helper uses AudioMain.cpp + MiniAudioRecorder.cpp only.
+No screen backend launchers or ScreenRecorderLib binary/source are packaged.
+Do not delete existing customer MP4s or change licenses of archived sources.

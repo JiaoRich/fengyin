@@ -145,7 +145,7 @@ void VlcPlaybackEngine::run()
     {
         VlcApi api(directory);
         const char* options[] = {"--ignore-config", "--no-media-library", "--no-video-title-show",
-                                 "--no-osd", "--no-interact", "--avcodec-hw=any"};
+                                 "--no-osd", "--no-interact", "--no-metadata-network-access", "--avcodec-hw=any"};
         auto* instance = api.libvlc_new(static_cast<int>(std::size(options)), options);
         if (!instance) throw std::runtime_error("无法初始化 VLC 播放组件");
         auto* player = api.libvlc_media_player_new(instance);
@@ -214,7 +214,9 @@ void VlcPlaybackEngine::run()
                         // without advancing playback or emitting accompaniment.
                         // No second decoder, snapshot file or full-file work.
                         api.libvlc_media_add_option(media,":start-paused");
-                        api.libvlc_media_parse_with_options(media,libvlc_media_parse_local,2500);
+                        // Playback already opens/demuxes the media and reports
+                        // length/tracks. A second preparser is unnecessary for
+                        // local accompaniment and competes during cold opening.
                         started=api.libvlc_media_player_play(player)==0;
                         if(!started)playbackError="视频无法打开，请检查文件是否完整";
                     }

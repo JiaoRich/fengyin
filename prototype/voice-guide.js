@@ -1,13 +1,13 @@
 /* Offline, reviewed speech. No browser/cloud TTS in the installed application. */
 (() => {
   const updates=[
-    ['REC_AUDIO','准备开始录音。'],['REC_VIDEO','准备开始录视频。'],
+    ['REC_AUDIO','准备开始录音。'],
     ['GUIDE_OUTPUT','请确认声音输出是您正在使用的扬声器或耳机。'],
     ['GUIDE_MATCH','点击开始匹配。保持管身不动，不咬嘴，吹一个气息由弱到强的长音。'],
     ['GUIDE_TRY','请吹几个音，试试轻吹和强吹。能听到声音后，就可以开始演奏了。'],
     ['GUIDE_TECH','选择咬嘴控制或按键控制，再点击映射。需要移除时，点击清除映射。'],
     ['GUIDE_KEY','根据歌曲需要选择演奏调。调整后，吹几个音确认调性。'],
-    ['GUIDE_RECORD','点击开始录制旁的小箭头，选择录音或录视频。结束后，在我的录制中查看文件。']
+    ['GUIDE_RECORD','点击开始录音。结束后，在我的录制中查看文件。']
   ].map(([id,text])=>({id,text}));
   const catalog=[...(window.FENGYIN_VOICE_CATALOG?.items || []),...updates];
   const clips=new Map(catalog.map(x=>[x.id,x]));
@@ -21,6 +21,9 @@
   const busy=()=>!!state.recording || !!state.screenRecordingBusy || Number(state.breath)>0.015 || videoWantsPlaying || !video.paused;
   function stop(){emit('stopVoice');if(pending){clearTimeout(pending.timeout);pending.resolve(false);pending=null;}}
   function say(id,{force=false}={}){
+    // Reuse reviewed audio-only guidance; the old GUIDE_RECORD WAV advertises
+    // withdrawn video capture and must never be spoken by this release.
+    if(id==='GUIDE_RECORD')id='G010';
     if(!enabled || !clips.has(id) || (busy()&&!force) || state.recording || state.screenRecordingBusy)return Promise.resolve(false);
     stop();const request=++token;
     return new Promise(resolve=>{
@@ -39,12 +42,12 @@
     learning(name){learnedName=controlName(name);say(/咬嘴|颤音|揉弦/.test(name)?'V047':'NEW_MAP_START');},
     cleared(){say('NEW_MAP_CLEAR');},
     tone(name){if(!toneEnabled)return;const spoken=name.replace('次中萨','次中音萨克斯').replace('上低萨','上低音萨克斯').replace('高萨','高音萨克斯').replace('中萨','中音萨克斯').replaceAll('-', '，');const match=catalog.find(x=>x.text.replace(/[。～]/g,'')===spoken);return say(match?.id || 'NEW_TONE_GENERIC');},
-    async beforeRecording(kind='audio'){
+    async beforeRecording(){
       if(countdown)return false;if(!enabled)return true;
       countdown=true;const button=document.querySelector('#record');button.disabled=true;
-      const isVideo=kind==='video';button.textContent=isVideo?'准备录视频…':'准备录音…';
-      try{return await say(isVideo?'REC_VIDEO':'REC_AUDIO',{force:true});}
-      finally{countdown=false;button.disabled=false;button.textContent='● 开始录制';}
+      button.textContent='准备录音…';
+      try{return await say('REC_AUDIO',{force:true});}
+      finally{countdown=false;button.disabled=false;button.textContent='● 开始录音';}
     }
   };
   const style=document.createElement('style');style.textContent=`
@@ -82,7 +85,7 @@
     ['演奏调','GUIDE_KEY','#transpose-key','play'],
     ['弯音范围','G004','#bend-range-button','play'],
     ['视频伴奏','V035','#choose-video','play'],
-    ['录音与录视频','GUIDE_RECORD','.record-control','play'],
+    ['录音与文件','GUIDE_RECORD','.record-control','play'],
     ['精简模式','V030','#window-mode-toggle','play'],
     ['更换主题','G013','#theme-button','play']
   ];

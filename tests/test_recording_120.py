@@ -5,9 +5,9 @@ ROOT=Path(__file__).resolve().parents[1]
 class Recording120(unittest.TestCase):
     def test_actual_encoder_checks_run_before_full_build(self):
         build=(ROOT/'scripts/build-windows.ps1').read_text(encoding='utf-8-sig')
-        self.assertIn('--target FengYinScreenRecorder --parallel 4',build)
-        self.assertLess(build.index('Screen recorder MP4 encoding selftest'),build.index('Invoke-Checked "主程序编译"'))
-        self.assertLess(build.index('System recording PCM continuity check'),build.index('Invoke-Checked "主程序编译"'))
+        self.assertNotIn('--target FengYinScreenRecorder',build)
+        self.assertLess(build.index('Miniaudio real WAV encoding selftest'),build.index('Invoke-Checked "主程序编译"'))
+        self.assertLess(build.index('Miniaudio actual PCM continuity'),build.index('Invoke-Checked "主程序编译"'))
 
     def test_layered_child_windows_have_embedded_compatibility_contract(self):
         manifest=(ROOT/'native/Source/WindowsCompatibility.manifest').read_text(encoding='utf-8')
@@ -38,7 +38,7 @@ class Recording120(unittest.TestCase):
         self.assertNotIn('ticks()-origin-2000000',worker)
         main=(ROOT/'native/Source/MainComponent.cpp').read_text(encoding='utf-8')
         self.assertNotIn('if(!visible && !windowRecorder.isAudioOnly())',main)
-        self.assertIn('windowRecorder.start(nullptr,juce::Colours::black,false,true)',main)
+        self.assertIn('windowRecorder.startAudio()',main)
 
     def test_native_title_uses_implicit_pointer_capture_not_css_coordinates(self):
         source=(ROOT/'native/Source/NativeCompactDragSurface.h').read_text(encoding='utf-8')

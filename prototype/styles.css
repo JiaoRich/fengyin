@@ -11,6 +11,11 @@ body[data-theme=gold]{--bg-highlight:#55351a;--accent-soft:rgba(255,200,90,.16);
 body[data-theme=minimal]{--bg-highlight:#28313d;--accent-soft:rgba(117,169,220,.15);--accent-2-soft:rgba(139,152,168,.08);--icon-filter:grayscale(.62) saturate(.7) brightness(1.02)}
 body.video-playing #theme-atmosphere,body.video-playing .ambient{display:none}body.video-playing .glass{backdrop-filter:none}body.video-playing .brand-glyph,body.video-playing .halo{animation-play-state:paused!important}.transpose-button{height:39px;white-space:nowrap;font-size:12px;border-color:var(--accent)!important;background:var(--accent-soft)!important}.transpose-button b{color:var(--text)}
 .video-card.native-vlc{display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+body.video-expanded{overflow:hidden}
+body.video-expanded #page-play .video-card.native-vlc{position:fixed;inset:0;width:100vw;height:100vh;min-height:0;max-height:none;border-radius:0;z-index:1000;backdrop-filter:none;background:#000}
+body.video-expanded .video-card .video-topline,body.video-expanded .video-card .video-controls{flex-shrink:0}
+#video-volume{touch-action:none;min-width:96px;width:clamp(96px,12vw,180px)}
+#video-volume-value{min-width:42px;text-align:right;font-variant-numeric:tabular-nums}
 #native-video-surface{position:relative;grid-row:2;min-width:0;min-height:0;background:#000}
 #native-video-surface[hidden]{display:none}
 .video-card.native-vlc .video-topline,.video-card.native-vlc .video-controls{position:relative;background:var(--panel);z-index:2}

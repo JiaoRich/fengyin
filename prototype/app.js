@@ -84,6 +84,7 @@ for (const edge of ['n','s','e','w','ne','nw','se','sw']) {
 }
 function applyWindowMode(compact) {
   cancelWindowGesture();
+  if(compact) setNativeVideoExpanded(false);
   compactMode = !!compact;
   document.body.classList.toggle('compact-mode', compactMode);
   $('#window-mode-toggle').textContent = compactMode ? '全屏' : '精简模式';
@@ -107,6 +108,9 @@ $('.system-pills').appendChild($('#window-mode-toggle'));
 $('.system-pills').appendChild(windowControls);
 window.__JUCE__?.backend?.addEventListener('windowModeChanged', applyWindowMode);
 document.addEventListener('keydown', e => {
+  if(e.key==='Escape' && document.body.classList.contains('video-expanded')) {
+    e.preventDefault();setNativeVideoExpanded(false);return;
+  }
   if (e.key === 'Escape' && !compactMode && !document.querySelector('[role="dialog"]:not([hidden])'))
     nativeEvent('setCompactMode', {compact:true});
 });
@@ -584,9 +588,8 @@ function showPage(page) {
   if (page === 'chain' && !studioUnlocked) return openStudioLogin();
   // Hide synchronously in the same bridge turn, not in a later animation
   // frame. This also works before a lost selection event has been recovered.
-  if(page!=='play') hideNativeVideoViewport();
-  for(const id of ['record-menu','bend-range-dialog'])if($('#'+id))$('#'+id).hidden=true;
-  $('#record-options')?.setAttribute('aria-expanded','false');
+  if(page!=='play') {setNativeVideoExpanded(false);hideNativeVideoViewport();}
+  if($('#bend-range-dialog'))$('#bend-range-dialog').hidden=true;
   $$('.nav-item,.page').forEach(el => el.classList.remove('active'));
   const button = $(`.nav-item[data-page="${page}"]`);
   button.classList.add('active');
@@ -1404,14 +1407,60 @@ window.__JUCE__?.backend?.addEventListener('nativeVideoState',state=>{
   nativeVideoLastError=state.error||'';
   scheduleNativeVideoViewport();
 });
-$('#video-volume').addEventListener('input', event => {
-  const value = event.target.value / 100;
-  video.volume = value;
-  nativeEvent('setVideoVolume',{value});
+const videoVolumeControl=$('#video-volume');
+let videoVolumeGesture=null,videoVolumeSendTimer=0;
+function sendVideoVolume() {
+  clearTimeout(videoVolumeSendTimer);videoVolumeSendTimer=0;
+  nativeEvent('setVideoVolume',{value:Number(videoVolumeControl.value)/100});
+}
+function updateVideoVolume() {
+  const value=Math.max(0,Math.min(100,Number(videoVolumeControl.value)||0));
+  video.volume=value/100;
+  $('#video-volume-value').textContent=`${value.toFixed(1).replace(/\.0$/,'')}%`;
+  videoVolumeControl.setAttribute('aria-valuetext',`${value.toFixed(1)}%`);
+  if(!videoVolumeSendTimer)videoVolumeSendTimer=setTimeout(sendVideoVolume,33);
+}
+videoVolumeControl.addEventListener('input',updateVideoVolume);
+videoVolumeControl.addEventListener('change',sendVideoVolume);
+// Relative dragging: touching the short track must not jump to its absolute
+// position. A full sweep spans >=480 CSS px; arrows retain 0.1% fine steps.
+videoVolumeControl.addEventListener('pointerdown',e=>{
+  if(e.button!==0 || videoVolumeGesture)return;
+  e.preventDefault();videoVolumeControl.focus();
+  videoVolumeGesture={id:e.pointerId,x:e.clientX,value:Number(videoVolumeControl.value),
+    span:Math.max(480,videoVolumeControl.getBoundingClientRect().width*4)};
+  videoVolumeControl.setPointerCapture(e.pointerId);
 });
+videoVolumeControl.addEventListener('pointermove',e=>{
+  if(!videoVolumeGesture || e.pointerId!==videoVolumeGesture.id)return;
+  const g=videoVolumeGesture;
+  videoVolumeControl.value=String(g.value+(e.clientX-g.x)*100/g.span);
+  updateVideoVolume();
+});
+function endVideoVolumeGesture(e) {
+  if(!videoVolumeGesture || (e?.pointerId!==undefined && e.pointerId!==videoVolumeGesture.id))return;
+  const id=videoVolumeGesture.id;videoVolumeGesture=null;
+  if(videoVolumeControl.hasPointerCapture(id))videoVolumeControl.releasePointerCapture(id);
+  sendVideoVolume();
+}
+for(const type of ['pointerup','pointercancel','lostpointercapture'])videoVolumeControl.addEventListener(type,endVideoVolumeGesture);
+window.addEventListener('blur',()=>endVideoVolumeGesture());
 const videoCard = $('.video-card');
 const fullscreenButton = $('#fullscreen');
+function setNativeVideoExpanded(active) {
+  hideNativeVideoViewport();
+  document.body.classList.toggle('video-expanded',!!active);
+  fullscreenButton.textContent=active?'退出全屏':'全屏';
+  fullscreenButton.setAttribute('aria-label',active?'退出视频全屏':'视频全屏');
+  nativeViewportLast='';scheduleNativeVideoViewport();
+}
 async function toggleFullscreen() {
+  // A native VLC HWND cannot enter WebView2's DOM fullscreen/top layer.
+  // FengYin's full layout already fills the display: expand the video inside
+  // that same parent window, keeping native render and HTML controls aligned.
+  if(nativeVideoEngine) {
+    setNativeVideoExpanded(!document.body.classList.contains('video-expanded'));return;
+  }
   try {
     if (document.fullscreenElement) await document.exitFullscreen();
     else if (videoCard.requestFullscreen) await videoCard.requestFullscreen();
@@ -1890,7 +1939,6 @@ $('#cancel-technique-learning').addEventListener('click', () => {
 });
 
 async function toggleAudioRecording() {
-  if(screenRecordingBusy){nativeEvent('toggleWindowRecording',{});return;}
   if (!recording && !latestBackendState.systemOutputRecordingSupported && video.src && window.__JUCE__?.backend?.emitEvent && !nativeAccompanimentReady) {
     return toast('伴奏音轨尚未准备好，请稍候再开始录音');
   }
@@ -1898,38 +1946,11 @@ async function toggleAudioRecording() {
   nativeEvent('toggleRecording');
   if(window.__JUCE__?.backend)return;
   recording = !recording;
-  $('#record').textContent = recording ? '■ 停止录音' : '● 开始录制';
+  $('#record').textContent = recording ? '■ 停止录音' : '● 开始录音';
   $('#record').style.color = recording ? 'var(--danger)' : '';
   toast(recording ? '已开始模拟录音' : '模拟录音已保存');
 }
-const recordMenu=$('#record-menu'),recordOptions=$('#record-options');
-function closeRecordMenu(){recordMenu.hidden=true;recordOptions.setAttribute('aria-expanded','false');}
-function toggleRecordMenu(){
-  if(recording||screenRecordingBusy)return;
-  if(!recordMenu.hidden)return closeRecordMenu();
-  recordMenu.hidden=false;recordOptions.setAttribute('aria-expanded','true');positionChoice(recordMenu,recordOptions);
-}
-recordOptions.addEventListener('click',toggleRecordMenu);
-$('#record').addEventListener('click',()=>{
-  if(screenRecordingBusy){nativeEvent('toggleWindowRecording',{});return;}
-  if(recording){toggleAudioRecording();return;}
-  toggleRecordMenu();
-});
-$('#record-audio-choice').onclick=()=>{
-  closeRecordMenu();if(screenRecordingBusy)return toast('请先停止并保存录屏');toggleAudioRecording();
-};
-$('#record-video-choice').onclick=async()=>{
-  closeRecordMenu();if(recording)return toast('请先停止录音');
-  if(!window.__JUCE__?.backend)return toast('录视频需要Windows版风吟，不会在网页中模拟保存');
-  if(!screenRecordingBusy && window.fengyinVoice && !await window.fengyinVoice.beforeRecording('video'))return;
-  const probe=document.createElement('span');probe.style.color='var(--bg)';document.body.append(probe);
-  const rgb=getComputedStyle(probe).color.match(/[\d.]+/g)?.map(Number)||[7,16,29];probe.remove();
-  const background='ff'+rgb.slice(0,3).map(n=>Math.max(0,Math.min(255,Math.round(n))).toString(16).padStart(2,'0')).join('');
-  nativeEvent('toggleWindowRecording',{background});
-};
-document.addEventListener('pointerdown',e=>{if(!recordMenu.contains(e.target)&&!recordOptions.contains(e.target)&&!$('#record').contains(e.target))closeRecordMenu();});
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeRecordMenu();});
-window.addEventListener('resize',closeRecordMenu);
+$('#record').addEventListener('click',toggleAudioRecording);
 window.__JUCE__?.backend?.addEventListener('screenRecordingMessage',message=>toast(String(message)));
 $('#recording-manager').addEventListener('click', () => nativeEvent('showRecordings'));
 $('#low-performance').addEventListener('change', event => {
@@ -2348,9 +2369,9 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
     if (versionNode) versionNode.textContent = `风吟 ${state.appVersion} · 本地运行，不会保存或上传个人资料。`;
   }
   recording = !!state.recording;
-  screenRecordingBusy=!!state.screenRecordingBusy;
+  screenRecordingBusy=false; // Video recording is withdrawn from this release.
   applyPreparedVideoSource();
-  $('#record').textContent = screenRecordingBusy ? (state.screenRecordingStopping?'正在保存…':state.screenRecording?'■ 停止录屏':'录屏启动中…') : recording ? (state.audioRecordingStopping?'正在保存…':state.systemOutputRecordingSupported&&!state.audioRecordingReady?'录音启动中…':'■ 停止录音') : '● 开始录制';
+  $('#record').textContent = recording ? (state.audioRecordingStopping?'正在保存…':state.systemOutputRecordingSupported&&!state.audioRecordingReady?'录音启动中…':'■ 停止录音') : '● 开始录音';
   $('#record').style.color = recording||screenRecordingBusy ? 'var(--danger)' : '';
   $('#record').disabled=!!state.screenRecordingStopping || !!state.audioRecordingStopping;
 });
@@ -2598,7 +2619,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.24 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.25 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

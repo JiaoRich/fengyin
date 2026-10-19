@@ -1,6 +1,5 @@
 #include "WindowRecordingService.h"
 #include "RecordingPaths.h"
-#include "../Recorder/RecorderPolicy.h"
 #if JUCE_WINDOWS
 #define NOMINMAX
 #include <windows.h>
@@ -11,36 +10,29 @@ WindowRecordingService::~WindowRecordingService() {
     if(running && !process.waitForProcessToFinish(10000))process.kill();
     poll(); // Preserve partial files on failure; never delete user recordings.
 }
-bool WindowRecordingService::start(void* window,juce::Colour background,bool rounded,bool audioOnly) {
+bool WindowRecordingService::startAudio() {
     poll();if(running)return false;
     lastError.clear();completed=false;finishing=false;ready=false;
-    audioMode=audioOnly;
    #if JUCE_WINDOWS
-    const auto backend=capture::backend(juce::SystemStats::getEnvironmentVariable("FENGYIN_RECORDING_BACKEND","").toStdString());
-    const bool legacy=backend==capture::Backend::legacy;
     const auto executable=juce::File::getSpecialLocation(juce::File::currentApplicationFile)
-        .getSiblingFile(legacy?"FengYinScreenRecorder.exe":"FengYinRecorder.exe");
-    juce::Logger::writeToLog(juce::String("Recording backend=")+(legacy?"legacy":audioOnly?"miniaudio":"ScreenRecorderLib")
-        +" scope="+(audioOnly?"system-output":"selected-display"));
-    const auto folder=audioMode?RecordingPaths::audio():RecordingPaths::video();
-    if((!audioMode&&!window) || !executable.existsAsFile() || !folder.createDirectory()) {
+        .getSiblingFile("FengYinRecorder.exe");
+    juce::Logger::writeToLog("Recording backend=miniaudio scope=system-output audio-only");
+    const auto folder=RecordingPaths::audio();
+    if(!executable.existsAsFile() || !folder.createDirectory()) {
         lastError=juce::String::fromUTF8("录制组件不可用，或无法创建录制目录");return false;
     }
-    destination=RecordingPaths::next(folder,audioMode?"wav":"mp4");
-    partialFile=destination.withFileExtension(audioMode?".partial.wav":".partial.mp4");
+    destination=RecordingPaths::next(folder,"wav");
+    partialFile=destination.withFileExtension(".partial.wav");
     stopFile=destination.withFileExtension(".stop");stateFile=destination.withFileExtension(".status");
     juce::StringArray args {executable.getFullPathName(),
-        audioMode?juce::String("audio"):"screen:"+juce::String::toHexString(static_cast<juce::int64>(reinterpret_cast<uintptr_t>(window))),
+        "audio",
         partialFile.getFullPathName(),stopFile.getFullPathName(),stateFile.getFullPathName(),
-        juce::String::toHexString(static_cast<int>(background.getARGB())),"0"};
-    juce::ignoreUnused(rounded); // Desktop pixels have no FengYin corner mask.
-    if(!legacy)args.add(juce::String(static_cast<juce::int64>(GetCurrentProcessId())));
+        "ff000000","0",juce::String(static_cast<juce::int64>(GetCurrentProcessId()))};
     running=process.start(args,0);
     startedAt=juce::Time::getMillisecondCounterHiRes();stoppedAt=0;
     if(!running)lastError=juce::String::fromUTF8("无法启动录制组件");
     return running;
    #else
-    juce::ignoreUnused(window,background,rounded,audioOnly);
     lastError=juce::String::fromUTF8("录制目前仅支持Windows 10 1903及以上版本");return false;
    #endif
 }

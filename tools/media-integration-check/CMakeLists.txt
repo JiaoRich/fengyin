@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 project(FengYinMediaIntegrationCheck LANGUAGES C CXX)
+set(FENGYIN_ARCHIVED_VIDEO_RECORDING ON) # Explicit archived-media diagnostic, not release.
 if(NOT WIN32)
     message(FATAL_ERROR "This diagnostic needs the actual Windows media stack")
 endif()

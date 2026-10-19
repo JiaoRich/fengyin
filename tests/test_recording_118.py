@@ -20,12 +20,12 @@ class Recording118Tests(unittest.TestCase):
 
     def test_recording_is_packaged_and_actual_encoded_media_checked(self):
         build=(ROOT/'scripts/build-windows.ps1').read_text(encoding='utf-8-sig')
-        self.assertIn('Copy-Item $ScreenRecorderExe',build)
-        self.assertIn("@('--selftest',",build)
-        self.assertIn('$RecorderProcess.WaitForExit(60000)',build)
-        self.assertIn('$global:LASTEXITCODE = $RecorderProcess.ExitCode',build)
-        self.assertNotIn('& $ScreenRecorderExe --selftest',build)
-        self.assertIn('verify_screen_recording.py',build)
+        self.assertNotIn('Copy-Item $ScreenRecorderExe',build)
+        self.assertIn("@('--audio-selftest',",build)
+        self.assertIn('$NativeProcess.WaitForExit(60000)',build)
+        self.assertIn('$global:LASTEXITCODE = $NativeProcess.ExitCode',build)
+        self.assertIn('verify_system_recording.py',build)
+        # Old capture implementation remains archived, not packaged.
         helper=(ROOT/'native/ScreenRecorder/main.cpp').read_text(encoding='utf-8')
         self.assertIn('writer->Finalize()',helper)
         self.assertIn('MFAudioFormat_AAC',helper)
@@ -36,13 +36,12 @@ class Recording118Tests(unittest.TestCase):
     def test_ui_exposes_real_video_event_not_fake_save(self):
         html=(ROOT/'prototype/index.html').read_text(encoding='utf-8')
         js=(ROOT/'prototype/app.js').read_text(encoding='utf-8')
-        self.assertIn('id="record-options"',html)
-        self.assertIn('id="record-video-choice"',html)
-        video=js.split("$('#record-video-choice').onclick",1)[1].split("document.addEventListener('pointerdown'",1)[0]
-        self.assertIn("nativeEvent('toggleWindowRecording'",video)
-        self.assertIn('Windows版风吟',video)
-        self.assertIn('screenRecordingStopping',js)
-        self.assertIn('screenRecordingBusy',(ROOT/'prototype/voice-guide.js').read_text(encoding='utf-8'))
+        self.assertNotIn('id="record-options"',html)
+        self.assertNotIn('id="record-video-choice"',html)
+        self.assertNotIn("nativeEvent('toggleWindowRecording'",js)
+        self.assertIn("$('#record').addEventListener('click',toggleAudioRecording)",js)
+        main=(ROOT/'native/Source/MainComponent.cpp').read_text(encoding='utf-8')
+        self.assertNotIn('.withEventListener("toggleWindowRecording"',main)
 
     def test_async_helper_does_not_touch_realtime_audio(self):
         service=(ROOT/'native/Source/WindowRecordingService.cpp').read_text(encoding='utf-8')

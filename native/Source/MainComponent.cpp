@@ -875,7 +875,6 @@ void MainComponent::setupWebInterface()
             voicePrompts.stop();
             if(isActivated || recorder.isRecording() || windowRecorder.busy())toggleRecording();
         })
-        .withEventListener("toggleWindowRecording", [this](juce::var payload) {toggleWindowRecording(payload);})
         .withEventListener("showRecordings", [](juce::var)
         {
             if(fengyin::RecordingPaths::ensureFolders())fengyin::RecordingPaths::root().revealToUser();
@@ -4053,24 +4052,6 @@ void MainComponent::showActivationDialog()
     }), false);
 }
 
-void MainComponent::toggleWindowRecording(const juce::var& payload)
-{
-    interruptIdleVideoPreparation();
-    if(windowRecorder.busy()){windowRecorder.stop();return;}
-    auto tell=[this](const juce::String& message){if(webInterface)webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",message);};
-    if(!isActivated){tell(utf8("请先激活或开启试用"));return;}
-    if(recorder.isRecording()){tell(utf8("请先停止录音，再开始录屏"));return;}
-    const auto type=audio.getStatus().deviceType;
-    if(superLowLatencyRunning || type.containsIgnoreCase("ASIO") || type.containsIgnoreCase("Exclusive")) {
-        tell(utf8("录屏固定采集系统扬声器，请先切换Windows共享或共享低延迟模式，并让伴奏从同一默认扬声器播放"));return;
-    }
-    voicePrompts.stop();
-    const auto colour=juce::Colour::fromString(payload.getProperty("background","ff07101d").toString()).withAlpha(1.f);
-    if(!windowRecorder.start(getPeer()?getPeer()->getNativeHandle():nullptr,colour,compactMode))tell(windowRecorder.error());
-    else tell(utf8("正在录制整个屏幕和系统声音，包括其他应用与通知；显示器已固定，点击停止后保存"));
-    lastWebStateAtMs=0;
-}
-
 void MainComponent::toggleRecording()
 {
     interruptIdleVideoPreparation();
@@ -4086,7 +4067,7 @@ void MainComponent::toggleRecording()
         tell(utf8("录音固定采集系统扬声器，请先切换Windows共享或共享低延迟模式，并让伴奏从同一默认扬声器播放"));return;
     }
     voicePrompts.stop();
-    if(!windowRecorder.start(nullptr,juce::Colours::black,false,true))tell(windowRecorder.error());
+    if(!windowRecorder.startAudio())tell(windowRecorder.error());
     lastWebStateAtMs=0;
     return;
    #endif

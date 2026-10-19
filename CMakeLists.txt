@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.24 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.25 LANGUAGES C CXX)
+option(FENGYIN_ARCHIVED_VIDEO_RECORDING "Build archived video-recording diagnostics, never for release" OFF)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
 set(CMAKE_CXX_STANDARD 20)
@@ -285,11 +286,13 @@ if(WIN32)
     add_subdirectory(native/Recorder)
     target_sources(FengYin PRIVATE native/Source/WindowsCompatibility.manifest)
     target_link_libraries(FengYin PRIVATE setupapi advapi32 shell32 avrt dwmapi)
+    if(FENGYIN_ARCHIVED_VIDEO_RECORDING)
     add_executable(FengYinScreenRecorder WIN32 native/ScreenRecorder/main.cpp)
     target_compile_definitions(FengYinScreenRecorder PRIVATE WINVER=0x0A00 _WIN32_WINNT=0x0A00)
     target_compile_options(FengYinScreenRecorder PRIVATE /utf-8)
     target_link_libraries(FengYinScreenRecorder PRIVATE windowsapp d3d11 dxgi dwmapi mfplat mfreadwrite mfuuid ole32 shell32 avrt)
     install(TARGETS FengYinScreenRecorder RUNTIME DESTINATION .)
+    endif()
     target_compile_definitions(FengYin PRIVATE
         # ASIO 只供用户主动选择 KoordASIO 的 WASAPI 共享模式。默认和
         # 自动优化仍只使用 Windows 共享输出，不会打开独占驱动。

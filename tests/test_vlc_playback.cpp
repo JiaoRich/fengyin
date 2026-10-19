@@ -76,7 +76,7 @@ struct Shutdown {
         if(!player.hasStopped()){std::cerr<<"FAIL VLC shutdown timeout\n";ExitProcess(2);}}
 };
 int wmain(int argc,wchar_t** argv) {
-    if(argc!=3){std::cerr<<"Expected runtime directory and a 12-second H264/AAC fixture\n";return 2;}
+    if(argc!=3){std::cerr<<"Expected runtime directory and a 12-second MP4/AAC fixture\n";return 2;}
     HWND window=CreateWindowExW(0,L"STATIC",L"FengYin VLC playback integration",
         WS_OVERLAPPEDWINDOW|WS_VISIBLE|WS_CLIPCHILDREN|SS_BLACKRECT,30,30,640,400,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
     if(!window)return 2;
@@ -144,7 +144,7 @@ int wmain(int argc,wchar_t** argv) {
         if(p.getState().decodedVideo!=stablePreview)throw std::runtime_error("Paused preview kept decoding");
         p.setVolume(.45f);p.setPlaying(true);
         waitFor([&]{auto s=p.getState();return s.position>.6 && s.decodedVideo>0 && s.displayedVideo>0 && p.testPcmNonzero>1000;},15000,"No decoded video/nonzero PCM");
-        std::cout<<"PASS real LibVLC H264 frames="<<p.getState().displayedVideo<<" nonzero PCM="<<p.testPcmNonzero.load()<<"\n";
+        std::cout<<"PASS real LibVLC MP4 frames="<<p.getState().displayedVideo<<" nonzero PCM="<<p.testPcmNonzero.load()<<"\n";
         p.setPlaying(false);
         waitFor([&]{return !p.getState().playing;},4000,"Pause did not complete");
         const auto pauseEnd=GetTickCount64()+400;while(GetTickCount64()<pauseEnd)pump();

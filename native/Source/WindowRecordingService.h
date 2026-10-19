@@ -2,12 +2,12 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 namespace fengyin {
-// Capture/encoding runs in a separate Windows helper, never the audio callback.
+// Release audio-only system capture; video implementations are archived.
 class WindowRecordingService {
 public:
     ~WindowRecordingService();
-    bool start(void* window, juce::Colour background, bool rounded, bool audioOnly=false);
-    bool isAudioOnly() const noexcept {return audioMode;}
+    bool startAudio();
+    bool isAudioOnly() const noexcept {return true;}
     double elapsedSeconds() const noexcept {return running?(juce::Time::getMillisecondCounterHiRes()-startedAt)/1000.0:0.0;}
     void stop();
     void poll();
@@ -21,7 +21,7 @@ private:
     juce::ChildProcess process;
     juce::File destination, stopFile, stateFile, partialFile;
     juce::String lastError;
-    bool running=false,finishing=false,ready=false,completed=false,audioMode=false;
+    bool running=false,finishing=false,ready=false,completed=false;
     double startedAt=0,stoppedAt=0;
 };
 }

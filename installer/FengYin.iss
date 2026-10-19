@@ -5,7 +5,7 @@
   #define OutputDir "."
 #endif
 #ifndef AppVersion
-  #define AppVersion "1.1.23"
+  #define AppVersion "1.1.25"
 #endif
 #ifndef ChineseMessages
   #define ChineseMessages "compiler:Languages\ChineseSimplified.isl"
@@ -54,6 +54,18 @@ Name: "{group}\安装 ASIO4ALL 低延迟组件"; Filename: "{app}\components\ASI
 Name: "{group}\安装 VB-CABLE 网页声音组件"; Filename: "{app}\components\VB-CABLE\VBCABLE_Setup_x64.exe"
 Name: "{group}\安装 Fresh Air 音色效果器"; Filename: "{app}\components\Fresh Air\Setup Fresh Air v1.0.8.exe"
 Name: "{autodesktop}\风吟"; Filename: "{app}\FengYin.exe"; Tasks: desktopicon
+
+[InstallDelete]
+; Remove only withdrawn application components on upgrade, never recordings.
+Type: files; Name: "{app}\FengYinScreenRecorder.exe"
+Type: files; Name: "{app}\Use-new-recording.cmd"
+Type: files; Name: "{app}\Use-legacy-recording.cmd"
+Type: files; Name: "{app}\Recording-backends.txt"
+Type: files; Name: "{app}\components\Recording\ScreenRecorderLib-MIT.txt"
+Type: files; Name: "{app}\components\Recording\ScreenRecorderLib-7.0.1-source.zip"
+Type: files; Name: "{app}\components\Recording\ScreenRecorderLib-WASAPI-fix.patch"
+Type: files; Name: "{app}\components\Recording\ScreenRecorderLib-local-patches.json"
+Type: files; Name: "{app}\components\Recording\FengYinCapturePacketCopy.h"
 
 [Run]
 Filename: "{tmp}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; Parameters: "/silent /install"; StatusMsg: "正在安装视频与精美界面离线运行组件…"; Flags: waituntilterminated

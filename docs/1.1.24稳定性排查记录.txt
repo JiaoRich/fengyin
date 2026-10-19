@@ -1,5 +1,40 @@
 风吟 1.1.24 稳定性排查（进行中，未交付）
 
+2026-10-19 相对路径继续验证状态（不是完成结论）：
+用户已授权继续验证，不改调音参数。再次核官方Kontakt Lua Options文档：non_player_content_base_path列在Constants中，仅描述读取；不能将其当setter。安装器当前未发现Kontakt根目录配置实现；未找到官方静默安装参数或公开根目录写入API，不能根据其他版本注册表名称猜写8.8.0。根目录属于本机偏好，配置还需核对当前用户与安装器提权账户一致、已有其他Non-Player库是否受影响、退出重开后是否持久化以及卸载/恢复边界。只增加本机路径不应覆盖整个NI配置、库登记或授权。
+执行环境限制：本机/Applications及/Library/Audio/Plug-Ins未找到Kontakt，不能用本机模拟证明肯萨加载。CUA实际查看ToDesk：风吟测试机在线但“已锁屏”；旧连接保存密码曾失效。已异步请求用户完成本机ToDesk连接/解锁，不索取聊天密码，不要求用户定位采样。尚未执行真实相对目录状态保存或不同根目录加载，不声称通过。
+验收计划保持：以原包快照/完整状态为基线，原始包只读；单独验证副本启用官方相对根目录保存后重采集；复制合法本机采样至不同测试根目录并保持相对结构，以旧位置确实不可解析的隔离条件测试，避免旧绝对路径仍存在导致假通过；分别检查无Missing Content弹窗、实际非零发声、重启恢复、全部参数/控制和效果不变。原厂state二进制可能因路径变动不相同，不能拿全字节一致作为唯一参数保留判据，也不能只比2785宿主参数就声称内部脚本/效果未变。安装配置须先只读导出、单项前后差分、版本识别/备份/回滚，再另用户环境测试，无证据不写入。
+
+2026-10-19 空音与Kontakt跨机器采样路径只读核对：
+代码：MainComponent.cpp3649按containerInstrument/kong选择samplerState，否则instrumentState；PluginHostEngine.cpp463均原样setStateInformation。实际肯萨包containerInstrument=0/adapter空，用402399字节INSTRUMENT_STATE，内部IComponent301685字节；不是空音KAM适配路径。二胡包containerInstrument=1/kong-v3，用SAMPLER_STATE；KAM中KAI=ErHu、Preset=*Erhu_Keyswitchs*，未见采样绝对路径。空音官方说明Windows安装音色库可选任意位置，移动后PATH需更新；这支持本机根目录机制，不支持宿主可以无条件自动搜任意盘的说法。安装器如何具体登记根目录尚未核定，不猜注册表键。
+Kontakt官方给出关键可行机制：Options/Loading中的Non-Player content base path和Store paths referenced in host projects relative to Non-Player content base path。宿主状态默认可保存绝对采样引用；启用相对本机内容根目录后重新保存宿主状态，可跨机器按各自根目录解析。只将NKI保存为相对路径不等于宿主完整状态已相对。官方Lua API里non_player_content_base_path是读取常量，未找到可从VST3宿主直接设置根目录/静默重定位的公开接口，不能承诺扫描后直接改opaque状态。肯萨状态只读解包外层，内部非公开数据未恢复出可靠文件清单；可打印字符串不构成路径/库类型判断依据。错误机器具体缺失内容尚未取得，路径原因未实证。
+候选方案：确认肯萨为Non-Player还是Native Access登记库；Non-Player优先按官方相对根目录方式重新捕获完整正常肯萨，部署时把每台本机根目录配置放在安装/技术准备阶段，保持库内部相对结构，终端用户不定位；若为登记库则走合法安装与本机库登记。根目录自动配置接口尚需验证，不盲写第三方私有配置、不创建盘符/junction掩盖问题、不批量重写NKI。根目录方案需同一包在不同盘符/中文空格路径、重启、首音、CC11/CC1/CC19和弯音/效果完整性实测通过后才称实现。当前未修改任何方案/原厂库/注册表。
+依据：https://chineekong.com/en/qin-engine-v3-user-guide/
+https://docs.native-instruments.com/ni-tech-manuals/kontakt-manual/en/options-dialog#loading
+https://docs.native-instruments.com/ni-tech-manuals/kontakt-manual/en/classic-view#saving-instruments
+https://www.native-instruments.com/fileadmin/ni_media/downloads/manuals/kontakt/Kontakt_8_API_Reference_EN_221024.pdf （Options常量，印刷45页）
+
+【最新产品决策，2026-10-19；覆盖此前录屏候选安排】
+用户决定下一版本暂时取消视频录制。视频录制相关功能代码须封存保留回退依据，后期独立测试成熟后再考虑集成；当前不做结束后视频编码架构、不继续录屏性能专项、不将录屏列为下一版本交付功能。录音功能未被取消，尤其WindowRecordingService/FengYinRecorder中的系统声音录音共用路径不可误删。实际撤下须覆盖正式UI入口、桥接启动入口和正式构建/打包依赖；仅隐藏按钮不算完成，封存代码和必要许可证/版本记录不能直接删除。当前仅已确认决策并梳理入口，未宣称撤下实现完成。
+下一版本优先解决视频播放场景：首次加载约10秒且后续快、视频全屏输入失效（Windows切焦点恢复）、页面/窗口切换显隐及焦点、换视频/播放暂停/音量/进度控制、错误恢复与退出。播放与吹奏组合需实际验证；不新增启动准备、不更改音色/增益/抖弓/气息/音高/128默认/设备路由/电源/驱动。值守保持关闭，未授权重开。
+
+下一版本录制候选（用户已同意可尝试，2026-10-19）：优先保证录制中吹奏稳定，允许停止后等待生成最终文件。评估实时轻量采集/中间编码、PCM音频与结束后压缩合成；不是批准原始1080P全帧无压缩落盘或承诺此举必然解决。先用系统跟踪与分段计时定位采集/编码/调度瓶颈，再选择实现。数据采集对照方案已获用户同意，具体集中测试尚未开始；值守保持关闭。
+
+2026-10-19 录制性能再审计（199用户实测仍爆音，值守已取消）：
+- 官方v7指南与接入再次逐项核对：采集单个eMultimedia共享loopback、无麦克风、预览关闭、回调仅原子计数、选项在BeginRecording前设置、异步完成后结束；未发现录屏编码等待直接进入乐器实时回调。不能据此断言原机资源无争用。
+- 新源码路径证据：WASAPICapture::GetNextFrameCount的accumulate参数AudioPacket按值传递，统计包大小时复制vector音频数据；调用链GrabAudioSamples持StaticMutex，GetNextAudioSampleDuration调用该统计。生产采集写入也需StaticMutex，因此重复复制会延长录制内部采集锁占用；并不是风吟乐器共享锁。/private/tmp/fy124-recorder-audit-repro.cpp已编译执行，100个480帧/8字节包统计复制100次384000字节；const引用统计复制0且结果一致。此为可消除冗余开销，非原机CPU100%根因证明；未修改生产补丁。
+- 条件性缺陷：EndpointLoopback用GetDevicePeriod默认周期的一半转整数毫秒；若默认周期低于2ms可能转0。微软SetWaitableTimer的period=0是单次，不是周期；上游随后等5秒可能超时。独立复现10ms=>5ms、2ms=>1ms、1ms=>0ms。目标机默认端点周期未知，不能把风吟128帧缓冲直接等同GetDevicePeriod默认周期，不能据此宣称命中现场。未猜测修改驱动或生产采集周期。
+- 后续一次集中原机采集应同时含主程序分段实际耗时/线程调度等待、helper CPU与GPU编码器实际选择、WriteSample耗时、采集队列时长/锁等待、端点周期和超时、DPC/ISR关联。使用WPR/WPA(ETW)补足应用计时看不到的线程未获调度时间；已知录制日志postAudioToFrame不是纯编码耗时。固定音色/视频/路由/缓冲，仅吹奏=>伴奏=>录音=>录屏=>停止录屏，对照后按证据修改。未重新开启值守或提交构建。
+官方依据：
+https://github.com/sskodje/ScreenRecorderLib/wiki/Quickstart-guide-v7.x.x-and-newer
+https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-setwaitabletimer
+https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclient-getdeviceperiod
+https://learn.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-recorder
+
+下一版本已确认修复项（用户2026-10-19补充）：
+- 解决视频全屏后界面卡住、退出全屏/换视频/播放/音量按钮失效，切换Windows焦点后才恢复的问题。199普通页面VLC窗口已获用户确认正常，但不能据此认定全屏路径已解决。验收覆盖反复进出视频全屏、控件点击、切页及最小化恢复，不依赖切换系统焦点恢复。
+- 启动准备阶段目前仅讨论，尚未批准具体实现：评估必要插件与VLC初始化分阶段准备、就绪判据和失败降级；不能将固定等待、整库加载或无依据预热当作方案已确认。
+
 用户反馈195测试版：视频灰屏、切页仍遮挡、显示有视频但提示未选择、气息和声音迟到数秒、录制时漏音及最终闪退。授权代码优先排查、修复、构建并传至原电脑安装验证；未批准更改音色、增益、128缓冲、设备路由、电源、驱动或许可。
 
 已复现的代码问题：
