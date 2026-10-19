@@ -23,6 +23,28 @@ class VlcWebViewDiagnostic(unittest.TestCase):
         self.assertIn('acknowledgements==20',runner)
         self.assertIn("all(r['passed'] for r in results)",runner)
 
+    def test_baseline_reversed_order_and_strict_picture_gate(self):
+        import importlib.util
+        spec=importlib.util.spec_from_file_location('video_check',ROOT/'scripts/check_vlc_webview.py')
+        runner=importlib.util.module_from_spec(spec);spec.loader.exec_module(runner)
+        cases=list(runner.case_order(2))
+        self.assertEqual(len(cases),10)
+        self.assertEqual(cases[0],(1,'web-only'))
+        self.assertEqual(cases[5],(2,'web-only'))
+        self.assertEqual([m for _,m in cases[1:5]],list(reversed([m for _,m in cases[6:]])))
+        clicks='PASS physical click cycle=\n'*20
+        self.assertTrue(runner.check_result('web-only',0,False,clicks)['passed'])
+        self.assertFalse(runner.check_result('immediate',0,False,clicks)['passed'])
+        complete=clicks+'PASS real paused first picture generation=\n'*4
+        self.assertTrue(runner.check_result('immediate',0,False,complete)['passed'])
+        self.assertFalse(runner.check_result('immediate',1,False,complete)['passed'])
+        self.assertFalse(runner.check_result('immediate',0,True,complete)['passed'])
+        source=(ROOT/'tools/vlc-webview-check/main.cpp').read_text(encoding='utf-8')
+        self.assertIn('runDispatchLoop();',source)
+        self.assertNotIn('runDispatchLoopUntil(',source)
+        self.assertIn('failed-window.bmp',source)
+        self.assertIn('picture rgb=',source)
+
     def test_production_stable_hwnd_and_separate_native_visibility(self):
         source=(ROOT/'native/Source/VlcVideoSurface.cpp').read_text(encoding='utf-8')
         header=(ROOT/'native/Source/VlcVideoSurface.h').read_text(encoding='utf-8')

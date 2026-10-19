@@ -11,6 +11,14 @@
 #include <thread>
 
 static uint64_t now() { return GetTickCount64(); }
+static void dumpProcess(const wchar_t* filename) {
+    auto file=CreateFileW(filename,GENERIC_WRITE,0,nullptr,CREATE_NEW,0,nullptr);
+    if(file!=INVALID_HANDLE_VALUE){
+        const bool ok=MiniDumpWriteDump(GetCurrentProcess(),GetCurrentProcessId(),file,
+            MiniDumpNormal,nullptr,nullptr,nullptr)!=FALSE;
+        CloseHandle(file);std::cerr<<"dump saved="<<ok<<std::endl;
+    }
+}
 static constexpr auto html=R"HTML(<!doctype html><meta charset="utf-8">
 <style>body{margin:0;background:#123;color:white;font:18px sans-serif}header{height:60px}
 button{height:45px;width:130px}#surface{position:fixed;left:20px;top:70px;width:480px;height:270px}
@@ -30,12 +38,13 @@ struct Scene final:juce::Component,juce::Timer {
     fengyin::VlcVideoSurface surface;
     std::unique_ptr<juce::WebBrowserComponent> web;
     juce::File fixture;
-    bool deferred=false,attachBeforePlayer=false,ready=false,expandedAck=false,failed=false;
+    bool deferred=false,attachBeforePlayer=false,webOnly=false,ready=false,expandedAck=false,failed=false;
     int clickAck=0,cycle=0,phase=0,generation=0;
-    uint64_t deadline=0;
+    uint64_t deadline=0,lastPictureLog=0;
     std::atomic<uint64_t> ui{now()},javascript{now()};
     explicit Scene(juce::File input,const juce::String& mode):fixture(input),
-        deferred(mode.contains("deferred")),attachBeforePlayer(mode.startsWith("attached-")) {
+        deferred(mode.contains("deferred")),attachBeforePlayer(mode.startsWith("attached-")),
+        webOnly(mode=="web-only") {
         auto options=juce::WebBrowserComponent::Options{}
           .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
           .withWinWebView2Options(juce::WebBrowserComponent::Options::WinWebView2{}
@@ -47,10 +56,13 @@ struct Scene final:juce::Component,juce::Timer {
               std::memcpy(bytes.data(),source.data(),source.size());
               return juce::WebBrowserComponent::Resource{std::move(bytes),"text/html"};})
           .withEventListener("heartbeat",[this](juce::var){javascript.store(now());})
-          .withEventListener("ready",[this](juce::var){ready=true;std::cout<<"web ready\n"<<std::flush;})
+          .withEventListener("ready",[this](juce::var){
+              // Cold WebView startup is not a post-ready heartbeat failure.
+              javascript.store(now());ready=true;std::cout<<"web ready\n"<<std::flush;})
           .withEventListener("expanded",[this](juce::var){expandedAck=true;})
           .withEventListener("clicked",[this](juce::var p){clickAck=int(p.getProperty("count",0));})
           .withEventListener("viewport",[this](juce::var p){
+              if(webOnly)return;
               const auto apply=[safe=juce::Component::SafePointer<Scene>(this),p]{if(safe){
                   const juce::Rectangle<int> bounds(int(p.getProperty("x",0)),int(p.getProperty("y",0)),
                     int(p.getProperty("width",0)),int(p.getProperty("height",0)));
@@ -68,13 +80,52 @@ struct Scene final:juce::Component,juce::Timer {
         deadline=now()+30000;startTimer(20);
     }
     ~Scene()override{stopTimer();surface.shutdown();web.reset();}
-    bool firstPictureVisible()const {
+    void finish(){stopTimer();juce::MessageManager::getInstance()->stopDispatchLoop();}
+    void captureFailure()const {
+        const auto hwnd=static_cast<HWND>(getPeer()->getNativeHandle());RECT r{};
+        if(!GetWindowRect(hwnd,&r))return;
+        const int width=r.right-r.left,height=r.bottom-r.top;
+        if(width<=0||height<=0)return;
+        auto screen=GetDC(nullptr);if(!screen)return;
+        auto memory=CreateCompatibleDC(screen);
+        BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);
+        info.bmiHeader.biWidth=width;info.bmiHeader.biHeight=-height;
+        info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;
+        void* pixels=nullptr;auto bitmap=CreateDIBSection(screen,&info,DIB_RGB_COLORS,&pixels,nullptr,0);
+        if(memory&&bitmap&&pixels){
+            auto old=SelectObject(memory,bitmap);
+            const auto copied=BitBlt(memory,0,0,width,height,screen,r.left,r.top,SRCCOPY|CAPTUREBLT);
+            if(copied){
+                GdiFlush();
+                BITMAPFILEHEADER header{};header.bfType=0x4d42;
+                header.bfOffBits=sizeof(header)+sizeof(BITMAPINFOHEADER);
+                header.bfSize=header.bfOffBits+width*height*4;
+                auto file=CreateFileW(L"failed-window.bmp",GENERIC_WRITE,0,nullptr,CREATE_ALWAYS,0,nullptr);
+                if(file!=INVALID_HANDLE_VALUE){DWORD written=0;
+                    WriteFile(file,&header,sizeof(header),&written,nullptr);
+                    WriteFile(file,&info.bmiHeader,sizeof(info.bmiHeader),&written,nullptr);
+                    WriteFile(file,pixels,width*height*4,&written,nullptr);CloseHandle(file);}
+            }
+            SelectObject(memory,old);
+        }
+        if(bitmap)DeleteObject(bitmap);if(memory)DeleteDC(memory);ReleaseDC(nullptr,screen);
+    }
+    bool firstPictureVisible() {
         const auto hwnd=static_cast<HWND>(surface.getHWND());RECT bounds{};
         if(!hwnd||!IsWindowVisible(hwnd)||!GetClientRect(hwnd,&bounds)
             ||bounds.right<8||bounds.bottom<8)return false;
         POINT point{bounds.right/2,bounds.bottom/2};ClientToScreen(hwnd,&point);
         const auto screen=GetDC(nullptr);if(!screen)return false;
         const auto colour=GetPixel(screen,point.x,point.y);ReleaseDC(nullptr,screen);
+        if(now()-lastPictureLog>1000){
+            lastPictureLog=now();const auto state=surface.getState();
+            std::cout<<"picture rgb="<<int(GetRValue(colour))<<","<<int(GetGValue(colour))<<","<<int(GetBValue(colour))
+                <<" client="<<bounds.right<<"x"<<bounds.bottom<<" screen="<<point.x<<","<<point.y
+                <<" hit="<<WindowFromPoint(point)<<" hwnd="<<hwnd<<" parent="<<GetParent(hwnd)
+                <<" foreground="<<GetForegroundWindow()<<" decoded="<<state.decodedVideo
+                <<" displayed="<<state.displayedVideo<<" lost="<<state.lostVideo
+                <<" state="<<surface.player()->testPlaybackState.load()<<std::endl;
+        }
         // The owned fixture is red; a blank HWND or the blue web page cannot pass.
         return colour!=CLR_INVALID&&GetRValue(colour)>150&&GetGValue(colour)<100&&GetBValue(colour)<100;
     }
@@ -93,13 +144,20 @@ struct Scene final:juce::Component,juce::Timer {
     }
     void timerCallback()override {
         ui.store(now());
-        if(now()>deadline){failed=true;stopTimer();std::cerr<<"FAIL stage timeout phase="<<phase<<std::endl;return;}
+        if(failed){finish();return;}
+        if(ready&&now()-javascript.load()>5000){
+            failed=true;std::cerr<<"FAIL web heartbeat stalled nativeAgeMs="<<(now()-ui.load())
+                <<" phase="<<phase<<std::endl;captureFailure();dumpProcess(L"web-stall.dmp");finish();return;
+        }
+        if(now()>deadline){failed=true;std::cerr<<"FAIL stage timeout phase="<<phase<<std::endl;
+            captureFailure();dumpProcess(L"stage-timeout.dmp");finish();return;}
         if(phase==0&&ready){
+            if(webOnly){phase=2;deadline=now()+10000;return;}
             // Test the discovered attachment ordering independently of callback
             // deferral. Production initialise() itself is not changed here.
             if(attachBeforePlayer)surface.setVisible(true);
             std::cout<<"initialise enter attached="<<attachBeforePlayer<<std::endl;
-            if(!surface.initialise()){failed=true;stopTimer();return;}
+            if(!surface.initialise()){failed=true;finish();return;}
             std::cout<<"initialise returned hwnd="<<surface.getHWND()<<std::endl;
             surface.player()->load(fixture.getFullPathName().toStdString(),++generation);
             phase=1;deadline=now()+30000;
@@ -108,25 +166,25 @@ struct Scene final:juce::Component,juce::Timer {
             phase=5;deadline=now()+10000;
         } else if(phase==5&&firstPictureVisible()){
             const auto pcm=surface.player()->testPcmNonzero.load();
-            if(generation==1&&pcm!=0){failed=true;stopTimer();std::cerr<<"FAIL preview emitted accompaniment\n";return;}
+            if(generation==1&&pcm!=0){failed=true;finish();std::cerr<<"FAIL preview emitted accompaniment\n";return;}
             std::cout<<"PASS real paused first picture generation="<<generation<<" cumulativePCM="<<pcm<<std::endl;
             surface.player()->setPlaying(true);phase=2;deadline=now()+10000;
-        } else if(phase==2&&surface.getState().generation==generation&&surface.getState().displayedVideo>0){
+        } else if(phase==2&&(webOnly||(surface.getState().generation==generation&&surface.getState().displayedVideo>0))){
             expandedAck=false;phase=3;deadline=now()+5000;click(60);
         } else if(phase==3&&expandedAck){
             phase=4;deadline=now()+5000;click(195);
         } else if(phase==4&&clickAck>cycle){
             std::cout<<"PASS physical click cycle="<<cycle<<" frames="<<surface.getState().displayedVideo
-              <<" nonzeroPCM="<<surface.player()->testPcmNonzero.load()<<std::endl;
-            if(++cycle==20){stopTimer();return;}
-            if(cycle%5==0){surface.player()->load(fixture.getFullPathName().toStdString(),++generation);phase=1;deadline=now()+30000;}
+              <<" nonzeroPCM="<<(webOnly?0:surface.player()->testPcmNonzero.load())<<std::endl;
+            if(++cycle==20){finish();return;}
+            if(!webOnly&&cycle%5==0){surface.player()->load(fixture.getFullPathName().toStdString(),++generation);phase=1;deadline=now()+30000;}
             else {phase=2;deadline=now()+10000;}
         }
     }
 };
 
 int main(int argc,char** argv) {
-    if(argc!=3){std::cerr<<"fixture.mp4 immediate|deferred|attached-immediate|attached-deferred\n";return 2;}
+    if(argc!=3){std::cerr<<"red-fixture.mp4 web-only|immediate|deferred|attached-immediate|attached-deferred\n";return 2;}
     juce::ScopedJuceInitialiser_GUI init;
     const auto fixture=juce::File(juce::String::fromUTF8(argv[1]));
     if(!fixture.existsAsFile())return 2;
@@ -137,18 +195,12 @@ int main(int argc,char** argv) {
             GUITHREADINFO info{sizeof(info)};GetGUIThreadInfo(uiThread,&info);
             std::cerr<<"FAIL native heartbeat stalled focus="<<info.hwndFocus<<" capture="<<info.hwndCapture
               <<" active="<<info.hwndActive<<" flags="<<info.flags<<std::endl;
-            auto dump=CreateFileW(L"native-ui-stall.dmp",GENERIC_WRITE,0,nullptr,CREATE_NEW,0,nullptr);
-            if(dump!=INVALID_HANDLE_VALUE){MiniDumpWriteDump(GetCurrentProcess(),GetCurrentProcessId(),dump,MiniDumpNormal,nullptr,nullptr,nullptr);CloseHandle(dump);}
+            dumpProcess(L"native-ui-stall.dmp");
             ExitProcess(3);
         }Sleep(200);
     }});
-    while(!scene.failed&&scene.cycle<20){
-        juce::MessageManager::getInstance()->runDispatchLoopUntil(25);
-        if(scene.ready&&now()-scene.javascript.load()>5000){
-            std::cerr<<"FAIL web heartbeat stalled while native UI pumps\n";scene.failed=true;
-        }
-    }
-    if(!scene.failed && scene.surface.player()->testPcmNonzero.load()==0){
+    juce::MessageManager::getInstance()->runDispatchLoop();
+    if(!scene.failed && !scene.webOnly && scene.surface.player()->testPcmNonzero.load()==0){
         std::cerr<<"FAIL no actual decoded nonzero accompaniment PCM\n";scene.failed=true;
     }
     done.store(true);watchdog.join();

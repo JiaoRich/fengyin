@@ -44,21 +44,33 @@ jobs:
   vlc-webview-test:
     if: ${{ inputs.vlc_webview_test }}
     runs-on: windows-2022
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5
         with:
           lfs: false
+      - name: Restore pinned diagnostic dependencies
+        id: video-deps
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party/vlc
+            third_party/ffmpeg-check
+            third_party/nuget-packages
+            build-vlc-webview/_deps/juce-src
+          key: win2022-video-deps-juce902-webview1348544-${{ hashFiles('scripts/prepare_vlc.py', 'scripts/prepare_ffmpeg.py') }}
       - name: Prepare real VLC and WebView2 diagnostic
         shell: powershell
         run: |
           $env:PYTHONUTF8='1'
-          python scripts/prepare_vlc.py third_party/vlc
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          python scripts/prepare_ffmpeg.py third_party/ffmpeg-check
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          nuget install Microsoft.Web.WebView2 -Version 1.0.3485.44 -OutputDirectory third_party/nuget-packages -NonInteractive
-          if($LASTEXITCODE){exit $LASTEXITCODE}
+          if ('${{ steps.video-deps.outputs.cache-hit }}' -ne 'true') {
+            python scripts/prepare_vlc.py third_party/vlc
+            if($LASTEXITCODE){exit $LASTEXITCODE}
+            python scripts/prepare_ffmpeg.py third_party/ffmpeg-check
+            if($LASTEXITCODE){exit $LASTEXITCODE}
+            nuget install Microsoft.Web.WebView2 -Version 1.0.3485.44 -OutputDirectory third_party/nuget-packages -NonInteractive
+            if($LASTEXITCODE){exit $LASTEXITCODE}
+          }
           cmake -S tools/vlc-webview-check -B build-vlc-webview -G "Visual Studio 17 2022" -A x64 "-DJUCE_WEBVIEW2_PACKAGE_LOCATION=$pwd/third_party/nuget-packages"
           if($LASTEXITCODE){exit $LASTEXITCODE}
           cmake --build build-vlc-webview --config Release --parallel 4
@@ -67,6 +79,16 @@ jobs:
           Copy-Item third_party/vlc build-vlc-webview/Release/components/VLC -Recurse
           & third_party/ffmpeg-check/ffmpeg.exe -hide_banner -loglevel error -nostdin -y -f lavfi -i "color=c=red:s=1280x720:r=24" -f lavfi -i "sine=frequency=440:sample_rate=48000" -t 30 -c:v mpeg4 -q:v 3 -c:a aac -ac 2 build-vlc-webview/fixture.mp4
           exit $LASTEXITCODE
+      - name: Save pinned dependencies before diagnostic execution
+        if: steps.video-deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party/vlc
+            third_party/ffmpeg-check
+            third_party/nuget-packages
+            build-vlc-webview/_deps/juce-src
+          key: ${{ steps.video-deps.outputs.cache-primary-key }}
       - name: Compare callback-inline and deferred HWND operations
         shell: powershell
         run: |

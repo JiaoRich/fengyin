@@ -393,7 +393,7 @@ if(BUILD_TESTING)
         add_test(NAME vlc_webview_interaction COMMAND "${Python3_EXECUTABLE}"
             "${CMAKE_SOURCE_DIR}/scripts/check_vlc_webview.py"
             "${CMAKE_BINARY_DIR}" "${CMAKE_BINARY_DIR}/vlc-playback-fixture.mp4")
-        set_tests_properties(vlc_webview_interaction PROPERTIES TIMEOUT 660)
+        set_tests_properties(vlc_webview_interaction PROPERTIES TIMEOUT 1600)
     endif()
     add_executable(FengYinMusicTempoTests tests/test_music_tempo.cpp)
     target_include_directories(FengYinMusicTempoTests PRIVATE native/Source)
