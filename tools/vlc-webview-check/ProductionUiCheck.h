@@ -126,6 +126,16 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
         if(failed||now()>deadline||(ready&&now()-javascript.load()>5000)) {
             failed=true;std::cerr<<"FAIL production UI phase="<<phase<<" cycle="<<cycle
                 <<" javascriptAge="<<now()-javascript.load()<<" deadlineExpired="<<(now()>deadline)<<std::endl;
+            EnumChildWindows(static_cast<HWND>(getPeer()->getNativeHandle()),[](HWND child,LPARAM)->BOOL {
+                wchar_t name[128]{};GetClassNameW(child,name,128);RECT r{};GetWindowRect(child,&r);
+                DWORD pid=0;const auto thread=GetWindowThreadProcessId(child,&pid);
+                GUITHREADINFO info{sizeof(info)};GetGUIThreadInfo(thread,&info);
+                std::cout<<"child="<<child<<" class="<<juce::String(name)<<" thread="<<thread<<" pid="<<pid
+                    <<" rect="<<r.left<<","<<r.top<<","<<r.right<<","<<r.bottom
+                    <<" visible="<<IsWindowVisible(child)<<" enabled="<<IsWindowEnabled(child)
+                    <<" capture="<<info.hwndCapture<<" focus="<<info.hwndFocus<<std::endl;
+                return TRUE;
+            },0);
             dumpProcess(L"production-ui-stall.dmp");finish();return;
         }
         if(touchDown) {
@@ -148,7 +158,15 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
                 clickPoint=p;touchDown=true;
                 if(!injectTouch(POINTER_FLAG_DOWN|POINTER_FLAG_INRANGE|POINTER_FLAG_INCONTACT)){failed=true;return;}
             } else {
-                SetCursorPos(p.x,p.y);INPUT input[2]{};input[0].type=input[1].type=INPUT_MOUSE;
+                POINT actual{};RECT clip{};
+                const bool moved=SetCursorPos(p.x,p.y)!=FALSE;
+                const bool located=GetCursorPos(&actual)!=FALSE;GetClipCursor(&clip);
+                std::cout<<"mouse actual="<<actual.x<<","<<actual.y<<" clip="<<clip.left<<","<<clip.top
+                    <<","<<clip.right<<","<<clip.bottom<<std::endl;
+                if(!moved||!located||std::abs(actual.x-p.x)>1||std::abs(actual.y-p.y)>1) {
+                    failed=true;std::cerr<<"FAIL input injection position mismatch; not an application click failure"<<std::endl;return;
+                }
+                INPUT input[2]{};input[0].type=input[1].type=INPUT_MOUSE;
                 input[0].mi.dwFlags=MOUSEEVENTF_LEFTDOWN;input[1].mi.dwFlags=MOUSEEVENTF_LEFTUP;
                 if(SendInput(2,input,sizeof(INPUT))!=2){failed=true;return;}
             }

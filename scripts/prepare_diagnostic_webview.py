@@ -3,7 +3,7 @@ import hashlib
 from pathlib import Path
 import sys
 
-UPSTREAM_SHA='7f831a0edf0b3dd7affb041d883601e20ff1f71e5db3b4cd1f97b93b295bfc4b'
+UPSTREAM_SHA='041ce850faeb2098093a1e9f65c43ba93d782cba3cbac1e08e5f98ccc4849e74'
 NEEDLE='        auto webViewOptions = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();'
 PATCH='''
         // FengYin diagnostic-only: programmatic arguments also work in elevated CI.

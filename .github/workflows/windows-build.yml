@@ -120,6 +120,12 @@ jobs:
             third_party/nuget-packages
             build-vlc-webview/_deps/juce-src
           key: win2022-video-deps-juce902-webview1348544-${{ hashFiles('scripts/prepare_vlc.py', 'scripts/prepare_ffmpeg.py') }}
+      - name: Restore verified WebView2 155 installer
+        id: video-webview-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: third_party/ci-webview/WebView2RuntimeInstallerX64.exe
+          key: win2022-webview155-0625fb5c1e75be58
       - name: Prepare real VLC and WebView2 diagnostic
         shell: powershell
         run: |
@@ -140,6 +146,12 @@ jobs:
           if (-not (Test-Path build-vlc-webview/Release/components/VLC/libvlc.dll)) { throw 'Private VLC runtime staging failed' }
           & third_party/ffmpeg-check/ffmpeg.exe -hide_banner -loglevel error -nostdin -y -f lavfi -i "color=c=red:s=1280x720:r=24" -f lavfi -i "sine=frequency=440:sample_rate=48000" -t 30 -c:v mpeg4 -q:v 3 -c:a aac -ac 2 build-vlc-webview/fixture.mp4
           exit $LASTEXITCODE
+      - name: Cache verified WebView2 installer even when a later diagnostic build fails
+        if: always() && steps.video-webview-cache.outputs.cache-hit != 'true' && hashFiles('ci-webview-runtime.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: third_party/ci-webview/WebView2RuntimeInstallerX64.exe
+          key: ${{ steps.video-webview-cache.outputs.cache-primary-key }}
       - name: Save pinned dependencies before diagnostic execution
         if: steps.video-deps.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -354,6 +366,13 @@ jobs:
         shell: powershell
         run: choco install innosetup --yes --no-progress
 
+      - name: Restore verified release WebView2 installer
+        id: release-webview-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: third_party/ci-webview/WebView2RuntimeInstallerX64.exe
+          key: win2022-webview155-0625fb5c1e75be58
+
       - name: 验证 Fresh Air 全新安装
         shell: powershell
         run: ./scripts/test-fresh-air-install.ps1
@@ -388,6 +407,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/build-windows.ps1
 
+      - name: Cache verified release WebView2 installer
+        if: always() && steps.release-webview-cache.outputs.cache-hit != 'true' && hashFiles('ci-webview-runtime.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: third_party/ci-webview/WebView2RuntimeInstallerX64.exe
+          key: ${{ steps.release-webview-cache.outputs.cache-primary-key }}
       - name: 保存自动测试结果
         if: always()
         shell: powershell

@@ -45,8 +45,13 @@ Invoke-Checked "Audio-only recording dependencies verification" { python (Join-P
 for ($attempt = 1; $attempt -le 4; $attempt++) {
     try {
         Write-Host "预检 WebView2 离线运行环境（$attempt/4）..."
-        Invoke-WebRequest -UseBasicParsing -TimeoutSec 300 `
-            -Uri "https://go.microsoft.com/fwlink/?linkid=2124701" -OutFile $PreparedWebView
+        $CachedCiWebView = Join-Path $ProjectRoot 'third_party\ci-webview\WebView2RuntimeInstallerX64.exe'
+        if ($env:GITHUB_ACTIONS -eq 'true' -and (Test-Path -LiteralPath $CachedCiWebView)) {
+            Copy-Item -LiteralPath $CachedCiWebView -Destination $PreparedWebView -Force
+        } else {
+            Invoke-WebRequest -UseBasicParsing -TimeoutSec 300 `
+                -Uri "https://go.microsoft.com/fwlink/?linkid=2124701" -OutFile $PreparedWebView
+        }
         if ((Get-Item $PreparedWebView).Length -lt 100MB) {
             throw "WebView2 下载不完整，实际字节数：$((Get-Item $PreparedWebView).Length)"
         }

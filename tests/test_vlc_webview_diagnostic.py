@@ -11,6 +11,7 @@ class VlcWebViewDiagnostic(unittest.TestCase):
                      'Start-Process','Version.Major -lt 155','WEBVIEW2_BROWSER_EXECUTABLE_FOLDER',
                      'installerSha256','ci-webview-runtime.json'):
             self.assertIn(item,helper)
+        self.assertIn('0625fb5c1e75be58a164e14f95aa58a3e5badb859b3d17c952385f3e4a9ff3e8',helper)
         for name in ('scripts/build-windows.ps1','.github/workflows/windows-build.yml'):
             self.assertIn('ensure_ci_webview.ps1',(ROOT/name).read_text(encoding='utf-8-sig'))
 

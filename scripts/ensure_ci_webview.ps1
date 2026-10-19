@@ -2,17 +2,25 @@ param([string]$Installer = '')
 $ErrorActionPreference = 'Stop'
 # Never install/update a developer's or customer's runtime from this test helper.
 if ($env:GITHUB_ACTIONS -ne 'true') { throw 'This helper is restricted to the disposable GitHub runner.' }
-$ownedDownload = $false
+$cache = Join-Path (Split-Path -Parent $PSScriptRoot) 'third_party\ci-webview\WebView2RuntimeInstallerX64.exe'
+$expectedSha = '0625fb5c1e75be58a164e14f95aa58a3e5badb859b3d17c952385f3e4a9ff3e8'
 try {
     if (-not $Installer) {
-        $Installer = Join-Path $env:TEMP ('fy-ci-webview-' + [guid]::NewGuid().ToString('N') + '.exe')
-        $ownedDownload = $true
-        Invoke-WebRequest -UseBasicParsing -TimeoutSec 300 -Uri 'https://go.microsoft.com/fwlink/?linkid=2124701' -OutFile $Installer
+        $Installer = $cache
+        if (-not (Test-Path -LiteralPath $Installer)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $cache) | Out-Null
+            Invoke-WebRequest -UseBasicParsing -TimeoutSec 300 -Uri 'https://go.microsoft.com/fwlink/?linkid=2124701' -OutFile $Installer
+        }
     }
     if (-not (Test-Path -LiteralPath $Installer) -or (Get-Item -LiteralPath $Installer).Length -lt 100MB) { throw 'Incomplete WebView2 offline installer' }
     $signature = Get-AuthenticodeSignature -FilePath $Installer
     if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') { throw 'WebView2 Microsoft signature check failed' }
     $installerSha = (Get-FileHash -LiteralPath $Installer -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($installerSha -ne $expectedSha) { throw 'WebView2 155.0.4283.62 installer SHA mismatch; re-audit the upstream update, never silently mix runtime versions.' }
+    if ($Installer -ne $cache) {
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $cache) | Out-Null
+        Copy-Item -LiteralPath $Installer -Destination $cache -Force
+    }
     $install = Start-Process -FilePath $Installer -ArgumentList @('/silent', '/install') -PassThru
     if (-not $install.WaitForExit(300000)) { $install.Kill(); throw 'CI WebView2 installation timed out' }
     $install.Refresh()
@@ -34,6 +42,4 @@ try {
     [pscustomobject]@{version=$runtime.Version.ToString();path=$runtime.Path;installerSha256=$installerSha;signature='Microsoft Corporation';exitCode=$install.ExitCode} |
         ConvertTo-Json | Set-Content -Encoding UTF8 'ci-webview-runtime.json'
     Write-Host ('Verified CI WebView2 runtime: ' + $runtime.Version)
-} finally {
-    if ($ownedDownload -and (Test-Path -LiteralPath $Installer)) { Remove-Item -LiteralPath $Installer -Force }
-}
+} catch { throw }
