@@ -23,14 +23,18 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
                     .getChildFile("fy-production-ui-"+juce::Uuid().toString())))
             .withNativeIntegrationEnabled()
             .withUserScript(R"JS(localStorage.setItem('fy-guide-seen','yes');localStorage.setItem('fy-voice-enabled','no');
+                for(const event of ['pointerdown','pointerup','click'])document.addEventListener(event,e=>
+                    window.__JUCE__.backend.emitEvent('testInput',{event,target:e.target.id,x:e.clientX,y:e.clientY}),true);
                 window.addEventListener('load',()=>setInterval(()=>window.__JUCE__.backend.emitEvent('testHeartbeat',
                 {expanded:document.body.classList.contains('video-expanded')}),100));)JS")
             .withEventListener("testHeartbeat",[this](juce::var p){javascript.store(now());expanded=bool(p["expanded"]);})
             .withEventListener("webReady",[this](juce::var p){session=p["videoSession"].toString();ready=true;javascript.store(now());})
             .withEventListener("requestBackendState",[this](juce::var){lastConfig=0;})
             .withEventListener("testPoint",[this](juce::var p){
+                std::cout<<"web point "<<juce::JSON::toString(p,true)<<std::endl;
                 clickPoint={int(p["x"]),int(p["y"])};clickPending=true;
             })
+            .withEventListener("testInput",[](juce::var p){std::cout<<"web input "<<juce::JSON::toString(p,true)<<std::endl;})
             .withEventListener("chooseVideo",[this](juce::var){
                 surface.player()->load(fixture.getFullPathName().toStdString(),++generation);
             })
@@ -60,7 +64,8 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
     void finish(){stopTimer();juce::MessageManager::getInstance()->stopDispatchLoop();}
     void click(const juce::String& selector,double fraction=.5) {
         const auto script="(()=>{const e=document.querySelector("+juce::JSON::toString(selector)+");const r=e.getBoundingClientRect();"
-            "window.__JUCE__.backend.emitEvent('testPoint',{x:r.x+r.width*"+juce::String(fraction)+",y:r.y+r.height*.5});})()";
+            "const x=r.x+r.width*"+juce::String(fraction)+",y=r.y+r.height*.5;window.__JUCE__.backend.emitEvent('testPoint',"
+            "{selector:"+juce::JSON::toString(selector)+",x,y,hit:document.elementFromPoint(x,y)?.id,dpr:devicePixelRatio,w:innerWidth,h:innerHeight});})()";
         web->evaluateJavascript(script);deadline=now()+10000;
     }
     void sendState() {
@@ -124,6 +129,12 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
             const auto scale=getPeer()->getPlatformScaleFactor();
             POINT p{juce::roundToInt(clickPoint.x*scale),juce::roundToInt(clickPoint.y*scale)};
             ClientToScreen(static_cast<HWND>(getPeer()->getNativeHandle()),&p);
+            wchar_t name[128]{};const auto hit=WindowFromPoint(p);GetClassNameW(hit,name,128);
+            RECT video{};GetWindowRect(static_cast<HWND>(surface.getHWND()),&video);
+            std::cout<<"native input phase="<<phase<<" cycle="<<cycle<<" xy="<<p.x<<","<<p.y
+                <<" scale="<<scale<<" hit="<<hit<<" class="<<juce::String(name)
+                <<" video="<<video.left<<","<<video.top<<","<<video.right<<","<<video.bottom
+                <<" capture="<<GetCapture()<<" foreground="<<GetForegroundWindow()<<std::endl;
             if(cycle%2) {
                 clickPoint=p;touchDown=true;
                 if(!injectTouch(POINTER_FLAG_DOWN|POINTER_FLAG_INRANGE|POINTER_FLAG_INCONTACT)){failed=true;return;}
