@@ -44,8 +44,15 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
                     if(!safe||p["session"].toString()!=safe->session
                         ||(bool(p["visible"])&&int(p["generation"])!=safe->generation))return;
                     std::cout<<"production viewport enter "<<juce::JSON::toString(p,true)<<std::endl;
-                    safe->surface.updateViewport({int(p["x"]),int(p["y"]),int(p["width"]),int(p["height"])},bool(p["visible"]));
+                    const juce::Rectangle<int> bounds{int(p["x"]),int(p["y"]),int(p["width"]),int(p["height"])};
+                    const bool moved=bool(p["visible"])&&safe->surface.getBounds()!=bounds;
+                    safe->surface.updateViewport(bounds,bool(p["visible"]));
                     std::cout<<"production viewport returned"<<std::endl;
+                    if(moved) {
+                        safe->web->focusGainedWithDirection(juce::Component::focusChangedDirectly,
+                            juce::Component::FocusChangeDirection::unknown);
+                        std::cout<<"production WebView MoveFocus after geometry change"<<std::endl;
+                    }
                 });
             })
             .withEventListener("setVideoPlaybackState",[this](juce::var p){
@@ -137,11 +144,12 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
             POINT p{juce::roundToInt(clickPoint.x*scale),juce::roundToInt(clickPoint.y*scale)};
             ClientToScreen(static_cast<HWND>(getPeer()->getNativeHandle()),&p);
             wchar_t name[128]{};const auto hit=WindowFromPoint(p);GetClassNameW(hit,name,128);
+            GUITHREADINFO info{sizeof(info)};GetGUIThreadInfo(GetWindowThreadProcessId(hit,nullptr),&info);
             RECT video{};GetWindowRect(static_cast<HWND>(surface.getHWND()),&video);
             std::cout<<"native input phase="<<phase<<" cycle="<<cycle<<" xy="<<p.x<<","<<p.y
                 <<" scale="<<scale<<" hit="<<hit<<" class="<<juce::String(name)
                 <<" video="<<video.left<<","<<video.top<<","<<video.right<<","<<video.bottom
-                <<" capture="<<GetCapture()<<" foreground="<<GetForegroundWindow()<<std::endl;
+                <<" capture="<<info.hwndCapture<<" focus="<<info.hwndFocus<<" foreground="<<GetForegroundWindow()<<std::endl;
             if(cycle%2) {
                 clickPoint=p;touchDown=true;
                 if(!injectTouch(POINTER_FLAG_DOWN|POINTER_FLAG_INRANGE|POINTER_FLAG_INCONTACT)){failed=true;return;}
