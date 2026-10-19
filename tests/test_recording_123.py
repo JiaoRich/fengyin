@@ -5,8 +5,10 @@ import unittest
 from unittest import mock
 import subprocess
 import json
+import sys
 
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT/'scripts'))
 def read(path):return (ROOT/path).read_text(encoding='utf-8-sig')
 
 class Recording123(unittest.TestCase):
@@ -68,7 +70,7 @@ class Recording123(unittest.TestCase):
             with mock.patch.object(module.subprocess,'run',side_effect=execute):
                 self.assertEqual(module.check(temp,temp,temp),1)
             results=json.loads((Path(temp)/'evidence/results.json').read_text(encoding='utf-8'))
-            self.assertEqual(len(results),17)
+            self.assertEqual(len(results),18)
             self.assertEqual(results[0]['code'],1)
             self.assertEqual(results[-1]['name'],'vlc-lifecycle')
             self.assertIn('srl-decode-video',[r['name'] for r in results])

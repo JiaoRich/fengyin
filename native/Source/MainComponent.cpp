@@ -272,7 +272,7 @@ void MainComponent::setWebPresentationVisible(bool visible)
     // Hiding/minimising FengYin no longer invalidates the recording source.
     if (webPresentationVisible == visible) return;
     webPresentationVisible = visible;
-    vlcVideo.updateViewport(vlcViewport, visible && vlcViewportVisible);
+    invalidateVlcViewport();
     lastWebStateAtMs = 0; // Restore gets a complete current snapshot, not stale deltas.
     if (webInterface && webInterfaceReady)
         webInterface->evaluateJavascript(visible ? "window.fengyinSetPresentationVisible?.(true);"
@@ -309,8 +309,7 @@ void MainComponent::setupWebInterface()
         {
             webInterfaceReady = true;
             videoWebSession=payload.getProperty("videoSession","").toString();
-            vlcViewportVisible=false;
-            vlcVideo.updateViewport(vlcViewport,false);
+            invalidateVlcViewport();
             lastVlcStateAtMs=0;
             updateVlcPlayback();
             emitAudioSettingsState(true, audio.isAutomaticLatencyTuning()
@@ -538,12 +537,15 @@ void MainComponent::setupWebInterface()
         {
             if (!fengyin::VlcVideoSurface::supported()) return;
             if(payload.getProperty("session","").toString()!=videoWebSession || videoWebSession.isEmpty())return;
-            if(!static_cast<bool>(payload.getProperty("visible",false))) {
+            const bool visible=static_cast<bool>(payload.getProperty("visible",false));
+            if(visible && static_cast<int>(payload.getProperty("generation",-1))!=webVideoGeneration)return;
+            if(!vlcViewportGate.apply(static_cast<juce::int64>(payload.getProperty("epoch",-1)),
+                static_cast<juce::int64>(payload.getProperty("revision",-1)),visible))return;
+            if(!visible || !webPresentationVisible) {
                 vlcViewportVisible=false;
                 vlcVideo.updateViewport(vlcViewport,false);
                 return;
             }
-            if(static_cast<int>(payload.getProperty("generation",-1))!=webVideoGeneration)return;
             // Browser CSS pixels are JUCE logical coordinates (zoom is locked).
             vlcViewport=juce::Rectangle<int>(
                 static_cast<int>(payload.getProperty("x",0)),static_cast<int>(payload.getProperty("y",0)),
@@ -973,6 +975,7 @@ void MainComponent::loadVideoForWebInterface(const juce::File& file)
     webVideoFile = file;
     webVideoPosition = 0.0;
     webVideoAudioReady = false;
+    if(fengyin::VlcVideoSurface::supported())invalidateVlcViewport();
 
     if (webInterface != nullptr)
     {
@@ -1091,6 +1094,20 @@ void MainComponent::seekAccompaniment(double seconds)
     if(auto* player=vlcVideo.player())player->seek(seconds,webVideoSeekRevision);
     else accompaniment.setPosition(seconds);
 }
+void MainComponent::invalidateVlcViewport()
+{
+    vlcViewportGate.invalidate();
+    vlcViewportVisible=false;
+    vlcVideo.updateViewport(vlcViewport,false);
+    lastVlcStateAtMs=0;
+    if(webInterface && webInterfaceReady) {
+        auto event=std::make_unique<juce::DynamicObject>();
+        event->setProperty("session",videoWebSession);
+        event->setProperty("epoch",static_cast<juce::int64>(vlcViewportGate.currentEpoch()));
+        webInterface->emitEventIfBrowserIsVisible("nativeVideoViewportReset",juce::var(event.release()));
+    }
+}
+
 void MainComponent::updateVlcPlayback()
 {
     if(!fengyin::VlcVideoSurface::supported() || !vlcVideo.player())return;
@@ -1105,6 +1122,7 @@ void MainComponent::updateVlcPlayback()
         auto result=std::make_unique<juce::DynamicObject>();
         result->setProperty("generation",status.generation);
         result->setProperty("engine","vlc");
+        result->setProperty("viewportEpoch",static_cast<juce::int64>(vlcViewportGate.currentEpoch()));
         result->setProperty("url",juce::URL(webVideoFile).toString(false));
         result->setProperty("name",webVideoFile.getFileName());
         result->setProperty("seekRevision",status.seekRevision);
@@ -1421,7 +1439,7 @@ void MainComponent::resized()
 {
     if (webInterface != nullptr)
     {
-        vlcVideo.updateViewport(vlcViewport,false); // Re-show only after fresh browser geometry.
+        invalidateVlcViewport(); // Re-show only after geometry from this layout epoch.
         webInterface->setBounds(getLocalBounds());
         return;
     }

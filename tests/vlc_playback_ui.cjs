@@ -22,6 +22,16 @@ const path=require('node:path');
  await page.waitForTimeout(100);
  assert.equal(await page.locator('#duration').innerText(),'02:00');
  assert(await page.evaluate(()=>sent.filter(x=>x.name==='nativeVideoViewport').at(-1).payload.visible));
+ await page.evaluate(()=>listeners.nativeVideoViewportReset({session:videoWebSession,epoch:5}));
+ await page.waitForTimeout(100);
+ assert.equal(await page.evaluate(()=>sent.filter(x=>x.name==='nativeVideoViewport').at(-1).payload.epoch),5);
+ const revisionBeforeHide=await page.evaluate(()=>sent.filter(x=>x.name==='nativeVideoViewport').at(-1).payload.revision);
+ await page.evaluate(()=>{showPage('sounds');});
+ const immediateHide=await page.evaluate(()=>sent.filter(x=>x.name==='nativeVideoViewport').at(-1).payload);
+ assert.equal(immediateHide.visible,false);assert(immediateHide.revision>revisionBeforeHide);
+ await page.evaluate(()=>{listeners.nativeVideoViewportReset({session:'old-document',epoch:99});showPage('play');});
+ await page.waitForTimeout(100);
+ assert.equal(await page.evaluate(()=>sent.filter(x=>x.name==='nativeVideoViewport').at(-1).payload.epoch),5);
  for(const width of [1920,1366,1050]){
   await page.setViewportSize({width,height:900});await page.waitForTimeout(100);
   const g=await page.evaluate(()=>{

@@ -1,6 +1,7 @@
 #define NOMINMAX
 #include <windows.h>
 #include "VlcPlaybackEngine.h"
+#include "VlcNativeWindow.h"
 #include <chrono>
 #include <cmath>
 #include <iostream>
@@ -14,35 +15,38 @@
 // picture and a zero statistics counter are not sufficient to distinguish
 // an actual blank surface from a stale counter. Keep the existing assertion
 // until the pixels and raw state establish which case occurred.
-void savePreviewEvidence(HWND window,const std::filesystem::path& path) {
+bool savePreviewEvidence(HWND window,const std::filesystem::path& path) {
     RECT bounds{}; POINT origin{};
-    if(!GetClientRect(window,&bounds) || !ClientToScreen(window,&origin))return;
+    if(!GetClientRect(window,&bounds) || !ClientToScreen(window,&origin))return false;
     const int width=bounds.right,height=bounds.bottom;
-    if(width<=0 || height<=0)return;
+    if(width<=0 || height<=0)return false;
     BITMAPINFO info{};
     info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);
     info.bmiHeader.biWidth=width;info.bmiHeader.biHeight=-height;
     info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;
     info.bmiHeader.biCompression=BI_RGB;
-    const auto screen=GetDC(nullptr);if(!screen)return;
+    const auto screen=GetDC(nullptr);if(!screen)return false;
     const auto dc=CreateCompatibleDC(screen);
     void* data=nullptr;
     const auto bitmap=CreateDIBSection(screen,&info,DIB_RGB_COLORS,&data,nullptr,0);
     if(!dc || !bitmap || !data) {
         if(bitmap)DeleteObject(bitmap);if(dc)DeleteDC(dc);ReleaseDC(nullptr,screen);
-        std::cout<<"PREVIEW capture unavailable\n";return;
+        std::cout<<"PREVIEW capture unavailable\n";return false;
     }
     const auto previous=SelectObject(dc,bitmap);
     const bool captured=BitBlt(dc,0,0,width,height,screen,origin.x,origin.y,SRCCOPY|CAPTUREBLT)!=0;
     GdiFlush();
+    bool picture=false;
     if(captured) {
         const auto bytes=static_cast<DWORD>(width*height*4);
         BITMAPFILEHEADER header{};header.bfType=0x4d42;
         header.bfOffBits=sizeof(header)+sizeof(BITMAPINFOHEADER);header.bfSize=header.bfOffBits+bytes;
-        std::ofstream file(path,std::ios::binary);
-        file.write(reinterpret_cast<const char*>(&header),sizeof(header));
-        file.write(reinterpret_cast<const char*>(&info.bmiHeader),sizeof(BITMAPINFOHEADER));
-        file.write(static_cast<const char*>(data),bytes);
+        if(!path.empty()) {
+            std::ofstream file(path,std::ios::binary);
+            file.write(reinterpret_cast<const char*>(&header),sizeof(header));
+            file.write(reinterpret_cast<const char*>(&info.bmiHeader),sizeof(BITMAPINFOHEADER));
+            file.write(static_cast<const char*>(data),bytes);
+        }
         const auto* pixels=static_cast<const unsigned char*>(data);
         unsigned red=0,blue=0;
         for(int y=0;y<height;++y)for(int x=0;x<width;++x) {
@@ -50,10 +54,12 @@ void savePreviewEvidence(HWND window,const std::filesystem::path& path) {
             if(y<height/2 && p[2]>150 && p[1]<100 && p[0]<100)++red;
             if(y>=height/2 && p[0]>150 && p[1]<100 && p[2]<100)++blue;
         }
-        std::cout<<"PREVIEW pixels width="<<width<<" height="<<height
-                 <<" redTop="<<red<<" blueBottom="<<blue<<" fileWritten="<<bool(file)<<"\n";
+        picture=red>unsigned(width*height/8) && blue>unsigned(width*height/8);
+        if(!path.empty())std::cout<<"PREVIEW pixels width="<<width<<" height="<<height
+                 <<" redTop="<<red<<" blueBottom="<<blue<<" picture="<<picture<<"\n";
     } else std::cout<<"PREVIEW capture failed win32="<<GetLastError()<<"\n";
     SelectObject(dc,previous);DeleteObject(bitmap);DeleteDC(dc);ReleaseDC(nullptr,screen);
+    return picture;
 }
 
 using fengyin::VlcPlaybackEngine;
@@ -74,9 +80,30 @@ int wmain(int argc,wchar_t** argv) {
     HWND window=CreateWindowExW(0,L"STATIC",L"FengYin VLC playback integration",
         WS_OVERLAPPEDWINDOW|WS_VISIBLE|WS_CLIPCHILDREN|SS_BLACKRECT,30,30,640,400,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
     if(!window)return 2;
+    const auto button=CreateWindowExW(0,L"BUTTON",L"Underlying FengYin controls",
+        WS_CHILD|WS_VISIBLE,0,0,624,361,window,nullptr,GetModuleHandleW(nullptr),nullptr);
+    const auto surface=fengyin::createVlcChildWindow(window);
+    if(!button || !surface)return 2;
+    MoveWindow(surface,0,0,624,361,FALSE);
     int code=0;
     try {
-        VlcPlaybackEngine p(std::filesystem::path(argv[1]),window);Shutdown cleanup{p};
+        const POINT centre{200,150};
+        for(int i=0;i<20;++i) {
+            if(!fengyin::setVlcChildVisible(surface,window,true) || GetParent(surface)!=window
+                || (GetWindowLongPtrW(surface,GWL_EXSTYLE)&WS_EX_TOPMOST)!=0)
+                throw std::runtime_error("VLC surface escaped its non-topmost child window");
+            fengyin::setVlcChildVisible(surface,window,false);
+            if(IsWindowVisible(surface) || ChildWindowFromPointEx(window,centre,CWP_SKIPINVISIBLE)!=button)
+                throw std::runtime_error("Hidden VLC surface intercepts underlying controls");
+        }
+        ShowWindow(window,SW_MINIMIZE);pump();
+        fengyin::setVlcChildVisible(surface,window,true);
+        if(GetWindowLongPtrW(surface,GWL_STYLE)&WS_VISIBLE)throw std::runtime_error("Minimised parent re-showed video");
+        ShowWindow(window,SW_RESTORE);pump();
+        if(IsWindowVisible(surface))throw std::runtime_error("Restore resurrected stale video");
+        if(!fengyin::setVlcChildVisible(surface,window,true))throw std::runtime_error("Fresh viewport failed");
+        std::cout<<"PASS native video child ownership, 20 show/hide hit tests and minimise/restore\n";
+        VlcPlaybackEngine p(std::filesystem::path(argv[1]),surface);Shutdown cleanup{p};
         // Exercise the exact failed-188 input: forward slash Windows absolute
         // path, with Unicode and a space as ordinary user media names contain.
         const auto fixture=std::filesystem::path(argv[2]);
@@ -87,6 +114,8 @@ int wmain(int argc,wchar_t** argv) {
         std::replace(file.begin(),file.end(),'\\','/');
         p.load(file,1);
         auto lastPreviewLog=GetTickCount64();
+        auto lastPreviewCapture=lastPreviewLog;
+        bool previewPicture=false;
         auto previewState=[&]{const auto s=p.getState();
             std::cout<<"PREVIEW rawState="<<p.testPlaybackState.load()<<" ready="<<s.ready
                      <<" playing="<<s.playing<<" position="<<s.position<<" duration="<<s.duration
@@ -96,12 +125,17 @@ int wmain(int argc,wchar_t** argv) {
             waitFor([&]{auto s=p.getState();
                 if(GetTickCount64()-lastPreviewLog>=1000){lastPreviewLog=GetTickCount64();previewState();}
                 if(!s.error.empty())throw std::runtime_error(s.error);
-                return s.ready && s.duration>10 && s.displayedVideo>0;
+                // A paused input can leave VLC's demux statistics unchanged.
+                // Require the actual red/blue fixture on the native surface.
+                if(s.ready && s.duration>10 && GetTickCount64()-lastPreviewCapture>=100) {
+                    lastPreviewCapture=GetTickCount64();previewPicture=savePreviewEvidence(surface,{});
+                }
+                return previewPicture;
             },15000,"paused first frame not ready");
         } catch(...) {
-            previewState();savePreviewEvidence(window,fixture.parent_path()/L"vlc-first-frame-failed.bmp");throw;
+            previewState();savePreviewEvidence(surface,fixture.parent_path()/L"vlc-first-frame-failed.bmp");throw;
         }
-        previewState();savePreviewEvidence(window,fixture.parent_path()/L"vlc-first-frame.bmp");
+        previewState();savePreviewEvidence(surface,fixture.parent_path()/L"vlc-first-frame.bmp");
         const auto idleEnd=GetTickCount64()+700;while(GetTickCount64()<idleEnd)pump();
         if(p.getState().playing || p.getState().position>.15 || p.testPcmSamples>0)
             throw std::runtime_error("First-frame preview advanced playback or emitted audio");

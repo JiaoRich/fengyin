@@ -26,3 +26,4 @@ target_include_directories(FengYinVlcTests PRIVATE "${FENGYIN_PROJECT_ROOT}/nati
 target_compile_definitions(FengYinVlcTests PRIVATE FENGYIN_VLC_TEST_PCM=1)
 target_compile_options(FengYinVlcTests PRIVATE /utf-8)
 target_link_libraries(FengYinVlcTests PRIVATE user32 gdi32)
+add_executable(FengYinRecorderPolicyTests "${FENGYIN_PROJECT_ROOT}/tests/test_recorder_policy.cpp")

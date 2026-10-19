@@ -22,6 +22,7 @@
 #include "RecordingManager.h"
 #include "MiniAudioRecorder.h"
 #include "RecorderPolicy.h"
+#include "RecordingStageTiming.h"
 using Microsoft::WRL::ComPtr;
 using namespace fengyin::capture;
 
@@ -47,6 +48,8 @@ struct Endpoint {
 struct Session {
     std::atomic<bool> ready{false},complete{false},failed{false};
     std::atomic<int> frames{0};std::mutex mutex;std::wstring error;
+    bool measure=false;
+    RecordingStageTiming timing;
 };
 Session* session=nullptr; // One recorder/session per isolated helper process.
 void __stdcall completed(std::wstring,nlohmann::fifo_map<std::wstring,int>){session->complete.store(true);}
@@ -55,7 +58,13 @@ void __stdcall failure(std::wstring message,std::wstring){
     {std::lock_guard<std::mutex> lock(session->mutex);session->error=std::move(message);}
     session->failed.store(true);
 }
-void __stdcall frame(int number,INT64,FRAME_BITMAP_DATA*){session->frames.store(number+1);}
+void __stdcall audioPacket(FRAME_AUDIO_INFO* info){
+    if(session->measure)session->timing.audio(GetTickCount64(),info?info->PaddedBytes:0);
+}
+void __stdcall frame(int number,INT64,FRAME_BITMAP_DATA*){
+    session->frames.store(number+1);
+    if(session->measure)session->timing.frame(GetTickCount64());
+}
 std::unique_ptr<H264_ENCODER_OPTIONS> encoderOptions(){
     auto options=std::make_unique<H264_ENCODER_OPTIONS>();
     options->SetVideoFps(fps);options->SetVideoBitrate(bitrate);
@@ -149,9 +158,15 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int){
             if(!GetMonitorInfoW(monitor,&info))throw std::runtime_error("Cannot resolve recording display");
             const auto size=canvas(info.rcMonitor.right-info.rcMonitor.left,info.rcMonitor.bottom-info.rcMonitor.top);
             Session progress;session=&progress;
+            wchar_t diagnostic[2]{};
+            progress.measure=GetEnvironmentVariableW(L"FENGYIN_RECORDING_DIAGNOSTICS",diagnostic,2)==1 && diagnostic[0]==L'1';
+            std::ofstream timing;
+            if(progress.measure)timing.open(output.wstring()+L".timing.log",std::ios::binary);
+            auto nextTiming=GetTickCount64()+1000;
             RecordingManager recorder;
             recorder.RecordingCompleteCallback=completed;recorder.RecordingFailedCallback=failure;
             recorder.RecordingStatusChangedCallback=stateChanged;recorder.RecordingFrameNumberChangedCallback=frame;
+            if(progress.measure)recorder.RecordingNewAudioCallback=audioPacket;
             recorder.SetLogEnabled(true);recorder.SetLogSeverityLevel(LOG_LVL_WARN);
             recorder.SetLogFilePath(output.wstring()+L".log");
             recorder.SetEncoderOptions(encoderOptions().release());
@@ -173,6 +188,15 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int){
                     if(!status(state,"recording")){deferredError="Cannot write recording status";break;}announced=true;
                 }
                 if(stopRequested())break;
+                if(progress.measure && GetTickCount64()>=nextTiming){
+                    const auto now=GetTickCount64();const auto sample=progress.timing.take(now);
+                    timing<<"wallMs="<<now<<" frames="<<progress.frames.load()
+                        <<" audioPackets="<<sample.audioPackets<<" paddedBytes="<<sample.paddedBytes
+                        <<" postAudioToFrameMaxMs="<<sample.postAudioToFrameMaxMs
+                        <<" frameIntervalMaxMs="<<sample.frameIntervalMaxMs
+                        <<" audioGapMs="<<sample.audioGapMs<<" frameGapMs="<<sample.frameGapMs<<'\n';
+                    timing.flush();nextTiming=now+1000;
+                }
                 if(!announced && GetTickCount64()-started>18000){deferredError="Screen recording startup timed out";break;}
                 if(GetTickCount64()>=nextEndpointCheck){
                     try{if(!endpoint.unchanged())deferredError="System output changed; recording stopped";}

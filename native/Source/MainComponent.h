@@ -21,6 +21,7 @@
 #include "VideoAudioExtractor.h"
 #include "VideoPlaybackCache.h"
 #include "VlcVideoSurface.h"
+#include "VideoViewportGate.h"
 #include "WindowsLowLatencyOptimizer.h"
 #include "VoicePromptService.h"
 
@@ -66,6 +67,7 @@ private:
     bool accompanimentFinished() const;
     void seekAccompaniment(double);
     void updateVlcPlayback();
+    void invalidateVlcViewport();
     juce::Rectangle<int> getContentBounds() const;
     void timerCallback() override;
     void startPluginScan();
@@ -223,6 +225,7 @@ private:
     fengyin::VlcVideoSurface vlcVideo;
     juce::Rectangle<int> vlcViewport;
     bool vlcViewportVisible = false;
+    fengyin::VideoViewportGate vlcViewportGate;
     double lastVlcStateAtMs = 0;
     juce::String videoWebSession;
     fengyin::VideoAudioExtractor webVideoAudioExtractor;

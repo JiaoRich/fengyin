@@ -2,7 +2,8 @@
 
 ## ScreenRecorderLib 7.0.1 / miniaudio 0.11.23
 
-- 独立 `FengYinRecorder.exe` 使用 ScreenRecorderLib 的未修改原生 C++ 核心录屏、miniaudio 的 WASAPI 回环与 WAV 编码录音；不依赖 .NET UI，不采麦克风。
+- 独立 `FengYinRecorder.exe` 使用 ScreenRecorderLib 原生 C++ 核心录屏、miniaudio 的 WASAPI 回环与 WAV 编码录音；不依赖 .NET UI，不采麦克风。
+- ScreenRecorderLib 附有一项 WASAPI 静音包复制修复：在自有缓冲中处理整包静音，不写入 Windows 端点缓冲。安装包保留原始源码、精确修改补丁、配套头文件与修改前后校验记录。
 - ScreenRecorderLib：MIT，https://github.com/sskodje/ScreenRecorderLib ，固定提交 `646383234187efd3854e6b1069612b80c3ab9981`。
 - miniaudio：Public Domain 或 MIT No Attribution 双许可，https://github.com/mackron/miniaudio/tree/0.11.23 。
 - `components/Recording/` 随附版本/校验记录、完整上游源码和许可证（包括源码附带的第三方声明）。各组件以其自身许可为准。

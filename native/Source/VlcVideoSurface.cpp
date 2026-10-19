@@ -1,4 +1,5 @@
 #include "VlcVideoSurface.h"
+#include "VlcNativeWindow.h"
 #if JUCE_WINDOWS
 #include <windows.h>
 #endif
@@ -10,8 +11,10 @@ bool VlcVideoSurface::initialise()
 {
 #if JUCE_WINDOWS
     if(engine)return true;
-    auto hwnd=CreateWindowExW(WS_EX_NOACTIVATE,L"STATIC",L"FengYin VLC video",
-        WS_POPUP|WS_CLIPCHILDREN|WS_CLIPSIBLINGS|SS_BLACKRECT,0,0,16,16,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
+    // Attach before VLC creates its render-thread children. It must never
+    // see a free-standing popup while the web page is still hidden.
+    const auto parent=getPeer()?static_cast<HWND>(getPeer()->getNativeHandle()):nullptr;
+    auto hwnd=createVlcChildWindow(parent);
     if(!hwnd)return false;
     setHWND(hwnd);
     auto root=juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory().getChildFile("components/VLC");
@@ -46,8 +49,8 @@ void VlcVideoSurface::updateViewport(juce::Rectangle<int> bounds,bool visible)
     if(getBounds()!=bounds)setBounds(bounds);
     if(isVisible()!=show)setVisible(show);
 #if JUCE_WINDOWS
-    if(show && getHWND())SetWindowPos(static_cast<HWND>(getHWND()),HWND_TOP,0,0,0,0,
-        SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_NOOWNERZORDER);
+    const auto parent=getPeer()?static_cast<HWND>(getPeer()->getNativeHandle()):nullptr;
+    setVlcChildVisible(static_cast<HWND>(getHWND()),parent,show && isShowing());
 #endif
 }
 }

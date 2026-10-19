@@ -76,7 +76,7 @@ struct VlcApi
  X(libvlc_media_player_new) X(libvlc_media_player_release) \
  X(libvlc_media_player_set_media) X(libvlc_media_player_set_hwnd) \
  X(libvlc_media_player_play) X(libvlc_media_player_set_pause) X(libvlc_media_player_stop) \
- X(libvlc_media_player_get_state) X(libvlc_media_player_can_pause) X(libvlc_media_player_get_time) X(libvlc_media_player_get_length) \
+ X(libvlc_media_player_get_state) X(libvlc_media_player_can_pause) X(libvlc_media_player_next_frame) X(libvlc_media_player_get_time) X(libvlc_media_player_get_length) \
  X(libvlc_media_player_set_time) X(libvlc_audio_set_volume) \
  X(libvlc_video_set_mouse_input) X(libvlc_video_set_key_input) \
  X(libvlc_media_player_event_manager) X(libvlc_event_attach) X(libvlc_event_detach)
@@ -182,6 +182,7 @@ void VlcPlaybackEngine::run()
         applied.generation = -1; applied.playRevision = -1;
         double pendingSeek = -1;
         bool started = false;
+        bool previewRequested = false;
         bool terminalChecked = false;
         std::string playbackError;
         while (true)
@@ -197,7 +198,7 @@ void VlcPlaybackEngine::run()
                 errorEvents.failed.store(false);
                 api.libvlc_media_player_set_media(player, nullptr);
                 if(media) { api.libvlc_media_parse_stop(media); api.libvlc_media_release(media); media=nullptr; }
-                started=false; terminalChecked=false; pendingSeek=-1;playbackError.clear();
+                started=false; previewRequested=false; terminalChecked=false; pendingSeek=-1;playbackError.clear();
                 if (!next.path.empty())
                 {
                     // VLC 3 Windows vlc_path2uri rejects drive paths using '/'
@@ -244,6 +245,12 @@ void VlcPlaybackEngine::run()
                     // explicit user pauses are applied below once safe.
                 }
                 playbackState=api.libvlc_media_player_get_state(player);
+                // start-paused alone can stop before the first displayed
+                // picture (confirmed by the Windows paused/zero-pixel test).
+                // Request exactly one native frame, keeping audio paused.
+                if(!next.playing && playbackState==libvlc_Paused && !previewRequested) {
+                    api.libvlc_media_player_next_frame(player);previewRequested=true;
+                }
 #if defined(FENGYIN_VLC_TEST_PCM)
                 testPlaybackState.store(static_cast<int>(playbackState));
 #endif

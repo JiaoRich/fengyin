@@ -32,6 +32,7 @@ def check(build, ffmpeg_dir, vlc):
         return result['code'] == 0
 
     ffmpeg, probe = ffmpeg_dir / 'ffmpeg.exe', ffmpeg_dir / 'ffprobe.exe'
+    run('capture-packet-and-viewport-policy', [build / 'Release/FengYinRecorderPolicyTests.exe'])
     for label, binary in [('legacy', 'FengYinScreenRecorder'), ('srl', 'FengYinRecorder'),
                           ('srl-explicit-rate', 'FengYinRecorderExplicitRate')]:
         exe = build / 'Release' / (binary + '.exe')

@@ -2,6 +2,7 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 // A new document must not inherit a native video window's stale visibility.
 const videoWebSession = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+let nativeViewportFrame=0,nativeViewportLast='',nativeViewportEpoch=0,nativeViewportRevision=0;
 let studioUnlocked = false, studioSavedId = '', studioExportAfterSave = false;
 let compactMode = false;
 let touchWindowGesture = null;
@@ -583,7 +584,7 @@ function showPage(page) {
   if (page === 'chain' && !studioUnlocked) return openStudioLogin();
   // Hide synchronously in the same bridge turn, not in a later animation
   // frame. This also works before a lost selection event has been recovered.
-  if(page!=='play') nativeEvent('nativeVideoViewport',{session:videoWebSession,visible:false});
+  if(page!=='play') hideNativeVideoViewport();
   for(const id of ['record-menu','bend-range-dialog'])if($('#'+id))$('#'+id).hidden=true;
   $('#record-options')?.setAttribute('aria-expanded','false');
   $$('.nav-item,.page').forEach(el => el.classList.remove('active'));
@@ -1330,7 +1331,18 @@ function applyVideoPlaybackClock(clock) {
 window.__JUCE__?.backend?.addEventListener('videoPlaybackClock',applyVideoPlaybackClock);
 // The native player owns the single A/V clock. JS never loads or seeks a
 // second decoder, and only sends explicit user commands and viewport changes.
-let nativeViewportFrame=0,nativeViewportLast='';
+function hideNativeVideoViewport() {
+  nativeViewportLast='';
+  nativeEvent('nativeVideoViewport',{session:videoWebSession,epoch:nativeViewportEpoch,revision:++nativeViewportRevision,visible:false});
+}
+function acceptNativeViewportEpoch(epoch) {
+  if(!Number.isSafeInteger(epoch) || epoch<nativeViewportEpoch)return;
+  if(epoch!==nativeViewportEpoch){nativeViewportEpoch=epoch;nativeViewportLast='';}
+  scheduleNativeVideoViewport();
+}
+window.__JUCE__?.backend?.addEventListener('nativeVideoViewportReset',event=>{
+  if(event?.session===videoWebSession)acceptNativeViewportEpoch(Number(event.epoch));
+});
 function scheduleNativeVideoViewport() {
   if(nativeViewportFrame || !nativeVideoEngine)return;
   nativeViewportFrame=requestAnimationFrame(reportNativeVideoViewport);
@@ -1343,9 +1355,9 @@ function reportNativeVideoViewport() {
   const visible=nativeVideoEngine && nativeAccompanimentReady && !blocked && !document.hidden
     && !document.body.classList.contains('presentation-hidden')
     && $('#page-play').classList.contains('active') && rect.width>0 && rect.height>0;
-  const payload={session:videoWebSession,generation:videoGeneration,x:Math.round(rect.x),y:Math.round(rect.y),width:Math.round(rect.width),height:Math.round(rect.height),visible};
+  const payload={session:videoWebSession,epoch:nativeViewportEpoch,generation:videoGeneration,x:Math.round(rect.x),y:Math.round(rect.y),width:Math.round(rect.width),height:Math.round(rect.height),visible};
   const key=JSON.stringify(payload);
-  if(key!==nativeViewportLast){nativeViewportLast=key;nativeEvent('nativeVideoViewport',payload);}
+  if(key!==nativeViewportLast){nativeViewportLast=key;nativeEvent('nativeVideoViewport',{...payload,revision:++nativeViewportRevision});}
 }
 new ResizeObserver(scheduleNativeVideoViewport).observe($('#native-video-surface'));
 window.addEventListener('resize',()=>{nativeViewportLast='';scheduleNativeVideoViewport();});
@@ -1364,6 +1376,7 @@ new MutationObserver(records=>{
   }
 }).observe(document.body,{childList:true});
 window.__JUCE__?.backend?.addEventListener('nativeVideoState',state=>{
+  acceptNativeViewportEpoch(Number(state?.viewportEpoch));
   // Native playback survives a web document reload. Every authoritative
   // snapshot can repair a missed one-shot videoSelected event without seeking
   // or restarting the native player, or resetting an in-flight user seek.
@@ -2857,6 +2870,7 @@ let nativePresentationVisible = true;
 window.fengyinSetPresentationVisible = visible => {
   nativePresentationVisible = !!visible;
   document.body.classList.toggle('presentation-hidden', !nativePresentationVisible);
+  if(!nativePresentationVisible)hideNativeVideoViewport();
   updateVideoPresentation();
   if (!nativePresentationVisible) { clearTimeout(visualTimer); visualTimer=null; cancelAnimationFrame(animationFrame); }
   else requestVisualFrame();

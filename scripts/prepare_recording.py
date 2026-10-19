@@ -7,6 +7,7 @@ import tempfile
 import urllib.request
 import zipfile
 import xml.etree.ElementTree as ET
+import patch_recording_capture
 
 SRL_COMMIT = '646383234187efd3854e6b1069612b80c3ab9981'  # upstream 7.0.1
 SRL_URL = f'https://codeload.github.com/sskodje/ScreenRecorderLib/zip/{SRL_COMMIT}'
@@ -49,7 +50,9 @@ def prepare(destination, srl_archive=None, ma_header=None):
     destination = Path(destination)
     marker = destination/'versions.json'
     versions = dict(screenRecorderLibCommit=SRL_COMMIT, screenRecorderLibSha256=SRL_SHA,
-                    miniaudioVersion=MA_VERSION, miniaudioSha256=MA_SHA)
+                    miniaudioVersion=MA_VERSION, miniaudioSha256=MA_SHA,
+                    localPatches=[patch_recording_capture.PATCH_ID],
+                    capturePacketHeaderSha256=hashlib.sha256(patch_recording_capture.HEADER.read_bytes()).hexdigest())
     if destination.exists() and any(destination.iterdir()):
         if not marker.exists() or json.loads(marker.read_text()) != versions:
             raise ValueError('Use an empty recording dependency directory')
@@ -77,6 +80,7 @@ def prepare(destination, srl_archive=None, ma_header=None):
         +''.join('    "${SRL_ROOT}/'+name+'"\n' for name in sources)+')\n',encoding='utf-8')
     # Source includes upstream license texts and attribution for bundled helpers.
     (destination/'licenses').mkdir(exist_ok=True)
+    patch_recording_capture.apply(root, destination/'licenses')
     shutil.copyfile(destination/'srl'/'LICENSE', destination/'licenses'/'ScreenRecorderLib-MIT.txt')
     license_text=ma.decode('utf-8').split('ALTERNATIVE 1 - Public Domain',1)[-1]
     if 'ALTERNATIVE 2 - MIT No Attribution' not in license_text: raise ValueError('miniaudio license missing')

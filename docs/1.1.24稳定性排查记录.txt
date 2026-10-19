@@ -39,3 +39,24 @@
   https://miniaud.io/docs/manual/index.html
 
 本轮271项Python测试通过（含源码约束与媒体脚本测试），日志/private/tmp/fy124-upstream-audit-python.log；这不等于本机实际执行了Windows VLC/SRL。下一步先跑短媒体流程验证当前修复，收集首帧BMP/状态/声音；不跳过196失败项，不直接整包交付。
+
+2026-10-19 11:50 官方录屏接入复核与窗口修复（候选，未交付）
+
+用户批准沿用VLC之前的页面显隐/窗口交互规则；最新要求声音阻塞优先核对录屏官方文档与代码。
+
+录屏审计使用ScreenRecorderLib 7.0.1的固定提交646383234187efd3854e6b1069612b80c3ab9981，而非其他版本示例。官方v7指南：
+https://github.com/sskodje/ScreenRecorderLib/wiki/Quickstart-guide-v7.x.x-and-newer
+已核对COM MTA、录制选项在BeginRecording之前设置、来源/选项的复制及所有权、完成事件后再析构、回调中只写原子状态、不启用画面/音频预览、单个共享EndpointLoopback/eMultimedia设备。未发现把录屏等待或磁盘写入直接放入吹奏音频回调的调用路径。EndRecording只发取消，风吟主线程不等待编码完成；录制进程内部的完成等待不能直接解释录制进行中的吹奏延迟。
+
+发现并修复的明确错误：官方WASAPICapture.cpp在AUDCLNT_BUFFERFLAGS_SILENT分支使用memset(pData,0,sizeof(pData))，64位仅清8字节，并写入Windows端点缓冲，之后复制整包；且静音标志与断续标志同时出现时原else-if会绕过静音分支。微软要求整包按静音处理，不依赖数据指针内容。本地补丁统一在自有bufferData中填满零，正常包只读取端点数据，空指针或超容量包明确返回错误并释放已获取的端点包。没有修改音量、气息、缓冲或录制格式。
+https://learn.microsoft.com/en-us/windows/win32/coreaudio/capturing-a-stream
+https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudiocaptureclient-getbuffer
+源文件原SHA c178fd0129dff6c9ba862730a2ac19d76489a111deef9d463acb73be0705ada0，补丁后805dcbaefe761fec318e045ddd95384c850d3a2fd7bc6e2ec7e2dc4c37f0b7a2。prepare脚本检查原SHA及唯一锚点，随包保留原源码、精确diff、修改后的复制头文件与哈希审计。已用实际官方源文件应用补丁，并以C++/ASan/UBSan检查空静音指针、超过8字节整包清零、正常复制、源缓冲不被改写及越界拒绝。此缺陷可导致录制错误；尚无证据认定它就是用户现场吹奏晚数秒的根因。
+
+资源和等待：官方MF_SINK_WRITER_DISABLE_THROTTLING默认关闭，写入可能因编码背压等待；保持限流，不能为掩盖阻塞而改成无限队列。硬编开关表示允许，并未验证原机实际选择的编码器。新增默认关闭的FENGYIN_RECORDING_DIAGNOSTICS=1，录制辅助进程每秒写一次timing.log；官方音频观察回调在纹理/RenderFrame之前、帧回调在之后，以无锁固定计数记录两者间耗时、帧间隔、停滞时间及补零字节。postAudioToFrame包括纹理处理和编码，不能冒充纯编码耗时；它也不包含实时乐器回调。未擅自改变低延迟编码模式、硬编、采集API或系统电源。
+
+VLC窗口：创建时直接作为主窗口WS_CHILD，交给VLC前已有正确父窗口；隐藏显式调用Win32，即使JUCE缓存为隐藏也执行。显示必须父窗口匹配、不是POPUP/TOPMOST、主窗口可见且未最小化。网页布局测量加入原生代次与有序指令：换媒体、网页重载、resize、最小化/恢复后先隐藏，必须收到本次布局的新坐标才显示；旧坐标/旧会话/旧顺序不能重新盖住页面。不在切页时重建播放器或停止伴奏。
+
+197专项已失败且取证：原始状态Paused、位置0、时长12.032、PCM0，15秒内显示/解码统计均0；实际BMP的红蓝像素也均0，确实没有首帧。不能将统计未刷新当成通过。候选改为start-paused就绪后仅请求一次官方next_frame，测试直接检查真实显示的红上蓝下像素、零预览PCM和暂停稳定性。另增加共享生产Win32子窗口辅助函数的20轮显隐命中、父子关系、非置顶、最小化恢复测试。仍须Windows实际执行。
+
+本机当前271Python、C++包复制/录制分段计数/显示代次及ASan/UBSan通过；Chrome包含切页立即隐藏、新布局测量、旧会话拒绝及原播放回归通过。日志/private/tmp/fy124-window-recording-python.log、fy124-window-recording-browser.log；实际应用原生窗口和录屏性能仍未验收，不宣称无延迟/无卡顿已解决。
