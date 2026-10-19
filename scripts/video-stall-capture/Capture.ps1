@@ -38,9 +38,9 @@ try {
     if(-not (Test-Path -LiteralPath $Wpr)){throw 'Windows Performance Recorder is unavailable; no trace was started.'}
     Add-Type -Path (Join-Path $PSScriptRoot 'WindowSnapshot.cs')
     Save-Logs 'before'
-    Write-Host 'Keep the existing FengYin if it is already unclickable. Otherwise open it normally.' -ForegroundColor Yellow
+    Write-Host 'Start this collector BEFORE reproducing. UAC/window switching can temporarily recover an existing fault.' -ForegroundColor Yellow
     Write-Host 'Press ENTER. Collecting lasts 180 seconds by default; do not return to this window during the fault.'
-    Write-Host 'Play briefly without video, select the same video, then keep playing. Do not switch windows to recover.'
+    Write-Host 'After CAPTURING: open or return to FengYin normally, play briefly, select the same video, then keep playing.'
     $null=Read-Host
     # Memory-mode CPU trace is bounded by the built-in profile buffers, unlike unbounded file mode.
     Run-Wpr '-start CPU' 'wpr-start'
