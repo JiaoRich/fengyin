@@ -1,0 +1,27 @@
+状态：诊断实现，尚未运行Windows，不是修复交付。
+用户反馈1.1.25 build200加载/视频铺满仍卡住，切换窗口或最小化恢复。
+用户禁止再次连接远程；本轮不连接ToDesk，不要求重复手工验收。
+
+已确认测试缺口
+tests/test_vlc_playback.cpp原20轮窗口显隐在播放器创建之前执行；没有WebView2。
+浏览器UI回归使用mock native bridge，没有真实Windows VLC子窗口。
+所以两套通过不证明实际组合可交互，不能再作为此次卡住的闭环证据。
+
+新增tools/vlc-webview-check
+- 相同JUCE9.0.2、WebView2 SDK1.0.3485.44、LibVLC3.0.24与生产VlcVideoSurface。
+- 实际原生窗口、真实解码和Windows SendInput点击网页按钮；20轮展开/收回、
+  每5轮重新载入，确认点击经过Win32/WebView/JS/native bridge四层。
+- immediate与deferred两种回调策略，仅诊断对照，不修改生产播放器。
+- 网页100ms/主线程20ms心跳；5秒停顿分别报告网页停顿或主线程停顿。
+  主线程停顿时记录focus/capture/active/GUI标志并尝试写线程转储。
+- 任一策略失败仍运行另一策略并保存结果；总结果仍失败，不跳过或忽略。
+- 不加载音色、用户媒体或麦克风，不改变用户音频配置，不生成完整安装包。
+- 此小场景若不能复现，仍不能宣称原机已修复；下一步复用生产网页/事件链
+  扩展，不随意改GPU/解码器/音频缓冲掩盖。
+
+依据
+https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/threading-model
+WebView2回调串行，嵌套消息循环/同步模态UI重入不受支持，建议回调完成后排队。
+当前viewport回调直接做原生window显隐/布局；这是待证风险，不是已证实根因。
+https://forum.juce.com/t/need-help-troubleshooting-gui-freeze-when-using-webview2/54807
+旧JUCE版本有相似“其他应用覆盖后恢复”报告，但无确认解决方案，不能直接套用。

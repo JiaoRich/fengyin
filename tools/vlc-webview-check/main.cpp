@@ -1,0 +1,129 @@
+// Diagnostic only: real WebView2 + production VLC surface/engine. No instrument,
+// microphone, user settings, recording, or customer's media is opened.
+#define NOMINMAX
+#include <juce_gui_extra/juce_gui_extra.h>
+#include <windows.h>
+#include <dbghelp.h>
+#include "VlcVideoSurface.h"
+#include <atomic>
+#include <chrono>
+#include <iostream>
+#include <thread>
+
+static uint64_t now() { return GetTickCount64(); }
+static constexpr auto html=R"HTML(<!doctype html><meta charset="utf-8">
+<style>body{margin:0;background:#123;color:white;font:18px sans-serif}header{height:60px}
+button{height:45px;width:130px}#surface{position:fixed;left:20px;top:70px;width:480px;height:270px}
+body.expanded #surface{left:10px;top:60px;width:calc(100vw - 20px);height:calc(100vh - 140px)}</style>
+<header><button id="expand">Expand</button><button id="check">Check input</button></header>
+<div id="surface"></div><script>
+const send=(name,payload)=>window.__JUCE__.backend.emitEvent(name,payload);
+let count=0;function report(){let r=document.querySelector('#surface').getBoundingClientRect();
+send('viewport',{x:r.x,y:r.y,width:r.width,height:r.height,visible:true});}
+document.querySelector('#expand').onclick=()=>{send('viewport',{visible:false});
+document.body.classList.toggle('expanded');requestAnimationFrame(()=>{report();send('expanded',{});});};
+document.querySelector('#check').onclick=()=>send('clicked',{count:++count});
+setInterval(()=>send('heartbeat',{}),100);window.addEventListener('resize',report);
+send('ready',{});report();</script>)HTML";
+
+struct Scene final:juce::Component,juce::Timer {
+    fengyin::VlcVideoSurface surface;
+    std::unique_ptr<juce::WebBrowserComponent> web;
+    juce::File fixture;
+    bool deferred=false,ready=false,expandedAck=false,failed=false;
+    int clickAck=0,cycle=0,phase=0,generation=0;
+    uint64_t deadline=0;
+    std::atomic<uint64_t> ui{now()},javascript{now()};
+    explicit Scene(juce::File input,bool post):fixture(input),deferred(post) {
+        auto options=juce::WebBrowserComponent::Options{}
+          .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
+          .withWinWebView2Options(juce::WebBrowserComponent::Options::WinWebView2{}
+            .withUserDataFolder(juce::File::getSpecialLocation(juce::File::tempDirectory)
+              .getChildFile("fy-vlc-webview-"+juce::Uuid().toString())))
+          .withNativeIntegrationEnabled()
+          .withResourceProvider([](const juce::String&)->std::optional<juce::WebBrowserComponent::Resource>{
+              const std::string source=html;std::vector<std::byte> bytes(source.size());
+              std::memcpy(bytes.data(),source.data(),source.size());
+              return juce::WebBrowserComponent::Resource{std::move(bytes),"text/html"};})
+          .withEventListener("heartbeat",[this](juce::var){javascript.store(now());})
+          .withEventListener("ready",[this](juce::var){ready=true;std::cout<<"web ready\n"<<std::flush;})
+          .withEventListener("expanded",[this](juce::var){expandedAck=true;})
+          .withEventListener("clicked",[this](juce::var p){clickAck=int(p.getProperty("count",0));})
+          .withEventListener("viewport",[this](juce::var p){
+              const auto apply=[safe=juce::Component::SafePointer<Scene>(this),p]{if(safe){
+                  const juce::Rectangle<int> bounds(int(p.getProperty("x",0)),int(p.getProperty("y",0)),
+                    int(p.getProperty("width",0)),int(p.getProperty("height",0)));
+                  safe->surface.updateViewport(bounds,bool(p.getProperty("visible",false)));}};
+              if(deferred)juce::MessageManager::callAsync(apply);else apply();});
+        web=std::make_unique<juce::WebBrowserComponent>(options);
+        addAndMakeVisible(*web);addChildComponent(surface);
+        setSize(900,650);addToDesktop(juce::ComponentPeer::windowHasTitleBar);
+        setTopLeftPosition(80,80);setVisible(true);toFront(true);
+        web->setBounds(getLocalBounds());
+        web->goToURL(juce::WebBrowserComponent::getResourceProviderRoot());
+        deadline=now()+30000;startTimer(20);
+    }
+    ~Scene()override{stopTimer();surface.shutdown();web.reset();}
+    void click(int x) {
+        auto* peer=getPeer();const auto scale=peer->getPlatformScaleFactor();
+        POINT p{juce::roundToInt(x*scale),juce::roundToInt(25*scale)};
+        ClientToScreen(static_cast<HWND>(peer->getNativeHandle()),&p);
+        const auto hit=WindowFromPoint(p);
+        wchar_t cls[128]{};GetClassNameW(hit,cls,128);
+        std::cout<<"input cycle="<<cycle<<" phase="<<phase<<" hit="<<juce::String(cls)
+          <<" foreground="<<GetForegroundWindow()<<" focus="<<GetFocus()<<std::endl;
+        SetCursorPos(p.x,p.y);INPUT inputs[2]{};
+        inputs[0].type=inputs[1].type=INPUT_MOUSE;
+        inputs[0].mi.dwFlags=MOUSEEVENTF_LEFTDOWN;inputs[1].mi.dwFlags=MOUSEEVENTF_LEFTUP;
+        if(SendInput(2,inputs,sizeof(INPUT))!=2){failed=true;std::cerr<<"SendInput failed\n";}
+    }
+    void timerCallback()override {
+        ui.store(now());
+        if(now()>deadline){failed=true;stopTimer();std::cerr<<"FAIL stage timeout phase="<<phase<<std::endl;return;}
+        if(phase==0&&ready){
+            if(!surface.initialise()){failed=true;stopTimer();return;}
+            surface.player()->load(fixture.getFullPathName().toStdString(),++generation);
+            phase=1;deadline=now()+30000;
+        } else if(phase==1&&surface.getState().ready){
+            web->evaluateJavascript("report()");
+            surface.player()->setPlaying(true);phase=2;deadline=now()+10000;
+        } else if(phase==2&&surface.getState().displayedVideo>0){
+            expandedAck=false;phase=3;deadline=now()+5000;click(60);
+        } else if(phase==3&&expandedAck){
+            phase=4;deadline=now()+5000;click(195);
+        } else if(phase==4&&clickAck>cycle){
+            std::cout<<"PASS physical click cycle="<<cycle<<" frames="<<surface.getState().displayedVideo
+              <<" nonzeroPCM="<<surface.player()->testPcmNonzero.load()<<std::endl;
+            if(++cycle==20){stopTimer();return;}
+            if(cycle%5==0){surface.player()->load(fixture.getFullPathName().toStdString(),++generation);phase=1;deadline=now()+30000;}
+            else {phase=2;deadline=now()+10000;}
+        }
+    }
+};
+
+int main(int argc,char** argv) {
+    if(argc!=3){std::cerr<<"fixture.mp4 immediate|deferred\n";return 2;}
+    juce::ScopedJuceInitialiser_GUI init;
+    const auto fixture=juce::File(juce::String::fromUTF8(argv[1]));
+    if(!fixture.existsAsFile())return 2;
+    Scene scene(fixture,juce::String(argv[2])=="deferred");
+    const DWORD uiThread=GetCurrentThreadId();std::atomic<bool> done{false};
+    std::thread watchdog([&]{while(!done.load()){
+        if(now()-scene.ui.load()>5000){
+            GUITHREADINFO info{sizeof(info)};GetGUIThreadInfo(uiThread,&info);
+            std::cerr<<"FAIL native heartbeat stalled focus="<<info.hwndFocus<<" capture="<<info.hwndCapture
+              <<" active="<<info.hwndActive<<" flags="<<info.flags<<std::endl;
+            auto dump=CreateFileW(L"native-ui-stall.dmp",GENERIC_WRITE,0,nullptr,CREATE_NEW,0,nullptr);
+            if(dump!=INVALID_HANDLE_VALUE){MiniDumpWriteDump(GetCurrentProcess(),GetCurrentProcessId(),dump,MiniDumpNormal,nullptr,nullptr,nullptr);CloseHandle(dump);}
+            ExitProcess(3);
+        }Sleep(200);
+    }});
+    while(!scene.failed&&scene.cycle<20){
+        juce::MessageManager::getInstance()->runDispatchLoopUntil(25);
+        if(scene.ready&&now()-scene.javascript.load()>5000){
+            std::cerr<<"FAIL web heartbeat stalled while native UI pumps\n";scene.failed=true;
+        }
+    }
+    done.store(true);watchdog.join();
+    return scene.failed?1:0;
+}
