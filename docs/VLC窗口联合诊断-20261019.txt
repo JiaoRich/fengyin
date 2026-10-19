@@ -1,4 +1,19 @@
-状态：诊断实现，尚未运行Windows，不是修复交付。
+状态：202完成实际对照，生产顺序修复待同场景复验，不是修复交付。
+202 run39250844525，remote eb990bdaf1093a86d26f07e01d1e9056864ab13d。
+已下载证据/private/tmp/fy-vlc-webview202/evidence/results.json及四组run.log。
+- immediate：退出1，0次点击，网页心跳停顿但原生UI仍泵消息。
+- deferred：退出1，0次点击；WindowFromPoint命中Chrome_RenderWidgetHostHWND，
+  点击后没有展开响应，phase3超时。单纯回调排队不解决。
+- attached-immediate、attached-deferred：均退出0、20次真实点击确认、非零PCM。
+- 差异是启动VLC前使JUCE HWNDComponent完成初始peer关联。原实现隐藏时setHWND
+  不会让Pimpl记录currentPeer；首次显示会removeFromParent再addToParent，此时
+  VLC已创建渲染子窗口。原代码“先挂接后启动”的注释并未保证JUCE层真正挂接。
+- 生产修复：创建HWND后暂置JUCE组件可见以初始化Pimpl，再立即恢复原隐藏标志，
+  验证HWND父子关系后才启动VLC。整个过程不泵消息/不插入用户事件；不改解码、
+  音量、缓冲、音色或强制切换前台。需在默认隐藏场景再通过相同联合测试。
+- 此结果在Windows runner证明一项可复现的窗口输入缺陷；尚无原用户电脑修复后
+  验收，不扩展声称所有视频/全屏/长期运行均已解决。
+
 201首轮未进入运行：独立目标用add_executable而未设置JUCE_NEEDS_WEBVIEW2，
 导致WebView2.h未加入搜索路径。已改用JUCE正式juce_add_console_app和
 NEEDS_WEBVIEW2 TRUE，输出目录保持原约定；不能将201失败称为故障复现。
