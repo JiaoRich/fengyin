@@ -25,4 +25,4 @@ add_executable(FengYinVlcTests "${FENGYIN_PROJECT_ROOT}/tests/test_vlc_playback.
 target_include_directories(FengYinVlcTests PRIVATE "${FENGYIN_PROJECT_ROOT}/native/Source" "${FENGYIN_VLC_ROOT}/sdk/include")
 target_compile_definitions(FengYinVlcTests PRIVATE FENGYIN_VLC_TEST_PCM=1)
 target_compile_options(FengYinVlcTests PRIVATE /utf-8)
-target_link_libraries(FengYinVlcTests PRIVATE user32)
+target_link_libraries(FengYinVlcTests PRIVATE user32 gdi32)

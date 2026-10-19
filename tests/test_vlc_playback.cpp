@@ -9,6 +9,53 @@
 #include <algorithm>
 #include <fstream>
 
+// Evidence only: capture this test's client area, never the whole desktop.
+// VLC 3 input statistics are periodically copied while demuxing; a paused
+// picture and a zero statistics counter are not sufficient to distinguish
+// an actual blank surface from a stale counter. Keep the existing assertion
+// until the pixels and raw state establish which case occurred.
+void savePreviewEvidence(HWND window,const std::filesystem::path& path) {
+    RECT bounds{}; POINT origin{};
+    if(!GetClientRect(window,&bounds) || !ClientToScreen(window,&origin))return;
+    const int width=bounds.right,height=bounds.bottom;
+    if(width<=0 || height<=0)return;
+    BITMAPINFO info{};
+    info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);
+    info.bmiHeader.biWidth=width;info.bmiHeader.biHeight=-height;
+    info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;
+    info.bmiHeader.biCompression=BI_RGB;
+    const auto screen=GetDC(nullptr);if(!screen)return;
+    const auto dc=CreateCompatibleDC(screen);
+    void* data=nullptr;
+    const auto bitmap=CreateDIBSection(screen,&info,DIB_RGB_COLORS,&data,nullptr,0);
+    if(!dc || !bitmap || !data) {
+        if(bitmap)DeleteObject(bitmap);if(dc)DeleteDC(dc);ReleaseDC(nullptr,screen);
+        std::cout<<"PREVIEW capture unavailable\n";return;
+    }
+    const auto previous=SelectObject(dc,bitmap);
+    const bool captured=BitBlt(dc,0,0,width,height,screen,origin.x,origin.y,SRCCOPY|CAPTUREBLT)!=0;
+    GdiFlush();
+    if(captured) {
+        const auto bytes=static_cast<DWORD>(width*height*4);
+        BITMAPFILEHEADER header{};header.bfType=0x4d42;
+        header.bfOffBits=sizeof(header)+sizeof(BITMAPINFOHEADER);header.bfSize=header.bfOffBits+bytes;
+        std::ofstream file(path,std::ios::binary);
+        file.write(reinterpret_cast<const char*>(&header),sizeof(header));
+        file.write(reinterpret_cast<const char*>(&info.bmiHeader),sizeof(BITMAPINFOHEADER));
+        file.write(static_cast<const char*>(data),bytes);
+        const auto* pixels=static_cast<const unsigned char*>(data);
+        unsigned red=0,blue=0;
+        for(int y=0;y<height;++y)for(int x=0;x<width;++x) {
+            const auto* p=pixels+(y*width+x)*4;
+            if(y<height/2 && p[2]>150 && p[1]<100 && p[0]<100)++red;
+            if(y>=height/2 && p[0]>150 && p[1]<100 && p[2]<100)++blue;
+        }
+        std::cout<<"PREVIEW pixels width="<<width<<" height="<<height
+                 <<" redTop="<<red<<" blueBottom="<<blue<<" fileWritten="<<bool(file)<<"\n";
+    } else std::cout<<"PREVIEW capture failed win32="<<GetLastError()<<"\n";
+    SelectObject(dc,previous);DeleteObject(bitmap);DeleteDC(dc);ReleaseDC(nullptr,screen);
+}
+
 using fengyin::VlcPlaybackEngine;
 void pump() { MSG m{}; while(PeekMessageW(&m,nullptr,0,0,PM_REMOVE)){TranslateMessage(&m);DispatchMessageW(&m);} Sleep(5); }
 void waitFor(const std::function<bool()>& predicate,int milliseconds,const char* label) {
@@ -25,7 +72,7 @@ struct Shutdown {
 int wmain(int argc,wchar_t** argv) {
     if(argc!=3){std::cerr<<"Expected runtime directory and a 12-second H264/AAC fixture\n";return 2;}
     HWND window=CreateWindowExW(0,L"STATIC",L"FengYin VLC playback integration",
-        WS_OVERLAPPEDWINDOW|WS_VISIBLE|SS_BLACKRECT,30,30,640,400,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
+        WS_OVERLAPPEDWINDOW|WS_VISIBLE|WS_CLIPCHILDREN|SS_BLACKRECT,30,30,640,400,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
     if(!window)return 2;
     int code=0;
     try {
@@ -39,7 +86,22 @@ int wmain(int argc,wchar_t** argv) {
         std::string file(reinterpret_cast<const char*>(bytes.data()),bytes.size());
         std::replace(file.begin(),file.end(),'\\','/');
         p.load(file,1);
-        waitFor([&]{auto s=p.getState();if(!s.error.empty())throw std::runtime_error(s.error);return s.ready && s.duration>10 && s.displayedVideo>0;},15000,"paused first frame not ready");
+        auto lastPreviewLog=GetTickCount64();
+        auto previewState=[&]{const auto s=p.getState();
+            std::cout<<"PREVIEW rawState="<<p.testPlaybackState.load()<<" ready="<<s.ready
+                     <<" playing="<<s.playing<<" position="<<s.position<<" duration="<<s.duration
+                     <<" decoded="<<s.decodedVideo<<" displayed="<<s.displayedVideo
+                     <<" pcmSamples="<<p.testPcmSamples.load()<<" error="<<s.error<<std::endl;};
+        try {
+            waitFor([&]{auto s=p.getState();
+                if(GetTickCount64()-lastPreviewLog>=1000){lastPreviewLog=GetTickCount64();previewState();}
+                if(!s.error.empty())throw std::runtime_error(s.error);
+                return s.ready && s.duration>10 && s.displayedVideo>0;
+            },15000,"paused first frame not ready");
+        } catch(...) {
+            previewState();savePreviewEvidence(window,fixture.parent_path()/L"vlc-first-frame-failed.bmp");throw;
+        }
+        previewState();savePreviewEvidence(window,fixture.parent_path()/L"vlc-first-frame.bmp");
         const auto idleEnd=GetTickCount64()+700;while(GetTickCount64()<idleEnd)pump();
         if(p.getState().playing || p.getState().position>.15 || p.testPcmSamples>0)
             throw std::runtime_error("First-frame preview advanced playback or emitted audio");

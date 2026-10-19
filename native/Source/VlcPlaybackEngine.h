@@ -35,6 +35,7 @@ public:
     bool hasStopped() const noexcept { return stopped.load(); }
 #if defined(FENGYIN_VLC_TEST_PCM)
     std::atomic<uint64_t> testPcmSamples{0},testPcmNonzero{0};
+    std::atomic<int> testPlaybackState{-1};
 #endif
 private:
     struct Request

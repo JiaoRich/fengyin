@@ -76,7 +76,7 @@ struct VlcApi
  X(libvlc_media_player_new) X(libvlc_media_player_release) \
  X(libvlc_media_player_set_media) X(libvlc_media_player_set_hwnd) \
  X(libvlc_media_player_play) X(libvlc_media_player_set_pause) X(libvlc_media_player_stop) \
- X(libvlc_media_player_get_state) X(libvlc_media_player_get_time) X(libvlc_media_player_get_length) \
+ X(libvlc_media_player_get_state) X(libvlc_media_player_can_pause) X(libvlc_media_player_get_time) X(libvlc_media_player_get_length) \
  X(libvlc_media_player_set_time) X(libvlc_audio_set_volume) \
  X(libvlc_video_set_mouse_input) X(libvlc_video_set_key_input) \
  X(libvlc_media_player_event_manager) X(libvlc_event_attach) X(libvlc_event_detach)
@@ -238,14 +238,21 @@ void VlcPlaybackEngine::run()
                         else api.libvlc_media_player_set_pause(player,0);
                         if(!started) playbackError="视频无法播放，请检查文件是否完整";
                     }
-                    else if(started) api.libvlc_media_player_set_pause(player,1);
+                    // Do not pause an Opening input here. In VLC 3.0.24,
+                    // set_pause(1) calls input_Stop when can-pause is still
+                    // false during initialisation. start-paused owns preview;
+                    // explicit user pauses are applied below once safe.
                 }
                 playbackState=api.libvlc_media_player_get_state(player);
+#if defined(FENGYIN_VLC_TEST_PCM)
+                testPlaybackState.store(static_cast<int>(playbackState));
+#endif
                 // start-paused is applied asynchronously by the input thread,
                 // including EOF replay. Resume only for explicit user intent.
                 if(next.playing && playbackState==libvlc_Paused)
                     api.libvlc_media_player_set_pause(player,0);
-                if(!next.playing && playbackState==libvlc_Playing)
+                if(!next.playing && playbackState==libvlc_Playing
+                    && api.libvlc_media_player_can_pause(player))
                     api.libvlc_media_player_set_pause(player,1);
                 if(pendingSeek>=0 && (playbackState==libvlc_Playing || playbackState==libvlc_Paused))
                 { api.libvlc_media_player_set_time(player,static_cast<int64_t>(pendingSeek*1000)); pendingSeek=-1; }

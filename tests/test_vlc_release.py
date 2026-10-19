@@ -60,4 +60,20 @@ class VlcReleaseTests(unittest.TestCase):
         self.assertEqual(len(prepare_vlc.SHA256),64)
         self.assertIn('sourceSha256',(ROOT/'scripts/prepare_vlc.py').read_text(encoding="utf-8"))
 
+    def test_preview_does_not_pause_an_opening_vlc_input(self):
+        player=(ROOT/'native/Source/VlcPlaybackEngine.cpp').read_text(encoding='utf-8')
+        # VLC 3.0.24 set_pause(1) stops an input when can-pause is false.
+        # This source guard supplements, not replaces, the Windows lifecycle
+        # test's actual first picture / zero preview audio assertions.
+        self.assertNotIn('else if(started) api.libvlc_media_player_set_pause(player,1)',player)
+        guarded='''if(!next.playing && playbackState==libvlc_Playing
+                    && api.libvlc_media_player_can_pause(player))
+                    api.libvlc_media_player_set_pause(player,1);'''
+        self.assertIn(guarded,player)
+        self.assertEqual(player.count('api.libvlc_media_player_set_pause(player,1);'),1)
+        test=(ROOT/'tests/test_vlc_playback.cpp').read_text(encoding='utf-8')
+        self.assertIn('WS_CLIPCHILDREN',test)
+        self.assertIn('First-frame preview advanced playback or emitted audio',test)
+        self.assertIn('vlc-first-frame-failed.bmp',test)
+
 if __name__=='__main__':unittest.main()

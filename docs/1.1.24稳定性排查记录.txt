@@ -11,3 +11,31 @@
 原电脑：安装版本1.1.23，启动BUILD revision=6478185ed975与195匹配。2026-10-19 02:14重新启动原版，未选音色，加载桌面0035.可可托海的牧羊人 降E.mp4后显示灰屏/05:43。远程点击存在延后，声音设置页最终能切换，需区分远程传输与应用响应。未发现本次对应Windows错误事件；旧10/17 QinEngineV3 3.11异常和10/16旧watchdog事件不得混为此次闪退。
 
 尚未闭环：真实灰屏/切页输入卡死的完整触发链；MIDI到声音数秒延迟；录屏额外成本；闪退调用栈。CPU界面显示的是音频处理平均负荷，不能排除回调外等待或GPU/调度问题。不能用CI通过或单独媒体测试宣称整体已正常。
+
+2026-10-19 官方接入审计（用户要求先查官方文档与开发者经验）
+
+先纠正现场表述：用户已经确认点击无反应属于风吟本身，不是远程传输卡顿；不能继续以ToDesk解释应用故障。本轮不占鼠标，不更改音色、缓冲、设备路由或电源。
+
+一、已确认并修正的接入错误
+- 待发布的首帧方案在libvlc_media_player_play后，只判断started就立即set_pause(1)。VLC 3.0.24该函数在can-pause为false时调用input_Stop，而打开阶段能力尚可能未就绪。现删除这次提前暂停，让start-paused负责首次缓冲；用户暂停只在Playing且can_pause时执行。此为待发布候选自身错误，不把它反推为195版所有问题的根因。
+  官方对应版本源码：https://github.com/videolan/vlc/blob/3.0.24/lib/media_player.c#L1022-L1043
+- 官方set_hwnd要求WS_CLIPCHILDREN。正式视频容器已有，独立Windows测试窗口漏设，现补齐，避免测试父窗口刷掉子画面。
+  https://github.com/videolan/vlc/blob/3.0.24/include/vlc/libvlc_media_player.h#L554-L567
+- 原196专项诊断实际失败在paused first frame not ready，其他16项媒体检查通过。失败产物SHA已核验，保存/private/tmp/fy124-media196。不能把它当安装包或通过。保留原首帧断言，并新增原始播放状态、PCM数量和测试窗口BMP留证，分清真正灰屏与暂停时统计未刷新；没有放宽通过条件。
+
+二、官方经验核对后没有盲改的项目
+- VLC官方Best practices：一个LibVLC实例；事件回调里不要重入VLC。现有单实例/单命令工作线程，错误回调仅置原子标记，符合此约定；没有证据将这一类死锁套到风吟。
+  https://docs.videolan.me/libvlcsharp/docs/best_practices.html
+- VLC Stop为同步操作。现有停止在工作线程，窗口释放会泵送同步Win32消息，但退出等待仍无总超时，需专项验证，不能宣称UI完全隔离。Windows原生视频和网页属于不同窗口层，CSS z-index不能替代原生隐藏；先前会话恢复/立即隐藏修复仍须实际WebView2验证。
+  https://docs.videolan.me/libvlcsharp/api/LibVLCSharp.Shared.MediaPlayer.html#LibVLCSharp_Shared_MediaPlayer_Stop
+  https://docs.videolan.me/libvlcsharp/docs/getting_started.html
+- ScreenRecorderLib #223有播放声音中断/恢复后录制卡死记录；尝试关硬编、换采集API都未在该报告中立即解决，不将这些猜测当修复方案。
+  https://github.com/sskodje/ScreenRecorderLib/issues/223
+- #374涉及无音频数据时录制停滞；维护者给出的6463832提交恰好就是风吟锁定的7.0.1源码，因此已经包含，不重复加补丁。后续仍有人报告GPU队列停滞，关闭限流仅掩盖为内存增长，未获通用修复；风吟保持限流，不改驱动，不先关硬编。
+  https://github.com/sskodje/ScreenRecorderLib/issues/374
+- 硬编enabled仅为允许硬编，不证明目标机实际使用；SRL通过MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS配置。后续需记录实际编码器及阻塞位置，不能凭设置名宣称GPU编码已生效。固定帧率比可变帧率耗资源，但当前24fps交付目标不擅自变更。
+  https://github.com/sskodje/ScreenRecorderLib/blob/646383234187efd3854e6b1069612b80c3ab9981/ScreenRecorderLibNative/OutputManager.cpp
+- miniaudio官方禁止回调内启停/销毁设备。现有回调只写预分配环形缓冲，磁盘写入和设备释放在外部，未发现该违规。历史loopback死锁修复不能未核版本就套用。录音/录屏独立辅助进程不等于CPU/GPU/音频设备资源完全隔离。
+  https://miniaud.io/docs/manual/index.html
+
+本轮271项Python测试通过（含源码约束与媒体脚本测试），日志/private/tmp/fy124-upstream-audit-python.log；这不等于本机实际执行了Windows VLC/SRL。下一步先跑短媒体流程验证当前修复，收集首帧BMP/状态/声音；不跳过196失败项，不直接整包交付。
