@@ -10,6 +10,7 @@ public:
     VlcVideoSurface() { setInterceptsMouseClicks(false,false);setWantsKeyboardFocus(false); }
     ~VlcVideoSurface() override;
     bool initialise();
+    void setWebViewCompanion(juce::Component* browser) { webViewCompanion=browser; }
     void shutdown();
     void updateViewport(juce::Rectangle<int>, bool visible);
     VlcPlaybackEngine* player() noexcept { return engine.get(); }
@@ -24,6 +25,7 @@ public:
     }
 private:
     void* nativeWindow=nullptr;
+    juce::Component::SafePointer<juce::Component> webViewCompanion;
     std::unique_ptr<VlcPlaybackEngine> engine;
 };
 }

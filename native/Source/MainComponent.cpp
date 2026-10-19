@@ -899,6 +899,7 @@ void MainComponent::setupWebInterface()
         .withResourceProvider([](const juce::String& path) { return getWebResource(path); });
 
     webInterface = std::make_unique<juce::WebBrowserComponent>(options);
+    vlcVideo.setWebViewCompanion(webInterface.get());
     addAndMakeVisible(*webInterface);
     // The component may have received its first resized() callback before the browser existed.
     // Give WebView2 a real viewport immediately so the legacy native UI never appears at startup.

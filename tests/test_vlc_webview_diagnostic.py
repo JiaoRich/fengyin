@@ -91,10 +91,13 @@ class VlcWebViewDiagnostic(unittest.TestCase):
         self.assertNotIn('SetParent(',source)
         viewport=source.split('void VlcVideoSurface::updateViewport',1)[1]
         self.assertNotIn('setVisible(',viewport)
-        self.assertIn('setVlcChildVisible(hwnd,parent,show && isShowing())',viewport)
+        self.assertIn('setVlcChildVisible(hwnd,parent,canShow)',viewport)
+        self.assertIn('clipWebViewForVideo(*webViewCompanion,hwnd,canShow)',viewport)
+        self.assertIn('canShow=false',viewport)
         self.assertIn('if(!bounds.isEmpty()',viewport)
         main=(ROOT/'native/Source/MainComponent.cpp').read_text(encoding='utf-8')
         self.assertIn('addAndMakeVisible(vlcVideo)',main)
+        self.assertIn('vlcVideo.setWebViewCompanion(webInterface.get())',main)
 
     def test_combined_input_is_required_release_gate(self):
         cmake=(ROOT/'CMakeLists.txt').read_text(encoding='utf-8')

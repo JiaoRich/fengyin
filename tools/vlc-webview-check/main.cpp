@@ -138,6 +138,12 @@ struct Scene final:juce::Component,juce::Timer {
         // The owned fixture is red; a blank HWND or the blue web page cannot pass.
         return colour!=CLR_INVALID&&GetRValue(colour)>150&&GetGValue(colour)<100&&GetBValue(colour)<100;
     }
+    bool webFirstPaintVisible() const {
+        POINT p{700,450};ClientToScreen(static_cast<HWND>(getPeer()->getNativeHandle()),&p);
+        const auto dc=GetDC(nullptr);if(!dc)return false;
+        const auto rgb=GetPixel(dc,p.x,p.y);ReleaseDC(nullptr,dc);
+        return rgb!=CLR_INVALID&&GetRValue(rgb)==17&&GetGValue(rgb)==34&&GetBValue(rgb)==51;
+    }
     void click(int x) {
         auto* peer=getPeer();const auto scale=peer->getPlatformScaleFactor();
         POINT p{juce::roundToInt(x*scale),juce::roundToInt(25*scale)};
@@ -165,7 +171,7 @@ struct Scene final:juce::Component,juce::Timer {
         if(now()>deadline){failed=true;std::cerr<<"FAIL stage timeout phase="<<phase<<std::endl;
             captureFailure();dumpProcess(L"stage-timeout.dmp");finish();return;}
         if(phase==0&&ready){
-            if(webOnly){phase=2;deadline=now()+10000;return;}
+            if(webOnly){if(!webFirstPaintVisible())return;std::cout<<"PASS real web first paint"<<std::endl;phase=2;deadline=now()+10000;return;}
             // Test the discovered attachment ordering independently of callback
             // deferral. Production initialise() itself is not changed here.
             if(attachBeforePlayer)surface.setVisible(true);

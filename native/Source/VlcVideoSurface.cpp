@@ -1,5 +1,6 @@
 #include "VlcVideoSurface.h"
 #include "VlcNativeWindow.h"
+#include "VlcWebViewClipping.h"
 #if JUCE_WINDOWS
 #include <windows.h>
 #endif
@@ -16,6 +17,7 @@ bool VlcVideoSurface::initialise()
     // WebView2 event. The video HWND remains a stable child for its lifetime;
     // only explicit Win32 viewport operations show/hide it, never SetParent.
     const auto parent=getPeer()?static_cast<HWND>(getPeer()->getNativeHandle()):nullptr;
+    if(webViewCompanion && !nativeWebViewHost(*webViewCompanion,parent))return false;
     setVisible(true);
     if(!isShowing())return false;
     auto hwnd=createVlcChildWindow(parent);
@@ -35,6 +37,9 @@ bool VlcVideoSurface::initialise()
 }
 void VlcVideoSurface::shutdown()
 {
+#if JUCE_WINDOWS
+    if(webViewCompanion)clipWebViewForVideo(*webViewCompanion,static_cast<HWND>(nativeWindow),false);
+#endif
     if(!engine)return;
     engine->requestShutdown();
 #if JUCE_WINDOWS
@@ -70,7 +75,12 @@ void VlcVideoSurface::updateViewport(juce::Rectangle<int> bounds,bool visible)
             SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOOWNERZORDER);
         if(oldContext)SetThreadDpiAwarenessContext(oldContext);
     }
-    setVlcChildVisible(hwnd,parent,show && isShowing());
+    bool canShow=show && isShowing();
+    if(webViewCompanion && !clipWebViewForVideo(*webViewCompanion,hwnd,canShow) && canShow) {
+        canShow=false;
+        juce::Logger::writeToLog("VLC/WebView region separation failed; video kept hidden to protect controls");
+    }
+    setVlcChildVisible(hwnd,parent,canShow);
 #endif
 }
 }

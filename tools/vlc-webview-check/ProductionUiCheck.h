@@ -48,10 +48,6 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
                 if(p["session"].toString()!=session||(bool(p["visible"])&&int(p["generation"])!=generation))return;
                 std::cout<<"production viewport enter "<<juce::JSON::toString(p,true)<<std::endl;
                 surface.updateViewport({int(p["x"]),int(p["y"]),int(p["width"]),int(p["height"])},bool(p["visible"]));
-                if(juce::SystemStats::getEnvironmentVariable("FENGYIN_DIAGNOSTIC_CLIP_WEBVIEW",{})=="1") {
-                    const bool ok=fengyin::clipWebViewForVideo(*web,static_cast<HWND>(surface.getHWND()),bool(p["visible"]));
-                    std::cout<<"WebView hole clip="<<ok<<std::endl;if(!ok)failed=true;
-                }
                 std::cout<<"production viewport returned"<<std::endl;
             })
             .withEventListener("setVideoPlaybackState",[this](juce::var p){
@@ -60,12 +56,14 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
             .withEventListener("setVideoVolume",[this](juce::var p){if(!webOnly)surface.player()->setVolume(float(p["value"]));++volumeCommands;})
             .withEventListener("seekVideo",[this](juce::var p){if(!webOnly)surface.player()->seek(double(p["position"]),int(p["seekRevision"]));});
         web=std::make_unique<juce::WebBrowserComponent>(options);
+        if(!webOnly&&juce::SystemStats::getEnvironmentVariable("FENGYIN_DIAGNOSTIC_LEGACY_OVERLAP",{})!="1")
+            surface.setWebViewCompanion(web.get());
         addAndMakeVisible(*web);addAndMakeVisible(surface);
         const auto* display=juce::Desktop::getInstance().getDisplays().getPrimaryDisplay();
         const auto bounds=display?display->userArea.reduced(8):juce::Rectangle<int>(0,0,1200,760);
         setBounds(bounds);addToDesktop(0);
         if(!fengyin::configureVideoHostRendering(getPeer()))failed=true;
-        if(!InitializeTouchInjection(1,TOUCH_FEEDBACK_NONE))failed=true;
+        if(!InitializeTouchInjection(10,TOUCH_FEEDBACK_NONE))failed=true;
         setVisible(true);toFront(true);web->setBounds(getLocalBounds());
         std::cout<<"production frontend="<<FENGYIN_DIAGNOSTIC_FRONTEND<<" viewport="<<getWidth()<<"x"<<getHeight()<<std::endl;
         if(webOnly)std::cout<<"CONTROL ONLY: no native HWND, decoder, first-picture or PCM acceptance"<<std::endl;
@@ -117,7 +115,7 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
     }
     bool injectTouch(POINTER_FLAGS flags) {
         POINTER_TOUCH_INFO contact{};
-        contact.pointerInfo.pointerType=PT_TOUCH;contact.pointerInfo.pointerId=1;
+        contact.pointerInfo.pointerType=PT_TOUCH;contact.pointerInfo.pointerId=0;
         contact.pointerInfo.ptPixelLocation=touchPoint;contact.pointerInfo.pointerFlags=flags;
         contact.touchMask=TOUCH_MASK_CONTACTAREA|TOUCH_MASK_ORIENTATION|TOUCH_MASK_PRESSURE;
         contact.orientation=90;contact.pressure=512;
