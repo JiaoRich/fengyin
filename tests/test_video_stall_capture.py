@@ -35,7 +35,7 @@ class VideoStallCapture(unittest.TestCase):
         self.assertNotIn('CommandLine', source)
 
     def test_actual_windows_smoke_is_required(self):
-        workflow = (ROOT / '.github/workflows/video-stall-collector.yml').read_text(encoding='utf-8')
+        workflow = (ROOT / '.github/workflows/windows-build.yml').read_text(encoding='utf-8')
         self.assertIn('windows-2022', workflow)
         self.assertIn('./scripts/video-stall-capture/Test.ps1', workflow)
         self.assertIn('if: success()', workflow)

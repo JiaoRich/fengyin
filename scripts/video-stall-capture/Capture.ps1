@@ -81,6 +81,9 @@ try {
         Start-Sleep -Seconds 2
     }
     Run-Wpr '-status collectors -details' 'wpr-status'
+    if(-not (Test-Path -LiteralPath (Join-Path $Out 'windows.jsonl'))) {
+        throw 'No FengYin window snapshots were captured; this is not a successful diagnostic run.'
+    }
 } catch {
     $CaptureError=$_.Exception.Message
     $CaptureError | Set-Content -LiteralPath (Join-Path $Out 'capture-error.txt') -Encoding UTF8
