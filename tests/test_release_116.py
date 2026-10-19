@@ -18,9 +18,12 @@ class Release116(unittest.TestCase):
             if key not in ['instrumentKey','instrumentChineseName','name']:self.assertEqual(value,new.get(key))
     def test_visibility_gate_does_not_stop_business_timer(self):
         main=(ROOT/'native/Source/MainComponent.cpp').read_text(encoding='utf-8')
-        gate=main.index('if (webPresentationVisible &&')
-        self.assertGreater(main.index('masterOutput.getSpectrum',gate),gate)
-        self.assertLess(main.index('// Automatic technique timing'),gate)
+        meter_gate=main.index('if(webPresentationVisible && webInterface && webInterfaceReady')
+        state_gate=main.index('if (webPresentationVisible &&')
+        self.assertGreater(main.index('"backendMeterState"',meter_gate),meter_gate)
+        self.assertGreater(main.index('"backendState"',state_gate),state_gate)
+        self.assertNotIn('masterOutput.getSpectrum(',main)
+        self.assertLess(main.index('// Automatic technique timing'),min(meter_gate,state_gate))
         self.assertIn('lastWebStateAtMs = 0',main)
         visibility=main.split('void MainComponent::setWebPresentationVisible',1)[1].split('void MainComponent::setupWebInterface',1)[0]
         for unsafe in ['stopTimer','webInterface.reset','suspendProcessing','pause()']:self.assertNotIn(unsafe,visibility)

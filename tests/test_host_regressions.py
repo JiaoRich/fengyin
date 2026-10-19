@@ -204,7 +204,11 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("isWindowsSharedType(current->getTypeName())", audio_device)
         self.assertIn("audio.followSystemDefaultOutput()", MAIN)
         refresh = MAIN.index("videoPlaybackActive ? 200.0 : 100.0")
-        self.assertGreater(MAIN.index("masterOutput.getSpectrum", refresh), refresh)
+        # The web UI consumes peaks, not the obsolete native FFT. Meter
+        # cadence remains video-aware; catalogue/configuration is separate.
+        self.assertNotIn("masterOutput.getSpectrum(", MAIN)
+        self.assertIn('"backendMeterState"',MAIN[refresh:])
+        self.assertIn('webNow - lastWebStateAtMs >= 1000.0',MAIN[refresh:])
 
     def test_initial_audio_setup_prefers_low_latency_without_overriding_manual_choice(self):
         audio_device = (ROOT / "native" / "Source" / "AudioDeviceService.cpp").read_text(encoding="utf-8")

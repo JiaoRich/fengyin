@@ -10,7 +10,7 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
     POINT clickPoint{};
     int phase=0,cycle=0,generation=0,playCommands=0,volumeCommands=0;
     int previousPlay=0,previousVolume=0;
-    uint64_t deadline=now()+30000,lastState=0;
+    uint64_t deadline=now()+30000,lastState=0,lastConfig=0;
     juce::String session;
     explicit ProductionUiScene(juce::File media):fixture(media) {
         // Match the real DocumentWindow. A default non-opaque Component with
@@ -27,6 +27,7 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
                 {expanded:document.body.classList.contains('video-expanded')}),100));)JS")
             .withEventListener("testHeartbeat",[this](juce::var p){javascript.store(now());expanded=bool(p["expanded"]);})
             .withEventListener("webReady",[this](juce::var p){session=p["videoSession"].toString();ready=true;javascript.store(now());})
+            .withEventListener("requestBackendState",[this](juce::var){lastConfig=0;})
             .withEventListener("testPoint",[this](juce::var p){
                 clickPoint={int(p["x"]),int(p["y"])};clickPending=true;
             })
@@ -71,7 +72,13 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
         state->setProperty("breath",double((now()/100)%8)/10);state->setProperty("audioCpu",.4);
         state->setProperty("outputLeftPeak",.4);state->setProperty("outputRightPeak",.5);
         state->setProperty("instrumentPeak",.4);state->setProperty("musicTempoMode",1);
-        web->emitEventIfBrowserIsVisible("backendState",juce::var(state.release()));
+        if(now()-lastConfig>=1000) {
+            lastConfig=now();web->emitEventIfBrowserIsVisible("backendState",juce::var(state.release()));
+        } else {
+            for(const char* key:{"activated","featuresUnlocked","deviceConnected","deviceMatched", "pluginLoaded",
+                "pluginName","instrumentKey","instrumentChineseName","musicTempoMode"})state->removeProperty(key);
+            web->emitEventIfBrowserIsVisible("backendMeterState",juce::var(state.release()));
+        }
         if(generation==0)return;
         const auto s=surface.getState();auto video=std::make_unique<juce::DynamicObject>();
         video->setProperty("engine","vlc");video->setProperty("generation",generation);video->setProperty("viewportEpoch",0);

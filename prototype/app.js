@@ -3,6 +3,9 @@ const $$ = (selector) => [...document.querySelectorAll(selector)];
 function setTextIfChanged(element, value) {
   if (element && element.textContent !== String(value)) element.textContent = String(value);
 }
+let backendRefreshTimer=0;
+const meterOnlyNativeEvents=new Set(['requestBackendState','webReady','nativeVideoViewport',
+  'windowDragRegion','windowAction','syncVideoPlayback']);
 // A new document must not inherit a native video window's stale visibility.
 const videoWebSession = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 let nativeViewportFrame=0,nativeViewportLast='',nativeViewportEpoch=0,nativeViewportRevision=0;
@@ -575,7 +578,13 @@ function applyPrototypeInstrument(key, chineseName, pluginName) {
 }
 
 function nativeEvent(name, payload = {}) {
-  if (window.__JUCE__?.backend?.emitEvent) window.__JUCE__.backend.emitEvent(name, payload);
+  const backend=window.__JUCE__?.backend;
+  if (!backend?.emitEvent)return;
+  backend.emitEvent(name,payload);
+  // Coalesce explicit user changes; do not make viewport/clock/drag traffic
+  // wake the entire plugin catalogue at the meter or mouse-move frequency.
+  if(!meterOnlyNativeEvents.has(name)&&!backendRefreshTimer)
+    backendRefreshTimer=setTimeout(()=>{backendRefreshTimer=0;backend.emitEvent('requestBackendState',{});},100);
 }
 
 function toast(message) {
@@ -2233,8 +2242,8 @@ function updateRealtimePresentation(state) {
   if (document.body.classList.contains('realtime-rendering') !== active)
     document.body.classList.toggle('realtime-rendering', active);
 }
-window.__JUCE__?.backend?.addEventListener('backendState', state => {
-  if(state.videoClock)applyVideoPlaybackClock(state.videoClock);
+function renderBackendMeters(packet,replace=false) {
+  const state=replace?packet:{...latestBackendState,...packet};
   const visualSignature = value=>JSON.stringify([Math.round(Number(value.breath||0)*127),Math.round(Number(value.instrumentPeak||0)*200),Math.round(Number(value.outputLeftPeak||0)*200),Math.round(Number(value.outputRightPeak||0)*200),!!value.pluginLoaded]);
   const visualChanged = visualSignature(state) !== visualSignature(latestBackendState);
   latestBackendState = state || {};
@@ -2245,6 +2254,11 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
     : Number(state.breath || 0) > 0.02 ? '已收到气息，尚未收到音符' : '已连接，等待吹奏信号');
   updateRealtimePresentation(state);
   if (visualChanged) requestVisualFrame();
+}
+window.__JUCE__?.backend?.addEventListener('backendMeterState',packet=>renderBackendMeters(packet));
+window.__JUCE__?.backend?.addEventListener('backendState', state => {
+  if(state.videoClock)applyVideoPlaybackClock(state.videoClock);
+  renderBackendMeters(state,true);
   if (!backendControlsChanged(state)) return;
   renderBendRange(state);
   $$('#music-tempo [data-tempo]').forEach(button=>{const active=Number(button.dataset.tempo)===Number(state.musicTempoMode??1);button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));});

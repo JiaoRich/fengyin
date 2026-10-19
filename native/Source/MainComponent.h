@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 
 #include <juce_gui_extra/juce_gui_extra.h>
 #include "AudioDeviceService.h"
@@ -290,6 +291,8 @@ private:
     int webUpdateCounter = 0;
     bool webPresentationVisible = true;
     double lastWebStateAtMs = 0;
+    double lastWebMeterAtMs = 0;
+    std::array<int,6> lastWebControlFlags {-1,-1,-1,-1,-1,-1};
     double nextAudioDiagnosticMs = 0;
 public:
     // Presentation only: audio/MIDI timers and business callbacks keep running.

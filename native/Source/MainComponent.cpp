@@ -310,6 +310,7 @@ void MainComponent::setupWebInterface()
         .withEventListener("webReady", [this](juce::var payload)
         {
             webInterfaceReady = true;
+            lastWebStateAtMs=0;
             videoWebSession=payload.getProperty("videoSession","").toString();
             invalidateVlcViewport();
             lastVlcStateAtMs=0;
@@ -318,6 +319,7 @@ void MainComponent::setupWebInterface()
                 ? utf8("正在自动优化声音，无需操作…") : juce::String());
             emitSuperLowLatencyState();
         })
+        .withEventListener("requestBackendState",[this](juce::var){lastWebStateAtMs=0;})
         .withEventListener("scanPlugins", [this](juce::var) { if (isActivated) startPluginScan(); })
         .withEventListener("choosePluginFolder", [this](juce::var)
         {
@@ -1779,14 +1781,36 @@ void MainComponent::timerCallback()
     const auto webNow = juce::Time::getMillisecondCounterHiRes();
     const bool webActive = snapshot.breath > 0.01f || snapshot.lastNote >= 0
         || videoPlaybackActive || recorder.isRecording() || windowRecorder.busy() || pluginLoading || effectLoading || pluginCatalog.getProgress().scanning;
+    const std::array<int,6> controlFlags {int(snapshot.deviceConnected),int(pluginHost.hasPlugin()),
+        int(pluginLoading),int(effectLoading),activeTechniqueLearn,int(isActivated)};
+    if(controlFlags!=lastWebControlFlags) {
+        lastWebControlFlags=controlFlags;lastWebStateAtMs=0;
+    }
+    if(webPresentationVisible && webInterface && webInterfaceReady
+        && webNow-lastWebMeterAtMs>=(webActive ? (videoPlaybackActive ? 200.0 : 100.0) : 1000.0)) {
+        lastWebMeterAtMs=webNow;
+        auto meters=std::make_unique<juce::DynamicObject>();
+        meters->setProperty("breath",snapshot.breath);
+        meters->setProperty("note",snapshot.lastNote);
+        meters->setProperty("noteReceived",snapshot.lastNote>=0);
+        meters->setProperty("audioCpu",currentAudio.cpuUsage);
+        meters->setProperty("outputLeftPeak",masterOutput.getLeftPeak());
+        meters->setProperty("outputRightPeak",masterOutput.getRightPeak());
+        meters->setProperty("instrumentPeak",currentAudio.ready&&!pluginLoading?masterOutput.getInstrumentPeak():0.0f);
+        meters->setProperty("audioXruns",currentAudio.xRunCount);
+        meters->setProperty("callbackOverruns",static_cast<juce::int64>(pluginHost.getCallbackOverruns()));
+        meters->setProperty("overloadSamples",static_cast<juce::int64>(masterOutput.getOverloadSamples()));
+        meters->setProperty("droppedMidiEvents",static_cast<juce::int64>(pluginHost.getDroppedMidiEventCount()));
+        webInterface->emitEventIfBrowserIsVisible("backendMeterState",juce::var(meters.release()));
+    }
     if (webPresentationVisible && webInterface != nullptr && webInterfaceReady
-        && webNow - lastWebStateAtMs >= (webActive ? (videoPlaybackActive ? 200.0 : 100.0) : 1000.0))
+        && webNow - lastWebStateAtMs >= 1000.0)
     {
         lastWebStateAtMs = webNow;
         webUpdateCounter = 0;
-        // FFT 只在真正要刷新网页时计算；视频播放期间由 30 次/秒降到 5 次/秒，
-        // 把 CPU 时间优先留给 SWAM 与视频解码。
-        if (webActive) masterOutput.getSpectrum(spectrumLevels);
+        // Configuration/catalogue snapshots are not audio meters. The web UI
+        // consumes peaks, not spectrumLevels: do not compute an unused FFT or
+        // serialize every library entry for each breath/level update.
         auto state = std::make_unique<juce::DynamicObject>();
         state->setProperty("audioTimingEnabled",pluginHost.isStageTimingEnabled());
         if (webVideoAudioReady && !fengyin::VlcVideoSurface::supported())

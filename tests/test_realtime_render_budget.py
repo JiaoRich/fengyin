@@ -31,4 +31,17 @@ class RealtimeRenderBudget(unittest.TestCase):
         self.assertIn('body.realtime-rendering',css)
         self.assertIn('backdrop-filter:none!important',css)
 
+    def test_native_meter_packets_do_not_serialize_catalogues_or_compute_unused_fft(self):
+        source=(ROOT/'native/Source/MainComponent.cpp').read_text(encoding='utf-8')
+        timer=source.split('void MainComponent::timerCallback()',1)[1].split('void MainComponent::emitSuperLowLatencyState',1)[0]
+        self.assertIn('webNow - lastWebStateAtMs >= 1000.0',timer)
+        meters=timer.split('auto meters=std::make_unique<juce::DynamicObject>();',1)[1].split('"backendMeterState"',1)[0]
+        for catalogue in ('publishedTones','getKongLibraryState','cachedPresets','instrumentModels','describeEffectChain'):
+            self.assertNotIn(catalogue,meters)
+        self.assertNotIn('masterOutput.getSpectrum(',timer)
+        self.assertIn('.withEventListener("requestBackendState"',source)
+        js=(ROOT/'prototype/app.js').read_text(encoding='utf-8')
+        self.assertIn("addEventListener('backendMeterState'",js)
+        self.assertIn("backend.emitEvent('requestBackendState',{})",js)
+
 if __name__=='__main__':unittest.main()
