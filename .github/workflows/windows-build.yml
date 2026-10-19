@@ -1,9 +1,13 @@
 name: Windows 编译与安装包
-run-name: ${{ inputs.vlc_webview_test && 'Windows VLC WebView interaction diagnostic' || inputs.media_integration_test && 'Windows media integration diagnostic' || inputs.native_window_test && 'Windows native input diagnostic' || 'Windows build and installer' }}
+run-name: ${{ inputs.media_runtime_test && 'Windows media performance runtime (no installer)' || inputs.vlc_webview_test && 'Windows VLC WebView interaction diagnostic' || inputs.media_integration_test && 'Windows media integration diagnostic' || inputs.native_window_test && 'Windows native input diagnostic' || 'Windows build and installer' }}
 
 on:
   workflow_dispatch:
     inputs:
+      media_runtime_test:
+        description: Build matching application and audio helpers only, no installers or driver changes
+        type: boolean
+        default: false
       vlc_webview_test:
         description: Exercise real WebView2 and VLC native-window input together
         type: boolean
@@ -41,6 +45,63 @@ permissions:
   contents: read
 
 jobs:
+  media-runtime-test:
+    if: ${{ inputs.media_runtime_test }}
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          lfs: true
+      - name: Restore verified media dependencies
+        id: runtime-deps
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party/vlc
+            third_party/ffmpeg-check
+            third_party/nuget-packages
+            build-vlc-webview/_deps/juce-src
+          key: win2022-video-deps-juce902-webview1348544-${{ hashFiles('scripts/prepare_vlc.py', 'scripts/prepare_ffmpeg.py') }}
+      - name: Prepare dependencies and parse development scripts
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          foreach ($file in @('scripts/test-video-fast.ps1','scripts/build-media-runtime.ps1','scripts/media-runtime-test/Run.ps1')) {
+            $tokens=$null; $errors=$null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file),[ref]$tokens,[ref]$errors) | Out-Null
+            if($errors.Count){throw ($errors | Out-String)}
+          }
+          if ('${{ steps.runtime-deps.outputs.cache-hit }}' -ne 'true') {
+            python scripts/prepare_vlc.py third_party/vlc
+            if($LASTEXITCODE){exit $LASTEXITCODE}
+            nuget install Microsoft.Web.WebView2 -Version 1.0.3485.44 -OutputDirectory third_party/nuget-packages -NonInteractive
+            if($LASTEXITCODE){exit $LASTEXITCODE}
+          }
+      - name: Build application and matching helpers, not installers
+        shell: powershell
+        run: |
+          if (Test-Path build-vlc-webview/_deps/juce-src/CMakeLists.txt) {
+            ./scripts/build-media-runtime.ps1 -JuceSource build-vlc-webview/_deps/juce-src
+          } else {
+            ./scripts/build-media-runtime.ps1
+          }
+      - uses: actions/upload-artifact@v5
+        if: success()
+        with:
+          name: FengYin-media-development-runtime
+          path: dist/media-runtime-*/
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: Media-runtime-build-failure-evidence
+          path: |
+            build-media-runtime/CMakeCache.txt
+            build-media-runtime/CMakeFiles/CMakeConfigureLog.yaml
+            build-media-runtime/*selftest*
+          if-no-files-found: warn
   vlc-webview-test:
     if: ${{ inputs.vlc_webview_test }}
     runs-on: windows-2022
@@ -225,7 +286,7 @@ jobs:
           name: FengYin-Crash-Capture
           path: diagnostic/FengYin-Crash-Capture.zip
   windows-release:
-    if: ${{ !inputs.vlc_webview_test && !inputs.media_integration_test && !inputs.diagnostic_only && !inputs.startup_comparison && !inputs.kong_test && !inputs.native_window_test }}
+    if: ${{ !inputs.media_runtime_test && !inputs.vlc_webview_test && !inputs.media_integration_test && !inputs.diagnostic_only && !inputs.startup_comparison && !inputs.kong_test && !inputs.native_window_test }}
     name: Windows x64 Release
     runs-on: windows-2022
     timeout-minutes: 45
