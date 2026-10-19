@@ -39,8 +39,14 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
                 surface.player()->load(fixture.getFullPathName().toStdString(),++generation);
             })
             .withEventListener("nativeVideoViewport",[this](juce::var p){
-                if(p["session"].toString()!=session||(bool(p["visible"])&&int(p["generation"])!=generation))return;
-                surface.updateViewport({int(p["x"]),int(p["y"]),int(p["width"]),int(p["height"])},bool(p["visible"]));
+                // Return from WebMessageReceived before native D3D/Win32 work.
+                juce::MessageManager::callAsync([safe=juce::Component::SafePointer<ProductionUiScene>(this),p]{
+                    if(!safe||p["session"].toString()!=safe->session
+                        ||(bool(p["visible"])&&int(p["generation"])!=safe->generation))return;
+                    std::cout<<"production viewport enter "<<juce::JSON::toString(p,true)<<std::endl;
+                    safe->surface.updateViewport({int(p["x"]),int(p["y"]),int(p["width"]),int(p["height"])},bool(p["visible"]));
+                    std::cout<<"production viewport returned"<<std::endl;
+                });
             })
             .withEventListener("setVideoPlaybackState",[this](juce::var p){
                 if(int(p["generation"])==generation){surface.player()->setPlaying(bool(p["playing"]));++playCommands;}
@@ -117,7 +123,8 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
             failed=true;std::cerr<<"FAIL production VLC engine: "<<surface.getState().error<<std::endl;
         }
         if(failed||now()>deadline||(ready&&now()-javascript.load()>5000)) {
-            failed=true;std::cerr<<"FAIL production UI phase="<<phase<<" cycle="<<cycle<<std::endl;
+            failed=true;std::cerr<<"FAIL production UI phase="<<phase<<" cycle="<<cycle
+                <<" javascriptAge="<<now()-javascript.load()<<" deadlineExpired="<<(now()>deadline)<<std::endl;
             dumpProcess(L"production-ui-stall.dmp");finish();return;
         }
         if(touchDown) {
