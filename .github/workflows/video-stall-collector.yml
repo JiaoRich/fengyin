@@ -1,0 +1,46 @@
+name: Video stall collector validation
+run-name: Windows video stall collector smoke test (no application build)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  collector:
+    runs-on: windows-2022
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          lfs: false
+      - name: Source safety regressions
+        shell: powershell
+        run: |
+          python -B -m unittest discover -s tests -p test_video_stall_capture.py
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+      - name: Compile and exercise actual Win32 APIs and CPU ETW
+        shell: powershell
+        run: ./scripts/video-stall-capture/Test.ps1
+      - name: Package collector only after actual tests pass
+        if: success()
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Path collector-package | Out-Null
+          foreach($name in @('Capture.ps1','Start.cmd','WindowSnapshot.cs')) {
+            Copy-Item -LiteralPath (Join-Path 'scripts/video-stall-capture' $name) -Destination collector-package/
+          }
+          Get-ChildItem scripts/video-stall-capture -Filter *.txt | Copy-Item -Destination collector-package/
+          Compress-Archive -Path collector-package/* -DestinationPath FengYin-Video-Stall-Capture.zip
+      - uses: actions/upload-artifact@v5
+        if: success()
+        with:
+          name: FengYin-Video-Stall-Capture
+          path: FengYin-Video-Stall-Capture.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: Collector-smoke-evidence
+          path: |
+            window-smoke.json
+            collector-smoke.zip
+          if-no-files-found: ignore
