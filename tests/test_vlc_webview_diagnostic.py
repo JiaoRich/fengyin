@@ -71,3 +71,14 @@ class VlcWebViewDiagnostic(unittest.TestCase):
         self.assertIn('firstPictureVisible()',source)
         self.assertIn('FAIL preview emitted accompaniment',source)
         self.assertIn('surface.getState().generation==generation',source)
+
+    def test_release_frontend_not_only_synthetic_buttons(self):
+        source=(ROOT/'tools/vlc-webview-check/ProductionUiCheck.h').read_text(encoding='utf-8')
+        for item in ('FENGYIN_DIAGNOSTIC_FRONTEND','juce::URL(juce::File(',
+                     '"#change-video"','"#fullscreen"','"#play-button"','"#video-volume"',
+                     'SendInput(2,input,sizeof(INPUT))','firstPictureVisible()',
+                     'backendState','nativeVideoState','if(++cycle==20)',
+                     'InitializeTouchInjection','InjectTouchInput','POINTER_FLAG_UP'):
+            self.assertIn(item,source)
+        self.assertNotIn('.click()',source)
+        self.assertIn("(args.rounds+1,'production-ui')",(ROOT/'scripts/check_vlc_webview.py').read_text(encoding='utf-8'))

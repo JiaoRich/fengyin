@@ -1,5 +1,8 @@
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
+function setTextIfChanged(element, value) {
+  if (element && element.textContent !== String(value)) element.textContent = String(value);
+}
 // A new document must not inherit a native video window's stale visibility.
 const videoWebSession = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 let nativeViewportFrame=0,nativeViewportLast='',nativeViewportEpoch=0,nativeViewportRevision=0;
@@ -685,13 +688,22 @@ function renderToneStyleSwitcher(reset = false) {
   }
   currentToneStyleIndex = Math.max(0, Math.min(styles.length - 1, currentToneStyleIndex));
   const selector = $('#tone-style-select');
-  selector.innerHTML = styles.map(style => `<option value="${style.id}">${style.name}</option>`).join('');
+  // Meter snapshots must not destroy a live select (including an open native
+  // popup on a touch device). Rebuild only when the actual catalogue changes.
+  const options = styles.map(style => `<option value="${style.id}">${style.name}</option>`).join('');
+  if (selector.dataset.optionsSignature !== options) {
+    selector.innerHTML = options;
+    selector.dataset.optionsSignature = options;
+  }
   selector.disabled = !enabled;
   $('#tone-style-prev').disabled = !enabled || styles.length < 2;
   $('#tone-style-next').disabled = !enabled || styles.length < 2;
   $('#tone-style-switcher').classList.toggle('disabled', !enabled);
   if ($('#chain-style-select')) {
-    $('#chain-style-select').innerHTML = selector.innerHTML;
+    if ($('#chain-style-select').dataset.optionsSignature !== options) {
+      $('#chain-style-select').innerHTML = options;
+      $('#chain-style-select').dataset.optionsSignature = options;
+    }
     $('#chain-style-select').disabled = !enabled;
   }
   if (!enabled) {
@@ -2204,12 +2216,37 @@ function renderSmartAdapter(state) {
   renderAdapterTechniqueGrid();
 }
 
+let backendControlSignature = '';
+function backendControlsChanged(state) {
+  const controls = {...state};
+  // These counters/meters have a fast path below. They must not rebuild every
+  // hidden settings panel, artwork and style selector at the audio-meter rate.
+  for (const key of ['breath','instrumentPeak','outputLeftPeak','outputRightPeak',
+    'audioCpu','audioXruns','callbackOverruns','overloadSamples','droppedMidiEvents','note','noteReceived','videoClock']) delete controls[key];
+  const signature = JSON.stringify(controls);
+  if (signature === backendControlSignature) return false;
+  backendControlSignature = signature;
+  return true;
+}
+function updateRealtimePresentation(state) {
+  const active = !!(state.pluginLoaded && state.deviceConnected) || !!originalVideoSource || !!state.recording;
+  if (document.body.classList.contains('realtime-rendering') !== active)
+    document.body.classList.toggle('realtime-rendering', active);
+}
 window.__JUCE__?.backend?.addEventListener('backendState', state => {
   if(state.videoClock)applyVideoPlaybackClock(state.videoClock);
-  renderBendRange(state);
   const visualSignature = value=>JSON.stringify([Math.round(Number(value.breath||0)*127),Math.round(Number(value.instrumentPeak||0)*200),Math.round(Number(value.outputLeftPeak||0)*200),Math.round(Number(value.outputRightPeak||0)*200),!!value.pluginLoaded]);
   const visualChanged = visualSignature(state) !== visualSignature(latestBackendState);
   latestBackendState = state || {};
+  hardwareBreath = state.deviceConnected ? Math.max(0,Math.min(100,Number(state.breath || 0)*100)) : null;
+  if (Number.isFinite(Number(state.audioCpu))) setTextIfChanged($('#cpu'),`${Math.round(Number(state.audioCpu)*100)}%`);
+  setTextIfChanged(document.querySelector('.sidebar-status small'),!state.deviceConnected ? '连接电吹管后即可演奏'
+    : state.noteReceived ? '气息与音符信号正常'
+    : Number(state.breath || 0) > 0.02 ? '已收到气息，尚未收到音符' : '已连接，等待吹奏信号');
+  updateRealtimePresentation(state);
+  if (visualChanged) requestVisualFrame();
+  if (!backendControlsChanged(state)) return;
+  renderBendRange(state);
   $$('#music-tempo [data-tempo]').forEach(button=>{const active=Number(button.dataset.tempo)===Number(state.musicTempoMode??1);button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));});
   $('#music-tempo').title='调整自动颤音介入和风吟混响预延迟；咬颤保持音色方案设置。';
   if(!localStorage.getItem('fy-music-tempo-v1-guide')){localStorage.setItem('fy-music-tempo-v1-guide','yes');toast('乐曲速度默认中速：慢速低于80，中速80至120，快速高于120 BPM。可调整自动颤音和混响预延迟。');window.fengyinVoice?.say('MT_GUIDE');}
@@ -2221,7 +2258,6 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
     sessionStorage.setItem('fy-pitch-remap-'+state.deviceIdentifier,'yes');
     toast('旧弯音技巧映射已解除。弯音专用，请用CC、压力或按键重新映射技巧。');
   }
-  if (visualChanged) requestVisualFrame();
   if (typeof state.compactMode === 'boolean' && state.compactMode !== compactMode) applyWindowMode(state.compactMode);
   const connected = !!state.deviceConnected;
   const adapterDeviceKey = String(state.deviceIdentifier || state.deviceId || state.deviceName || state.deviceProfileName || 'connected-device');
@@ -2240,8 +2276,6 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
     $('#audio-latency-value').textContent = value > 0 ? `${value.toFixed(1)} ms · ${value <= 10 ? '优秀' : value <= 20 ? '良好' : '偏高'}` : '音频未运行 · 暂无延迟数据';
     $('#audio-latency-value').classList.toggle('green', value > 0 && value <= 20);
   }
-  if (Number.isFinite(Number(state.audioCpu))) $('#cpu').textContent = `${Math.round(Number(state.audioCpu)*100)}%`;
-  hardwareBreath = connected ? Math.max(0,Math.min(100,Number(state.breath || 0)*100)) : null;
   const targetKey = Number(state.targetKey || 0);
   if (targetKey !== selectedTargetKey) updateTransposeDisplay(targetKey);
   if (Number.isFinite(Number(state.growlSensitivity)))
@@ -2484,6 +2518,7 @@ function receiveVideoSelection(result) {
   nativeVideoFinished=false;
   preparedVideoSource=null;restoringVideoPosition=null;usingPreparedVideo=false;
   originalVideoSource=result.url;
+  updateRealtimePresentation(latestBackendState);
   lastVideoSyncAt = 0;
   videoSeekDragging=false;pendingVideoSeek=null;
   $('#seek').value = 0;
@@ -2899,7 +2934,8 @@ window.fengyinSetPresentationVisible = visible => {
 window.__JUCE__?.backend?.addEventListener('presentationVisibility', window.fengyinSetPresentationVisible);
 function requestVisualFrame() {
   if (visualTimer !== null || document.hidden || !nativePresentationVisible) return;
-  visualTimer = setTimeout(()=>{animationFrame=requestAnimationFrame(draw);},Math.max(0,1000/24-(performance.now()-lastDrawAt)));
+  const fps = document.body.classList.contains('realtime-rendering') ? 12 : 24;
+  visualTimer = setTimeout(()=>{animationFrame=requestAnimationFrame(draw);},Math.max(0,1000/fps-(performance.now()-lastDrawAt)));
 }
 function updateStaticTheme() {
   const palettes = {spring:['#123c2b','#68e7ac'],summer:['#103940','#65e0d2'],autumn:['#38271c','#e7aa5e'],winter:['#183454','#b7ecff'],'china-red':['#431316','#ff4b52'],gold:['#392719','#ffc85a'],minimal:['#202b36','#75a9dc']};
@@ -2911,7 +2947,8 @@ function updateStaticTheme() {
 function draw(timestamp = performance.now()) {
   visualTimer = null;
   if (document.hidden || !nativePresentationVisible || !$('#page-play').classList.contains('active') || !$('#technique-dialog').hidden) return;
-  const targetInterval = 1000/24;
+  const realtime = document.body.classList.contains('realtime-rendering');
+  const targetInterval = realtime ? 1000/12 : 1000/24;
   if (timestamp - lastDrawAt < targetInterval) {
     requestVisualFrame();
     return;
@@ -2932,13 +2969,15 @@ function draw(timestamp = performance.now()) {
   const safeBreath = Math.max(0,Math.min(100,breath));
   const rimTarget = safeBreath / 100;
   compactRimBreath += (rimTarget - compactRimBreath) * (rimTarget > compactRimBreath ? .12 : .055);
-  document.body.style.setProperty('--breath-energy', compactRimBreath.toFixed(3));
-  document.body.style.setProperty('--breath-speed', `${12-compactRimBreath*6}s`);
+  if (!realtime) {
+    document.body.style.setProperty('--breath-energy', compactRimBreath.toFixed(3));
+    document.body.style.setProperty('--breath-speed', `${12-compactRimBreath*6}s`);
+  }
   const tonePeak = currentPluginLoaded ? Math.min(1, Math.max(0, Number(latestBackendState.instrumentPeak || 0))) : 0;
   const styles = getComputedStyle(document.body);
   const a = styles.getPropertyValue('--accent').trim();
   const b = styles.getPropertyValue('--accent-2').trim();
-  if ($('#page-play').classList.contains('active')) drawBreathWave(ratio,safeBreath,a,b);
+  if (!realtime && $('#page-play').classList.contains('active')) drawBreathWave(ratio,safeBreath,a,b);
   const bars = compactMode ? 0 : 66;
   for(let i=0;i<bars;i++) {
     const x = i*bounds.width/bars;
@@ -2951,13 +2990,13 @@ function draw(timestamp = performance.now()) {
     ctx.fillRect(x,bounds.height-h,Math.max(3,bounds.width/bars-5),h);
   }
   ctx.globalAlpha = 1;
-  $('#breath-value').textContent = currentPluginLoaded ? `${Math.round(safeBreath)}%` : '—';
+  setTextIfChanged($('#breath-value'),currentPluginLoaded ? `${Math.round(safeBreath)}%` : '—');
   $('#breath-bar').style.width = currentPluginLoaded ? `${safeBreath}%` : '0%';
   $('#meter-l').style.width = `${Math.min(100,Number(latestBackendState.outputLeftPeak||0)*100)}%`;
   $('#meter-r').style.width = `${Math.min(100,Number(latestBackendState.outputRightPeak||0)*100)}%`;
   if (!window.__JUCE__?.backend?.emitEvent) $('#cpu').textContent = `${Math.round(14+Math.abs(Math.sin(tick*.3))*9)}%`;
   // No recurring frame loop: new MIDI/meter state, resize or transition wakes us.
-  if (Math.abs(rimTarget-compactRimBreath)>.001) requestVisualFrame(); // Finish only the active fade.
+  if (!realtime && Math.abs(rimTarget-compactRimBreath)>.001) requestVisualFrame(); // Finish only the active fade.
 }
 updateStaticTheme(); requestVisualFrame();
 window.addEventListener('resize', requestVisualFrame);

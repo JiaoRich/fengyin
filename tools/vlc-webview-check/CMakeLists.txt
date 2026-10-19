@@ -20,6 +20,7 @@ target_sources(FengYinVlcWebViewCheck PRIVATE main.cpp
     "${ROOT}/native/Source/WindowsCompatibility.manifest")
 target_include_directories(FengYinVlcWebViewCheck PRIVATE "${ROOT}/native/Source" "${ROOT}/third_party/vlc/sdk/include")
 target_compile_definitions(FengYinVlcWebViewCheck PRIVATE JUCE_WEB_BROWSER=1 JUCE_USE_CURL=0
-    JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1 JUCE_MODAL_LOOPS_PERMITTED=1 FENGYIN_VLC_TEST_PCM=1)
+    JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1 JUCE_MODAL_LOOPS_PERMITTED=1 FENGYIN_VLC_TEST_PCM=1
+    FENGYIN_DIAGNOSTIC_FRONTEND="${ROOT}/prototype/index.html")
 target_compile_options(FengYinVlcWebViewCheck PRIVATE /utf-8 /EHsc)
 target_link_libraries(FengYinVlcWebViewCheck PRIVATE juce::juce_gui_extra juce::juce_recommended_config_flags user32 gdi32 dbghelp)

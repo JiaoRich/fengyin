@@ -19,7 +19,7 @@ def check_result(mode,code,timeout,text):
     acknowledgements=text.count('PASS physical click cycle=')
     previews=text.count('PASS real paused first picture generation=')
     passed=(code==0 and acknowledgements==20 and not timeout
-            and (mode=='web-only' or previews==4))
+            and (mode=='web-only' or (previews>=4 if mode=='production-ui' else previews==4)))
     return dict(mode=mode,exitCode=code,timedOut=timeout,
                 clickAcknowledgements=acknowledgements,pausedFirstPictures=previews,passed=passed)
 
@@ -34,7 +34,7 @@ def main():
     evidence=root/'evidence';evidence.mkdir(exist_ok=True)
     session=evidence/('run-'+uuid.uuid4().hex[:12]);session.mkdir()
     results=[]
-    for iteration,mode in case_order(args.rounds):
+    for iteration,mode in (*case_order(args.rounds),(args.rounds+1,'production-ui')):
         directory=session/f'{iteration}-{mode}';directory.mkdir()
         with (directory/'run.log').open('wb') as log:
             process=subprocess.Popen([str(root/'Release/FengYinVlcWebViewCheck.exe'),str(fixture),mode],

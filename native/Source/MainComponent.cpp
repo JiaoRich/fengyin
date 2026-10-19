@@ -1315,6 +1315,9 @@ void MainComponent::applyTheme(Theme theme)
 void MainComponent::paint(juce::Graphics& g)
 {
     g.fillAll(themeBackground);
+    // WebView2 and VLC already own their child-window pixels. Repainting the
+    // obsolete native dashboard underneath them only submits extra D2D work.
+    if (webInterface != nullptr && webInterfaceReady) return;
     g.setColour(themeBackground.darker(0.3f));
     g.fillRect(getLocalBounds().removeFromLeft(238));
     g.setGradientFill({ themeAccent, 26.0f, 26.0f, themeAccent2, 76.0f, 76.0f, false });
@@ -2152,7 +2155,7 @@ void MainComponent::timerCallback()
         breathLabel.setText(utf8("气息强度 ") + juce::String(juce::roundToInt(simulatedBreath * 100.0f)) + "%",
                             juce::dontSendNotification);
     }
-    repaint();
+    if (webInterface == nullptr || !webInterfaceReady) repaint();
 }
 
 void MainComponent::emitSuperLowLatencyState(const juce::String& overrideMessage)

@@ -10,6 +10,7 @@
 #endif
 #include "CompactWindowGlow.h"
 #include "NativeCompactDragSurface.h"
+#include "VideoHostRendering.h"
 
 class FengYinApplication final : public juce::JUCEApplication
 {
@@ -100,6 +101,11 @@ private:
             centreWithSize(juce::jmin(1440, juce::jmax(1120, available.getWidth() - 32)),
                            juce::jmin(900, juce::jmax(700, available.getHeight() - 32)));
             setVisible(true);
+           #if JUCE_WINDOWS
+            juce::Logger::writeToLog(fengyin::configureVideoHostRendering(getPeer())
+                ? "Host backing renderer=Software; WebView2/VLC hardware rendering unchanged"
+                : "Host backing renderer selection unavailable");
+           #endif
             setFullScreen(true);
             startTimerHz(60); // Input polling only; the visual companion remains capped at 24 Hz.
         }

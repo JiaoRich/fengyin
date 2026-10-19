@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <dbghelp.h>
 #include "VlcVideoSurface.h"
+#include "VideoHostRendering.h"
 #include <atomic>
 #include <chrono>
 #include <iostream>
@@ -74,6 +75,9 @@ struct Scene final:juce::Component,juce::Timer {
         web=std::make_unique<juce::WebBrowserComponent>(options);
         addAndMakeVisible(*web);addAndMakeVisible(surface);
         setSize(900,650);addToDesktop(juce::ComponentPeer::windowHasTitleBar);
+        if(!fengyin::configureVideoHostRendering(getPeer())) {
+            failed=true;std::cerr<<"FAIL production backing renderer unavailable\n";
+        }
         setTopLeftPosition(80,80);setVisible(true);toFront(true);
         web->setBounds(getLocalBounds());
         web->goToURL(juce::WebBrowserComponent::getResourceProviderRoot());
@@ -114,7 +118,9 @@ struct Scene final:juce::Component,juce::Timer {
         const auto hwnd=static_cast<HWND>(surface.getHWND());RECT bounds{};
         if(!hwnd||!IsWindowVisible(hwnd)||!GetClientRect(hwnd,&bounds)
             ||bounds.right<8||bounds.bottom<8)return false;
-        POINT point{bounds.right/2,bounds.bottom/2};ClientToScreen(hwnd,&point);
+        // Release fixtures have red above blue; standalone fixtures are red.
+        // Sample the known red region, never the ambiguous centre boundary.
+        POINT point{bounds.right/2,bounds.bottom/4};ClientToScreen(hwnd,&point);
         const auto screen=GetDC(nullptr);if(!screen)return false;
         const auto colour=GetPixel(screen,point.x,point.y);ReleaseDC(nullptr,screen);
         if(now()-lastPictureLog>1000){
@@ -183,12 +189,9 @@ struct Scene final:juce::Component,juce::Timer {
     }
 };
 
-int main(int argc,char** argv) {
-    if(argc!=3){std::cerr<<"red-fixture.mp4 web-only|immediate|deferred|attached-immediate|attached-deferred\n";return 2;}
-    juce::ScopedJuceInitialiser_GUI init;
-    const auto fixture=juce::File(juce::String::fromUTF8(argv[1]));
-    if(!fixture.existsAsFile())return 2;
-    Scene scene(fixture,juce::String(argv[2]));
+#include "ProductionUiCheck.h"
+
+template<class CheckedScene>int runCheckedScene(CheckedScene& scene) {
     const DWORD uiThread=GetCurrentThreadId();std::atomic<bool> done{false};
     std::thread watchdog([&]{while(!done.load()){
         if(now()-scene.ui.load()>5000){
@@ -205,4 +208,15 @@ int main(int argc,char** argv) {
     }
     done.store(true);watchdog.join();
     return scene.failed?1:0;
+}
+
+int main(int argc,char** argv) {
+    if(argc!=3){std::cerr<<"red-fixture.mp4 web-only|immediate|deferred|attached-immediate|attached-deferred|production-ui\n";return 2;}
+    juce::ScopedJuceInitialiser_GUI init;
+    const auto fixture=juce::File(juce::String::fromUTF8(argv[1]));
+    if(!fixture.existsAsFile())return 2;
+    if(juce::String(argv[2])=="production-ui") {
+        ProductionUiScene scene(fixture);return runCheckedScene(scene);
+    }
+    Scene scene(fixture,juce::String(argv[2]));return runCheckedScene(scene);
 }
