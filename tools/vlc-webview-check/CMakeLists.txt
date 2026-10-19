@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(FengYinVlcWebViewCheck LANGUAGES C CXX)
+project(FengYinVlcWebViewCheck VERSION 1.1.25 LANGUAGES C CXX)
 if(NOT WIN32)
     message(FATAL_ERROR "Requires real Windows WebView2 and VLC HWNDs")
 endif()
@@ -9,7 +9,10 @@ get_filename_component(ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 include(FetchContent)
 FetchContent_Declare(JUCE GIT_REPOSITORY https://github.com/juce-framework/JUCE.git GIT_TAG 9.0.2 GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(JUCE)
-add_executable(FengYinVlcWebViewCheck main.cpp
+juce_add_console_app(FengYinVlcWebViewCheck NEEDS_WEBVIEW2 TRUE)
+set_target_properties(FengYinVlcWebViewCheck PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
+target_sources(FengYinVlcWebViewCheck PRIVATE main.cpp
     "${ROOT}/native/Source/VlcVideoSurface.cpp"
     "${ROOT}/native/Source/VlcPlaybackEngine.cpp"
     "${ROOT}/native/Source/WindowsCompatibility.manifest")

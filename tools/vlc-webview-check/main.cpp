@@ -30,11 +30,12 @@ struct Scene final:juce::Component,juce::Timer {
     fengyin::VlcVideoSurface surface;
     std::unique_ptr<juce::WebBrowserComponent> web;
     juce::File fixture;
-    bool deferred=false,ready=false,expandedAck=false,failed=false;
+    bool deferred=false,attachBeforePlayer=false,ready=false,expandedAck=false,failed=false;
     int clickAck=0,cycle=0,phase=0,generation=0;
     uint64_t deadline=0;
     std::atomic<uint64_t> ui{now()},javascript{now()};
-    explicit Scene(juce::File input,bool post):fixture(input),deferred(post) {
+    explicit Scene(juce::File input,const juce::String& mode):fixture(input),
+        deferred(mode.contains("deferred")),attachBeforePlayer(mode.startsWith("attached-")) {
         auto options=juce::WebBrowserComponent::Options{}
           .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
           .withWinWebView2Options(juce::WebBrowserComponent::Options::WinWebView2{}
@@ -53,7 +54,10 @@ struct Scene final:juce::Component,juce::Timer {
               const auto apply=[safe=juce::Component::SafePointer<Scene>(this),p]{if(safe){
                   const juce::Rectangle<int> bounds(int(p.getProperty("x",0)),int(p.getProperty("y",0)),
                     int(p.getProperty("width",0)),int(p.getProperty("height",0)));
-                  safe->surface.updateViewport(bounds,bool(p.getProperty("visible",false)));}};
+                  std::cout<<"viewport enter visible="<<bool(p.getProperty("visible",false))
+                    <<" bounds="<<bounds.toString()<<" hwnd="<<safe->surface.getHWND()<<std::endl;
+                  safe->surface.updateViewport(bounds,bool(p.getProperty("visible",false)));
+                  std::cout<<"viewport returned\n"<<std::flush;}};
               if(deferred)juce::MessageManager::callAsync(apply);else apply();});
         web=std::make_unique<juce::WebBrowserComponent>(options);
         addAndMakeVisible(*web);addChildComponent(surface);
@@ -81,7 +85,12 @@ struct Scene final:juce::Component,juce::Timer {
         ui.store(now());
         if(now()>deadline){failed=true;stopTimer();std::cerr<<"FAIL stage timeout phase="<<phase<<std::endl;return;}
         if(phase==0&&ready){
+            // Test the discovered attachment ordering independently of callback
+            // deferral. Production initialise() itself is not changed here.
+            if(attachBeforePlayer)surface.setVisible(true);
+            std::cout<<"initialise enter attached="<<attachBeforePlayer<<std::endl;
             if(!surface.initialise()){failed=true;stopTimer();return;}
+            std::cout<<"initialise returned hwnd="<<surface.getHWND()<<std::endl;
             surface.player()->load(fixture.getFullPathName().toStdString(),++generation);
             phase=1;deadline=now()+30000;
         } else if(phase==1&&surface.getState().ready){
@@ -102,11 +111,11 @@ struct Scene final:juce::Component,juce::Timer {
 };
 
 int main(int argc,char** argv) {
-    if(argc!=3){std::cerr<<"fixture.mp4 immediate|deferred\n";return 2;}
+    if(argc!=3){std::cerr<<"fixture.mp4 immediate|deferred|attached-immediate|attached-deferred\n";return 2;}
     juce::ScopedJuceInitialiser_GUI init;
     const auto fixture=juce::File(juce::String::fromUTF8(argv[1]));
     if(!fixture.existsAsFile())return 2;
-    Scene scene(fixture,juce::String(argv[2])=="deferred");
+    Scene scene(fixture,juce::String(argv[2]));
     const DWORD uiThread=GetCurrentThreadId();std::atomic<bool> done{false};
     std::thread watchdog([&]{while(!done.load()){
         if(now()-scene.ui.load()>5000){
@@ -123,6 +132,9 @@ int main(int argc,char** argv) {
         if(scene.ready&&now()-scene.javascript.load()>5000){
             std::cerr<<"FAIL web heartbeat stalled while native UI pumps\n";scene.failed=true;
         }
+    }
+    if(!scene.failed && scene.surface.player()->testPcmNonzero.load()==0){
+        std::cerr<<"FAIL no actual decoded nonzero accompaniment PCM\n";scene.failed=true;
     }
     done.store(true);watchdog.join();
     return scene.failed?1:0;

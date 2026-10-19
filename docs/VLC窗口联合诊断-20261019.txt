@@ -1,4 +1,9 @@
 状态：诊断实现，尚未运行Windows，不是修复交付。
+201首轮未进入运行：独立目标用add_executable而未设置JUCE_NEEDS_WEBVIEW2，
+导致WebView2.h未加入搜索路径。已改用JUCE正式juce_add_console_app和
+NEEDS_WEBVIEW2 TRUE，输出目录保持原约定；不能将201失败称为故障复现。
+扩展四组因子：回调内/排队操作 x 初始隐藏延迟挂接/启动播放器前挂接。
+增加每次viewport操作前后日志，所有通过必须有20轮原生点击确认及非零PCM。
 用户反馈1.1.25 build200加载/视频铺满仍卡住，切换窗口或最小化恢复。
 用户禁止再次连接远程；本轮不连接ToDesk，不要求重复手工验收。
 

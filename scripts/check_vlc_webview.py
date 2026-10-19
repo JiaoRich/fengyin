@@ -10,7 +10,7 @@ fixture=Path(sys.argv[2]).resolve()
 evidence=root/'evidence'
 evidence.mkdir(exist_ok=True)
 results=[]
-for mode in ('immediate','deferred'):
+for mode in ('immediate','deferred','attached-immediate','attached-deferred'):
     directory=evidence/mode
     directory.mkdir(exist_ok=True)
     with (directory/'run.log').open('wb') as log:
