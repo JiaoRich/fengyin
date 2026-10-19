@@ -1,6 +1,7 @@
 """Real Windows UI/video checks with no-player controls and reversed ordering."""
 import argparse
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -19,7 +20,7 @@ def check_result(mode,code,timeout,text):
     acknowledgements=text.count('PASS physical click cycle=')
     previews=text.count('PASS real paused first picture generation=')
     passed=(code==0 and acknowledgements==20 and not timeout
-            and (mode in ('web-only','production-ui-control') or (previews>=4 if mode=='production-ui' else previews==4)))
+            and (mode in ('web-only','production-ui-control') or (previews>=4 if mode.startswith('production-ui') else previews==4)))
     return dict(mode=mode,exitCode=code,timedOut=timeout,
                 clickAcknowledgements=acknowledgements,pausedFirstPictures=previews,passed=passed)
 
@@ -37,12 +38,18 @@ def main():
     evidence=root/'evidence';evidence.mkdir(exist_ok=True)
     session=evidence/('run-'+uuid.uuid4().hex[:12]);session.mkdir()
     results=[]
-    cases=((1,'production-ui-control'),) if args.control_without_native_video else (((1,'production-ui'),) if args.production_only else (*case_order(args.rounds),(args.rounds+1,'production-ui')))
+    # Isolate modalities in fresh processes. On this VM, switching from injected
+    # touch to injected mouse stops delivery even WITHOUT native video. That
+    # paired control is retained separately, not mislabelled a decoder failure.
+    cases=((1,'production-ui-control'),) if args.control_without_native_video else (((1,'production-ui'),) if args.production_only else (*case_order(args.rounds),(args.rounds+1,'production-ui-mouse'),(args.rounds+2,'production-ui-touch')))
     for iteration,mode in cases:
         directory=session/f'{iteration}-{mode}';directory.mkdir()
         with (directory/'run.log').open('wb') as log:
+            environment=os.environ.copy()
+            for modality in ('mouse','touch'):
+                if mode=='production-ui-'+modality:environment['FENGYIN_DIAGNOSTIC_INPUT_MODE']=modality
             process=subprocess.Popen([str(root/'Release/FengYinVlcWebViewCheck.exe'),str(fixture),mode],
-                                     cwd=directory,stdout=log,stderr=subprocess.STDOUT)
+                                     cwd=directory,env=environment,stdout=log,stderr=subprocess.STDOUT)
             timeout=False
             try:
                 code=process.wait(timeout=150)

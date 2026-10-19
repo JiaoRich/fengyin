@@ -199,9 +199,24 @@ jobs:
         run: |
           $env:FENGYIN_DIAGNOSTIC_LEGACY_OVERLAP = '1'
           try {
-            python scripts/check_vlc_webview.py build-vlc-webview build-vlc-webview/fixture.mp4 --production-only --label legacy-overlap-control
-            Write-Host ('Legacy overlap negative control exit=' + $LASTEXITCODE)
-          } finally { Remove-Item Env:\FENGYIN_DIAGNOSTIC_LEGACY_OVERLAP }
+            foreach ($mode in @('mouse','touch')) {
+              $env:FENGYIN_DIAGNOSTIC_INPUT_MODE = $mode
+              python scripts/check_vlc_webview.py build-vlc-webview build-vlc-webview/fixture.mp4 --production-only --label ('legacy-overlap-' + $mode)
+              Write-Host ('Legacy overlap ' + $mode + ' negative control exit=' + $LASTEXITCODE)
+            }
+          } finally {
+            Remove-Item Env:\FENGYIN_DIAGNOSTIC_LEGACY_OVERLAP
+            Remove-Item Env:\FENGYIN_DIAGNOSTIC_INPUT_MODE
+          }
+          exit 0
+      - name: Preserve synthetic mixed-input limitation and paired no-video control
+        if: success()
+        shell: powershell
+        run: |
+          python scripts/check_vlc_webview.py build-vlc-webview build-vlc-webview/fixture.mp4 --production-only --label mixed-input-diagnostic-not-release-acceptance
+          Write-Host ('Mixed input diagnostic exit=' + $LASTEXITCODE)
+          python scripts/check_vlc_webview.py build-vlc-webview build-vlc-webview/fixture.mp4 --control-without-native-video --label mixed-input-no-video-control
+          Write-Host ('Mixed input no-video control exit=' + $LASTEXITCODE)
           exit 0
       - uses: actions/upload-artifact@v5
         if: always()
