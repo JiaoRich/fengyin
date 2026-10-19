@@ -4,18 +4,16 @@
 
 namespace fengyin
 {
-#if JUCE_WINDOWS
-class VlcVideoSurface final : public juce::HWNDComponent
-#else
 class VlcVideoSurface final : public juce::Component
-#endif
 {
 public:
+    VlcVideoSurface() { setInterceptsMouseClicks(false,false);setWantsKeyboardFocus(false); }
     ~VlcVideoSurface() override;
     bool initialise();
     void shutdown();
     void updateViewport(juce::Rectangle<int>, bool visible);
     VlcPlaybackEngine* player() noexcept { return engine.get(); }
+    void* getHWND() const noexcept { return nativeWindow; }
     VlcPlaybackEngine::State getState() const { return engine ? engine->getState() : VlcPlaybackEngine::State{}; }
     static constexpr bool supported() noexcept {
 #if JUCE_WINDOWS
@@ -25,6 +23,7 @@ public:
 #endif
     }
 private:
+    void* nativeWindow=nullptr;
     std::unique_ptr<VlcPlaybackEngine> engine;
 };
 }

@@ -23,13 +23,29 @@ class VlcWebViewDiagnostic(unittest.TestCase):
         self.assertIn('acknowledgements==20',runner)
         self.assertIn("all(r['passed'] for r in results)",runner)
 
-    def test_production_association_before_player_with_hidden_state_restored(self):
+    def test_production_stable_hwnd_and_separate_native_visibility(self):
         source=(ROOT/'native/Source/VlcVideoSurface.cpp').read_text(encoding='utf-8')
-        begin=source.index('const bool previouslyVisible=isVisible();')
-        attach=source.index('setHWND(hwnd);',begin)
-        restore=source.index('if(!previouslyVisible)setVisible(false);',attach)
-        player=source.index('engine=std::make_unique<VlcPlaybackEngine>',restore)
-        self.assertLess(begin,attach)
-        self.assertLess(attach,restore)
-        self.assertLess(restore,player)
-        self.assertIn('GetParent(hwnd)!=parent',source[restore:player])
+        header=(ROOT/'native/Source/VlcVideoSurface.h').read_text(encoding='utf-8')
+        self.assertIn('class VlcVideoSurface final : public juce::Component',header)
+        self.assertNotIn('public juce::HWNDComponent',header)
+        self.assertLess(source.index('nativeWindow=hwnd'),source.index('engine=std::make_unique<VlcPlaybackEngine>'))
+        self.assertNotIn('SetParent(',source)
+        viewport=source.split('void VlcVideoSurface::updateViewport',1)[1]
+        self.assertNotIn('setVisible(',viewport)
+        self.assertIn('setVlcChildVisible(hwnd,parent,show && isShowing())',viewport)
+        self.assertIn('if(!bounds.isEmpty()',viewport)
+        main=(ROOT/'native/Source/MainComponent.cpp').read_text(encoding='utf-8')
+        self.assertIn('addAndMakeVisible(vlcVideo)',main)
+
+    def test_combined_input_is_required_release_gate(self):
+        cmake=(ROOT/'CMakeLists.txt').read_text(encoding='utf-8')
+        self.assertIn('add_test(NAME vlc_webview_interaction',cmake)
+        build=(ROOT/'scripts/build-windows.ps1').read_text(encoding='utf-8-sig')
+        self.assertIn('--target FengYinVlcWebViewCheck',build)
+        self.assertIn("-R '^vlc_webview_interaction$'",build)
+        workflow=(ROOT/'.github/workflows/windows-build.yml').read_text(encoding='utf-8')
+        self.assertIn('path: build-windows/evidence/',workflow)
+        source=(ROOT/'tools/vlc-webview-check/main.cpp').read_text(encoding='utf-8')
+        self.assertIn('firstPictureVisible()',source)
+        self.assertIn('FAIL preview emitted accompaniment',source)
+        self.assertIn('surface.getState().generation==generation',source)

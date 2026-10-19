@@ -259,6 +259,13 @@ jobs:
           if (Test-Path build-windows/Testing) {
             Compress-Archive -Path build-windows/Testing -DestinationPath windows-test-results.zip -Force
           }
+      - name: 保存真实VLC和WebView2联合输入证据
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: Windows-VLC-WebView-interaction-evidence
+          path: build-windows/evidence/
+          if-no-files-found: warn
 
       - name: 准备 VB-CABLE 可选测试入口
         if: inputs.vbcable_trial == true

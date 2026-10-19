@@ -238,7 +238,9 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
     applyTheme(Theme::neon);
     showPage(Page::play);
     setupWebInterface();
-    addChildComponent(vlcVideo);
+    // The transparent placeholder stays in JUCE's visible hierarchy. Native
+    // video visibility is controlled solely by its explicit Win32 viewport.
+    addAndMakeVisible(vlcVideo);
     // Discover dependencies on a fresh installation, without creating tones.
     // Discover later-installed plugins too; existing unchanged plugins use cache.
     pluginChoicesLoaded = false;

@@ -60,7 +60,7 @@ struct Scene final:juce::Component,juce::Timer {
                   std::cout<<"viewport returned\n"<<std::flush;}};
               if(deferred)juce::MessageManager::callAsync(apply);else apply();});
         web=std::make_unique<juce::WebBrowserComponent>(options);
-        addAndMakeVisible(*web);addChildComponent(surface);
+        addAndMakeVisible(*web);addAndMakeVisible(surface);
         setSize(900,650);addToDesktop(juce::ComponentPeer::windowHasTitleBar);
         setTopLeftPosition(80,80);setVisible(true);toFront(true);
         web->setBounds(getLocalBounds());
@@ -68,6 +68,16 @@ struct Scene final:juce::Component,juce::Timer {
         deadline=now()+30000;startTimer(20);
     }
     ~Scene()override{stopTimer();surface.shutdown();web.reset();}
+    bool firstPictureVisible()const {
+        const auto hwnd=static_cast<HWND>(surface.getHWND());RECT bounds{};
+        if(!hwnd||!IsWindowVisible(hwnd)||!GetClientRect(hwnd,&bounds)
+            ||bounds.right<8||bounds.bottom<8)return false;
+        POINT point{bounds.right/2,bounds.bottom/2};ClientToScreen(hwnd,&point);
+        const auto screen=GetDC(nullptr);if(!screen)return false;
+        const auto colour=GetPixel(screen,point.x,point.y);ReleaseDC(nullptr,screen);
+        // The owned fixture is red; a blank HWND or the blue web page cannot pass.
+        return colour!=CLR_INVALID&&GetRValue(colour)>150&&GetGValue(colour)<100&&GetBValue(colour)<100;
+    }
     void click(int x) {
         auto* peer=getPeer();const auto scale=peer->getPlatformScaleFactor();
         POINT p{juce::roundToInt(x*scale),juce::roundToInt(25*scale)};
@@ -93,10 +103,15 @@ struct Scene final:juce::Component,juce::Timer {
             std::cout<<"initialise returned hwnd="<<surface.getHWND()<<std::endl;
             surface.player()->load(fixture.getFullPathName().toStdString(),++generation);
             phase=1;deadline=now()+30000;
-        } else if(phase==1&&surface.getState().ready){
+        } else if(phase==1&&surface.getState().generation==generation&&surface.getState().ready){
             web->evaluateJavascript("report()");
+            phase=5;deadline=now()+10000;
+        } else if(phase==5&&firstPictureVisible()){
+            const auto pcm=surface.player()->testPcmNonzero.load();
+            if(generation==1&&pcm!=0){failed=true;stopTimer();std::cerr<<"FAIL preview emitted accompaniment\n";return;}
+            std::cout<<"PASS real paused first picture generation="<<generation<<" cumulativePCM="<<pcm<<std::endl;
             surface.player()->setPlaying(true);phase=2;deadline=now()+10000;
-        } else if(phase==2&&surface.getState().displayedVideo>0){
+        } else if(phase==2&&surface.getState().generation==generation&&surface.getState().displayedVideo>0){
             expandedAck=false;phase=3;deadline=now()+5000;click(60);
         } else if(phase==3&&expandedAck){
             phase=4;deadline=now()+5000;click(195);

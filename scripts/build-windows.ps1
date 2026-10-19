@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.1.25",
+    [string]$Version = "1.1.26",
     [switch]$SkipInstaller
 )
 
@@ -108,6 +108,12 @@ Invoke-Checked "LibVLC fixture preparation" {
 Invoke-Checked "LibVLC integration preflight build" { cmake --build $BuildDir --config Release --target FengYinVlcTests --parallel 4 }
 Invoke-Checked "LibVLC real playback and lifecycle check" {
     ctest --test-dir $BuildDir -C Release -R '^vlc_real_playback$' -V --output-on-failure
+}
+Invoke-Checked "Real WebView2 and VLC native-input preflight build" {
+    cmake --build $BuildDir --config Release --target FengYinVlcWebViewCheck --parallel 4
+}
+Invoke-Checked "Real WebView2 and VLC native-input interaction" {
+    ctest --test-dir $BuildDir -C Release -R '^vlc_webview_interaction$' -V --output-on-failure
 }
 
 Write-Host "[2/5] 编译风吟和自动测试..." -ForegroundColor Cyan

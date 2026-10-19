@@ -1,4 +1,10 @@
-状态：202完成实际对照，生产顺序修复待同场景复验，不是修复交付。
+状态：202完成实际对照；203最小预挂接修补仍失败，继续修复，不是交付。
+203 run39252154663结果与202一致：默认隐藏两组0点击失败，保持JUCE可见两组
+各20点击通过。因此“临时预挂接再恢复隐藏”不足以解决，不能作为已验证修复。
+新的候选移除HWNDComponent包装：VlcVideoSurface改用透明、不接收输入的普通
+Component，始终保留在JUCE可见层级；原生HWND只创建一次、父窗口不变，显示/
+隐藏和DPI位置由Win32显式控制，关闭VLC线程后才DestroyWindow。不缩为0尺寸。
+正式构建前必须再次通过联合输入和实际暂停首帧/零预览PCM测试。
 202 run39250844525，remote eb990bdaf1093a86d26f07e01d1e9056864ab13d。
 已下载证据/private/tmp/fy-vlc-webview202/evidence/results.json及四组run.log。
 - immediate：退出1，0次点击，网页心跳停顿但原生UI仍泵消息。
