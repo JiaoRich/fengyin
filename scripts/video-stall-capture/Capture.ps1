@@ -38,14 +38,14 @@ try {
     if(-not (Test-Path -LiteralPath $Wpr)){throw 'Windows Performance Recorder is unavailable; no trace was started.'}
     Add-Type -Path (Join-Path $PSScriptRoot 'WindowSnapshot.cs')
     # Persist the unique ID BEFORE attempting start, so even partial failures are recoverable.
-    [pscustomobject]@{Started=(Get-Date).ToString('o');Seconds=$Seconds;CollectorPID=$PID;Session=$Session;LogicalProcessors=[Environment]::ProcessorCount;Kind='CPU ETW and read-only window state; not a fix'} |
+    [pscustomobject]@{Started=(Get-Date).ToString('o');Seconds=$Seconds;CollectorPID=$PID;Session=$Session;LogicalProcessors=[Environment]::ProcessorCount;WprVersion=(Get-Item -LiteralPath $Wpr).VersionInfo.FileVersion;OSVersion=[Environment]::OSVersion.VersionString;Kind='CPU ETW and read-only window state; not a fix'} |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $Out 'session.json') -Encoding UTF8
     $inventory=Invoke-CapturedNative (Join-Path $env:SystemRoot 'System32/logman.exe') 'query -ets' $Out 'trace-inventory' 30
     if($inventory.ExitCode -ne 0){throw 'Cannot inventory prior collector sessions; refusing to start another trace.'}
     foreach($prior in @(Get-OwnedStallSessionNames $inventory.Output)) {
         if($prior -eq $Session){continue}
         Write-Host 'Saving a previous FengYin collector trace before starting this run.' -ForegroundColor Yellow
-        Run-Wpr ('-stop "'+(Join-Path $Out ($prior+'.etl'))+'" -skipPdbGen -compress') ('recover-'+$prior) 120 $prior
+        Run-Wpr ('-stop "'+(Join-Path $Out ($prior+'.etl'))+'" "FengYin previous diagnostic" -skipPdbGen') ('recover-'+$prior) 120 $prior
     }
     Save-Logs 'before'
     Write-Host 'Start this collector BEFORE reproducing. UAC/window switching can temporarily recover an existing fault.' -ForegroundColor Yellow
@@ -56,7 +56,7 @@ try {
     $StartAttempted=$true
     Run-Wpr '-start CPU' 'wpr-start'
     $Tracing=$true
-    Run-Wpr '-status profiles' 'wpr-confirm-running'
+    Run-Wpr '-status' 'wpr-confirm-running'
     Write-Host ('CAPTURING '+$Seconds+' seconds. Return to FengYin now. No settings will change.') -ForegroundColor Green
     $clock=[Diagnostics.Stopwatch]::StartNew()
     $identities=@{}
@@ -90,7 +90,7 @@ try {
         }
         Start-Sleep -Seconds 2
     }
-    Run-Wpr '-status collectors -details' 'wpr-status'
+    Run-Wpr '-status' 'wpr-status'
     if(-not (Test-Path -LiteralPath (Join-Path $Out 'windows.jsonl'))) {
         throw 'No FengYin window snapshots were captured; this is not a successful diagnostic run.'
     }
@@ -99,7 +99,9 @@ try {
     $CaptureError | Set-Content -LiteralPath (Join-Path $Out 'capture-error.txt') -Encoding UTF8
 } finally {
     if($Tracing) {
-        try {Run-Wpr ('-stop "'+(Join-Path $Out 'cpu.etl')+'" -skipPdbGen -compress') 'wpr-stop' 120;$Tracing=$false}
+        # Use the inbox Windows 10 grammar. Trace compression is done by ZIP,
+        # not the newer optional WPR switch introduced with the Windows 11 ADK.
+        try {Run-Wpr ('-stop "'+(Join-Path $Out 'cpu.etl')+'" "FengYin CPU diagnostic" -skipPdbGen') 'wpr-stop' 120;$Tracing=$false}
         catch {
             $CaptureError=$_.Exception.Message
             $CaptureError | Set-Content -LiteralPath (Join-Path $Out 'trace-stop-error.txt') -Encoding UTF8

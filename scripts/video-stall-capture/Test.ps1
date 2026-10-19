@@ -57,9 +57,9 @@ try {
     $active=$true
     $clock=[Diagnostics.Stopwatch]::StartNew()
     while($clock.Elapsed.TotalSeconds -lt 5) { [Math]::Sqrt(12345) | Out-Null }
-    & $wpr -status collectors -details -instancename $session
+    & $wpr -status -instancename $session
     if($LASTEXITCODE){throw 'WPR status failed'}
-    & $wpr -stop (Join-Path $pwd 'cpu-smoke.etl') -skipPdbGen -compress -instancename $session
+    & $wpr -stop (Join-Path $pwd 'cpu-smoke.etl') 'FengYin collector smoke' -skipPdbGen -instancename $session
     if($LASTEXITCODE){throw 'WPR stop failed'}
     $active=$false
     if((Get-Item 'cpu-smoke.etl').Length -lt 4096){throw 'ETL missing/empty'}
@@ -99,10 +99,14 @@ try {
     $start=Invoke-CapturedNative $wpr ('-start CPU -instancename '+$orphan) $nativeOut 'orphan-start' 30
     if($start.ExitCode -ne 0){throw 'Cannot create synthetic prior collector session'}
     $orphanStarted=$true
-    $output=Join-Path $pwd 'exact-entry-output'
+    # Match the customer's extracted folder spelling: spaces and parentheses.
+    $copyRoot=Join-Path $pwd 'collector script (4)'
+    New-Item -ItemType Directory -Path $copyRoot | Out-Null
+    Get-ChildItem -LiteralPath $PSScriptRoot -File | Copy-Item -Destination $copyRoot
+    $output=Join-Path $pwd 'exact entry output (4)'
     New-Item -ItemType Directory -Path $output | Out-Null
     $elapsed=[Diagnostics.Stopwatch]::StartNew()
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Capture.ps1') -NoPrompt -Seconds 30 -OutputBase $output
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $copyRoot 'Capture.ps1') -NoPrompt -Seconds 30 -OutputBase $output
     if($LASTEXITCODE -ne 0){throw 'Exact user entry returned failure'}
     if($elapsed.Elapsed.TotalSeconds -lt 30){throw 'Capture ended before requested duration'}
     $bundle=@(Get-ChildItem -LiteralPath $output -Directory)

@@ -299,7 +299,7 @@ jobs:
             collector-smoke.zip
             collector-exact-entry.zip
             native-command-smoke/
-            exact-entry-output/
+            exact entry output (4)/
           if-no-files-found: ignore
       - name: Validate and package crash collector
         shell: powershell

@@ -21,6 +21,8 @@ class VideoStallCapture(unittest.TestCase):
         self.assertIn('[ValidateRange(30,300)]', source)
         self.assertIn("Run-Wpr '-start CPU'", source)
         self.assertNotIn('-filemode', source)
+        self.assertNotIn('-compress', source)
+        self.assertNotIn('-details', source)
         self.assertIn("$Arguments+' -instancename '+$Instance", source)
         self.assertIn("Run-Wpr '-cancel' 'wpr-cancel-own'", source)
         self.assertIn('if($Tracing)', source)
@@ -48,11 +50,12 @@ class VideoStallCapture(unittest.TestCase):
         self.assertIn('if: success()', workflow)
         smoke = (CAPTURE / 'Test.ps1').read_text(encoding='utf-8')
         for required in ('$panel.Enabled=$false', '$panel.Enabled=$true', '$form.Hide()',
-                         '-start CPU -instancename', '-status collectors -details -instancename',
-                         '-skipPdbGen -compress -instancename', 'ETL ZIP round trip changed bytes'):
+                         '-start CPU -instancename', '-status -instancename',
+                         '-skipPdbGen -instancename', 'ETL ZIP round trip changed bytes'):
             self.assertIn(required, smoke)
 
-        for required in ("-File (Join-Path $PSScriptRoot 'Capture.ps1') -NoPrompt -Seconds 30",
+        for required in ("-File (Join-Path $copyRoot 'Capture.ps1') -NoPrompt -Seconds 30",
+                         'collector script (4)', 'exact entry output (4)',
                          'Exact entry missing evidence', 'User entry leaked an ETW session',
                          'collector-exact-entry.zip'):
             self.assertIn(required, smoke)
