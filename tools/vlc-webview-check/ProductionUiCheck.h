@@ -6,7 +6,9 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
     std::unique_ptr<juce::WebBrowserComponent> web;
     juce::File fixture;
     std::atomic<uint64_t> ui{now()},javascript{now()};
-    bool failed=false,webOnly=false,ready=false,clickPending=false,expanded=false,touchDown=false;
+    bool failed=false,webOnly=false,ready=false,clickPending=false,expanded=false;
+    int touchPhase=0;
+    POINT touchPoint{};
     bool controlPlaying=false;
     POINT clickPoint{};
     int phase=0,cycle=0,generation=0,playCommands=0,volumeCommands=0,webReadyGeneration=0;
@@ -46,6 +48,10 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
                 if(p["session"].toString()!=session||(bool(p["visible"])&&int(p["generation"])!=generation))return;
                 std::cout<<"production viewport enter "<<juce::JSON::toString(p,true)<<std::endl;
                 surface.updateViewport({int(p["x"]),int(p["y"]),int(p["width"]),int(p["height"])},bool(p["visible"]));
+                if(juce::SystemStats::getEnvironmentVariable("FENGYIN_DIAGNOSTIC_CLIP_WEBVIEW",{})=="1") {
+                    const bool ok=fengyin::clipWebViewForVideo(*web,static_cast<HWND>(surface.getHWND()),bool(p["visible"]));
+                    std::cout<<"WebView hole clip="<<ok<<std::endl;if(!ok)failed=true;
+                }
                 std::cout<<"production viewport returned"<<std::endl;
             })
             .withEventListener("setVideoPlaybackState",[this](juce::var p){
@@ -112,11 +118,17 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
     bool injectTouch(POINTER_FLAGS flags) {
         POINTER_TOUCH_INFO contact{};
         contact.pointerInfo.pointerType=PT_TOUCH;contact.pointerInfo.pointerId=1;
-        contact.pointerInfo.ptPixelLocation=clickPoint;contact.pointerInfo.pointerFlags=flags;
+        contact.pointerInfo.ptPixelLocation=touchPoint;contact.pointerInfo.pointerFlags=flags;
         contact.touchMask=TOUCH_MASK_CONTACTAREA|TOUCH_MASK_ORIENTATION|TOUCH_MASK_PRESSURE;
         contact.orientation=90;contact.pressure=512;
-        contact.rcContact={clickPoint.x-2,clickPoint.y-2,clickPoint.x+2,clickPoint.y+2};
-        return InjectTouchInput(1,&contact)!=FALSE;
+        contact.rcContact={touchPoint.x-2,touchPoint.y-2,touchPoint.x+2,touchPoint.y+2};
+        for(int attempt=0;attempt<4;++attempt) {
+            if(InjectTouchInput(1,&contact))return true;
+            const auto error=GetLastError();
+            if(error!=ERROR_NOT_READY){std::cerr<<"FAIL InjectTouchInput error="<<error<<" flags="<<flags<<std::endl;return false;}
+            Sleep(1);
+        }
+        std::cerr<<"FAIL InjectTouchInput repeatedly not ready flags="<<flags<<std::endl;return false;
     }
     void timerCallback()override {
         ui.store(now());
@@ -138,11 +150,12 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
             },0);
             dumpProcess(L"production-ui-stall.dmp");finish();return;
         }
-        if(touchDown) {
-            touchDown=false;
-            if(!injectTouch(POINTER_FLAG_UP)){failed=true;return;}
+        if(touchPhase) {
+            const auto flags=touchPhase==1?(POINTER_FLAG_UPDATE|POINTER_FLAG_INRANGE|POINTER_FLAG_INCONTACT):POINTER_FLAG_UP;
+            if(!injectTouch(flags)){failed=true;return;}
+            touchPhase=touchPhase==1?2:0;
         }
-        if(clickPending) {
+        if(clickPending&&touchPhase==0) {
             clickPending=false;
             const auto scale=getPeer()->getPlatformScaleFactor();
             POINT p{juce::roundToInt(clickPoint.x*scale),juce::roundToInt(clickPoint.y*scale)};
@@ -155,7 +168,7 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
                 <<" video="<<video.left<<","<<video.top<<","<<video.right<<","<<video.bottom
                 <<" capture="<<info.hwndCapture<<" focus="<<info.hwndFocus<<" foreground="<<GetForegroundWindow()<<std::endl;
             if(cycle%2) {
-                clickPoint=p;touchDown=true;
+                touchPoint=p;touchPhase=1;
                 if(!injectTouch(POINTER_FLAG_DOWN|POINTER_FLAG_INRANGE|POINTER_FLAG_INCONTACT)){failed=true;return;}
             } else {
                 POINT actual{};RECT clip{};

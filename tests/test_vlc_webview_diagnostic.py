@@ -5,6 +5,19 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 class VlcWebViewDiagnostic(unittest.TestCase):
+    def test_nonoverlap_trial_uses_owned_native_region_not_focus_or_gpu_flags(self):
+        helper=(ROOT/'native/Source/VlcWebViewClipping.h').read_text(encoding='utf-8')
+        for item in ('getNativeChildForComponent','pid==GetCurrentProcessId()',
+                     'GetParent(hwnd)==parent','CombineRgn(region,region,hole,RGN_DIFF)',
+                     'SetWindowRgn(host,nullptr,TRUE)'):
+            self.assertIn(item,helper)
+        for item in ('SetFocus','SetForegroundWindow','disable-gpu'):
+            self.assertNotIn(item,helper)
+        source=(ROOT/'tools/vlc-webview-check/ProductionUiCheck.h').read_text(encoding='utf-8')
+        self.assertIn('POINTER_FLAG_UPDATE|POINTER_FLAG_INRANGE|POINTER_FLAG_INCONTACT',source)
+        self.assertIn('contact.pointerInfo.ptPixelLocation=touchPoint',source)
+        self.assertIn('GetLastError()',source)
+
     def test_ci_uses_verified_current_runtime_not_old_runner_image(self):
         helper=(ROOT/'scripts/ensure_ci_webview.ps1').read_text(encoding='utf-8')
         for item in ("$env:GITHUB_ACTIONS -ne 'true'",'Get-AuthenticodeSignature','Microsoft Corporation',

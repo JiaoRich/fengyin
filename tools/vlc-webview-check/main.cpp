@@ -6,6 +6,7 @@
 #include <dbghelp.h>
 #include "VlcVideoSurface.h"
 #include "VideoHostRendering.h"
+#include "VlcWebViewClipping.h"
 #include <atomic>
 #include <chrono>
 #include <iostream>
