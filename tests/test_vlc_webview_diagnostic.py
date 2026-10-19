@@ -121,5 +121,7 @@ class VlcWebViewDiagnostic(unittest.TestCase):
                      'InitializeTouchInjection','InjectTouchInput','POINTER_FLAG_UP'):
             self.assertIn(item,source)
         self.assertNotIn('.click()',source)
+        self.assertIn('requestedGeneration=generation+1',source)
+        self.assertIn('generation==requestedGeneration',source)
         self.assertLess(source.index('setOpaque(true)'),source.index('addToDesktop(0)'))
         self.assertIn("(args.rounds+1,'production-ui')",(ROOT/'scripts/check_vlc_webview.py').read_text(encoding='utf-8'))

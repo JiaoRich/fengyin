@@ -16,7 +16,7 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
     bool touchInput()const{return inputMode=="touch"||(inputMode=="mixed"&&cycle%2);}
     bool controlPlaying=false;
     POINT clickPoint{};
-    int phase=0,cycle=0,generation=0,playCommands=0,volumeCommands=0,webReadyGeneration=0;
+    int phase=0,cycle=0,generation=0,requestedGeneration=1,playCommands=0,volumeCommands=0,webReadyGeneration=0;
     int previousPlay=0,previousVolume=0;
     uint64_t deadline=now()+30000,lastState=0,lastConfig=0;
     juce::String session;
@@ -81,6 +81,7 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
     void paint(juce::Graphics& g)override{g.fillAll(juce::Colour(0xff07101d));}
     void finish(){stopTimer();juce::MessageManager::getInstance()->stopDispatchLoop();}
     void click(const juce::String& selector,double fraction=.5) {
+        if(selector=="#change-video")requestedGeneration=generation+1;
         const auto script="(()=>{const e=document.querySelector("+juce::JSON::toString(selector)+");const r=e.getBoundingClientRect();"
             "const x=r.x+r.width*"+juce::String(fraction)+",y=r.y+r.height*.5;window.__JUCE__.backend.emitEvent('testPoint',"
             "{selector:"+juce::JSON::toString(selector)+",x,y,hit:document.elementFromPoint(x,y)?.id,dpr:devicePixelRatio,w:innerWidth,h:innerHeight});})()";
@@ -135,6 +136,16 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
         }
         std::cerr<<"FAIL InjectTouchInput repeatedly not ready flags="<<flags<<std::endl;return false;
     }
+    bool moveMouse(POINT p) {
+        const auto left=GetSystemMetrics(SM_XVIRTUALSCREEN),top=GetSystemMetrics(SM_YVIRTUALSCREEN);
+        const auto width=GetSystemMetrics(SM_CXVIRTUALSCREEN),height=GetSystemMetrics(SM_CYVIRTUALSCREEN);
+        if(width<2||height<2)return false;
+        INPUT input{};input.type=INPUT_MOUSE;
+        input.mi.dx=LONG((int64_t(p.x-left)*65536)/width+32768/width);
+        input.mi.dy=LONG((int64_t(p.y-top)*65536)/height+32768/height);
+        input.mi.dwFlags=MOUSEEVENTF_MOVE|MOUSEEVENTF_ABSOLUTE|MOUSEEVENTF_VIRTUALDESK|MOUSEEVENTF_MOVE_NOCOALESCE;
+        return SendInput(1,&input,sizeof(INPUT))==1;
+    }
     void timerCallback()override {
         ui.store(now());
         if(surface.player()&&!surface.getState().error.empty()) {
@@ -162,6 +173,10 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
             if(touchPhase==0)inputSettledAt=now()+250;
         }
         if(mousePhase) {
+            if(mousePhase==3) {
+                if(!moveMouse(mousePoint)){failed=true;return;}
+                mousePhase=1;
+            } else {
             INPUT input{};input.type=INPUT_MOUSE;
             input.mi.dwFlags=mousePhase==1?MOUSEEVENTF_LEFTDOWN:MOUSEEVENTF_LEFTUP;
             POINT actual{};
@@ -171,6 +186,7 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
             if(SendInput(1,&input,sizeof(INPUT))!=1){failed=true;std::cerr<<"FAIL mouse button injection error="<<GetLastError()<<std::endl;return;}
             mousePhase=mousePhase==1?2:0;
             if(mousePhase==0)inputSettledAt=now()+250;
+            }
         }
         if(clickPending&&touchPhase==0&&mousePhase==0&&now()>=inputSettledAt) {
             clickPending=false;
@@ -191,15 +207,8 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
                 // Real mouse motion is required to leave Chromium's touch modality.
                 // SetCursorPos alone is not a hardware mouse move. Separate motion,
                 // down and up by message-loop turns, just as for touch injection.
-                const auto left=GetSystemMetrics(SM_XVIRTUALSCREEN),top=GetSystemMetrics(SM_YVIRTUALSCREEN);
-                const auto width=GetSystemMetrics(SM_CXVIRTUALSCREEN),height=GetSystemMetrics(SM_CYVIRTUALSCREEN);
-                if(width<2||height<2){failed=true;return;}
-                INPUT input{};input.type=INPUT_MOUSE;
-                input.mi.dx=LONG((int64_t(p.x-left)*65536)/width+32768/width);
-                input.mi.dy=LONG((int64_t(p.y-top)*65536)/height+32768/height);
-                input.mi.dwFlags=MOUSEEVENTF_MOVE|MOUSEEVENTF_ABSOLUTE|MOUSEEVENTF_VIRTUALDESK;
-                if(SendInput(1,&input,sizeof(INPUT))!=1){failed=true;std::cerr<<"FAIL mouse motion injection error="<<GetLastError()<<std::endl;return;}
-                mousePoint=p;mousePhase=1;
+                if(!moveMouse({p.x-4,p.y})){failed=true;std::cerr<<"FAIL mouse motion injection error="<<GetLastError()<<std::endl;return;}
+                mousePoint=p;mousePhase=3;
             }
         }
         if(ready&&now()-lastState>=100){lastState=now();sendState();}
@@ -207,7 +216,7 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
             web->evaluateJavascript("window.__JUCE__.backend.emitEvent('testRuntime',{userAgent:navigator.userAgent})");
             if(!webOnly&&!surface.initialise()){failed=true;return;}
             phase=1;click("#change-video");deadline=now()+30000;
-        } else if(phase==1&&generation>0&&webReadyGeneration==generation&&(webOnly||(surface.getState().generation==generation&&surface.getState().ready&&firstPictureVisible()))) {
+        } else if(phase==1&&generation==requestedGeneration&&webReadyGeneration==generation&&(webOnly||(surface.getState().generation==generation&&surface.getState().ready&&firstPictureVisible()))) {
             std::cout<<(webOnly?"CONTROL fake selection generation=":"PASS real paused first picture generation=")<<generation<<std::endl;
             if(!webOnly&&generation==1&&surface.player()->testPcmNonzero.load()!=0){failed=true;return;}
             phase=2;click("#fullscreen");
