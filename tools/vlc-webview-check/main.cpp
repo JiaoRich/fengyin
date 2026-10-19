@@ -46,6 +46,7 @@ struct Scene final:juce::Component,juce::Timer {
     explicit Scene(juce::File input,const juce::String& mode):fixture(input),
         deferred(mode.contains("deferred")),attachBeforePlayer(mode.startsWith("attached-")),
         webOnly(mode=="web-only") {
+        setOpaque(true);
         auto options=juce::WebBrowserComponent::Options{}
           .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
           .withWinWebView2Options(juce::WebBrowserComponent::Options::WinWebView2{}
@@ -84,6 +85,7 @@ struct Scene final:juce::Component,juce::Timer {
         deadline=now()+30000;startTimer(20);
     }
     ~Scene()override{stopTimer();surface.shutdown();web.reset();}
+    void paint(juce::Graphics& g)override{g.fillAll(juce::Colour(0xff07101d));}
     void finish(){stopTimer();juce::MessageManager::getInstance()->stopDispatchLoop();}
     void captureFailure()const {
         const auto hwnd=static_cast<HWND>(getPeer()->getNativeHandle());RECT r{};

@@ -13,6 +13,9 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
     uint64_t deadline=now()+30000,lastState=0;
     juce::String session;
     explicit ProductionUiScene(juce::File media):fixture(media) {
+        // Match the real DocumentWindow. A default non-opaque Component with
+        // no title bar creates a layered HWND, which is a different host model.
+        setOpaque(true);
         const auto options=juce::WebBrowserComponent::Options{}
             .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
             .withWinWebView2Options(juce::WebBrowserComponent::Options::WinWebView2{}
@@ -52,6 +55,7 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
         startTimer(20);
     }
     ~ProductionUiScene()override{stopTimer();surface.shutdown();web.reset();}
+    void paint(juce::Graphics& g)override{g.fillAll(juce::Colour(0xff07101d));}
     void finish(){stopTimer();juce::MessageManager::getInstance()->stopDispatchLoop();}
     void click(const juce::String& selector,double fraction=.5) {
         const auto script="(()=>{const e=document.querySelector("+juce::JSON::toString(selector)+");const r=e.getBoundingClientRect();"
