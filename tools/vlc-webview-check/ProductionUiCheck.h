@@ -9,6 +9,11 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
     bool failed=false,webOnly=false,ready=false,clickPending=false,expanded=false;
     int touchPhase=0,mousePhase=0;
     POINT touchPoint{},mousePoint{};
+    const juce::String inputMode=juce::SystemStats::getEnvironmentVariable("FENGYIN_DIAGNOSTIC_INPUT_MODE","mixed");
+    // Test pacing only: finish OS compatibility-pointer processing before the
+    // next independent gesture. No delay is added to production controls.
+    uint64_t inputSettledAt=0;
+    bool touchInput()const{return inputMode=="touch"||(inputMode=="mixed"&&cycle%2);}
     bool controlPlaying=false;
     POINT clickPoint{};
     int phase=0,cycle=0,generation=0,playCommands=0,volumeCommands=0,webReadyGeneration=0;
@@ -26,14 +31,16 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
                     .getChildFile("fy-production-ui-"+juce::Uuid().toString())))
             .withNativeIntegrationEnabled()
             .withUserScript(R"JS(localStorage.setItem('fy-guide-seen','yes');localStorage.setItem('fy-voice-enabled','no');
-                for(const event of ['pointerdown','pointerup','click'])document.addEventListener(event,e=>
-                    window.__JUCE__.backend.emitEvent('testInput',{event,target:e.target.id,x:e.clientX,y:e.clientY}),true);
+                window.addEventListener('error',e=>window.__JUCE__.backend.emitEvent('testError',{message:e.message}));
+                for(const event of ['pointerdown','pointerup','click','gotpointercapture','lostpointercapture'])document.addEventListener(event,e=>
+                    window.__JUCE__.backend.emitEvent('testInput',{event,target:e.target.id,x:e.clientX,y:e.clientY,pointerId:e.pointerId,pointerType:e.pointerType}),true);
                 window.addEventListener('load',()=>setInterval(()=>window.__JUCE__.backend.emitEvent('testHeartbeat',
                 {expanded:document.body.classList.contains('video-expanded'),selected:
                     typeof nativeVideoEngine!=='undefined'&&nativeVideoEngine&&nativeAccompanimentReady?videoGeneration:0}),100));)JS")
             .withEventListener("testHeartbeat",[this](juce::var p){javascript.store(now());expanded=bool(p["expanded"]);webReadyGeneration=int(p["selected"]);})
             .withEventListener("webReady",[this](juce::var p){session=p["videoSession"].toString();ready=true;javascript.store(now());})
             .withEventListener("testRuntime",[](juce::var p){std::cout<<"production runtime "<<juce::JSON::toString(p,true)<<std::endl;})
+            .withEventListener("testError",[this](juce::var p){failed=true;std::cerr<<"FAIL page script "<<juce::JSON::toString(p,true)<<std::endl;})
             .withEventListener("requestBackendState",[this](juce::var){lastConfig=0;})
             .withEventListener("testPoint",[this](juce::var p){
                 std::cout<<"web point "<<juce::JSON::toString(p,true)<<std::endl;
@@ -152,6 +159,7 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
             const auto flags=touchPhase==1?(POINTER_FLAG_UPDATE|POINTER_FLAG_INRANGE|POINTER_FLAG_INCONTACT):POINTER_FLAG_UP;
             if(!injectTouch(flags)){failed=true;return;}
             touchPhase=touchPhase==1?2:0;
+            if(touchPhase==0)inputSettledAt=now()+250;
         }
         if(mousePhase) {
             INPUT input{};input.type=INPUT_MOUSE;
@@ -162,8 +170,9 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
             }
             if(SendInput(1,&input,sizeof(INPUT))!=1){failed=true;std::cerr<<"FAIL mouse button injection error="<<GetLastError()<<std::endl;return;}
             mousePhase=mousePhase==1?2:0;
+            if(mousePhase==0)inputSettledAt=now()+250;
         }
-        if(clickPending&&touchPhase==0&&mousePhase==0) {
+        if(clickPending&&touchPhase==0&&mousePhase==0&&now()>=inputSettledAt) {
             clickPending=false;
             const auto scale=getPeer()->getPlatformScaleFactor();
             POINT p{juce::roundToInt(clickPoint.x*scale),juce::roundToInt(clickPoint.y*scale)};
@@ -175,7 +184,7 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
                 <<" scale="<<scale<<" hit="<<hit<<" class="<<juce::String(name)
                 <<" video="<<video.left<<","<<video.top<<","<<video.right<<","<<video.bottom
                 <<" capture="<<info.hwndCapture<<" focus="<<info.hwndFocus<<" foreground="<<GetForegroundWindow()<<std::endl;
-            if(cycle%2) {
+            if(touchInput()) {
                 touchPoint=p;touchPhase=1;
                 if(!injectTouch(POINTER_FLAG_DOWN|POINTER_FLAG_INRANGE|POINTER_FLAG_INCONTACT)){failed=true;return;}
             } else {
@@ -207,7 +216,7 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
         } else if(phase==3&&playCommands>previousPlay) {
             previousVolume=volumeCommands;phase=4;click("#video-volume",cycle%2?.25:.75);
         } else if(phase==4&&volumeCommands>previousVolume) {
-            std::cout<<"PASS physical click cycle="<<cycle<<" production fullscreen/play/volume, input="<<(cycle%2?"touch":"mouse")<<" PCM="<<(webOnly?0:surface.player()->testPcmNonzero.load())<<std::endl;
+            std::cout<<"PASS physical click cycle="<<cycle<<" production fullscreen/play/volume, input="<<(touchInput()?"touch":"mouse")<<" PCM="<<(webOnly?0:surface.player()->testPcmNonzero.load())<<std::endl;
             if(++cycle==20){finish();return;}
             if(cycle%5==0){phase=1;click("#change-video");deadline=now()+30000;}
             else {phase=2;click("#fullscreen");}
