@@ -1,5 +1,6 @@
 param([ValidateRange(30,300)][int]$Seconds=180,
-      [string]$OriginalAppData=$env:APPDATA,[string]$OriginalLocalData=$env:LOCALAPPDATA)
+      [string]$OriginalAppData=$env:APPDATA,[string]$OriginalLocalData=$env:LOCALAPPDATA,
+      [switch]$NoPrompt,[string]$OutputBase=$PSScriptRoot)
 $ErrorActionPreference='Stop'
 $principal=New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
 if(-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -8,19 +9,18 @@ if(-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrat
     $child=Start-Process powershell.exe -Verb RunAs -ArgumentList $arguments -PassThru -Wait
     exit $child.ExitCode
 }
-$Out=Join-Path $PSScriptRoot ('Video-stall-'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,6))
+$Out=Join-Path $OutputBase ('Video-stall-'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,6))
 New-Item -ItemType Directory -Path $Out | Out-Null
+. (Join-Path $PSScriptRoot 'NativeCommands.ps1')
 $Wpr=Join-Path $env:SystemRoot 'System32/wpr.exe'
 $Session='FengYinVideo-'+[guid]::NewGuid().ToString('N')
 $Tracing=$false
+$StartAttempted=$false
 $CaptureError=$null
-function Run-Wpr([string]$Arguments,[string]$Label,[int]$Timeout=30) {
-    $process=Start-Process -FilePath $Wpr -ArgumentList ($Arguments+' -instancename '+$Session) -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $Out ($Label+'.txt')) -RedirectStandardError (Join-Path $Out ($Label+'-stderr.txt'))
-    if(-not $process.WaitForExit($Timeout*1000)) {
-        $process.Kill();$process.WaitForExit();throw ('WPR command timed out: '+$Label)
-    }
-    $process.WaitForExit()
-    if($process.ExitCode -ne 0){throw ('WPR command failed: '+$Label+' ('+$process.ExitCode+')')}
+function Run-Wpr([string]$Arguments,[string]$Label,[int]$Timeout=30,[string]$Instance=$Session) {
+    $result=Invoke-CapturedNative $Wpr ($Arguments+' -instancename '+$Instance) $Out $Label $Timeout
+    [pscustomobject]@{Command=$Label;Session=$Instance;ExitCode=$result.ExitCode} | ConvertTo-Json -Compress | Add-Content -LiteralPath (Join-Path $Out 'commands.jsonl') -Encoding UTF8
+    if($result.ExitCode -ne 0){throw ('WPR command failed: '+$Label+' ('+$result.ExitCode+') '+$result.Output+' '+$result.Error)}
 }
 function Save-Logs([string]$Label) {
     foreach($pair in @(@('roaming',$OriginalAppData),@('local',$OriginalLocalData))) {
@@ -37,16 +37,26 @@ try {
     if(-not [Environment]::Is64BitProcess){throw 'Use 64-bit Windows PowerShell.'}
     if(-not (Test-Path -LiteralPath $Wpr)){throw 'Windows Performance Recorder is unavailable; no trace was started.'}
     Add-Type -Path (Join-Path $PSScriptRoot 'WindowSnapshot.cs')
+    # Persist the unique ID BEFORE attempting start, so even partial failures are recoverable.
+    [pscustomobject]@{Started=(Get-Date).ToString('o');Seconds=$Seconds;CollectorPID=$PID;Session=$Session;LogicalProcessors=[Environment]::ProcessorCount;Kind='CPU ETW and read-only window state; not a fix'} |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $Out 'session.json') -Encoding UTF8
+    $inventory=Invoke-CapturedNative (Join-Path $env:SystemRoot 'System32/logman.exe') 'query -ets' $Out 'trace-inventory' 30
+    if($inventory.ExitCode -ne 0){throw 'Cannot inventory prior collector sessions; refusing to start another trace.'}
+    foreach($prior in @(Get-OwnedStallSessionNames $inventory.Output)) {
+        if($prior -eq $Session){continue}
+        Write-Host 'Saving a previous FengYin collector trace before starting this run.' -ForegroundColor Yellow
+        Run-Wpr ('-stop "'+(Join-Path $Out ($prior+'.etl'))+'" -skipPdbGen -compress') ('recover-'+$prior) 120 $prior
+    }
     Save-Logs 'before'
     Write-Host 'Start this collector BEFORE reproducing. UAC/window switching can temporarily recover an existing fault.' -ForegroundColor Yellow
     Write-Host 'Press ENTER. Collecting lasts 180 seconds by default; do not return to this window during the fault.'
     Write-Host 'After CAPTURING: open or return to FengYin normally, play briefly, select the same video, then keep playing.'
-    $null=Read-Host
+    if(-not $NoPrompt){$null=Read-Host}
     # Memory-mode CPU trace is bounded by the built-in profile buffers, unlike unbounded file mode.
+    $StartAttempted=$true
     Run-Wpr '-start CPU' 'wpr-start'
     $Tracing=$true
-    [pscustomobject]@{Started=(Get-Date).ToString('o');Seconds=$Seconds;CollectorPID=$PID;Session=$Session;LogicalProcessors=[Environment]::ProcessorCount;Kind='CPU ETW and read-only window state; not a fix'} |
-        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $Out 'session.json') -Encoding UTF8
+    Run-Wpr '-status profiles' 'wpr-confirm-running'
     Write-Host ('CAPTURING '+$Seconds+' seconds. Return to FengYin now. No settings will change.') -ForegroundColor Green
     $clock=[Diagnostics.Stopwatch]::StartNew()
     $identities=@{}
@@ -96,6 +106,9 @@ try {
             # Never cancel another tool's trace; the unique instance is mandatory on every command.
             try {Run-Wpr '-cancel' 'wpr-cancel-own' 30;$Tracing=$false} catch {$_ | Out-String | Set-Content -LiteralPath (Join-Path $Out 'cancel-error.txt')}
         }
+    } elseif($StartAttempted) {
+        # Start can fail after partially creating sessions. Our GUID was saved before the attempt.
+        try {Run-Wpr '-cancel' 'wpr-cancel-partial-start' 30} catch {$_ | Out-String | Set-Content -LiteralPath (Join-Path $Out 'partial-start-cleanup.txt')}
     }
     Save-Logs 'after'
     @('CPU trace can contain system process/module names and paths; do not publish it.',

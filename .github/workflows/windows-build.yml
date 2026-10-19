@@ -279,7 +279,7 @@ jobs:
         shell: powershell
         run: |
           New-Item -ItemType Directory -Path collector-package | Out-Null
-          foreach($name in @('Capture.ps1','Start.cmd','WindowSnapshot.cs')) {
+          foreach($name in @('Capture.ps1','Start.cmd','WindowSnapshot.cs','NativeCommands.ps1')) {
             Copy-Item -LiteralPath (Join-Path 'scripts/video-stall-capture' $name) -Destination collector-package/
           }
           Get-ChildItem scripts/video-stall-capture -Filter *.txt | Copy-Item -Destination collector-package/
@@ -297,6 +297,9 @@ jobs:
           path: |
             window-smoke.json
             collector-smoke.zip
+            collector-exact-entry.zip
+            native-command-smoke/
+            exact-entry-output/
           if-no-files-found: ignore
       - name: Validate and package crash collector
         shell: powershell
