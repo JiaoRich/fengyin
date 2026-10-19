@@ -153,6 +153,10 @@ struct Scene final:juce::Component,juce::Timer {
     void timerCallback()override {
         ui.store(now());
         if(failed){finish();return;}
+        if(!webOnly&&surface.player()&&!surface.getState().error.empty()) {
+            failed=true;std::cerr<<"FAIL VLC engine: "<<surface.getState().error<<std::endl;
+            captureFailure();finish();return;
+        }
         if(ready&&now()-javascript.load()>5000){
             failed=true;std::cerr<<"FAIL web heartbeat stalled nativeAgeMs="<<(now()-ui.load())
                 <<" phase="<<phase<<std::endl;captureFailure();dumpProcess(L"web-stall.dmp");finish();return;

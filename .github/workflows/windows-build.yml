@@ -136,8 +136,7 @@ jobs:
           if($LASTEXITCODE){exit $LASTEXITCODE}
           cmake --build build-vlc-webview --config Release --parallel 4
           if($LASTEXITCODE){exit $LASTEXITCODE}
-          New-Item -ItemType Directory -Force build-vlc-webview/Release/components | Out-Null
-          Copy-Item third_party/vlc build-vlc-webview/Release/components/VLC -Recurse
+          if (-not (Test-Path build-vlc-webview/Release/components/VLC/libvlc.dll)) { throw 'Private VLC runtime staging failed' }
           & third_party/ffmpeg-check/ffmpeg.exe -hide_banner -loglevel error -nostdin -y -f lavfi -i "color=c=red:s=1280x720:r=24" -f lavfi -i "sine=frequency=440:sample_rate=48000" -t 30 -c:v mpeg4 -q:v 3 -c:a aac -ac 2 build-vlc-webview/fixture.mp4
           exit $LASTEXITCODE
       - name: Save pinned dependencies before diagnostic execution

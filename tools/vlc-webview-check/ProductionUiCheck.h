@@ -108,6 +108,9 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
     }
     void timerCallback()override {
         ui.store(now());
+        if(surface.player()&&!surface.getState().error.empty()) {
+            failed=true;std::cerr<<"FAIL production VLC engine: "<<surface.getState().error<<std::endl;
+        }
         if(failed||now()>deadline||(ready&&now()-javascript.load()>5000)) {
             failed=true;std::cerr<<"FAIL production UI phase="<<phase<<" cycle="<<cycle<<std::endl;
             dumpProcess(L"production-ui-stall.dmp");finish();return;

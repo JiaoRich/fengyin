@@ -5,6 +5,15 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 class VlcWebViewDiagnostic(unittest.TestCase):
+    def test_private_vlc_is_staged_for_every_build_entry(self):
+        cmake=(ROOT/'tools/vlc-webview-check/CMakeLists.txt').read_text(encoding='utf-8')
+        self.assertIn('TARGET FengYinVlcWebViewCheck POST_BUILD',cmake)
+        self.assertIn('-E copy_directory "${FENGYIN_VLC_ROOT}"',cmake)
+        self.assertIn('$<TARGET_FILE_DIR:FengYinVlcWebViewCheck>/components/VLC',cmake)
+        for name in ('main.cpp','ProductionUiCheck.h'):
+            source=(ROOT/'tools/vlc-webview-check'/name).read_text(encoding='utf-8')
+            self.assertIn('!surface.getState().error.empty()',source)
+
     def test_real_juce_webview_sdk_and_production_surface(self):
         cmake=(ROOT/'tools/vlc-webview-check/CMakeLists.txt').read_text(encoding='utf-8')
         self.assertIn('juce_add_console_app(FengYinVlcWebViewCheck NEEDS_WEBVIEW2 TRUE)',cmake)
