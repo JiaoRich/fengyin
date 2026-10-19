@@ -19,7 +19,7 @@ def check_result(mode,code,timeout,text):
     acknowledgements=text.count('PASS physical click cycle=')
     previews=text.count('PASS real paused first picture generation=')
     passed=(code==0 and acknowledgements==20 and not timeout
-            and (mode=='web-only' or (previews>=4 if mode=='production-ui' else previews==4)))
+            and (mode in ('web-only','production-ui-control') or (previews>=4 if mode=='production-ui' else previews==4)))
     return dict(mode=mode,exitCode=code,timedOut=timeout,
                 clickAcknowledgements=acknowledgements,pausedFirstPictures=previews,passed=passed)
 
@@ -29,12 +29,16 @@ def main():
     parser.add_argument('root',type=Path)
     parser.add_argument('fixture',type=Path,help='red video with nonzero audio, not arbitrary customer media')
     parser.add_argument('--rounds',type=int,choices=(1,2),default=2)
+    parser.add_argument('--production-only',action='store_true',help='diagnostic comparison only; release gate uses all scenes')
+    parser.add_argument('--label',default='default')
+    parser.add_argument('--control-without-native-video',action='store_true',help='negative input control, never media acceptance')
     args=parser.parse_args()
     root=args.root.resolve();fixture=args.fixture.resolve()
     evidence=root/'evidence';evidence.mkdir(exist_ok=True)
     session=evidence/('run-'+uuid.uuid4().hex[:12]);session.mkdir()
     results=[]
-    for iteration,mode in (*case_order(args.rounds),(args.rounds+1,'production-ui')):
+    cases=((1,'production-ui-control'),) if args.control_without_native_video else (((1,'production-ui'),) if args.production_only else (*case_order(args.rounds),(args.rounds+1,'production-ui')))
+    for iteration,mode in cases:
         directory=session/f'{iteration}-{mode}';directory.mkdir()
         with (directory/'run.log').open('wb') as log:
             process=subprocess.Popen([str(root/'Release/FengYinVlcWebViewCheck.exe'),str(fixture),mode],
@@ -48,7 +52,7 @@ def main():
                 process.wait();code=-1
         text=(directory/'run.log').read_text(encoding='utf-8',errors='replace')
         result=check_result(mode,code,timeout,text)
-        result.update(iteration=iteration,evidence=str(directory.relative_to(evidence)))
+        result.update(iteration=iteration,label=args.label,evidence=str(directory.relative_to(evidence)))
         results.append(result)
         # Preserve partial results after each case, even if a later case crashes.
         for target in (session/'results.json',evidence/'results.json'):

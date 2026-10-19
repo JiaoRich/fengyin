@@ -151,11 +151,30 @@ jobs:
             build-vlc-webview/_deps/juce-src
           key: ${{ steps.video-deps.outputs.cache-primary-key }}
       - name: Compare callback-inline and deferred HWND operations
+        id: default-interaction
         shell: powershell
         run: |
           $env:PYTHONUTF8='1'
           python scripts/check_vlc_webview.py build-vlc-webview build-vlc-webview/fixture.mp4
           exit $LASTEXITCODE
+      - name: Isolate WebView renderer only after default interaction fails
+        if: always() && steps.default-interaction.outcome == 'failure'
+        shell: powershell
+        run: |
+          $previous = $env:FENGYIN_DIAGNOSTIC_WEBVIEW_ARGS
+          try {
+            python scripts/check_vlc_webview.py build-vlc-webview build-vlc-webview/fixture.mp4 --control-without-native-video --label no-native-video-control
+            foreach ($variant in @(
+              @{name='software-web-ui';args='--disable-gpu'},
+              @{name='no-native-occlusion';args='--disable-features=CalculateNativeWinOcclusion'},
+              @{name='no-web-gpu-compositing';args='--disable-gpu-compositing'})) {
+              $env:FENGYIN_DIAGNOSTIC_WEBVIEW_ARGS = $variant.args
+              python scripts/check_vlc_webview.py build-vlc-webview build-vlc-webview/fixture.mp4 --production-only --label $variant.name
+              Write-Host ($variant.name + ' comparison exit=' + $LASTEXITCODE)
+            }
+          } finally { $env:FENGYIN_DIAGNOSTIC_WEBVIEW_ARGS = $previous }
+          # Comparisons preserve the original default-step failure; no release bypass.
+          exit 0
       - uses: actions/upload-artifact@v5
         if: always()
         with:

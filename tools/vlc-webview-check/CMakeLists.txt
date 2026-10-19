@@ -11,6 +11,12 @@ if(NOT TARGET juce::juce_gui_extra)
     FetchContent_Declare(JUCE GIT_REPOSITORY https://github.com/juce-framework/JUCE.git GIT_TAG 9.0.2 GIT_SHALLOW TRUE)
     FetchContent_MakeAvailable(JUCE)
 endif()
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    execute_process(COMMAND "${Python3_EXECUTABLE}" "${ROOT}/scripts/prepare_diagnostic_webview.py"
+        "${juce_SOURCE_DIR}/modules/juce_gui_extra/native/juce_WebBrowserComponent_windows.cpp"
+        COMMAND_ERROR_IS_FATAL ANY)
+endif()
 juce_add_console_app(FengYinVlcWebViewCheck NEEDS_WEBVIEW2 TRUE)
 set_target_properties(FengYinVlcWebViewCheck PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")

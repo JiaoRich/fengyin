@@ -7,12 +7,13 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
     juce::File fixture;
     std::atomic<uint64_t> ui{now()},javascript{now()};
     bool failed=false,webOnly=false,ready=false,clickPending=false,expanded=false,touchDown=false;
+    bool controlPlaying=false;
     POINT clickPoint{};
-    int phase=0,cycle=0,generation=0,playCommands=0,volumeCommands=0;
+    int phase=0,cycle=0,generation=0,playCommands=0,volumeCommands=0,webReadyGeneration=0;
     int previousPlay=0,previousVolume=0;
     uint64_t deadline=now()+30000,lastState=0,lastConfig=0;
     juce::String session;
-    explicit ProductionUiScene(juce::File media):fixture(media) {
+    explicit ProductionUiScene(juce::File media,bool withoutNativeVideo=false):fixture(media),webOnly(withoutNativeVideo) {
         // Match the real DocumentWindow. A default non-opaque Component with
         // no title bar creates a layered HWND, which is a different host model.
         setOpaque(true);
@@ -26,8 +27,9 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
                 for(const event of ['pointerdown','pointerup','click'])document.addEventListener(event,e=>
                     window.__JUCE__.backend.emitEvent('testInput',{event,target:e.target.id,x:e.clientX,y:e.clientY}),true);
                 window.addEventListener('load',()=>setInterval(()=>window.__JUCE__.backend.emitEvent('testHeartbeat',
-                {expanded:document.body.classList.contains('video-expanded')}),100));)JS")
-            .withEventListener("testHeartbeat",[this](juce::var p){javascript.store(now());expanded=bool(p["expanded"]);})
+                {expanded:document.body.classList.contains('video-expanded'),selected:
+                    typeof nativeVideoEngine!=='undefined'&&nativeVideoEngine&&nativeAccompanimentReady?videoGeneration:0}),100));)JS")
+            .withEventListener("testHeartbeat",[this](juce::var p){javascript.store(now());expanded=bool(p["expanded"]);webReadyGeneration=int(p["selected"]);})
             .withEventListener("webReady",[this](juce::var p){session=p["videoSession"].toString();ready=true;javascript.store(now());})
             .withEventListener("testRuntime",[](juce::var p){std::cout<<"production runtime "<<juce::JSON::toString(p,true)<<std::endl;})
             .withEventListener("requestBackendState",[this](juce::var){lastConfig=0;})
@@ -37,19 +39,20 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
             })
             .withEventListener("testInput",[](juce::var p){std::cout<<"web input "<<juce::JSON::toString(p,true)<<std::endl;})
             .withEventListener("chooseVideo",[this](juce::var){
-                surface.player()->load(fixture.getFullPathName().toStdString(),++generation);
+                ++generation;if(!webOnly)surface.player()->load(fixture.getFullPathName().toStdString(),generation);
             })
             .withEventListener("nativeVideoViewport",[this](juce::var p){
+                if(webOnly)return;
                 if(p["session"].toString()!=session||(bool(p["visible"])&&int(p["generation"])!=generation))return;
                 std::cout<<"production viewport enter "<<juce::JSON::toString(p,true)<<std::endl;
                 surface.updateViewport({int(p["x"]),int(p["y"]),int(p["width"]),int(p["height"])},bool(p["visible"]));
                 std::cout<<"production viewport returned"<<std::endl;
             })
             .withEventListener("setVideoPlaybackState",[this](juce::var p){
-                if(int(p["generation"])==generation){surface.player()->setPlaying(bool(p["playing"]));++playCommands;}
+                if(int(p["generation"])==generation){controlPlaying=bool(p["playing"]);if(!webOnly)surface.player()->setPlaying(controlPlaying);++playCommands;}
             })
-            .withEventListener("setVideoVolume",[this](juce::var p){surface.player()->setVolume(float(p["value"]));++volumeCommands;})
-            .withEventListener("seekVideo",[this](juce::var p){surface.player()->seek(double(p["position"]),int(p["seekRevision"]));});
+            .withEventListener("setVideoVolume",[this](juce::var p){if(!webOnly)surface.player()->setVolume(float(p["value"]));++volumeCommands;})
+            .withEventListener("seekVideo",[this](juce::var p){if(!webOnly)surface.player()->seek(double(p["position"]),int(p["seekRevision"]));});
         web=std::make_unique<juce::WebBrowserComponent>(options);
         addAndMakeVisible(*web);addAndMakeVisible(surface);
         const auto* display=juce::Desktop::getInstance().getDisplays().getPrimaryDisplay();
@@ -59,6 +62,7 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
         if(!InitializeTouchInjection(1,TOUCH_FEEDBACK_NONE))failed=true;
         setVisible(true);toFront(true);web->setBounds(getLocalBounds());
         std::cout<<"production frontend="<<FENGYIN_DIAGNOSTIC_FRONTEND<<" viewport="<<getWidth()<<"x"<<getHeight()<<std::endl;
+        if(webOnly)std::cout<<"CONTROL ONLY: no native HWND, decoder, first-picture or PCM acceptance"<<std::endl;
         web->goToURL(juce::URL(juce::File(FENGYIN_DIAGNOSTIC_FRONTEND)).toString(false));
         startTimer(20);
     }
@@ -91,8 +95,8 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
         const auto s=surface.getState();auto video=std::make_unique<juce::DynamicObject>();
         video->setProperty("engine","vlc");video->setProperty("generation",generation);video->setProperty("viewportEpoch",0);
         video->setProperty("url",juce::URL(fixture).toString(false));video->setProperty("name",fixture.getFileName());
-        video->setProperty("seekRevision",s.seekRevision);video->setProperty("ready",s.generation==generation&&s.ready);
-        video->setProperty("playing",s.playing);video->setProperty("finished",s.finished);
+        video->setProperty("seekRevision",s.seekRevision);video->setProperty("ready",webOnly||(s.generation==generation&&s.ready));
+        video->setProperty("playing",webOnly?controlPlaying:s.playing);video->setProperty("finished",s.finished);
         video->setProperty("duration",s.duration);video->setProperty("position",s.position);
         video->setProperty("error",juce::String::fromUTF8(s.error.c_str()));
         web->emitEventIfBrowserIsVisible("nativeVideoState",juce::var(video.release()));
@@ -152,18 +156,18 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
         if(ready&&now()-lastState>=100){lastState=now();sendState();}
         if(phase==0&&ready) {
             web->evaluateJavascript("window.__JUCE__.backend.emitEvent('testRuntime',{userAgent:navigator.userAgent})");
-            if(!surface.initialise()){failed=true;return;}
+            if(!webOnly&&!surface.initialise()){failed=true;return;}
             phase=1;click("#change-video");deadline=now()+30000;
-        } else if(phase==1&&surface.getState().generation==generation&&surface.getState().ready&&firstPictureVisible()) {
-            std::cout<<"PASS real paused first picture generation="<<generation<<std::endl;
-            if(generation==1&&surface.player()->testPcmNonzero.load()!=0){failed=true;return;}
+        } else if(phase==1&&generation>0&&webReadyGeneration==generation&&(webOnly||(surface.getState().generation==generation&&surface.getState().ready&&firstPictureVisible()))) {
+            std::cout<<(webOnly?"CONTROL fake selection generation=":"PASS real paused first picture generation=")<<generation<<std::endl;
+            if(!webOnly&&generation==1&&surface.player()->testPcmNonzero.load()!=0){failed=true;return;}
             phase=2;click("#fullscreen");
         } else if(phase==2&&expanded==(cycle%2==0)) {
             previousPlay=playCommands;phase=3;click("#play-button");
         } else if(phase==3&&playCommands>previousPlay) {
             previousVolume=volumeCommands;phase=4;click("#video-volume",cycle%2?.25:.75);
         } else if(phase==4&&volumeCommands>previousVolume) {
-            std::cout<<"PASS physical click cycle="<<cycle<<" production fullscreen/play/volume, input="<<(cycle%2?"touch":"mouse")<<" PCM="<<surface.player()->testPcmNonzero.load()<<std::endl;
+            std::cout<<"PASS physical click cycle="<<cycle<<" production fullscreen/play/volume, input="<<(cycle%2?"touch":"mouse")<<" PCM="<<(webOnly?0:surface.player()->testPcmNonzero.load())<<std::endl;
             if(++cycle==20){finish();return;}
             if(cycle%5==0){phase=1;click("#change-video");deadline=now()+30000;}
             else {phase=2;click("#fullscreen");}

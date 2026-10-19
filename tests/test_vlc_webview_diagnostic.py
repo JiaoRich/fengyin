@@ -52,6 +52,8 @@ class VlcWebViewDiagnostic(unittest.TestCase):
         self.assertEqual([m for _,m in cases[1:5]],list(reversed([m for _,m in cases[6:]])))
         clicks='PASS physical click cycle=\n'*20
         self.assertTrue(runner.check_result('web-only',0,False,clicks)['passed'])
+        self.assertTrue(runner.check_result('production-ui-control',0,False,clicks)['passed'])
+        self.assertFalse(runner.check_result('production-ui',0,False,clicks)['passed'])
         self.assertFalse(runner.check_result('immediate',0,False,clicks)['passed'])
         complete=clicks+'PASS real paused first picture generation=\n'*4
         self.assertTrue(runner.check_result('immediate',0,False,complete)['passed'])
@@ -62,6 +64,9 @@ class VlcWebViewDiagnostic(unittest.TestCase):
         self.assertNotIn('runDispatchLoopUntil(',source)
         self.assertIn('failed-window.bmp',source)
         self.assertIn('picture rgb=',source)
+        runner_source=(ROOT/'scripts/check_vlc_webview.py').read_text(encoding='utf-8')
+        self.assertIn('if args.production_only else (*case_order(args.rounds)',runner_source)
+        self.assertIn("all(r['passed'] for r in results)",runner_source)
 
     def test_production_stable_hwnd_and_separate_native_visibility(self):
         source=(ROOT/'native/Source/VlcVideoSurface.cpp').read_text(encoding='utf-8')

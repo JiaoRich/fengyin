@@ -217,12 +217,13 @@ template<class CheckedScene>int runCheckedScene(CheckedScene& scene) {
 }
 
 int main(int argc,char** argv) {
+    std::cout<<"diagnostic WebView args="<<juce::SystemStats::getEnvironmentVariable("FENGYIN_DIAGNOSTIC_WEBVIEW_ARGS",{})<<std::endl;
     if(argc!=3){std::cerr<<"red-fixture.mp4 web-only|immediate|deferred|attached-immediate|attached-deferred|production-ui\n";return 2;}
     juce::ScopedJuceInitialiser_GUI init;
     const auto fixture=juce::File(juce::String::fromUTF8(argv[1]));
     if(!fixture.existsAsFile())return 2;
-    if(juce::String(argv[2])=="production-ui") {
-        ProductionUiScene scene(fixture);return runCheckedScene(scene);
+    if(juce::String(argv[2]).startsWith("production-ui")) {
+        ProductionUiScene scene(fixture,juce::String(argv[2])=="production-ui-control");return runCheckedScene(scene);
     }
     Scene scene(fixture,juce::String(argv[2]));return runCheckedScene(scene);
 }
