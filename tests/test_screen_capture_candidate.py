@@ -21,8 +21,9 @@ class ScreenCaptureCandidate(unittest.TestCase):
         self.assertIn('MFT_ENUM_HARDWARE_URL_Attribute', gpu)
         self.assertIn('MF_SA_D3D11_AWARE', gpu)
         self.assertIn('tracking->SetAllocator', gpu)
-        self.assertIn('device.As(&multithread)', gpu)
-        self.assertNotIn('context.As(&multithread)', gpu)
+        self.assertIn('ComPtr<ID3D11Multithread>', gpu)
+        self.assertIn('context.As(&multithread)', gpu)
+        self.assertNotIn('ID3D10Multithread', gpu)
         self.assertLess(gpu.index('if(!proven)'), gpu.index('writer->BeginWriting()'))
 
     def test_pcm_producer_never_encodes_or_writes_to_disk(self):

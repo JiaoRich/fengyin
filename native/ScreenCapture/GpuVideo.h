@@ -1,7 +1,6 @@
 #pragma once
 #include <windows.h>
-#include <d3d11.h>
-#include <d3d10_1.h>
+#include <d3d11_4.h>
 #include <dxgi1_2.h>
 #include <mfapi.h>
 #include <mfidl.h>
@@ -63,9 +62,9 @@ public:
         if(FAILED(hr)&&allowWarpForConversionTest)hr=D3D11CreateDevice(nullptr,D3D_DRIVER_TYPE_WARP,nullptr,
             D3D11_CREATE_DEVICE_BGRA_SUPPORT|D3D11_CREATE_DEVICE_VIDEO_SUPPORT,nullptr,0,D3D11_SDK_VERSION,&device,nullptr,&context);
         checked(hr,"Create D3D11 video device");
-        // Microsoft's D3D11/MF interop contract queries ID3D10Multithread from
-        // the DEVICE, not ID3D11DeviceContext (which may return E_NOINTERFACE).
-        ComPtr<ID3D10Multithread> multithread;checked(device.As(&multithread),"D3D device multithread interface");multithread->SetMultithreadProtected(TRUE);
+        // Use the Windows 10 D3D11 interface on its documented immediate
+        // context, not the D3D10 compatibility interface on a D3D11 object.
+        ComPtr<ID3D11Multithread> multithread;checked(context.As(&multithread),"D3D11 context multithread interface");multithread->SetMultithreadProtected(TRUE);
         checked(device.As(&videoDevice),"D3D11 video device interface");checked(context.As(&videoContext),"D3D11 video context interface");
         UINT token=0;checked(MFCreateDXGIDeviceManager(&token,&manager));checked(manager->ResetDevice(device.Get(),token));
         D3D11_VIDEO_PROCESSOR_CONTENT_DESC content{};content.InputFrameFormat=D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
