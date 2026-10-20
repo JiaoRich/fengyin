@@ -48,7 +48,8 @@ static void record(HWND hwnd,const std::filesystem::path& folder,HANDLE parent){
     while(!audio->firstQpc()){audio->checkError();if(qpc()>deadline)throw std::runtime_error("No timestamped speaker samples");Sleep(5);}
     session.StartCapture();
     std::int64_t origin=0,lastFrame=0,next=0;auto checkAt=GetTickCount64()+1000;
-    Direct3D11CaptureFrame held{nullptr};std::int64_t heldStamp=0;std::uint64_t staticFrames=0;
+    Direct3D11CaptureFrame held{nullptr};std::int64_t heldStamp=0;std::uint64_t reusedFrames=0;
+    std::int64_t maxNewFrameAge=0;bool newSurface=false;
     const auto stop=[&]{return std::filesystem::exists(folder/L"stop")||WaitForSingleObject(parent,0)!=WAIT_TIMEOUT;};
     status(folder,"starting");
     try{
@@ -60,20 +61,22 @@ static void record(HWND hwnd,const std::filesystem::path& folder,HANDLE parent){
                 for(int n=0;n<2;++n){auto newer=pool.TryGetNextFrame();if(!newer)break;frame.Close();frame=std::move(newer);}
                 const auto size=frame.ContentSize();
                 if(size.Width!=width||size.Height!=height)throw std::runtime_error("Display geometry changed; recording stopped");
-                const auto time=frame.SystemRelativeTime().Value().count();
-                if(held)held.Close();held=std::move(frame);heldStamp=time;
+                const auto time=frame.SystemRelativeTime().count();
+                if(held)held.Close();held=std::move(frame);heldStamp=time;newSurface=true;
             }
             const auto now=qpc();
             if(held&&now>=next){
                     // WGC need not send unchanged desktop frames. Hold one
-                    // frame-pool lease and repeat only an unchanged surface;
-                    // this is not concealing encoder overload or lost audio.
+                    // frame-pool lease. Report every reuse separately: lack of
+                    // a new surface alone does not prove the desktop was static.
                     const auto time=origin?now:heldStamp;
-                    if(origin&&heldStamp<=lastFrame)++staticFrames;
+                    if(newSurface){maxNewFrameAge=std::max(maxNewFrameAge,now-heldStamp);
+                        if(now-heldStamp>second/5)throw std::runtime_error("New capture frame is over 200ms stale");}
+                    else ++reusedFrames;
                     auto access=held.Surface().as<::Windows::Graphics::DirectX::Direct3D11::IDirect3DDxgiInterfaceAccess>();
                     ComPtr<ID3D11Texture2D> texture;checked(access->GetInterface(IID_PPV_ARGS(&texture)));
                     if(!origin){origin=time;status(folder,"recording");}
-                    gpu.submit(texture.Get(),time-origin);lastFrame=time;next=time+second/fps;
+                    gpu.submit(texture.Get(),time-origin);lastFrame=time;next=time+second/fps;newSurface=false;
             }else Sleep(1);
             if(!origin&&qpc()>deadline)throw std::runtime_error("No screen frames");
             if(origin&&qpc()-lastFrame>second/2)throw std::runtime_error("Capture stopped providing frames");
@@ -90,7 +93,7 @@ static void record(HWND hwnd,const std::filesystem::path& folder,HANDLE parent){
         audio->stop();audio->checkError();gpu.close();
         std::ofstream report(folder/L"metrics.txt");
         report<<"encoder="<<gpu.encoder<<"\nframes="<<gpu.health.frames<<"\nlateIntervals="<<gpu.health.late
-              <<"\nmaxFrameGap100ns="<<gpu.health.maxGap<<"\nunchangedSurfaceFrames="<<staticFrames<<"\nvideoFirstQpc="<<origin<<"\naudioFirstQpc="<<audio->firstQpc()
+              <<"\nmaxFrameGap100ns="<<gpu.health.maxGap<<"\nreusedSurfaceFrames="<<reusedFrames<<"\nmaxNewFrameAge100ns="<<maxNewFrameAge<<"\nvideoFirstQpc="<<origin<<"\naudioFirstQpc="<<audio->firstQpc()
               <<"\naudioEndQpc="<<audio->endQpc()<<"\naudioFrames="<<audio->frames()<<"\n";
         report.flush();if(!report)throw std::runtime_error("Cannot save session metrics");
         if(!origin)throw std::runtime_error("Recording cancelled before first frame");

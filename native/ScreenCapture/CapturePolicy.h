@@ -26,6 +26,7 @@ struct FrameHealth {
             if(gap>second/5)throw std::runtime_error("Video stalled for over 200ms; partial recording retained");
         }
         previous=time;++frames;
+        if(frames>=300 && late*100>frames)throw std::runtime_error("Over one percent late video intervals; partial recording retained");
     }
 };
 }

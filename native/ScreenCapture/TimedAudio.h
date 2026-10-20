@@ -42,7 +42,8 @@ public:
                 for(;;){
                     const auto index=consumed.load(std::memory_order_relaxed);
                     if(index==produced.load(std::memory_order_acquire)){
-                        if(producerDone.load())break;Sleep(3);continue;
+                        if(producerDone.load()&&index==produced.load(std::memory_order_acquire))break;
+                        Sleep(3);continue;
                     }
                     const auto& packet=queue[index%capacity];pcm.resize(packet.frames*2);
                     std::memcpy(pcm.data(),packet.pcm.data(),pcm.size()*2);writer.append(pcm);
