@@ -1,9 +1,13 @@
 name: Windows 编译与安装包
-run-name: ${{ inputs.diagnostic_only && 'Windows diagnostic collectors only' || inputs.media_runtime_test && 'Windows media performance runtime (no installer)' || inputs.vlc_webview_test && 'Windows VLC WebView interaction diagnostic' || inputs.media_integration_test && 'Windows media integration diagnostic' || inputs.native_window_test && 'Windows native input diagnostic' || 'Windows build and installer' }}
+run-name: ${{ inputs.screen_capture_probe && 'Windows isolated GPU recording candidate' || inputs.diagnostic_only && 'Windows diagnostic collectors only' || inputs.media_runtime_test && 'Windows media performance runtime (no installer)' || inputs.vlc_webview_test && 'Windows VLC WebView interaction diagnostic' || inputs.media_integration_test && 'Windows media integration diagnostic' || inputs.native_window_test && 'Windows native input diagnostic' || 'Windows build and installer' }}
 
 on:
   workflow_dispatch:
     inputs:
+      screen_capture_probe:
+        description: Build isolated GPU recording candidate, never installer or production app
+        type: boolean
+        default: false
       media_runtime_test:
         description: Build matching application and audio helpers only, no installers or driver changes
         type: boolean
@@ -45,6 +49,53 @@ permissions:
   contents: read
 
 jobs:
+  screen-capture-probe:
+    if: ${{ inputs.screen_capture_probe }}
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Compile isolated recording candidate
+        shell: powershell
+        run: |
+          cmake -S native/ScreenCapture -B build-screen-probe -G "Visual Studio 17 2022" -A x64
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          cmake --build build-screen-probe --config Release --parallel 2
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          ctest --test-dir build-screen-probe -C Release -R screen_capture_policy --output-on-failure
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+      - name: Record actual GPU capabilities without pretending VM has hardware encoding
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory build-screen-probe/evidence -Force | Out-Null
+          $Exe=Resolve-Path build-screen-probe/Release/FengYinScreenCaptureProbe.exe
+          & $Exe --gpu-selftest *> build-screen-probe/evidence/gpu-conversion.txt
+          $Conversion=$LASTEXITCODE
+          & $Exe --encode-selftest build-screen-probe/evidence/hardware.mp4 *> build-screen-probe/evidence/hardware-encoder.txt
+          $Hardware=$LASTEXITCODE
+          @{GpuConversionExit=$Conversion;HardwareEncodeExit=$Hardware;TargetBlowingAcceptance=$false;ProductionIntegration=$false} |
+            ConvertTo-Json | Set-Content build-screen-probe/evidence/capabilities.json
+          $global:LASTEXITCODE=0
+      - uses: actions/cache/restore@v4
+        with:
+          path: third_party/ffmpeg-check
+          key: screen-probe-ffmpeg-${{ hashFiles('scripts/prepare_ffmpeg.py') }}
+      - name: Verify deferred mux with actual decoded PCM and compressed video identity
+        shell: powershell
+        run: |
+          python scripts/prepare_ffmpeg.py third_party/ffmpeg-check
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          python scripts/test_screen_capture_mux.py build-screen-probe/Release/FengYinScreenCaptureProbe.exe third_party/ffmpeg-check build-screen-probe/evidence
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: FengYin-isolated-screen-capture-candidate
+          path: |
+            build-screen-probe/Release/FengYinScreenCaptureProbe.exe
+            build-screen-probe/evidence/
+          if-no-files-found: error
+          retention-days: 7
   media-runtime-test:
     if: ${{ inputs.media_runtime_test }}
     runs-on: windows-2022
@@ -382,7 +433,7 @@ jobs:
           name: FengYin-Crash-Capture
           path: diagnostic/FengYin-Crash-Capture.zip
   windows-release:
-    if: ${{ !inputs.media_runtime_test && !inputs.vlc_webview_test && !inputs.media_integration_test && !inputs.diagnostic_only && !inputs.startup_comparison && !inputs.kong_test && !inputs.native_window_test }}
+    if: ${{ !inputs.screen_capture_probe && !inputs.media_runtime_test && !inputs.vlc_webview_test && !inputs.media_integration_test && !inputs.diagnostic_only && !inputs.startup_comparison && !inputs.kong_test && !inputs.native_window_test }}
     name: Windows x64 Release
     runs-on: windows-2022
     timeout-minutes: 45

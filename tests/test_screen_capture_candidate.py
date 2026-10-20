@@ -1,0 +1,49 @@
+from pathlib import Path
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class ScreenCaptureCandidate(unittest.TestCase):
+    def test_candidate_cannot_enter_release_or_link_into_host(self):
+        cmake = (ROOT / 'native/ScreenCapture/CMakeLists.txt').read_text()
+        production = (ROOT / 'CMakeLists.txt').read_text()
+        self.assertNotIn('add_subdirectory(native/ScreenCapture)', production)
+        self.assertNotIn('install(TARGETS', cmake)
+        service = (ROOT / 'native/Source/WindowRecordingService.cpp').read_text()
+        self.assertNotIn('FengYinScreenCaptureProbe', service)
+
+    def test_no_full_frame_readback_or_software_fallback(self):
+        gpu = (ROOT / 'native/ScreenCapture/GpuVideo.h').read_text()
+        self.assertNotIn('D3D11_USAGE_STAGING', gpu)
+        self.assertNotIn('context->Map(', gpu)
+        self.assertIn('MFCreateDXGISurfaceBuffer', gpu)
+        self.assertIn('MFT_ENUM_HARDWARE_URL_Attribute', gpu)
+        self.assertIn('MF_SA_D3D11_AWARE', gpu)
+        self.assertIn('tracking->SetAllocator', gpu)
+        self.assertLess(gpu.index('if(!proven)'), gpu.index('writer->BeginWriting()'))
+
+    def test_pcm_producer_never_encodes_or_writes_to_disk(self):
+        audio = (ROOT / 'native/ScreenCapture/TimedAudio.h').read_text()
+        callback = audio.split('producer=std::thread(', 1)[1]
+        self.assertNotIn('writer.append', callback)
+        self.assertNotIn('WriteSample', callback)
+        self.assertIn('AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY', callback)
+        self.assertIn('produced.store(index+1,std::memory_order_release)', callback)
+        self.assertIn('Audio disk queue overflow', callback)
+
+    def test_mux_is_explicit_and_failure_cannot_remove_originals(self):
+        main = (ROOT / 'native/ScreenCapture/main.cpp').read_text()
+        capture = main.split('static void record(', 1)[1].split('int wmain(', 1)[0]
+        self.assertNotIn('mux(', capture)
+        self.assertIn('--mux-session', main)
+        mux = (ROOT / 'native/ScreenCapture/OfflineMux.h').read_text()
+        self.assertNotIn('remove(', mux)
+        self.assertIn('MFVideoFormat_H264', mux)
+        self.assertIn('refusing silent padding', mux)
+
+    def test_diagnostic_dispatch_does_not_trigger_full_installer(self):
+        workflow = (ROOT / '.github/workflows/windows-build.yml').read_text()
+        release = workflow.split('  windows-release:', 1)[1]
+        self.assertIn('!inputs.screen_capture_probe', release.split('steps:', 1)[0])
+        self.assertIn('targetPerformanceAccepted=False', (ROOT / 'scripts/test_screen_capture_mux.py').read_text())
