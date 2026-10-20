@@ -10,6 +10,24 @@ public static class FengYinProbeWindow {
 $Helper=Join-Path $PSScriptRoot 'FengYinScreenCaptureProbe.exe'
 $Session=$null
 $Capture=$null
+function Invoke-CaptureProcess([string[]]$Arguments,[int]$Timeout) {
+    # Own the original .NET process handle. Start-Process objects can lose the
+    # exit code on Windows PowerShell 5.1 after a short-lived helper exits.
+    $Process=New-Object System.Diagnostics.Process
+    $Process.StartInfo.FileName=$Helper
+    $Process.StartInfo.Arguments=(($Arguments | ForEach-Object {'"'+$_+'"'}) -join ' ')
+    $Process.StartInfo.UseShellExecute=$false
+    $Process.StartInfo.CreateNoWindow=$true
+    try {
+        if(-not $Process.Start()){throw '无法启动本次测试组件。'}
+        if(-not $Process.WaitForExit($Timeout)) {
+            $Process.Kill()
+            $Process.WaitForExit()
+            throw '本次测试组件超时，已只关闭该组件；风吟未关闭，临时文件保留。'
+        }
+        return [int]$Process.ExitCode
+    } finally {$Process.Dispose()}
+}
 try {
     if(-not (Test-Path -LiteralPath $Helper)){throw '缺少录屏测试组件，请先完整解压测试包。'}
     $Apps=@(Get-Process -Name FengYin -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowHandle -ne [IntPtr]::Zero})
@@ -22,25 +40,18 @@ try {
     [FengYinProbeWindow]::SetForegroundWindow($App.MainWindowHandle) | Out-Null
     Start-Sleep -Seconds 15
     if($App.HasExited){throw '风吟已关闭，未开始录屏。'}
-    $Arguments=@('--capture',$App.MainWindowHandle.ToInt64().ToString('x'),('"{0}"' -f $Session),[string]$App.Id,'45')
-    $Capture=Start-Process -FilePath $Helper -ArgumentList $Arguments -WindowStyle Hidden -PassThru
+    $Arguments=@('--capture',$App.MainWindowHandle.ToInt64().ToString('x'),$Session,[string]$App.Id,'45')
     # The helper starts its 45s deadline only after the first real video frame.
     # This independent watchdog protects the app if initialization/finalize hangs.
-    if(-not $Capture.WaitForExit(80000)) {
-        Stop-Process -Id $Capture.Id -Force
-        throw '录屏组件超时，已只关闭本次测试组件；风吟未关闭，临时文件保留。'
-    }
-    $Capture.Refresh()
-    if($Capture.ExitCode -ne 0){
+    $CaptureExit=Invoke-CaptureProcess $Arguments 80000
+    if($CaptureExit -ne 0){
         $Detail=if(Test-Path -LiteralPath (Join-Path $Session 'state.txt')){Get-Content -LiteralPath (Join-Path $Session 'state.txt') -Raw -Encoding UTF8}else{'组件未生成状态记录'}
         throw "录屏未通过：$Detail`n正式版风吟与原有设置未改变。"
     }
     $Choice=[Windows.Forms.MessageBox]::Show("实时录屏测试结束，可以停止吹奏。`n`n接下来只合成刚才的视频与音频，不重新压缩视频。合成期间请暂不吹奏。`n`n点击确定开始合成；取消则保留原始音视频，暂不合成。",'实时测试结束',[Windows.Forms.MessageBoxButtons]::OKCancel)
     if($Choice -eq [Windows.Forms.DialogResult]::OK){
-        $Mux=Start-Process -FilePath $Helper -ArgumentList @('--mux-session',('"{0}"' -f $Session)) -WindowStyle Hidden -PassThru
-        if(-not $Mux.WaitForExit(120000)){Stop-Process -Id $Mux.Id -Force;throw '合成超时，原始音视频仍保留。'}
-        $Mux.Refresh()
-        if($Mux.ExitCode -ne 0){throw ('合成未通过，原始文件保留：'+(Get-Content -LiteralPath (Join-Path $Session 'state.txt') -Raw -Encoding UTF8))}
+        $MuxExit=Invoke-CaptureProcess @('--mux-session',$Session) 120000
+        if($MuxExit -ne 0){throw ('合成未通过，原始文件保留：'+(Get-Content -LiteralPath (Join-Path $Session 'state.txt') -Raw -Encoding UTF8))}
     }
     [Windows.Forms.MessageBox]::Show("测试文件已保存在：`n$Session`n`n请回报：录屏前后吹奏是否有差别、视频是否卡顿、回放声音是否正常。`n此测试包还不是正式录屏功能。",'测试完成') | Out-Null
     Start-Process explorer.exe -ArgumentList ('"{0}"' -f $Session)
