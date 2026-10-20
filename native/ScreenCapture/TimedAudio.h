@@ -81,10 +81,12 @@ public:
                 auto nextCheck=GetTickCount64()+1000;
                 while(!stopping.load()){
                     feedSilence();UINT32 available=0;checked(input->GetNextPacketSize(&available));
-                    while(available){
+                    for(int packets=0;available&&packets<32;++packets){
                         BYTE* data=nullptr;UINT32 count=0;DWORD flags=0;UINT64 position=0,stamp=0;
                         checked(input->GetBuffer(&data,&count,&flags,&position,&stamp));
-                        struct Release{IAudioCaptureClient* p;UINT32 n;~Release(){p->ReleaseBuffer(n);}} release{input.Get(),count};
+                        struct Release{IAudioCaptureClient* p;UINT32 n;bool active=true;
+                            ~Release(){if(active)p->ReleaseBuffer(n);}
+                            void now(){checked(p->ReleaseBuffer(n));active=false;}} release{input.Get(),count};
                         if((flags&AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR)||stamp==0)throw std::runtime_error("Audio timestamp unavailable; no guessed sync");
                         if(seen&&((flags&AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY)||position!=nextPosition))throw std::runtime_error("Audio discontinuity detected; partial recording retained");
                         if(count>packetFrames)throw std::runtime_error("Audio packet exceeds bounded queue slot");
@@ -99,7 +101,7 @@ public:
                         produced.store(index+1,std::memory_order_release);
                         // Release before asking for the next packet. Never wait
                         // for disk or video while an endpoint buffer is held.
-                        break;
+                        release.now();checked(input->GetNextPacketSize(&available));
                     }
                     if(GetTickCount64()>=nextCheck){ComPtr<IMMDevice> current;
                         checked(enumerator->GetDefaultAudioEndpoint(eRender,eMultimedia,&current));

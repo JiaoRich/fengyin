@@ -64,15 +64,20 @@ jobs:
           if($LASTEXITCODE){exit $LASTEXITCODE}
           ctest --test-dir build-screen-probe -C Release -R screen_capture_policy --output-on-failure
           if($LASTEXITCODE){exit $LASTEXITCODE}
+          $tokens=$null; $errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path scripts/screen-capture-test/Run.ps1),[ref]$tokens,[ref]$errors) | Out-Null
+          if($errors.Count){throw ($errors | Out-String)}
       - name: Record actual GPU capabilities without pretending VM has hardware encoding
         shell: powershell
         run: |
           New-Item -ItemType Directory build-screen-probe/evidence -Force | Out-Null
           $Exe=Resolve-Path build-screen-probe/Release/FengYinScreenCaptureProbe.exe
-          & $Exe --gpu-selftest *> build-screen-probe/evidence/gpu-conversion.txt
-          $Conversion=$LASTEXITCODE
-          & $Exe --encode-selftest build-screen-probe/evidence/hardware.mp4 *> build-screen-probe/evidence/hardware-encoder.txt
-          $Hardware=$LASTEXITCODE
+          $Probe=Start-Process -FilePath $Exe -ArgumentList '--gpu-selftest' -NoNewWindow -PassThru -RedirectStandardOutput build-screen-probe/evidence/gpu-conversion.txt -RedirectStandardError build-screen-probe/evidence/gpu-conversion-error.txt
+          if(-not $Probe.WaitForExit(60000)){Stop-Process -Id $Probe.Id -Force;throw 'GPU conversion probe timed out'}
+          $Probe.Refresh(); $Conversion=$Probe.ExitCode
+          $Probe=Start-Process -FilePath $Exe -ArgumentList @('--encode-selftest','build-screen-probe/evidence/hardware.mp4') -NoNewWindow -PassThru -RedirectStandardOutput build-screen-probe/evidence/hardware-encoder.txt -RedirectStandardError build-screen-probe/evidence/hardware-encoder-error.txt
+          if(-not $Probe.WaitForExit(60000)){Stop-Process -Id $Probe.Id -Force;throw 'Hardware encoder probe timed out'}
+          $Probe.Refresh(); $Hardware=$Probe.ExitCode
           @{GpuConversionExit=$Conversion;HardwareEncodeExit=$Hardware;TargetBlowingAcceptance=$false;ProductionIntegration=$false} |
             ConvertTo-Json | Set-Content build-screen-probe/evidence/capabilities.json
           $global:LASTEXITCODE=0
@@ -87,6 +92,14 @@ jobs:
           if($LASTEXITCODE){exit $LASTEXITCODE}
           python scripts/test_screen_capture_mux.py build-screen-probe/Release/FengYinScreenCaptureProbe.exe third_party/ffmpeg-check build-screen-probe/evidence
           if($LASTEXITCODE){exit $LASTEXITCODE}
+      - name: Package independent one-click test, not a FengYin replacement
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory build-screen-probe/test-package -Force | Out-Null
+          Copy-Item build-screen-probe/Release/FengYinScreenCaptureProbe.exe build-screen-probe/test-package/
+          Copy-Item scripts/screen-capture-test/* build-screen-probe/test-package/
+          @{Commit='${{ github.sha }}';Kind='Independent candidate, not production release';HardwareAccepted=$false;BlowingAccepted=$false} |
+            ConvertTo-Json | Set-Content build-screen-probe/test-package/build.json -Encoding UTF8
       - uses: actions/upload-artifact@v5
         if: always()
         with:
@@ -94,6 +107,7 @@ jobs:
           path: |
             build-screen-probe/Release/FengYinScreenCaptureProbe.exe
             build-screen-probe/evidence/
+            build-screen-probe/test-package/
           if-no-files-found: error
           retention-days: 7
   media-runtime-test:

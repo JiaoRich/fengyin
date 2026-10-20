@@ -29,7 +29,7 @@ static ComPtr<ID3D11Texture2D> pattern(GpuVideo& gpu,int w,int h){
     D3D11_SUBRESOURCE_DATA data{pixels.data(),UINT(w*4),0};ComPtr<ID3D11Texture2D> texture;
     checked(gpu.getDevice()->CreateTexture2D(&d,&data,&texture));return texture;
 }
-static void record(HWND hwnd,const std::filesystem::path& folder,HANDLE parent){
+static void record(HWND hwnd,const std::filesystem::path& folder,HANDLE parent,int maxSeconds){
     if(!IsWindow(hwnd))throw std::runtime_error("FengYin window is unavailable");
     const auto monitor=MonitorFromWindow(hwnd,MONITOR_DEFAULTTONEAREST);MONITORINFO info{};info.cbSize=sizeof(info);
     if(!GetMonitorInfoW(monitor,&info))throw std::runtime_error("Cannot find target monitor");
@@ -50,7 +50,8 @@ static void record(HWND hwnd,const std::filesystem::path& folder,HANDLE parent){
     std::int64_t origin=0,lastFrame=0,next=0;auto checkAt=GetTickCount64()+1000;
     Direct3D11CaptureFrame held{nullptr};std::int64_t heldStamp=0;std::uint64_t reusedFrames=0;
     std::int64_t maxNewFrameAge=0;bool newSurface=false;
-    const auto stop=[&]{return std::filesystem::exists(folder/L"stop")||WaitForSingleObject(parent,0)!=WAIT_TIMEOUT;};
+    const auto stop=[&]{return std::filesystem::exists(folder/L"stop")||WaitForSingleObject(parent,0)!=WAIT_TIMEOUT
+        ||(origin&&qpc()-origin>=std::int64_t(maxSeconds)*second);};
     status(folder,"starting");
     try{
         deadline=qpc()+8*second;
@@ -111,7 +112,11 @@ int wmain(int argc,wchar_t** argv){
     std::filesystem::path folder;
     try{
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-        winrt::init_apartment(winrt::apartment_type::multi_threaded);checked(MFStartup(MF_VERSION));
+        struct MediaRuntime{
+            MediaRuntime(){winrt::init_apartment(winrt::apartment_type::multi_threaded);
+                const auto hr=MFStartup(MF_VERSION);if(FAILED(hr)){winrt::uninit_apartment();checked(hr);}}
+            ~MediaRuntime(){MFShutdown();winrt::uninit_apartment();}
+        } runtime;
         if(argc==2&&std::wstring(argv[1])==L"--gpu-selftest"){
             GpuVideo gpu;gpu.initialise(1920,1080,true);auto texture=pattern(gpu,1920,1080);
             for(int i=0;i<120;++i)gpu.convert(texture.Get(),i%4);
@@ -136,14 +141,16 @@ int wmain(int argc,wchar_t** argv){
             status(folder,"finalizing");mux(folder/L"video.partial.mp4",folder/L"audio.wav",folder/L"recording.mp4",trim,duration);
             status(folder,"saved");return 0;
         }
-        if(argc!=5||std::wstring(argv[1])!=L"--capture")throw std::runtime_error("Use --capture <HWND hex> <new session directory> <parent PID>; diagnostic component, not production integration");
+        if((argc!=5&&argc!=6)||std::wstring(argv[1])!=L"--capture")throw std::runtime_error("Use --capture <HWND hex> <new session directory> <parent PID> [seconds]; diagnostic component, not production integration");
+        const int seconds=argc==6?std::stoi(argv[5]):45;
+        if(seconds<5||seconds>1800)throw std::runtime_error("Capture duration must be between 5 and 1800 seconds");
         folder=argv[3];if(!std::filesystem::create_directory(folder))throw std::runtime_error("Session directory must be new");
         if(std::filesystem::space(folder).available<1024ULL*1024*1024)throw std::runtime_error("At least 1GB free space required");
         HANDLE parent=OpenProcess(SYNCHRONIZE,FALSE,DWORD(std::stoul(argv[4])));
         if(!parent)throw std::runtime_error("Parent process not found");
         struct Close{HANDLE h;~Close(){CloseHandle(h);}} handle{parent};
         SetPriorityClass(GetCurrentProcess(),BELOW_NORMAL_PRIORITY_CLASS);
-        record(reinterpret_cast<HWND>(std::uintptr_t(std::stoull(argv[2],nullptr,16))),folder,parent);
+        record(reinterpret_cast<HWND>(std::uintptr_t(std::stoull(argv[2],nullptr,16))),folder,parent,seconds);
         return 0;
     }catch(const winrt::hresult_error& e){std::cerr<<winrt::to_string(e.message())<<" HRESULT="<<std::hex<<unsigned(e.code().value)<<"\n";
         if(!folder.empty()&&std::filesystem::exists(folder))try{status(folder,"failed: "+winrt::to_string(e.message()));}catch(...){}return 1;
