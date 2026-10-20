@@ -19,6 +19,9 @@
 namespace fengyin::screen {
 using Microsoft::WRL::ComPtr;
 inline void checked(HRESULT hr){winrt::check_hresult(hr);}
+inline void checked(HRESULT hr,const char* operation){
+    if(FAILED(hr))throw std::runtime_error(std::string(operation)+": "+winrt::to_string(winrt::hresult_error(hr).message()));
+}
 inline std::int64_t qpc(){LARGE_INTEGER t,f;QueryPerformanceCounter(&t);QueryPerformanceFrequency(&f);return std::int64_t(double(t.QuadPart)*second/f.QuadPart);}
 struct Slots { std::array<std::atomic<bool>,4> busy{}; };
 // IMFTrackedSample returns the surface only after the encoder releases it.
@@ -59,19 +62,21 @@ public:
             D3D11_CREATE_DEVICE_BGRA_SUPPORT|D3D11_CREATE_DEVICE_VIDEO_SUPPORT,nullptr,0,D3D11_SDK_VERSION,&device,nullptr,&context);
         if(FAILED(hr)&&allowWarpForConversionTest)hr=D3D11CreateDevice(nullptr,D3D_DRIVER_TYPE_WARP,nullptr,
             D3D11_CREATE_DEVICE_BGRA_SUPPORT|D3D11_CREATE_DEVICE_VIDEO_SUPPORT,nullptr,0,D3D11_SDK_VERSION,&device,nullptr,&context);
-        checked(hr);
-        ComPtr<ID3D10Multithread> multithread;checked(context.As(&multithread));multithread->SetMultithreadProtected(TRUE);
-        checked(device.As(&videoDevice));checked(context.As(&videoContext));
+        checked(hr,"Create D3D11 video device");
+        // Microsoft's D3D11/MF interop contract queries ID3D10Multithread from
+        // the DEVICE, not ID3D11DeviceContext (which may return E_NOINTERFACE).
+        ComPtr<ID3D10Multithread> multithread;checked(device.As(&multithread),"D3D device multithread interface");multithread->SetMultithreadProtected(TRUE);
+        checked(device.As(&videoDevice),"D3D11 video device interface");checked(context.As(&videoContext),"D3D11 video context interface");
         UINT token=0;checked(MFCreateDXGIDeviceManager(&token,&manager));checked(manager->ResetDevice(device.Get(),token));
         D3D11_VIDEO_PROCESSOR_CONTENT_DESC content{};content.InputFrameFormat=D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
         content.InputWidth=w;content.InputHeight=h;content.OutputWidth=output.width;content.OutputHeight=output.height;
         content.InputFrameRate={fps,1};content.OutputFrameRate={fps,1};content.Usage=D3D11_VIDEO_USAGE_PLAYBACK_NORMAL;
-        checked(videoDevice->CreateVideoProcessorEnumerator(&content,&enumerator));
+        checked(videoDevice->CreateVideoProcessorEnumerator(&content,&enumerator),"Create GPU video processor enumerator");
         UINT flags=0;checked(enumerator->CheckVideoProcessorFormat(DXGI_FORMAT_B8G8R8A8_UNORM,&flags));
         if(!(flags&D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_INPUT))throw std::runtime_error("GPU cannot process BGRA capture");
         checked(enumerator->CheckVideoProcessorFormat(DXGI_FORMAT_NV12,&flags));
         if(!(flags&D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT))throw std::runtime_error("GPU cannot produce NV12");
-        checked(videoDevice->CreateVideoProcessor(enumerator.Get(),0,&processor));
+        checked(videoDevice->CreateVideoProcessor(enumerator.Get(),0,&processor),"Create GPU video processor");
         RECT src{0,0,w,h},dst{0,0,output.width,output.height};
         videoContext->VideoProcessorSetStreamSourceRect(processor.Get(),0,TRUE,&src);
         videoContext->VideoProcessorSetStreamDestRect(processor.Get(),0,TRUE,&dst);
@@ -105,7 +110,7 @@ public:
         checked(in->SetGUID(MF_MT_SUBTYPE,MFVideoFormat_NV12));checked(in->SetUINT32(MF_MT_DEFAULT_STRIDE,output.width));
         checked(in->SetUINT32(MF_MT_YUV_MATRIX,MFVideoTransferMatrix_BT709));
         checked(in->SetUINT32(MF_MT_VIDEO_NOMINAL_RANGE,MFNominalRange_16_235));
-        checked(writer->SetInputMediaType(stream,in.Get(),nullptr));
+        checked(writer->SetInputMediaType(stream,in.Get(),nullptr),"Configure NV12 hardware encoder input");
         // Windows 10-compatible actual encoder inspection. Merely enabling HW
         // transforms is not evidence; the Windows 11 25H2-only HW-only flag is
         // deliberately not used. Never feed frames to an unproven encoder.
