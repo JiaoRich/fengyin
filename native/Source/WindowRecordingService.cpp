@@ -18,7 +18,7 @@ void WindowRecordingService::cleanCompletedSession() {
     // user-selected directory; failed/recoverable originals remain untouched.
     if(sessionFolder.getParentDirectory()!=temporaryFolder() || sessionFolder.isSymbolicLink()
        || sessionFolder.getChildFile("fengyin-session-v2").loadFileAsString()!="FengYin recording session v2")return;
-    const juce::StringArray owned{"audio.partial.wav","audio.wav","video.partial.mp4","alignment.txt","metrics.txt","failure.txt","state.txt","state.tmp","state.txt.tmp","stop","begin"};
+    const juce::StringArray owned{"audio.partial.wav","audio.wav","video.partial.mp4","alignment.txt","metrics.txt","audio-metrics.txt","failure.txt","state.txt","state.tmp","state.txt.tmp","stop","begin"};
     for(const auto& file:sessionFolder.findChildFiles(juce::File::findFiles,false)){
         if(file.isSymbolicLink())continue;
         const auto name=file.getFileName();

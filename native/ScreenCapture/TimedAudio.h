@@ -12,16 +12,17 @@
 #include <vector>
 #include "GpuVideo.h"
 #include "../ScreenRecorder/PcmWaveWriter.h"
+#include "PcmFrameQueue.h"
 
 namespace fengyin::screen {
-// Experimental helper only: not a replacement for the release WAV recorder.
+// Screen-capture helper only: independent of the audio-only WAV recorder.
 // Endpoint QPC comes from GetBuffer, not callback-arrival time. The same 48k,
 // stereo, s16 format as the current verified release recorder is retained.
 class TimedAudio {
-    static constexpr std::size_t capacity=64,packetFrames=2048;
-    struct Packet {std::array<std::int16_t,packetFrames*2> pcm;UINT32 frames=0;};
-    std::array<Packet,capacity> queue{};
-    std::atomic<std::uint64_t> produced{0},consumed{0};
+    static constexpr std::size_t batchFrames=4800; // 100 ms writes, unchanged PCM
+    PcmFrameQueue queue;
+    std::filesystem::path metricsPath;
+    std::uint64_t maxWrite100ns=0,writeBatches=0;
     std::atomic<bool> stopping{false},producerDone{false},failed{false};
     std::thread producer,consumer;
     std::mutex errorMutex;std::string failure;
@@ -35,19 +36,20 @@ public:
     bool hasFailed()const{return failed.load();}
     void checkError(){if(failed.load()){std::lock_guard lock(errorMutex);throw std::runtime_error(failure);}}
     void start(const std::filesystem::path& path){
+        metricsPath=path.parent_path()/L"audio-metrics.txt";
         std::promise<void> ready;auto future=ready.get_future();
         consumer=std::thread([this,path]{
             try{
-                PcmWaveWriter writer(path);std::vector<std::int16_t> pcm(packetFrames*2);
+                PcmWaveWriter writer(path);std::vector<std::int16_t> pcm(batchFrames*2);
                 for(;;){
-                    const auto index=consumed.load(std::memory_order_relaxed);
-                    if(index==produced.load(std::memory_order_acquire)){
-                        if(producerDone.load()&&index==produced.load(std::memory_order_acquire))break;
-                        Sleep(3);continue;
-                    }
-                    const auto& packet=queue[index%capacity];pcm.resize(packet.frames*2);
-                    std::memcpy(pcm.data(),packet.pcm.data(),pcm.size()*2);writer.append(pcm);
-                    consumed.store(index+1,std::memory_order_release);
+                    const bool done=producerDone.load();
+                    const auto available=queue.available();
+                    if(done&&!available)break;
+                    if(available<batchFrames&&!done){Sleep(3);continue;}
+                    pcm.resize(batchFrames*2);
+                    const auto frames=queue.pop(pcm.data(),batchFrames);pcm.resize(frames*2);
+                    const auto started=qpc();writer.append(pcm);
+                    maxWrite100ns=std::max(maxWrite100ns,std::uint64_t(qpc()-started));++writeBatches;
                 }
                 writer.close();
             }catch(const std::exception& e){fail(e.what());}
@@ -89,16 +91,13 @@ public:
                             void now(){checked(p->ReleaseBuffer(n));active=false;}} release{input.Get(),count};
                         if((flags&AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR)||stamp==0)throw std::runtime_error("Audio timestamp unavailable; no guessed sync");
                         if(seen&&((flags&AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY)||position!=nextPosition))throw std::runtime_error("Audio discontinuity detected; partial recording retained");
-                        if(count>packetFrames)throw std::runtime_error("Audio packet exceeds bounded queue slot");
-                        const auto index=produced.load(std::memory_order_relaxed);
-                        if(index-consumed.load(std::memory_order_acquire)>=capacity)throw std::runtime_error("Audio disk queue overflow; partial recording retained");
-                        auto& packet=queue[index%capacity];packet.frames=count;
-                        if(flags&AUDCLNT_BUFFERFLAGS_SILENT)std::memset(packet.pcm.data(),0,count*4);
-                        else{if(!data)throw std::runtime_error("Missing audio packet");std::memcpy(packet.pcm.data(),data,count*4);}
+                        const bool silence=(flags&AUDCLNT_BUFFERFLAGS_SILENT)!=0;
+                        if(!silence&&!data)throw std::runtime_error("Missing audio packet");
+                        if(!queue.push(reinterpret_cast<const std::int16_t*>(data),count,silence))
+                            throw std::runtime_error("Audio disk queue exceeded 10 seconds; partial recording retained");
                         if(!seen)first.store(stamp);
                         nextPosition=position+count;seen=true;
                         last.store(stamp+std::int64_t(count)*second/audioRate);total.fetch_add(count);
-                        produced.store(index+1,std::memory_order_release);
                         // Release before asking for the next packet. Never wait
                         // for disk or video while an endpoint buffer is held.
                         release.now();checked(input->GetNextPacketSize(&available));
@@ -117,7 +116,15 @@ public:
         });
         future.get();
     }
-    void stop(){stopping.store(true);if(producer.joinable())producer.join();if(consumer.joinable())consumer.join();}
+    void stop(){
+        stopping.store(true);if(producer.joinable())producer.join();if(consumer.joinable())consumer.join();
+        if(!metricsPath.empty())try{
+            std::ofstream report(metricsPath);
+            report<<"queueCapacityFrames=480000\nqueueHighWaterFrames="<<queue.highWaterFrames()
+                  <<"\nmaxWrite100ns="<<maxWrite100ns<<"\nwriteBatches="<<writeBatches
+                  <<"\naudioFrames="<<total.load()<<"\n";
+        }catch(...){} // Diagnostics must never mask a capture/write error.
+    }
     ~TimedAudio(){stop();}
 };
 }

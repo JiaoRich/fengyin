@@ -35,8 +35,14 @@ class ScreenCaptureCandidate(unittest.TestCase):
         self.assertNotIn('writer.append', callback)
         self.assertNotIn('WriteSample', callback)
         self.assertIn('AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY', callback)
-        self.assertIn('produced.store(index+1,std::memory_order_release)', callback)
-        self.assertIn('Audio disk queue overflow', callback)
+        self.assertIn('queue.push(', callback)
+        self.assertIn('Audio disk queue exceeded 10 seconds', callback)
+        queue = (ROOT / 'native/ScreenCapture/PcmFrameQueue.h').read_text(encoding='utf-8')
+        self.assertIn('frames=48000*10', queue)
+        self.assertIn('written.store(w+frames,std::memory_order_release)', queue)
+        consumer = audio.split('consumer=std::thread(', 1)[1].split('producer=std::thread(', 1)[0]
+        self.assertLess(consumer.index('queue.pop('), consumer.index('writer.append('))
+        self.assertIn('batchFrames=4800', audio)
 
     def test_mux_is_explicit_and_failure_cannot_remove_originals(self):
         main = (ROOT / 'native/ScreenCapture/main.cpp').read_text(encoding='utf-8')

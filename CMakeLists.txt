@@ -379,6 +379,10 @@ install(FILES
 
 include(CTest)
 if(BUILD_TESTING)
+    find_package(Threads REQUIRED)
+    add_executable(FengYinPcmFrameQueueTests tests/test_pcm_frame_queue.cpp)
+    target_link_libraries(FengYinPcmFrameQueueTests PRIVATE Threads::Threads)
+    add_test(NAME recording_pcm_frame_queue COMMAND FengYinPcmFrameQueueTests)
     add_executable(FengYinRecordingStartupTests tests/test_recording_startup_guard.cpp)
     add_test(NAME recording_startup_phase_guard COMMAND FengYinRecordingStartupTests)
     add_executable(FengYinScreenCapturePolicyTests tests/test_screen_capture_policy.cpp)
