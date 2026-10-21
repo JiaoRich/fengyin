@@ -13,9 +13,10 @@ int wmain(int argc,wchar_t** argv){
     if(action==L"--mux-session"){
         const fs::path folder=argv[2];write(folder/L"recording.mp4",std::string(4096,'m'));
         if(fs::exists(folder/L"fail-once")){fs::remove(folder/L"fail-once");write(folder/L"state.txt","failed: fixture failure");return 1;}
-        write(folder/L"state.txt","saved");return 0;
+        write(folder/L"recording.wav",std::string(4096,'w'));write(folder/L"state.txt","saved");return 0;
     }
     const bool audio=action==L"audio";
+    if(!audio&&(argc<6||std::wstring(argv[5])!=L"1800"))return 2;
     const fs::path folder=audio?fs::path(argv[2]).parent_path():fs::path(argv[3]);
     if(!audio)fs::create_directory(folder);
     const fs::path stop=audio?fs::path(argv[3]):folder/L"stop";

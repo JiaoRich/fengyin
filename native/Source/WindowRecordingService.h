@@ -40,6 +40,7 @@ private:
     juce::File temporaryFolder() const;
     bool createSession();
     void cleanCompletedSession();
+    bool publishFiles();
     juce::String lastError;
     RecordingStartupGuard startupGuard;
     bool running=false,finishing=false,ready=false,completed=false;

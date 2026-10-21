@@ -9,7 +9,30 @@ std::int16_t value(std::uint64_t sample){return std::int16_t(int((sample*17)%300
 void fill(std::vector<std::int16_t>& block,std::uint64_t frame){
     for(std::size_t i=0;i<block.size();++i)block[i]=value(frame*2+i);
 }
-int main(){
+int main(int argc,char** argv){
+    if(argc==2&&std::string(argv[1])=="--realtime-30min"){
+        PcmFrameQueue queue;constexpr std::uint64_t target=48000ULL*1800;
+        std::atomic<bool> overflow{false};const auto origin=std::chrono::steady_clock::now();
+        const auto path=std::filesystem::temp_directory_path()/("fy-soak-"+std::to_string(origin.time_since_epoch().count())+".wav");
+        std::thread producer([&]{std::vector<std::int16_t> block(256);
+            for(std::uint64_t sent=0;sent<target;sent+=128){
+                std::this_thread::sleep_until(origin+std::chrono::nanoseconds(sent*1000000000/48000));
+                fill(block,sent);if(!queue.push(block.data(),128)){overflow=true;break;}
+            }
+        });
+        std::uint64_t received=0;std::vector<std::int16_t> batch(9600);
+        {PcmWaveWriter writer(path);
+            while(received<target&&!overflow.load()){
+                if(queue.available()<4800){std::this_thread::sleep_for(std::chrono::milliseconds(3));continue;}
+                batch.resize(9600);const auto count=queue.pop(batch.data(),4800);batch.resize(count*2);
+                for(std::size_t i=0;i<count*2;++i)require(batch[i]==value(received*2+i));
+                writer.append(batch);received+=count;
+            }writer.close();
+        }
+        producer.join();require(!overflow&&received==target);
+        require(std::filesystem::file_size(path)==44+target*4);std::filesystem::remove(path);
+        std::cout<<"REALTIME 30-minute PCM queue+disk PASS, frames="<<received<<", highWater="<<queue.highWaterFrames()<<"\n";return 0;
+    }
     // Packet sizes must not determine buffering duration. Includes 1-frame
     // packets and real low-latency sizes that exhausted the old 64-packet queue.
     for(std::size_t packet:{1,64,128,256,480,2048}){

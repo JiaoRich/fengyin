@@ -1,5 +1,6 @@
 #include "WindowRecordingService.h"
 #include "RecordingPaths.h"
+#include "RecordingLimits.h"
 #if JUCE_WINDOWS
 #define NOMINMAX
 #include <windows.h>
@@ -22,7 +23,7 @@ void WindowRecordingService::cleanCompletedSession() {
     for(const auto& file:sessionFolder.findChildFiles(juce::File::findFiles,false)){
         if(file.isSymbolicLink())continue;
         const auto name=file.getFileName();
-        if(owned.contains(name)||name.matchesWildcard("recording-incomplete*.mp4",false))file.deleteFile();
+        if(owned.contains(name)||name.matchesWildcard("recording-incomplete*.mp4",false)||name.matchesWildcard("recording-incomplete*.wav",false))file.deleteFile();
     }
     // A foreign file placed here is not ours to delete. Keep the marker and
     // report residuals rather than recursively sweeping arbitrary contents.
@@ -82,7 +83,7 @@ bool WindowRecordingService::startScreen(std::uintptr_t window,bool prepareOnly)
     stopFile=sessionFolder.getChildFile("stop");stateFile=sessionFolder.getChildFile("state.txt");
     partialFile=sessionFolder.getChildFile("recording.mp4");
     juce::StringArray args {executable.getFullPathName(),"--capture",juce::String::toHexString(static_cast<juce::int64>(window)),
-        sessionFolder.getFullPathName(),juce::String(static_cast<juce::int64>(GetCurrentProcessId())),"21600"};
+        sessionFolder.getFullPathName(),juce::String(static_cast<juce::int64>(GetCurrentProcessId())),juce::String(recordingMaxSeconds)};
     if(prepareOnly)args.add("--armed");
     running=process.start(args,0);startedAt=juce::Time::getMillisecondCounterHiRes();stoppedAt=0;lastPollAt=0;
     if(!running)lastError=juce::String::fromUTF8("无法启动GPU录屏组件");
@@ -112,14 +113,30 @@ bool WindowRecordingService::resumeScreenSession(const juce::File& folder) {
     partialFile=folder.getChildFile("recording.mp4");
     destination=RecordingPaths::next(videoFolder(),"mp4");return true;
 }
+bool WindowRecordingService::publishFiles() {
+    if(partialFile.getSize()<=1024||destination.exists())return false;
+    if(!screen)return partialFile.moveFileTo(destination);
+    const auto wave=sessionFolder.getChildFile("recording.wav");
+    const auto target=audioFolder().getChildFile(destination.getFileNameWithoutExtension()+".wav");
+    if(wave.getSize()<=44||audioFolder().createDirectory().failed()||target.exists())return false;
+    if(!wave.moveFileTo(target))return false;
+    if(partialFile.moveFileTo(destination))return true;
+    // Roll back only our own move; never overwrite another file. Even if the
+    // rollback fails, original capture PCM/video are still kept for recovery.
+    if(!wave.exists())target.moveFileTo(wave);
+    return false;
+}
 bool WindowRecordingService::generateVideo() {
     if(!captured || running)return false;
     const auto executable=juce::File::getSpecialLocation(juce::File::currentApplicationFile).getSiblingFile("FengYinScreenCapture.exe");
     // The helper never overwrites an existing output. Successful previous mux
     // can be recovered without re-encoding or losing the original WAV/video.
-    if(stateFile.loadFileAsString().trim()=="saved" && partialFile.getSize()>1024 && !destination.existsAsFile()
-        && partialFile.moveFileTo(destination)){
+    if(stateFile.loadFileAsString().trim()=="saved" && publishFiles()){
         captured=false;completed=true;lastError.clear();cleanCompletedSession();return true;
+    }
+    const auto oldWave=sessionFolder.getChildFile("recording.wav");
+    if(oldWave.existsAsFile()&&!oldWave.moveFileTo(sessionFolder.getNonexistentChildFile("recording-incomplete",".wav"))){
+        lastError=juce::String::fromUTF8("无法保留上次WAV文件，原始素材未覆盖");captured=false;completed=true;return false;
     }
     if(partialFile.existsAsFile()){
         const auto preserved=sessionFolder.getNonexistentChildFile("recording-incomplete",".mp4");
@@ -193,8 +210,8 @@ void WindowRecordingService::poll() {
         captured=true;lastError.clear();return;
     }
     completed=true;muxing=false;
-    if(process.getExitCode()==0 && status=="saved" && partialFile.getSize()>1024 && !destination.existsAsFile()
-        && partialFile.moveFileTo(destination)){lastError.clear();cleanCompletedSession();}
+    if(process.getExitCode()==0 && status=="saved" && publishFiles()){lastError.clear();cleanCompletedSession();}
+    else if(status=="saved")lastError=juce::String::fromUTF8("录制文件未能全部保存到目标目录，临时素材已保留，请检查目录权限、空间或同名文件。");
     else if(lastError.isEmpty())lastError=juce::String::fromUTF8("录制未成功保存：")
         +(status.isNotEmpty()?status:juce::String::fromUTF8("组件未启动或Windows媒体组件不可用"))
         +juce::String::fromUTF8("。临时素材已保留。");

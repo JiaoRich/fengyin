@@ -6,6 +6,8 @@ import math
 from pathlib import Path
 import subprocess
 import sys
+import wave
+import shutil
 
 
 def check(helper, ffmpeg_dir, directory):
@@ -59,9 +61,23 @@ def check(helper, ffmpeg_dir, directory):
     assert refused.returncode != 0 and hashlib.sha256(output.read_bytes()).hexdigest() == before
     short = subprocess.run([str(helper), '--mux-existing', str(video), str(audio), str(directory / 'insufficient.mp4'), '1250000', '30000000'], capture_output=True, timeout=120)
     assert short.returncode != 0, 'Missing audio was silently padded'
+    session = directory / 'dual-output-session'
+    session.mkdir()
+    shutil.copyfile(video, session / 'video.partial.mp4')
+    source_pcm = run([ffmpeg, '-v', 'error', '-i', audio, '-f', 's16le', '-ac', '2', '-ar', '48000', '-'])
+    with wave.open(str(session / 'audio.wav'), 'wb') as wav:
+        wav.setparams((2, 2, 48000, 0, 'NONE', 'not compressed'))
+        wav.writeframes(source_pcm)
+    (session / 'alignment.txt').write_text('1250000 20000000\n')
+    run([helper, '--mux-session', session])
+    assert (session / 'state.txt').read_text().strip() == 'saved'
+    assert hashes(session / 'recording.mp4') == source_hashes
+    with wave.open(str(session / 'recording.wav'), 'rb') as wav:
+        assert wav.getnframes() == 96000 and wav.getframerate() == 48000
+        assert wav.readframes(96000) == source_pcm[6000*4:102000*4], 'WAV altered samples or included cue'
     result = dict(fixtureEncoder=fixture_encoder, videoPackets=60, compressedVideoUnchanged=True, audioDecodedFrames=len(samples)//2,
                   audioSnrDb=snr, overwriteRefused=True, insufficientAudioRefused=True,
-                  targetPerformanceAccepted=False, hardwareCaptureAccepted=False)
+                  defaultWaveSampleExact=True, targetPerformanceAccepted=False, hardwareCaptureAccepted=False)
     (directory / 'mux-verification.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(result))
 

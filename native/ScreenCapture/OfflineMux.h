@@ -30,7 +30,7 @@ inline void mux(const std::filesystem::path& video,const std::filesystem::path& 
     checked(MFCreateMediaType(&aac));checked(aac->SetGUID(MF_MT_MAJOR_TYPE,MFMediaType_Audio));
     checked(aac->SetGUID(MF_MT_SUBTYPE,MFAudioFormat_AAC));checked(aac->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND,48000));
     checked(aac->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS,2));checked(aac->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE,16));
-    checked(aac->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND,24000));checked(aac->SetUINT32(MF_MT_AAC_PAYLOAD_TYPE,0));
+    checked(aac->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND,32000));checked(aac->SetUINT32(MF_MT_AAC_PAYLOAD_TYPE,0));
     checked(out->AddStream(aac.Get(),&a));checked(out->SetInputMediaType(a,pcm.Get(),nullptr));checked(out->BeginWriting());
     // Interleave reads by media time. This prevents the mux from retaining an
     // entire video stream while it waits for the first audio sample.
@@ -48,7 +48,11 @@ inline void mux(const std::filesystem::path& video,const std::filesystem::path& 
         if(!sample)continue;
         if(takeVideo){
             checked(sample->GetSampleTime(&time));vt=time;
-            if(time<duration)checked(out->WriteSample(v,sample.Get()));else ve=true;
+            if(time<duration){
+                LONGLONG length=0;checked(sample->GetSampleDuration(&length));
+                if(time+length>duration)checked(sample->SetSampleDuration(duration-time));
+                checked(out->WriteSample(v,sample.Get()));
+            }else ve=true;
         }else{
             ComPtr<IMFMediaBuffer> buffer;checked(sample->ConvertToContiguousBuffer(&buffer));
             BYTE* data=nullptr;DWORD bytes=0;checked(buffer->Lock(&data,nullptr,&bytes));

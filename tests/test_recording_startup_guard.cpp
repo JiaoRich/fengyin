@@ -1,7 +1,12 @@
 #include "../native/Source/RecordingStartupGuard.h"
+#include "../native/Source/RecordingLimits.h"
 #include <stdexcept>
 void require(bool ok){if(!ok)throw std::runtime_error("Recording startup guard regression");}
 int main(){
+    require(fengyin::recordingMaxSeconds==1800);
+    require(!fengyin::recordingLimitReached(17999999999LL));
+    require(fengyin::recordingLimitReached(18000000000LL));
+    require(fengyin::recordingLimitReached(18000000001LL));
     fengyin::RecordingStartupGuard guard;
     require(!guard.timedOut(20000,false,false,true));
     require(guard.timedOut(20001,false,false,true));

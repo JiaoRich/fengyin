@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.30 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.31 LANGUAGES C CXX)
 option(FENGYIN_ARCHIVED_VIDEO_RECORDING "Build archived video-recording diagnostics, never for release" OFF)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
@@ -379,6 +379,8 @@ install(FILES
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(FengYinExportWaveTests tests/test_export_wave.cpp)
+    add_test(NAME recording_aligned_30min_wave COMMAND FengYinExportWaveTests)
     find_package(Threads REQUIRED)
     add_executable(FengYinPcmFrameQueueTests tests/test_pcm_frame_queue.cpp)
     target_link_libraries(FengYinPcmFrameQueueTests PRIVATE Threads::Threads)

@@ -86,6 +86,7 @@ int main(){
         require(resumed.resumeScreenSession(session));require(resumed.generateVideo());
         wait(resumed,[&]{return !resumed.busy();});require(resumed.takeCompleted()&&resumed.error().isEmpty());
         require(resumed.lastFile().getSize()==4096);
+        require(root.getChildFile("audio").getChildFile(resumed.lastFile().getFileNameWithoutExtension()+".wav").getSize()==4096);
         require(resumed.hasVideoQualityWarning()); // successful save retains the quality warning
         require(!session.exists()); // successful owned session is automatically cleaned
     }
@@ -99,6 +100,24 @@ int main(){
         require(!recovery.hasVideoQualityWarning());require(recovery.generateVideo());
         wait(recovery,[&]{return !recovery.busy();});require(recovery.error().isEmpty());
         require(external.getChildFile("audio.wav").existsAsFile());
+    }
+    {
+        const auto external=root.getChildFile("pair-collision");require(external.createDirectory().wasOk());
+        require(external.getChildFile("audio.wav").replaceWithText(juce::String::repeatedString("a",4096)));
+        require(external.getChildFile("video.partial.mp4").replaceWithText(juce::String::repeatedString("v",4096)));
+        require(external.getChildFile("alignment.txt").replaceWithText("0 20000000"));
+        WindowRecordingService recovery(root);require(recovery.resumeScreenSession(external));
+        const auto conflict=root.getChildFile("audio").getChildFile(recovery.lastFile().getFileNameWithoutExtension()+".wav");
+        require(conflict.replaceWithText("do not overwrite"));
+        require(recovery.generateVideo());wait(recovery,[&]{return !recovery.busy();});
+        require(recovery.error().isNotEmpty()&&!recovery.lastFile().exists());
+        require(conflict.loadFileAsString()=="do not overwrite");
+        require(external.getChildFile("recording.mp4").getSize()==4096);
+        require(external.getChildFile("recording.wav").getSize()==4096);
+        require(conflict.deleteFile());require(recovery.resumeScreenSession(external));
+        require(recovery.generateVideo());require(!recovery.busy()&&recovery.error().isEmpty());
+        require(recovery.lastFile().getSize()==4096);
+        require(root.getChildFile("audio").getChildFile(recovery.lastFile().getFileNameWithoutExtension()+".wav").getSize()==4096);
     }
     require(root.deleteRecursively()); // only this test's fresh UUID temp directory
 }

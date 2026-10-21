@@ -50,7 +50,8 @@ class RecordingInteraction128(unittest.TestCase):
         for token in ['getParentDirectory()!=temporaryFolder()','isSymbolicLink()','fengyin-session-v2','owned.contains(name)']:
             self.assertIn(token,cleanup)
         self.assertNotIn('deleteRecursively',cleanup)
-        self.assertIn('partialFile.moveFileTo(destination)){lastError.clear();cleanCompletedSession();}',service)
+        self.assertIn('publishFiles()){lastError.clear();cleanCompletedSession();}',service)
+        self.assertIn('if(!wave.moveFileTo(target))return false;',service)
         for folder in ['录音文件','录屏文件','临时文件']:
             self.assertIn(folder,read('native/Source/RecordingPaths.h'))
 

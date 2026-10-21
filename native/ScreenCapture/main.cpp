@@ -1,6 +1,8 @@
 #include "GpuVideo.h"
 #include "TimedAudio.h"
 #include "OfflineMux.h"
+#include "ExportWave.h"
+#include "../Source/RecordingLimits.h"
 #include <windows.graphics.capture.interop.h>
 #include <windows.graphics.directx.direct3d11.interop.h>
 #include <winrt/Windows.Foundation.h>
@@ -81,7 +83,7 @@ static void record(HWND hwnd,const std::filesystem::path& folder,HANDLE parent,i
     const auto stop=[&]{
         const auto tick=GetTickCount64();
         if(tick>=nextStopCheck){nextStopCheck=tick+50;requestedStop=std::filesystem::exists(folder/L"stop")||WaitForSingleObject(parent,0)!=WAIT_TIMEOUT;}
-        return requestedStop||(origin&&qpc()-origin>=std::int64_t(maxSeconds)*second);
+        return requestedStop||(origin&&fengyin::recordingLimitReached(qpc()-origin,maxSeconds));
     };
     status(folder,"starting");
     try{
@@ -128,7 +130,7 @@ static void record(HWND hwnd,const std::filesystem::path& folder,HANDLE parent,i
         }
         if(held){held.Close();held=nullptr;}session.Close();pool.Close();
         // Capture the final audio block covering the last video frame.
-        const auto end=lastFrame+second/fps,waitUntil=qpc()+second;
+        const auto end=std::min(lastFrame+second/fps,origin+std::int64_t(maxSeconds)*second),waitUntil=qpc()+second;
         while(audio->endQpc()<end&&qpc()<waitUntil){audio->checkError();Sleep(3);}
         audio->stop();audio->checkError();gpu.close();
         writeMetrics();
@@ -196,13 +198,14 @@ int wmain(int argc,wchar_t** argv){
             if(!(alignment>>trim>>duration))throw std::runtime_error("Missing capture alignment");
             SetPriorityClass(GetCurrentProcess(),BELOW_NORMAL_PRIORITY_CLASS);
             status(folder,"finalizing");mux(folder/L"video.partial.mp4",folder/L"audio.wav",folder/L"recording.mp4",trim,duration);
+            exportWave(folder/L"audio.wav",folder/L"recording.wav",trim,duration);
             status(folder,"saved");return 0;
         }
         if((argc!=5&&argc!=6&&argc!=7)||std::wstring(argv[1])!=L"--capture")throw std::runtime_error("Use --capture <HWND hex> <new session directory> <parent PID> [seconds] [--armed]");
         const bool armed=argc==7&&std::wstring(argv[6])==L"--armed";
         if(argc==7&&!armed)throw std::runtime_error("Unknown recording preparation mode");
         const int seconds=argc>=6?std::stoi(argv[5]):45;
-        if(seconds<5||seconds>21600)throw std::runtime_error("Capture duration must be between 5 and 21600 seconds");
+        if(seconds<5||seconds>fengyin::recordingMaxSeconds)throw std::runtime_error("Capture duration must be between 5 and 1800 seconds");
         folder=argv[3];if(!std::filesystem::create_directory(folder)){
             for(const auto& entry:std::filesystem::directory_iterator(folder))
                 if(entry.path().filename()!=L"fengyin-session-v2"||!entry.is_regular_file())throw std::runtime_error("Session directory must be new");
