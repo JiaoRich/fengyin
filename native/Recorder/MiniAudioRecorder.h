@@ -10,6 +10,7 @@ public:
     MiniAudioRecorder();
     ~MiniAudioRecorder();
     void start(const std::filesystem::path& output,const std::wstring& endpoint);
+    void setRecordingEnabled(bool enabled);
     void drain();
     void finish();
     static void selfTest(const std::filesystem::path& output);

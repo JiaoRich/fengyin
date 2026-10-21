@@ -18,6 +18,13 @@ int main(){
     }
     require(exitAudio.getSize()==4096);
     {
+        WindowRecordingService armed(root);require(armed.startAudio(true));
+        wait(armed,[&]{return armed.prepared();});require(!armed.recording());
+        armed.stop();wait(armed,[&]{return !armed.busy();});require(armed.wasCancelled());
+        require(!armed.lastFile().exists());
+        require(root.getChildFile("temporary").findChildFiles(juce::File::findDirectories,false).isEmpty());
+    }
+    {
         WindowRecordingService service(root);
         require(service.startAudio());require(!service.startScreen(1));
         wait(service,[&]{return service.recording();});service.stop();
@@ -26,11 +33,14 @@ int main(){
     }
     juce::File session;
     {
-        WindowRecordingService service(root);require(service.startScreen(1));
+        WindowRecordingService service(root);require(service.startScreen(1,true));
+        wait(service,[&]{return service.prepared();});require(!service.recording());
+        require(service.beginCapture());
         wait(service,[&]{return service.recording();});service.stop();
         wait(service,[&]{return service.needsVideoGeneration();});
         require(service.busy()&&!service.recording()&&!service.stopping());require(!service.takeCompleted());
-        auto directories=root.getChildFile("video").findChildFiles(juce::File::findDirectories,false);require(directories.size()==1);session=directories[0];
+        auto directories=root.getChildFile("temporary").findChildFiles(juce::File::findDirectories,false);require(directories.size()==1);session=directories[0];
+        require(root.getChildFile("video").findChildFiles(juce::File::findDirectories,false).isEmpty());
         require(!session.getChildFile("recording.mp4").existsAsFile()); // no automatic encode
     }
     {
@@ -42,8 +52,17 @@ int main(){
         require(resumed.resumeScreenSession(session));require(resumed.generateVideo());
         wait(resumed,[&]{return !resumed.busy();});require(resumed.takeCompleted()&&resumed.error().isEmpty());
         require(resumed.lastFile().getSize()==4096);
-        require(!session.findChildFiles(juce::File::findFiles,false,"recording-incomplete*.mp4").isEmpty());
-        require(session.getChildFile("audio.wav").existsAsFile());
+        require(!session.exists()); // successful owned session is automatically cleaned
+    }
+    {
+        // A user-selected recovery directory is never recursively cleaned.
+        const auto external=root.getChildFile("user-recovery");require(external.createDirectory().wasOk());
+        require(external.getChildFile("audio.wav").replaceWithText(juce::String::repeatedString("a",4096)));
+        require(external.getChildFile("video.partial.mp4").replaceWithText(juce::String::repeatedString("v",4096)));
+        require(external.getChildFile("alignment.txt").replaceWithText("0 20000000"));
+        WindowRecordingService recovery(root);require(recovery.resumeScreenSession(external));require(recovery.generateVideo());
+        wait(recovery,[&]{return !recovery.busy();});require(recovery.error().isEmpty());
+        require(external.getChildFile("audio.wav").existsAsFile());
     }
     require(root.deleteRecursively()); // only this test's fresh UUID temp directory
 }

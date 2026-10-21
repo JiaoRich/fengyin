@@ -38,7 +38,7 @@ class Recording120(unittest.TestCase):
         self.assertNotIn('ticks()-origin-2000000',worker)
         main=(ROOT/'native/Source/MainComponent.cpp').read_text(encoding='utf-8')
         self.assertNotIn('if(!visible && !windowRecorder.isAudioOnly())',main)
-        self.assertIn('windowRecorder.startAudio()',main)
+        self.assertIn('windowRecorder.startAudio(true)',main)
 
     def test_native_title_uses_implicit_pointer_capture_not_css_coordinates(self):
         source=(ROOT/'native/Source/NativeCompactDragSurface.h').read_text(encoding='utf-8')

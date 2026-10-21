@@ -10,7 +10,7 @@ JS = (ROOT / "prototype" / "app.js").read_text(encoding="utf-8")
 
 class PrototypeStructureTests(unittest.TestCase):
     def test_all_primary_pages_exist(self):
-        for page in ("play", "sounds", "chain", "wind", "audio", "settings"):
+        for page in ("play", "sounds", "chain", "wind", "settings"):
             self.assertIn(f'id="page-{page}"', HTML)
             self.assertIn(f'data-page="{page}"', HTML)
 
@@ -107,9 +107,10 @@ class PrototypeStructureTests(unittest.TestCase):
 
     def test_audio_settings_are_inline_and_apply_immediately(self):
         for control_id in ("audio-driver-select", "audio-output-select", "audio-rate-select",
-                           "audio-buffer-select", "audio-latency-value", "audio-auto-optimize"):
+                           "audio-buffer-select", "audio-latency-value"):
             self.assertIn(f'id="{control_id}"', HTML)
         self.assertIn("nativeEvent('applyAudioSettings'", JS)
+        self.assertNotIn('id="audio-auto-optimize"', HTML)
         self.assertIn("nativeEvent('requestAudioSettings')", JS)
         self.assertIn("addEventListener('audioSettingsState'", JS)
         self.assertNotIn("document.querySelectorAll('#page-audio button')", JS)

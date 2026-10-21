@@ -30,7 +30,7 @@ class RecordingRelease127(unittest.TestCase):
     def test_no_full_config_updates_added_to_meter_path(self):
         main=read('native/Source/MainComponent.cpp')
         self.assertIn('screenRecordingPending',main)
-        self.assertIn('midi.getSnapshot().breath>0.01f',main)
+        self.assertIn('updateRecordingPerformanceGate()',main)
         self.assertIn('juce::Component::SafePointer<MainComponent>',main)
         gpu=read('native/ScreenCapture/GpuVideo.h')
         self.assertNotIn('D3D11_USAGE_STAGING',gpu)
@@ -38,7 +38,8 @@ class RecordingRelease127(unittest.TestCase):
 
     def test_audio_and_video_state_controls_do_not_fake_completion(self):
         js=read('prototype/app.js')
-        self.assertIn("nativeEvent('toggleScreenRecording')",js)
+        self.assertIn("?'toggleScreenRecording':'toggleRecording'",js)
         self.assertIn('screenRecordingBusy=!!state.screenRecordingBusy',js)
-        self.assertIn("state.screenRecordingPending?'生成视频'",js)
+        self.assertIn("saving?'正在保存，请稍等'",js)
+        self.assertNotIn("state.screenRecordingPending?'生成视频'",js)
         self.assertNotIn('screenRecordingBusy=false; // Video recording is withdrawn',js)

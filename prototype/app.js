@@ -121,7 +121,7 @@ document.addEventListener('keydown', e => {
     nativeEvent('setCompactMode', {compact:true});
 });
 
-const titles = {play:'开始演奏',sounds:'音色方案',chain:'调音师工作台',wind:'智能适配',audio:'声音设置',settings:'软件设置'};
+const titles = {play:'开始演奏',sounds:'音色方案',chain:'调音师工作台',wind:'智能适配',audio:'高级设置',settings:'高级设置'};
 const presets = [
   ['高音萨克斯','SWAM Soprano Sax 3','自然原声、丝滑抒情、明亮舞台'],
   ['中音萨克斯','SWAM Alto Sax 3','自然原声、温暖爵士、流行穿透'],
@@ -596,6 +596,9 @@ function toast(message) {
 }
 
 function showPage(page) {
+  if(page==='audio')page='settings';
+  closeRecordingMenu();
+  if(page!=='play')$('#record-success').hidden=true;
   if (compactMode) page = 'play';
   if (page === 'chain' && !studioUnlocked) return openStudioLogin();
   // Hide synchronously in the same bridge turn, not in a later animation
@@ -607,7 +610,7 @@ function showPage(page) {
   button.classList.add('active');
   $(`#page-${page}`).classList.add('active');
   $('#page-title').textContent = titles[page];
-  if (page === 'audio') nativeEvent('requestAudioSettings');
+  if (page === 'settings') nativeEvent('requestAudioSettings');
   if (page === 'sounds') promptForKongLibraryIfNeeded();
   updateVideoPresentation();
   requestVisualFrame();
@@ -1959,33 +1962,42 @@ $('#cancel-technique-learning').addEventListener('click', () => {
   renderTechniqueMappings();
 });
 
-async function toggleAudioRecording() {
-  if(screenRecordingBusy || $('#record-kind').value==='video') {
-    if(!window.__JUCE__?.backend)return toast('录屏需要Windows原生组件');
-    nativeEvent('toggleScreenRecording');return;
-  }
-  if (!recording && !latestBackendState.systemOutputRecordingSupported && video.src && window.__JUCE__?.backend?.emitEvent && !nativeAccompanimentReady) {
-    return toast('伴奏音轨尚未准备好，请稍候再开始录音');
-  }
-  if(!recording && window.fengyinVoice && !await window.fengyinVoice.beforeRecording('audio'))return;
-  nativeEvent('toggleRecording');
-  if(window.__JUCE__?.backend)return;
-  recording = !recording;
-  $('#record').textContent = recording ? '■ 停止录音' : '● 开始录音';
-  $('#record').style.color = recording ? 'var(--danger)' : '';
-  toast(recording ? '已开始模拟录音' : '模拟录音已保存');
+let recordingRequestPending=false;
+function closeRecordingMenu(){ $('#record-menu').hidden=true;$('#record').setAttribute('aria-expanded','false'); }
+function positionRecordingMenu(){
+  const menu=$('#record-menu'),anchor=$('#record').getBoundingClientRect();
+  menu.style.left=`${Math.max(8,Math.min(innerWidth-menu.offsetWidth-8,anchor.left))}px`;
+  menu.style.top=`${Math.max(8,Math.min(innerHeight-menu.offsetHeight-8,anchor.top-menu.offsetHeight-8))}px`;
 }
-$('#record').addEventListener('click',toggleAudioRecording);
-$('#record-kind').addEventListener('change',event=>{
-  if(event.target.value==='recover'){event.target.value='audio';nativeEvent('resumeScreenRecording');return;}
-  if(!recording && !screenRecordingBusy)$('#record').textContent=event.target.value==='video'?'● 开始录屏':'● 开始录音';
+$('#record').addEventListener('click',()=>{
+  if(latestBackendState.recordingSaving||recordingRequestPending)return;
+  if(recording||screenRecordingBusy){nativeEvent(screenRecordingBusy?'toggleScreenRecording':'toggleRecording');return;}
+  const open=$('#record-menu').hidden;$('#record-menu').hidden=!open;$('#record').setAttribute('aria-expanded',String(open));if(open){positionRecordingMenu();$('#record-menu button').focus();}
 });
+$$('[data-record-kind]').forEach(button=>button.addEventListener('click',()=>{
+  closeRecordingMenu();$('#record-success').hidden=true;
+  if(!window.__JUCE__?.backend)return toast('请在Windows风吟中使用录制功能');
+  if(recording||screenRecordingBusy||recordingRequestPending)return;
+  recordingRequestPending=true;$('#record').textContent='准备中 · 取消';
+  // Start native preparation immediately. Native prompt playback runs alongside it.
+  nativeEvent(button.dataset.recordKind==='video'?'toggleScreenRecording':'toggleRecording',window.fengyinVoice?.recordingPreferences?.()||{announce:false,volume:.45});
+}));
+document.addEventListener('pointerdown',event=>{if(!event.target.closest('#record-menu,.record-control'))closeRecordingMenu();});
+document.addEventListener('keydown',event=>{if(event.key==='Escape')closeRecordingMenu();});
+window.addEventListener('resize',()=>{closeRecordingMenu();$('#record-success').hidden=true;});
 window.__JUCE__?.backend?.addEventListener('screenRecordingMessage',message=>toast(String(message)));
 $('#recording-manager').addEventListener('click', () => nativeEvent('showRecordings'));
-$('#low-performance').addEventListener('change', event => {
-  document.body.classList.toggle('low-performance', event.target.checked);
-  toast(event.target.checked ? '已开启流畅模式' : '已关闭低性能模式，主题背景保持静态');
+window.__JUCE__?.backend?.addEventListener('recordingResult',result=>{
+  const banner=$('#record-success');banner.hidden=!result?.success&&!result?.canRecover;if(banner.hidden)return;
+  $('#record-recover').hidden=!result?.canRecover;
+  banner.querySelector('span').textContent=String(result.message||'录制成功！在这里查看录制文件');
+  const anchor=$('#recording-manager').getBoundingClientRect(),left=Math.max(8,Math.min(innerWidth-banner.offsetWidth-8,anchor.left));
+  banner.style.left=`${left}px`;banner.style.top=`${Math.max(8,anchor.top-banner.offsetHeight-12)}px`;
+  banner.querySelector('i').style.left=`${Math.max(12,Math.min(banner.offsetWidth-18,anchor.left+anchor.width/2-left))}px`;
+  if(result.cleanupWarning)toast('录制已保存，但部分临时文件未能清理，请在“临时文件”中查看。');
 });
+$('#record-result-close').addEventListener('click',()=>{$('#record-success').hidden=true;});
+$('#record-recover').addEventListener('click',()=>{$('#record-success').hidden=true;nativeEvent('resumeScreenRecording');});
 
 function trialTimeText(seconds) {
   const safe = Math.max(0, Number(seconds) || 0);
@@ -1999,6 +2011,8 @@ function renderLicenseState(state = {}) {
   const lock = $('#license-lock');
   $('#license-title').classList.toggle('green', permanent || trialActive);
   $('#start-trial').hidden = permanent || trialActive || trialExpired;
+  $('#license-code').hidden=permanent;$('#activate').hidden=permanent;
+  $('.license-code-label').hidden=permanent;
   if (permanent) {
     $('#license-title').textContent = '已永久激活';
     lock.hidden = true;
@@ -2135,7 +2149,6 @@ function setAudioControlsBusy(busy) {
   audioSettingsApplying = busy;
   audioControls.forEach(control => { control.disabled = busy; });
   $('#configure-asio4all').disabled = busy;
-  $('#audio-auto-optimize').disabled = busy;
   $('#audio-apply-status').classList.toggle('audio-saving', busy);
   if (busy) $('#audio-apply-status').textContent = '正在应用并保存声音设置…';
 }
@@ -2157,12 +2170,6 @@ $('#configure-asio4all').addEventListener('click', () => nativeEvent('configureA
 
 
 ['#audio-output-select','#audio-rate-select','#audio-buffer-select'].forEach(id => $(id).addEventListener('change', () => applyInlineAudioSettings(false)));
-$('#audio-auto-optimize').addEventListener('click', () => {
-  setAudioControlsBusy(true);
-  showAudioOptimisationProgress();
-  if (!window.__JUCE__?.backend?.emitEvent) return;
-  nativeEvent('optimiseAudioSettings');
-});
 
 const superLatencyDialog = $('#super-latency-confirm-dialog');
 $('#super-latency-optimize').addEventListener('click', () => {
@@ -2425,15 +2432,16 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
     if (versionNode) versionNode.textContent = `风吟 ${state.appVersion} · 本地运行，不会保存或上传个人资料。`;
   }
   recording = !!state.recording;
+  recordingRequestPending=false;
   screenRecordingBusy=!!state.screenRecordingBusy;
   applyPreparedVideoSource();
-  $('#record').textContent = recording ? (state.audioRecordingStopping?'正在保存…':state.systemOutputRecordingSupported&&!state.audioRecordingReady?'录音启动中…':'■ 停止录音') : '● 开始录音';
-  if(screenRecordingBusy)$('#record').textContent=state.screenRecordingPending?'生成视频':state.screenRecordingStopping?'正在保存…':state.screenRecording?'■ 停止录屏':'录屏启动中…';
-  else if(!recording && $('#record-kind').value==='video')$('#record').textContent='● 开始录屏';
-  $('#record-kind').disabled=recording||screenRecordingBusy;
-  $('#record-kind').querySelector('option[value="video"]').disabled=state.screenRecordingSupported===false;
+  const saving=!!state.recordingSaving||!!state.screenRecordingStopping||!!state.audioRecordingStopping;
+  $('#record').textContent=saving?'正在保存，请稍等':state.recordingPreparing?'准备中 · 取消':recording||screenRecordingBusy?'正在录制 · 停止':'● 开始录制';
+  $('#record').classList.toggle('saving',saving);$('#record').classList.toggle('recording',recording||screenRecordingBusy);
+  $('#record').setAttribute('aria-busy',String(saving||!!state.recordingPreparing));
+  $('#record').setAttribute('aria-haspopup',recording||screenRecordingBusy?'false':'menu');
   $('#record').style.color = recording||screenRecordingBusy ? 'var(--danger)' : '';
-  $('#record').disabled=!!state.screenRecordingStopping || !!state.audioRecordingStopping;
+  $('#record').disabled=saving;
 });
 
 $('#copy-machine-code').addEventListener('click', () => {
@@ -2633,14 +2641,14 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   $('#audio-buffer-help').textContent = asioBridge
     ? '直接选择缓冲区并自动保存：128 延迟低，256 更稳定，512 适合较高负载；不支持时恢复原设置。'
     : buffers.length <= 1
-    ? (lowLatency ? '当前设备驱动仅上报这一个可用缓冲值' : '普通 Windows Audio 由系统固定缓冲；请点击“自动优化”')
+    ? (lowLatency ? '当前设备驱动仅上报这一个可用缓冲值' : '当前声音模式由系统固定缓冲；可在上方选择其他声音模式')
     : '128 延迟低；出现爆音时可改为 256';
   const latency = Number(state?.latency);
   const latencyText = Number.isFinite(latency) && latency > 0 ? `${latency.toFixed(1)} ms · ${latency <= 10 ? '优秀' : latency <= 20 ? '良好' : '偏高'}` : '音频未运行 · 暂无延迟数据';
   $('#audio-latency-value').textContent = latencyText;
   $('#audio-latency-value').classList.toggle('green', Number.isFinite(latency) && latency > 0 && latency <= 20);
   const status = $('#audio-apply-status');
-  status.textContent = state?.message || (state?.automatic ? '已由风吟自动优化；也可使用上方高级选项手动调整。' : '已使用高级手动设置，软件不会自动覆盖。');
+  status.textContent = state?.message || (state?.automatic ? '当前声音配置已生效；上方选项可手动调整。' : '已使用手动设置，软件不会自动覆盖。');
   status.classList.toggle('audio-error', state?.success === false);
   if (state?.autoTuning) {
     if ($('#audio-optimization-dialog').hidden) showAudioOptimisationProgress();
@@ -2680,7 +2688,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.27 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.28 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},
@@ -3060,7 +3068,7 @@ studioCss.textContent=`
 .studio-final-label{margin:28px 0 12px;color:var(--accent,#43d9ff)}
 `;
 document.head.append(studioCss);
-$('#page-settings .panel').insertAdjacentHTML('beforeend',`<div class="tone-diagnostic-section"><button id="studio-entry" type="button">调音师入口</button><span id="studio-session-status" role="status"></span></div>`);
+$('#advanced-studio').insertAdjacentHTML('beforeend',`<div class="tone-diagnostic-section"><button id="studio-entry" type="button">调音师入口</button><span id="studio-session-status" role="status"></span></div>`);
 document.body.insertAdjacentHTML('beforeend',`<div class="studio-login" id="studio-login" hidden role="dialog" aria-modal="true" aria-labelledby="studio-login-title"><div><h2 id="studio-login-title">调音师入口</h2><label>密码<input id="studio-password" type="password" autocomplete="off"></label><p id="studio-login-status" role="status"></p><footer><button id="studio-login-cancel">取消</button><button id="studio-login-confirm" class="primary-button">进入</button></footer></div></div>`);
 $('#page-chain .panel').insertAdjacentHTML('afterbegin',`<div class="studio-toolbar"><div><button id="studio-new">新建音色</button> <button id="studio-import">导入方案包</button> <button id="studio-show-drafts">草稿箱</button></div><button id="studio-exit">退出调音师</button></div><p id="studio-import-status" role="status" hidden></p><div id="studio-drafts" hidden></div>`);
 $('#custom-tone-editor .custom-tone-step').insertAdjacentHTML('beforeend',`<div class="studio-names"><input id="studio-instrument-name" type="hidden"><label>音色名称<input id="studio-style-name" placeholder="例如：次中萨-醇厚" aria-describedby="tone-name-limit"><small id="tone-name-limit">最多10个字（含字母、数字、标点）</small></label></div>`);

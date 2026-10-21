@@ -29,7 +29,7 @@ static ComPtr<ID3D11Texture2D> pattern(GpuVideo& gpu,int w,int h){
     D3D11_SUBRESOURCE_DATA data{pixels.data(),UINT(w*4),0};ComPtr<ID3D11Texture2D> texture;
     checked(gpu.getDevice()->CreateTexture2D(&d,&data,&texture));return texture;
 }
-static void record(HWND hwnd,const std::filesystem::path& folder,HANDLE parent,int maxSeconds){
+static void record(HWND hwnd,const std::filesystem::path& folder,HANDLE parent,int maxSeconds,bool armed){
     if(!IsWindow(hwnd))throw std::runtime_error("FengYin window is unavailable");
     const auto monitor=MonitorFromWindow(hwnd,MONITOR_DEFAULTTONEAREST);MONITORINFO info{};info.cbSize=sizeof(info);
     if(!GetMonitorInfoW(monitor,&info))throw std::runtime_error("Cannot find target monitor");
@@ -47,8 +47,24 @@ static void record(HWND hwnd,const std::filesystem::path& folder,HANDLE parent,i
     auto deadline=qpc()+5*second;
     while(!audio->firstQpc()){audio->checkError();if(qpc()>deadline)throw std::runtime_error("No timestamped speaker samples");Sleep(5);}
     session.StartCapture();
-    std::int64_t origin=0,lastFrame=0,next=0;auto checkAt=GetTickCount64()+1000;
     Direct3D11CaptureFrame held{nullptr};std::int64_t heldStamp=0;std::uint64_t reusedFrames=0;
+    std::int64_t beginQpc=0;
+    if(armed){
+        // Only the control handshake changes: prepare existing resources while
+        // the announcement plays; retain at most one screen surface, keep PCM for
+        // the existing timestamp trim. No encoder/capture format changes.
+        status(folder,"starting");const auto limit=GetTickCount64()+30000;const auto firstFrameLimit=qpc()+8*second;bool announced=false;
+        while(!std::filesystem::exists(folder/L"begin")){
+            audio->checkError();auto preparedFrame=pool.TryGetNextFrame();
+            if(preparedFrame){const auto size=preparedFrame.ContentSize();if(size.Width!=width||size.Height!=height)throw std::runtime_error("Display geometry changed while preparing");if(held)held.Close();held=std::move(preparedFrame);heldStamp=held.SystemRelativeTime().count();}
+            if(held&&!announced){status(folder,"ready");announced=true;}
+            if(!held&&qpc()>firstFrameLimit)throw std::runtime_error("No screen frames while preparing");
+            if(std::filesystem::exists(folder/L"stop")||WaitForSingleObject(parent,0)!=WAIT_TIMEOUT){if(held){held.Close();held=nullptr;}session.Close();pool.Close();audio->stop();gpu.close();status(folder,"cancelled");return;}
+            if(GetTickCount64()>limit)throw std::runtime_error("Recording preparation timed out");Sleep(5);
+        }
+        beginQpc=qpc();
+    }
+    std::int64_t origin=0,lastFrame=0,next=0;auto checkAt=GetTickCount64()+1000;
     std::int64_t maxNewFrameAge=0;bool newSurface=false;
     const auto stop=[&]{return std::filesystem::exists(folder/L"stop")||WaitForSingleObject(parent,0)!=WAIT_TIMEOUT
         ||(origin&&qpc()-origin>=std::int64_t(maxSeconds)*second);};
@@ -70,7 +86,10 @@ static void record(HWND hwnd,const std::filesystem::path& folder,HANDLE parent,i
                     // WGC need not send unchanged desktop frames. Hold one
                     // frame-pool lease. Report every reuse separately: lack of
                     // a new surface alone does not prove the desktop was static.
-                    const auto time=origin?now:heldStamp;
+                    // The desktop may be static throughout the cue. Reuse its
+                    // one prepared surface at the actual start time, rather
+                    // than waiting forever for a post-cue desktop change.
+                    const auto time=origin?now:std::max(heldStamp,beginQpc);
                     if(newSurface){maxNewFrameAge=std::max(maxNewFrameAge,now-heldStamp);
                         if(now-heldStamp>second/5)throw std::runtime_error("New capture frame is over 200ms stale");}
                     else ++reusedFrames;
@@ -154,16 +173,21 @@ int wmain(int argc,wchar_t** argv){
             status(folder,"finalizing");mux(folder/L"video.partial.mp4",folder/L"audio.wav",folder/L"recording.mp4",trim,duration);
             status(folder,"saved");return 0;
         }
-        if((argc!=5&&argc!=6)||std::wstring(argv[1])!=L"--capture")throw std::runtime_error("Use --capture <HWND hex> <new session directory> <parent PID> [seconds]; diagnostic component, not production integration");
-        const int seconds=argc==6?std::stoi(argv[5]):45;
+        if((argc!=5&&argc!=6&&argc!=7)||std::wstring(argv[1])!=L"--capture")throw std::runtime_error("Use --capture <HWND hex> <new session directory> <parent PID> [seconds] [--armed]");
+        const bool armed=argc==7&&std::wstring(argv[6])==L"--armed";
+        if(argc==7&&!armed)throw std::runtime_error("Unknown recording preparation mode");
+        const int seconds=argc>=6?std::stoi(argv[5]):45;
         if(seconds<5||seconds>21600)throw std::runtime_error("Capture duration must be between 5 and 21600 seconds");
-        folder=argv[3];if(!std::filesystem::create_directory(folder))throw std::runtime_error("Session directory must be new");
+        folder=argv[3];if(!std::filesystem::create_directory(folder)){
+            for(const auto& entry:std::filesystem::directory_iterator(folder))
+                if(entry.path().filename()!=L"fengyin-session-v2"||!entry.is_regular_file())throw std::runtime_error("Session directory must be new");
+        }
         if(std::filesystem::space(folder).available<1024ULL*1024*1024)throw std::runtime_error("At least 1GB free space required");
         HANDLE parent=OpenProcess(SYNCHRONIZE,FALSE,DWORD(std::stoul(argv[4])));
         if(!parent)throw std::runtime_error("Parent process not found");
         struct Close{HANDLE h;~Close(){CloseHandle(h);}} handle{parent};
         SetPriorityClass(GetCurrentProcess(),BELOW_NORMAL_PRIORITY_CLASS);
-        record(reinterpret_cast<HWND>(std::uintptr_t(std::stoull(argv[2],nullptr,16))),folder,parent,seconds);
+        record(reinterpret_cast<HWND>(std::uintptr_t(std::stoull(argv[2],nullptr,16))),folder,parent,seconds,armed);
         return 0;
     }catch(const winrt::hresult_error& e){std::cerr<<winrt::to_string(e.message())<<" HRESULT="<<std::hex<<unsigned(e.code().value)<<"\n";
         if(!folder.empty()&&std::filesystem::exists(folder))try{status(folder,"failed: "+winrt::to_string(e.message()));}catch(...){}return 1;

@@ -39,7 +39,8 @@ class Recording118Tests(unittest.TestCase):
         self.assertNotIn('id="record-options"',html)
         self.assertNotIn('id="record-video-choice"',html)
         self.assertNotIn("nativeEvent('toggleWindowRecording'",js)
-        self.assertIn("$('#record').addEventListener('click',toggleAudioRecording)",js)
+        self.assertIn("$$('[data-record-kind]')",js)
+        self.assertIn("?'toggleScreenRecording':'toggleRecording'",js)
         main=(ROOT/'native/Source/MainComponent.cpp').read_text(encoding='utf-8')
         self.assertNotIn('.withEventListener("toggleWindowRecording"',main)
 

@@ -699,21 +699,6 @@ void MainComponent::setupWebInterface()
         {
             startSuperLowLatencyOptimisation(true);
         })
-        .withEventListener("optimiseAudioSettings", [this](juce::var)
-        {
-            if (videoPlaybackActive || recorder.isRecording() || windowRecorder.busy() || midi.getSnapshot().breath > 0.01f
-                || midi.getSnapshot().lastNote >= 0)
-                emitAudioSettingsState(false, utf8("请先暂停伴奏、录音和吹奏，再优化声音"));
-            else if (! pluginHost.hasPlugin())
-                emitAudioSettingsState(false, utf8("请先选择一个音色方案，再进行真实音源优化"));
-            else if (audio.beginAutomaticLatencyTuning(true))
-            {
-                pluginHost.setLatencyProbeActive(true);
-                emitAudioSettingsState(true, utf8("正在自动优化声音，无需操作…"));
-            }
-            else
-                emitAudioSettingsState(false, utf8("当前无法开始自动优化，请检查声音输出设备"));
-        })
         .withEventListener("beginBreathMatch", [this](juce::var)
         {
             if (! midi.getSnapshot().deviceConnected)
@@ -874,12 +859,17 @@ void MainComponent::setupWebInterface()
             if(token<=0 || !data || recorder.isRecording() || windowRecorder.busy() || !voicePrompts.play(data,size,token,gain))
                 if(webInterface)webInterface->emitEventIfBrowserIsVisible("voiceFinished",-token);
         })
-        .withEventListener("stopVoice", [this](juce::var) {voicePrompts.stop();})
-        .withEventListener("toggleRecording", [this](juce::var) {
-            voicePrompts.stop();
+        .withEventListener("stopVoice", [this](juce::var) {if(recordingPromptPhase==0)voicePrompts.stop();})
+        .withEventListener("toggleRecording", [this](juce::var payload) {
+            recordingAnnouncementsEnabled=static_cast<bool>(payload.getProperty("announce",true));
+            recordingPromptVolume=juce::jlimit(0.f,.7f,static_cast<float>(payload.getProperty("volume",.45)));
             if(isActivated || recorder.isRecording() || windowRecorder.busy())toggleRecording();
         })
-        .withEventListener("toggleScreenRecording", [this](juce::var) {toggleScreenRecording();})
+        .withEventListener("toggleScreenRecording", [this](juce::var payload) {
+            recordingAnnouncementsEnabled=static_cast<bool>(payload.getProperty("announce",true));
+            recordingPromptVolume=juce::jlimit(0.f,.7f,static_cast<float>(payload.getProperty("volume",.45)));
+            toggleScreenRecording();
+        })
         .withEventListener("resumeScreenRecording", [this](juce::var) {resumeScreenRecording();})
         .withEventListener("showRecordings", [](juce::var)
         {
@@ -1573,7 +1563,7 @@ void MainComponent::timerCallback()
     updateVlcPlayback();
     if(performanceNotesEnabled) {
         const auto now=juce::Time::getMillisecondCounterHiRes()*.001;
-        const bool allowed=isActivated && videoPlaybackActive && pluginHost.hasPlugin() && !pluginLoading
+        const bool allowed=isActivated && !recordingPerformancePaused && videoPlaybackActive && pluginHost.hasPlugin() && !pluginLoading
             && !midi.getSnapshot().deviceConnected;
         const bool running=performanceNotesStarted>0 && now-performanceNotesStarted<180;
         if(performanceNote>=0 && (!allowed || !running || now>=performanceNotesNext)) {
@@ -1595,17 +1585,25 @@ void MainComponent::timerCallback()
         }
     }
     windowRecorder.poll();
+    advanceRecordingPrompt(voicePrompts.consumeFinished());
+    if(windowRecorder.needsVideoGeneration())windowRecorder.generateVideo();
+    updateRecordingPerformanceGate();
     if(windowRecorder.takeCompleted() && webInterface) {
-        const auto message=windowRecorder.error().isEmpty()
-            ? utf8(windowRecorder.isAudioOnly()?"录音已保存：":"录屏已保存：")+windowRecorder.lastFile().getFullPathName():windowRecorder.error();
+        const auto message=recordingPromptError.isNotEmpty()?recordingPromptError:windowRecorder.wasCancelled()?utf8("已取消录制准备")
+            :windowRecorder.error().isEmpty()?utf8(windowRecorder.isAudioOnly()?"录制成功！在这里查看录音文件":"录制成功！在这里查看录屏文件"):windowRecorder.error();
         webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",message);
+        auto result=std::make_unique<juce::DynamicObject>();
+        result->setProperty("success",!windowRecorder.wasCancelled()&&recordingPromptError.isEmpty()&&windowRecorder.error().isEmpty());
+        result->setProperty("message",message);
+        result->setProperty("canRecover",!windowRecorder.wasCancelled()&&windowRecorder.hasRecoverableVideo()&&windowRecorder.error().isNotEmpty());
+        result->setProperty("cleanupWarning",windowRecorder.hasCleanupWarning());
+        webInterface->emitEventIfBrowserIsVisible("recordingResult",juce::var(result.release()));
         recordingStatus.setText(message,juce::dontSendNotification);
-        if(windowRecorder.isAudioOnly())webInterface->emitEventIfBrowserIsVisible("recordingSaved",windowRecorder.error().isEmpty());
+        if(windowRecorder.isAudioOnly())webInterface->emitEventIfBrowserIsVisible("recordingSaved",!windowRecorder.wasCancelled()&&recordingPromptError.isEmpty()&&windowRecorder.error().isEmpty());
+        recordingPromptError.clear();
         lastWebStateAtMs=0;
     }
     midi.tickTechniqueAutomation(); // Restore the established native UI timer path.
-    if(const auto token=voicePrompts.consumeFinished();token!=0 && webInterface)
-        webInterface->emitEventIfBrowserIsVisible("voiceFinished",token);
     if (superLowLatencyRunning && ++superLowLatencyPollTicks >= 30)
     {
         superLowLatencyPollTicks = 0;
@@ -1615,8 +1613,8 @@ void MainComponent::timerCallback()
             superLowLatencyRunning = false;
             if (isActivated)
             {
-                if (pluginHost.hasPlugin()) midi.setPerformanceSink(&pluginHost);
-                else midi.setPerformanceSink(&testSynth);
+                if (pluginHost.hasPlugin()) midi.setPerformanceSink(recordingPerformancePaused?nullptr:&pluginHost);
+                else midi.setPerformanceSink(recordingPerformancePaused?nullptr:&testSynth);
             }
             emitSuperLowLatencyState();
         }
@@ -1866,6 +1864,9 @@ void MainComponent::timerCallback()
         state->setProperty("licenseMessage", currentLicenseStatus.message);
         state->setProperty("machineCode", machineCode);
         state->setProperty("recording", recorder.isRecording() || (windowRecorder.busy() && windowRecorder.isAudioOnly()));
+        state->setProperty("recordingPreparing",windowRecorder.preparing()||(windowRecorder.busy()&&!windowRecorder.recording()&&!windowRecorder.stopping()&&!windowRecorder.needsVideoGeneration()));
+        state->setProperty("recordingSaving",windowRecorder.stopping() || windowRecorder.needsVideoGeneration());
+        state->setProperty("recordingPerformancePaused",recordingPerformancePaused);
         state->setProperty("screenRecordingBusy",windowRecorder.busy() && !windowRecorder.isAudioOnly());
         state->setProperty("screenRecording",windowRecorder.recording() && !windowRecorder.isAudioOnly());
         state->setProperty("screenRecordingStopping",windowRecorder.stopping() && !windowRecorder.isAudioOnly());
@@ -2915,7 +2916,7 @@ void MainComponent::useTestSynth()
     pluginHost.unload();
     audio.getDeviceManager().removeAudioCallback(&testSynth);
     audio.getDeviceManager().addAudioCallback(&testSynth);
-    midi.setPerformanceSink(&testSynth);
+    midi.setPerformanceSink(recordingPerformancePaused?nullptr:&testSynth);
     masterOutput.setInstrumentProfile(fengyin::InstrumentMixProfile::generic);
     currentPluginBrand.clear();
     currentInstrumentKey.clear();
@@ -3825,7 +3826,7 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName, bool ap
     pluginHost.attachTo(audio.getDeviceManager());
     juce::Logger::writeToLog("Plugin output attached");
     midi.setTechniqueContext(currentInstrumentKey);
-    midi.setPerformanceSink(&pluginHost);
+    midi.setPerformanceSink(recordingPerformancePaused?nullptr:&pluginHost);
     configureTechniqueDefaults();
     if (currentPluginBrand == "kong")
     {
@@ -4021,7 +4022,7 @@ void MainComponent::refreshLicenseUi()
         else
         {
             audio.getDeviceManager().addAudioCallback(&testSynth);
-            midi.setPerformanceSink(&testSynth);
+            midi.setPerformanceSink(recordingPerformancePaused?nullptr:&testSynth);
         }
         featureAudioEnabled = isActivated;
     }
@@ -4093,32 +4094,74 @@ void MainComponent::showActivationDialog()
 void MainComponent::resumeScreenRecording()
 {
     if(!isActivated || windowRecorder.busy() || recorder.isRecording())return;
-    recordingFolderChooser=std::make_unique<juce::FileChooser>(utf8("选择待生成视频的录屏会话文件夹"),fengyin::RecordingPaths::video());
+    recordingFolderChooser=std::make_unique<juce::FileChooser>(utf8("选择需要恢复的录屏临时会话文件夹"),fengyin::RecordingPaths::temporary());
     auto safe=juce::Component::SafePointer<MainComponent>(this);
     recordingFolderChooser->launchAsync(juce::FileBrowserComponent::openMode|juce::FileBrowserComponent::canSelectDirectories,
         [safe](const juce::FileChooser& chooser){if(!safe)return;const auto folder=chooser.getResult();if(!folder.isDirectory())return;
-            if(safe->windowRecorder.resumeScreenSession(folder))safe->toggleScreenRecording();
+            if(safe->windowRecorder.resumeScreenSession(folder)){safe->windowRecorder.generateVideo();safe->updateRecordingPerformanceGate();}
             else if(safe->webInterface)safe->webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",safe->windowRecorder.error());
             safe->lastWebStateAtMs=0;
         });
+}
+void MainComponent::startRecordingPrompt()
+{
+    recordingPromptError.clear();
+    voicePrompts.stop();recordingPromptPhase=recordingAnnouncementsEnabled?1:2;
+    recordingBeginAfterMs=juce::Time::getMillisecondCounterHiRes()+45000;
+    if(recordingAnnouncementsEnabled){
+        int size=0;const auto* data=BinaryData::getNamedResource(windowRecorder.isAudioOnly()?"REC_PREP_AUDIO_wav":"REC_PREP_SCREEN_wav",size);
+        if(!data||!voicePrompts.play(data,size,700000001,recordingPromptVolume)){
+            recordingPromptError=utf8("准备提示音不可用，未开始录制");
+            recordingPromptPhase=0;windowRecorder.stop();
+            if(webInterface)webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",utf8("准备提示音不可用，未开始录制"));
+        }
+    }
+    lastWebStateAtMs=0;
+}
+void MainComponent::advanceRecordingPrompt(int token)
+{
+    if(token==700000001&&recordingPromptPhase==1)recordingPromptPhase=2;
+    else if(token==700000002&&recordingPromptPhase==3){
+        recordingPromptPhase=4;
+        // Prompt completion is the output callback, not the physical speaker.
+        // Allow the device/loopback tail to drain before opening the start gate.
+        recordingBeginAfterMs=juce::Time::getMillisecondCounterHiRes()+juce::jmax(150.0,audio.getStatus().estimatedBufferLatencyMs*2+60.0);
+    }else if(token!=0&&token!=700000001&&token!=700000002&&webInterface)
+        webInterface->emitEventIfBrowserIsVisible("voiceFinished",token);
+    if(!windowRecorder.preparing()){if(recordingPromptPhase>0)voicePrompts.stop();recordingPromptPhase=0;return;}
+    if(recordingPromptPhase==2&&windowRecorder.prepared()){
+        int size=0;const auto* data=BinaryData::getNamedResource("REC_BEGIN_BEEP_wav",size);
+        if(data&&voicePrompts.play(data,size,700000002,juce::jmax(.15f,recordingPromptVolume)))recordingPromptPhase=3;
+        else{recordingPromptError=utf8("开始提示音不可用，未开始录制");recordingPromptPhase=0;windowRecorder.stop();}
+    }
+    if(recordingPromptPhase==4&&juce::Time::getMillisecondCounterHiRes()>=recordingBeginAfterMs){
+        windowRecorder.beginCapture();recordingPromptPhase=0;lastWebStateAtMs=0;
+    }else if(recordingPromptPhase>0&&recordingPromptPhase<4&&juce::Time::getMillisecondCounterHiRes()>recordingBeginAfterMs){
+        recordingPromptError=utf8("录制准备超时，未开始录制");
+        voicePrompts.stop();windowRecorder.stop();recordingPromptPhase=0;
+    }
+}
+void MainComponent::updateRecordingPerformanceGate()
+{
+    const bool pause=windowRecorder.stopping()&&!windowRecorder.wasCancelled();
+    if(pause==recordingPerformancePaused)return;
+    recordingPerformancePaused=pause;
+    if(pause){
+        midi.setPerformanceSink(nullptr);
+        if(pluginHost.hasPlugin())pluginHost.resetPerformance();else testSynth.resetPerformance();
+    }else if(isActivated&&!pluginLoading&&!effectLoading){
+        if(pluginHost.hasPlugin())midi.setPerformanceSink(&pluginHost);else midi.setPerformanceSink(&testSynth);
+    }
+    lastWebStateAtMs=0;
 }
 void MainComponent::toggleScreenRecording()
 {
     auto tell=[this](const juce::String& message){if(webInterface)webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",message);};
     if(windowRecorder.needsVideoGeneration()){
-        if(midi.getSnapshot().breath>0.01f){tell(utf8("请先停止吹奏，再生成视频；原始音视频已保存"));return;}
-        auto safe=juce::Component::SafePointer<MainComponent>(this);
-        juce::AlertWindow::showOkCancelBox(juce::MessageBoxIconType::InfoIcon,utf8("生成录屏视频"),
-            utf8("采集已结束，原始音视频已保存。请暂停吹奏和伴奏，点击生成后再合成为MP4；视频不会二次压缩。取消可稍后生成。"),
-            utf8("生成视频"),utf8("稍后生成"),this,juce::ModalCallbackFunction::create([safe](int result){
-                if(!safe || result==0)return;
-                if(!safe->windowRecorder.generateVideo() && safe->webInterface)
-                    safe->webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",safe->windowRecorder.error());
-                safe->lastWebStateAtMs=0;
-            }));return;
+        windowRecorder.generateVideo();updateRecordingPerformanceGate();return;
     }
     if(windowRecorder.busy()){
-        if(!windowRecorder.isAudioOnly())windowRecorder.stop();
+        if(!windowRecorder.isAudioOnly()){voicePrompts.stop();recordingPromptPhase=0;windowRecorder.stop();updateRecordingPerformanceGate();}
         else tell(utf8("请先停止录音，再开始录屏"));
         lastWebStateAtMs=0;return;
     }
@@ -4129,24 +4172,16 @@ void MainComponent::toggleScreenRecording()
         tell(utf8("录屏采集系统扬声器，请使用Windows共享输出，并让吹奏和伴奏从同一默认扬声器播放"));return;
     }
     interruptIdleVideoPreparation();voicePrompts.stop();
-    auto safe=juce::Component::SafePointer<MainComponent>(this);
-    juce::AlertWindow::showOkCancelBox(juce::MessageBoxIconType::WarningIcon,utf8("开始录屏"),
-        utf8("将录制风吟所在的整块显示器和系统扬声器声音，包括其他窗口、通知和任务栏。全屏及精简模式均保持整屏录制。需要可用的GPU硬件编码，不支持时不会转为软件编码。"),
-        utf8("开始录屏"),utf8("取消"),this,juce::ModalCallbackFunction::create([safe](int result){
-            if(!safe || result==0 || safe->windowRecorder.busy() || !safe->isActivated)return;
-            const auto* peer=safe->getPeer();
-            const auto handle=peer?reinterpret_cast<std::uintptr_t>(peer->getNativeHandle()):0;
-            if(!safe->windowRecorder.startScreen(handle) && safe->webInterface)
-                safe->webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",safe->windowRecorder.error());
-            safe->lastWebStateAtMs=0;
-        }));
+    const auto* peer=getPeer();const auto handle=peer?reinterpret_cast<std::uintptr_t>(peer->getNativeHandle()):0;
+    if(windowRecorder.startScreen(handle,true))startRecordingPrompt();else tell(windowRecorder.error());
+    lastWebStateAtMs=0;
 }
 void MainComponent::toggleRecording()
 {
     interruptIdleVideoPreparation();
    #if JUCE_WINDOWS
     if(windowRecorder.busy()) {
-        if(windowRecorder.isAudioOnly())windowRecorder.stop();
+        if(windowRecorder.isAudioOnly()){voicePrompts.stop();recordingPromptPhase=0;windowRecorder.stop();updateRecordingPerformanceGate();}
         lastWebStateAtMs=0;return;
     }
     auto tell=[this](const juce::String& message){if(webInterface)webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",message);};
@@ -4156,7 +4191,7 @@ void MainComponent::toggleRecording()
         tell(utf8("录音固定采集系统扬声器，请先切换Windows共享或共享低延迟模式，并让伴奏从同一默认扬声器播放"));return;
     }
     voicePrompts.stop();
-    if(!windowRecorder.startAudio())tell(windowRecorder.error());
+    if(windowRecorder.startAudio(true))startRecordingPrompt();else tell(windowRecorder.error());
     lastWebStateAtMs=0;
     return;
    #endif

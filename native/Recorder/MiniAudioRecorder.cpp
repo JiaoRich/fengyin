@@ -32,6 +32,7 @@ struct MiniAudioRecorder::Impl {
     ma_pcm_rb queue{};
     bool contextReady=false,captureReady=false,silenceReady=false,encoderReady=false,queueReady=false;
     std::atomic<bool> stopping{false},failed{false};
+    std::atomic<bool> recordingEnabled{true};
     uint64_t written=0;
     std::filesystem::path outputPath;
     void initWriter(const std::filesystem::path& path) {
@@ -47,6 +48,7 @@ struct MiniAudioRecorder::Impl {
     }
     // Single producer, no locks/allocation/disk IO on miniaudio's capture callback.
     void push(const void* input,ma_uint32 count) noexcept {
+        if(!recordingEnabled.load(std::memory_order_acquire))return;
         const auto* pcm=static_cast<const int16_t*>(input);
         while(count) {
             auto frames=count;void* target=nullptr;
@@ -116,6 +118,7 @@ void MiniAudioRecorder::start(const std::filesystem::path& output,const std::wst
    #endif
 }
 void MiniAudioRecorder::drain(){impl->drain();}
+void MiniAudioRecorder::setRecordingEnabled(bool enabled){impl->recordingEnabled.store(enabled,std::memory_order_release);}
 void MiniAudioRecorder::finish(){
     auto& p=*impl;p.stopDevices();p.drain();
     ma_encoder_uninit(&p.encoder);p.encoderReady=false;
@@ -135,6 +138,10 @@ void MiniAudioRecorder::finish(){
 void MiniAudioRecorder::selfTest(const std::filesystem::path& output){
     MiniAudioRecorder recorder;auto& p=*recorder.impl;p.initWriter(output);
     std::vector<int16_t> pcm(2000*2);
+    // Preparation audio (including announcements/beep) must not enter the WAV.
+    recorder.setRecordingEnabled(false);p.push(pcm.data(),2000);
+    if(ma_pcm_rb_available_read(&p.queue)!=0)throw std::runtime_error("Preparation audio entered recording queue");
+    recorder.setRecordingEnabled(true);
     for(int block=0;block<48;++block){
         for(int i=0;i<2000;++i){const auto v=static_cast<int16_t>(std::sin((block*2000+i)*6.283185307179586*440/48000)*3000);
             pcm[i*2]=pcm[i*2+1]=v;}

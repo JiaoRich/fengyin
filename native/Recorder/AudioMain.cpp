@@ -40,7 +40,7 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int) {
             if(std::filesystem::exists(output))throw std::runtime_error("Refusing to overwrite existing output");
             MiniAudioRecorder::selfTest(output);
         } else {
-            if(argc!=8 || args[1]!=L"audio")throw std::runtime_error("This release supports audio recording only");
+            if((argc!=8&&argc!=9) || args[1]!=L"audio")throw std::runtime_error("This release supports audio recording only");
             output=args[2];state=args[4];const std::filesystem::path stop=args[3];
             if(std::filesystem::exists(output))throw std::runtime_error("Refusing to overwrite existing recording");
             parent=OpenProcess(SYNCHRONIZE,FALSE,static_cast<DWORD>(std::stoul(args[7])));
@@ -49,7 +49,18 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int) {
             checked(CoCreateInstance(__uuidof(MMDeviceEnumerator),nullptr,CLSCTX_ALL,IID_PPV_ARGS(&enumerator)));
             const auto id=endpoint(enumerator.Get());
             auto nextCheck=GetTickCount64()+1000;
-            MiniAudioRecorder audio;audio.start(output,id);
+            MiniAudioRecorder audio;const bool armed=argc==9;
+            audio.setRecordingEnabled(!armed);audio.start(output,id);
+            if(armed){
+                if(!status(state,"ready"))throw std::runtime_error("Cannot write ready status");
+                const auto limit=GetTickCount64()+30000;
+                while(!std::filesystem::exists(args[8])){
+                    if(std::filesystem::exists(stop)||WaitForSingleObject(parent,0)!=WAIT_TIMEOUT)throw std::runtime_error("Recording preparation cancelled");
+                    if(GetTickCount64()>limit)throw std::runtime_error("Recording preparation timed out");
+                    Sleep(10);
+                }
+                audio.setRecordingEnabled(true);
+            }
             if(!status(state,"recording"))throw std::runtime_error("Cannot write recording status");
             while(!std::filesystem::exists(stop) && WaitForSingleObject(parent,0)==WAIT_TIMEOUT) {
                 audio.drain();

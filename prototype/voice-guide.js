@@ -42,13 +42,7 @@
     learning(name){learnedName=controlName(name);say(/咬嘴|颤音|揉弦/.test(name)?'V047':'NEW_MAP_START');},
     cleared(){say('NEW_MAP_CLEAR');},
     tone(name){if(!toneEnabled)return;const spoken=name.replace('次中萨','次中音萨克斯').replace('上低萨','上低音萨克斯').replace('高萨','高音萨克斯').replace('中萨','中音萨克斯').replaceAll('-', '，');const match=catalog.find(x=>x.text.replace(/[。～]/g,'')===spoken);return say(match?.id || 'NEW_TONE_GENERIC');},
-    async beforeRecording(){
-      if(countdown)return false;if(!enabled)return true;
-      countdown=true;const button=document.querySelector('#record');button.disabled=true;
-      button.textContent='准备录音…';
-      try{return await say('REC_AUDIO',{force:true});}
-      finally{countdown=false;button.disabled=false;button.textContent='● 开始录音';}
-    }
+    recordingPreferences(){return {announce:enabled,volume};}
   };
   const style=document.createElement('style');style.textContent=`
   .voice-settings{margin-top:20px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}.voice-settings label{display:flex;gap:8px;align-items:center}
@@ -60,8 +54,8 @@
   #fy-guide[hidden],#fy-guide-spot[hidden],#fy-guide-hand[hidden]{display:none}
   `;document.head.append(style);
   const settings=document.createElement('div');settings.className='voice-settings';
-  settings.innerHTML='<label><input type="checkbox" id="fy-voice-enabled">语音提示</label><label><input type="checkbox" id="fy-voice-tones">音色播报</label><label>提示音量<input type="range" id="fy-voice-volume" min="0" max="70" aria-label="语音音量"></label><button id="fy-guide-restart">首次演奏引导</button><button id="fy-guide-advanced">进阶功能引导</button>';
-  document.querySelector('#page-settings .panel').append(settings);
+  settings.innerHTML='<label><input type="checkbox" id="fy-voice-enabled" role="switch">语音提示</label><label><input type="checkbox" id="fy-voice-tones" role="switch">音色播报</label><label hidden>提示音量<input type="range" id="fy-voice-volume" min="0" max="70" aria-label="语音音量"></label><button id="fy-guide-restart" hidden>首次演奏引导</button><button id="fy-guide-advanced" hidden>进阶功能引导</button>';
+  document.querySelector('#advanced-voice').append(settings);
   document.querySelector('#fy-voice-enabled').checked=enabled;document.querySelector('#fy-voice-tones').checked=toneEnabled;
   document.querySelector('#fy-voice-volume').value=Math.round(volume*100);
   document.querySelector('#fy-voice-enabled').onchange=e=>{enabled=e.target.checked;localStorage.setItem('fy-voice-enabled',enabled?'yes':'no');if(enabled)say('V072');else stop();};

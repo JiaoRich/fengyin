@@ -42,7 +42,7 @@ class Release125(unittest.TestCase):
         self.assertNotIn('toggleWindowRecording', read('native/Source/MainComponent.cpp'))
         self.assertNotIn('toggleWindowRecording', read('prototype/app.js'))
         service = read('native/Source/WindowRecordingService.cpp')
-        self.assertIn('bool WindowRecordingService::startAudio()', service)
+        self.assertIn('bool WindowRecordingService::startAudio(bool prepareOnly)', service)
         self.assertNotIn('screen:', service)
         self.assertNotIn('FENGYIN_RECORDING_BACKEND', service)
         self.assertIn('RecordingPaths::video()', service)

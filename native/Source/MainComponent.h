@@ -116,6 +116,15 @@ private:
     void toggleRecording();
     void toggleScreenRecording();
     void resumeScreenRecording();
+    void startRecordingPrompt();
+    void advanceRecordingPrompt(int finishedToken);
+    void updateRecordingPerformanceGate();
+    bool recordingAnnouncementsEnabled = true;
+    float recordingPromptVolume = .45f;
+    int recordingPromptPhase = 0;
+    double recordingBeginAfterMs = 0;
+    bool recordingPerformancePaused = false;
+    juce::String recordingPromptError;
     void showDeviceSettings();
     void emitAudioSettingsState(bool success = true, const juce::String& message = {});
     void logAudioDiagnostic(const fengyin::AudioDeviceStatus& status);

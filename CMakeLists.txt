@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.27 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.28 LANGUAGES C CXX)
 option(FENGYIN_ARCHIVED_VIDEO_RECORDING "Build archived video-recording diagnostics, never for release" OFF)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
@@ -510,6 +510,9 @@ if(BUILD_TESTING)
     target_include_directories(FengYinVoicePromptTests PRIVATE native/Source)
     target_link_libraries(FengYinVoicePromptTests PRIVATE juce::juce_audio_utils juce::juce_recommended_config_flags)
     add_test(NAME offline_voice_prompt COMMAND FengYinVoicePromptTests "${CMAKE_SOURCE_DIR}/assets/voice/V041.wav")
+    add_test(NAME recording_prepare_audio_prompt COMMAND FengYinVoicePromptTests "${CMAKE_SOURCE_DIR}/assets/voice/REC_PREP_AUDIO.wav")
+    add_test(NAME recording_prepare_screen_prompt COMMAND FengYinVoicePromptTests "${CMAKE_SOURCE_DIR}/assets/voice/REC_PREP_SCREEN.wav")
+    add_test(NAME recording_begin_beep COMMAND FengYinVoicePromptTests "${CMAKE_SOURCE_DIR}/assets/voice/REC_BEGIN_BEEP.wav")
 
     add_executable(FengYinToneStyleTests tests/test_tone_style_catalog.cpp native/Source/MasterOutputService.cpp)
     target_include_directories(FengYinToneStyleTests PRIVATE native/Source)

@@ -20,6 +20,14 @@ int wmain(int argc,wchar_t** argv){
     if(!audio)fs::create_directory(folder);
     const fs::path stop=audio?fs::path(argv[3]):folder/L"stop";
     const fs::path state=audio?fs::path(argv[4]):folder/L"state.txt";
+    const bool armed=audio?argc==9:argc==7;
+    const fs::path begin=audio&&armed?fs::path(argv[8]):folder/L"begin";
+    if(armed){
+        write(state,"ready");
+        for(int n=0;n<1000&&!fs::exists(begin)&&!fs::exists(stop);++n)std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        if(fs::exists(stop)){write(state,"cancelled");return 0;}
+        if(!fs::exists(begin)){write(state,"failed: preparation timeout");return 1;}
+    }
     write(state,"recording");
     for(int n=0;n<1000&&!fs::exists(stop);++n)std::this_thread::sleep_for(std::chrono::milliseconds(5));
     if(!fs::exists(stop)){write(state,"failed: fixture timeout");return 1;}
