@@ -30,7 +30,9 @@ inline void mux(const std::filesystem::path& video,const std::filesystem::path& 
     checked(MFCreateMediaType(&aac));checked(aac->SetGUID(MF_MT_MAJOR_TYPE,MFMediaType_Audio));
     checked(aac->SetGUID(MF_MT_SUBTYPE,MFAudioFormat_AAC));checked(aac->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND,48000));
     checked(aac->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS,2));checked(aac->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE,16));
-    checked(aac->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND,32000));checked(aac->SetUINT32(MF_MT_AAC_PAYLOAD_TYPE,0));
+    // Microsoft's stereo AAC encoder supports at most 24000 bytes/sec (192 kbps).
+    // The separate PCM WAV preserves the captured samples without lossy encoding.
+    checked(aac->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND,24000));checked(aac->SetUINT32(MF_MT_AAC_PAYLOAD_TYPE,0));
     checked(out->AddStream(aac.Get(),&a));checked(out->SetInputMediaType(a,pcm.Get(),nullptr));checked(out->BeginWriting());
     // Interleave reads by media time. This prevents the mux from retaining an
     // entire video stream while it waits for the first audio sample.

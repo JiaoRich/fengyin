@@ -1,6 +1,8 @@
 范围与交付条件
 1. 录屏最长1800秒，从实际第一帧开始计时，不包括准备提示音。到时走正常停止、合成、保存流程。
-2. MP4音轨AAC 256 kbps；压缩视频包复制，不重新编码视频。最后一帧声明时长裁至截止时间。
+2. MP4音轨AAC 192 kbps；压缩视频包复制，不重新编码视频。最后一帧声明时长裁至截止时间。
+   Windows实际合成测试拦截了256 kbps不兼容配置。Microsoft AAC编码器最高支持24000 bytes/sec，使用192 kbps；无损音频由默认WAV保留。
+   官方依据：https://learn.microsoft.com/en-us/windows/win32/medfound/aac-encoder
 3. 默认同时导出48kHz立体声16位PCM WAV；与MP4使用相同trimFrames和targetFrames，无重采样、增益或静音填充。
 4. WAV放入录音文件，MP4放入录屏文件；同名。没有新增选项或操作步骤。
 5. 发布前检查两份文件，先移动WAV再移动MP4，后者失败尝试回滚；原始PCM/video始终保留到双文件成功。

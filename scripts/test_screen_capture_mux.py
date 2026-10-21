@@ -18,7 +18,11 @@ def check(helper, ffmpeg_dir, directory):
     video, audio, output = directory / 'fixture.mp4', directory / 'fixture.wav', directory / 'muxed.mp4'
 
     def run(args, **kwargs):
-        return subprocess.run([str(a) for a in args], check=True, capture_output=True, timeout=120, **kwargs).stdout
+        result = subprocess.run([str(a) for a in args], capture_output=True, timeout=120, **kwargs)
+        if result.returncode:
+            raise RuntimeError(f'Media check failed ({result.returncode}): {args}\n'
+                               + result.stderr.decode(errors='replace'))
+        return result.stdout
 
     fixture_encoder = None
     for encoder in ('libopenh264', 'h264_mf'):
