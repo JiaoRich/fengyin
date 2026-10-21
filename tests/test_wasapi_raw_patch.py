@@ -19,4 +19,4 @@ class WasapiRawPatchTests(unittest.TestCase):
         self.assertNotIn("RAW Test Mode", preferred)
         ui = (ROOT / "prototype" / "app.js").read_text(encoding="utf-8")
         self.assertNotIn("RAW测试模式（共享）", ui)
-        self.assertIn("不修改驱动、不独占设备", ui)
+        self.assertNotIn("不修改驱动、不独占设备", ui)  # No explanatory footnote; defaults above remain unchanged.

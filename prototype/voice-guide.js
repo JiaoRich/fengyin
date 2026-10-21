@@ -1,6 +1,7 @@
 /* Offline, reviewed speech. No browser/cloud TTS in the installed application. */
 (() => {
   const updates=[
+    ['REC_SAVED','录制已保存，可以在我的录制中查看。'],
     ['REC_AUDIO','准备开始录音。'],
     ['GUIDE_OUTPUT','请确认声音输出是您正在使用的扬声器或耳机。'],
     ['GUIDE_MATCH','点击开始匹配。保持管身不动，不咬嘴，吹一个气息由弱到强的长音。'],
@@ -20,14 +21,14 @@
   const emit=(name,value={})=>backend?.emitEvent(name,value);
   const busy=()=>!!state.recording || !!state.screenRecordingBusy || Number(state.breath)>0.015 || videoWantsPlaying || !video.paused;
   function stop(){emit('stopVoice');if(pending){clearTimeout(pending.timeout);pending.resolve(false);pending=null;}}
-  function say(id,{force=false}={}){
-    // Reuse reviewed audio-only guidance; the old GUIDE_RECORD WAV advertises
-    // withdrawn video capture and must never be spoken by this release.
+  function say(id,{force=false,completion=false}={}){
+    // Reuse the reviewed audio-only clip for this legacy step. The updated
+    // recording step below explains the current audio/screen workflow in text.
     if(id==='GUIDE_RECORD')id='G010';
     if(!enabled || !clips.has(id) || (busy()&&!force) || state.recording || state.screenRecordingBusy)return Promise.resolve(false);
     stop();const request=++token;
     return new Promise(resolve=>{
-      pending={request,resolve,timeout:setTimeout(()=>{stop();},45000)};
+      pending={request,resolve,completion,timeout:setTimeout(()=>{stop();},45000)};
       if(!backend){stop();return;}
       emit('playVoice',{id,token:request,volume});
     });
@@ -56,6 +57,9 @@
   const settings=document.createElement('div');settings.className='voice-settings';
   settings.innerHTML='<label><input type="checkbox" id="fy-voice-enabled" role="switch">语音提示</label><label><input type="checkbox" id="fy-voice-tones" role="switch">音色播报</label><label hidden>提示音量<input type="range" id="fy-voice-volume" min="0" max="70" aria-label="语音音量"></label><button id="fy-guide-restart" hidden>首次演奏引导</button><button id="fy-guide-advanced" hidden>进阶功能引导</button>';
   document.querySelector('#advanced-voice').append(settings);
+  const guideEntry=document.createElement('button');
+  guideEntry.id='fy-guide-open';guideEntry.type='button';guideEntry.textContent='新手指引';
+  document.querySelector('#advanced-studio').prepend(guideEntry);
   document.querySelector('#fy-voice-enabled').checked=enabled;document.querySelector('#fy-voice-tones').checked=toneEnabled;
   document.querySelector('#fy-voice-volume').value=Math.round(volume*100);
   document.querySelector('#fy-voice-enabled').onchange=e=>{enabled=e.target.checked;localStorage.setItem('fy-voice-enabled',enabled?'yes':'no');if(enabled)say('V072');else stop();};
@@ -71,7 +75,6 @@
     ['匹配气息','GUIDE_MATCH','#adapter-match','wind',null,'matched'],
     ['选择音色','V011','#preset-grid','sounds',null,'loaded'],
     ['试着吹奏','GUIDE_TRY','#sound-name','play',null,'played'],
-    ['可以开始演奏了','V012','.nav-item[data-page="play"]','play']
   ];
   const advancedSteps=[
     ['技巧控制与映射','GUIDE_TECH','#adapter-technique-grid','wind'],
@@ -79,10 +82,22 @@
     ['演奏调','GUIDE_KEY','#transpose-key','play'],
     ['弯音范围','G004','#bend-range-button','play'],
     ['视频伴奏','V035','#choose-video','play'],
-    ['录音与文件','GUIDE_RECORD','.record-control','play'],
+    ['录音与录屏',null,'.record-control','play',null,null,'点击“开始录制”，选择录音或录屏。风吟立即准备，准备好后播放“滴”声并开始录制；准备中可取消。再次点击停止后自动保存，按钮显示“正在保存，请稍等”。保存期间暂时不能吹奏，完成后恢复。'],
+    ['我的录制',null,'#recording-manager','play',null,null,'点击“我的录制”查看文件。录音文件为 WAV，录屏文件为 MP4；临时文件单独存放，成功保存后自动清理。若保存失败，请按提示恢复保存。'],
     ['精简模式','V030','#window-mode-toggle','play'],
     ['更换主题','G013','#theme-button','play']
   ];
+  const completeSteps=[...basicSteps,...advancedSteps,
+    ['播放与进度',null,'.video-controls','play',null,null,'加载视频后，可播放、暂停或拖动进度。选择视频可更换伴奏；全屏按钮切换画面显示。'],
+    ['伴奏音量',null,'#video-volume','play',null,null,'拖动视频音量调节伴奏响度。伴奏音量与吹奏音量分别控制。'],
+    ['混响',null,'#performance-reverb','play',null,null,'调节乐器的混响量，伴奏保持原有声音。'],
+    ['吹奏音量',null,'#master-volume','play',null,null,'调节吹奏音量，与伴奏取得合适的平衡。'],
+    ['声音设置',null,'#page-audio','settings',null,null,'在高级设置中选择声音模式、输出设备、采样率和缓冲区，并查看预计延迟。修改会保存；如出现声音异常，查看页面的错误提示。'],
+    ['授权与激活',null,'.activation','settings',null,null,'这里查看激活状态、复制本机识别码。未激活时，可输入激活码并点击激活。'],
+    ['语音与音色播报',null,'#advanced-voice','settings',null,null,'语音提示和音色播报可以分别开关。录制开始的“滴”声用于确认开始时间。'],
+    ['调音师工作台',null,'#studio-entry','settings',null,null,'调音师入口需要密码。进入后可创建或编辑音色方案、选择音源、调整效果链并保存或导出方案；导入方案后也可继续编辑。'],
+    ['随时重新查看',null,'#fy-guide-open','settings',null,null,'以后可在高级设置点击“新手指引”重新查看。每一步都可以返回、跳过或结束；引导不会替你录制、激活或修改调音参数。'],
+    ['可以开始演奏了','V012','.nav-item[data-page="play"]','play']];
   let steps=basicSteps,trialPerformed=false;
   function updateGuideProgress(){
     if(!guiding)return;
@@ -114,12 +129,13 @@
     showPage(page);
     trialPerformed=false;
     panel.innerHTML=`<small>${step+1} / ${steps.length}</small><h3></h3><p></p><button data-guide="back">上一步</button><button data-guide="repeat">重听</button><button data-guide="next">${step===steps.length-1?'完成':'下一步'}</button><button data-guide="skip">跳过</button><button data-guide="end">结束引导</button>`;
-    panel.querySelector('h3').textContent=title;panel.querySelector('p').textContent=clips.get(id)?.text || '';
+    panel.querySelector('h3').textContent=title;panel.querySelector('p').textContent=steps[step][6] || clips.get(id)?.text || '';
     panel.querySelector('[data-guide=repeat]').disabled=!clips.has(id);
     panel.querySelector('[data-guide=back]').disabled=step===0;panel.hidden=false;
     document.querySelector(selector)?.scrollIntoView({block:'nearest'});place();updateGuideProgress();say(id);
   }
-  function start(kind='basic'){if(busy())return toast('请先停止吹奏、伴奏和录音，再开始引导');steps=kind==='advanced'?advancedSteps:basicSteps;guiding=true;panel.style.right=panel.style.bottom='auto';show(0);clearInterval(guideTimer);guideTimer=setInterval(place,150);}
+  function start(kind='all'){if(busy())return toast('请先停止吹奏、伴奏和录音，再开始引导');steps=kind==='advanced'?advancedSteps:kind==='basic'?basicSteps:completeSteps;guiding=true;panel.style.right=panel.style.bottom='auto';show(0);clearInterval(guideTimer);guideTimer=setInterval(place,150);}
+  guideEntry.onclick=()=>start();
   panel.onclick=e=>{const action=e.target.dataset.guide;if(action==='next'||action==='skip')show(step+1);if(action==='back')show(step-1);if(action==='repeat')say(steps[step][1]);if(action==='end')end();};
   document.querySelector('#fy-guide-restart').onclick=()=>start();
   document.querySelector('#fy-guide-advanced').onclick=()=>start('advanced');
@@ -129,12 +145,20 @@
     state=next;
     if(guiding&&steps[step]?.[5]==='played'&&Number(next.breath)>.02&&(next.noteReceived||Number(next.note)>=0))trialPerformed=true;
     updateGuideProgress();
-    if(busy() && pending && !countdown)stop();
+    if(pending && !countdown && (state.recording || state.screenRecordingBusy || (busy()&&!pending.completion)))stop();
     const value=!!next.deviceConnected;
     if(value!==connected){const previous=connected;connected=value;clearTimeout(connectionTimer);if(value||previous===true)connectionTimer=setTimeout(()=>{if(!guiding)say(value?'V003':'V060');},900);}
     if(!next.pluginLoaded && Number(next.breath)>.03 && Date.now()-noToneAt>20000){noToneAt=Date.now();setTimeout(()=>{if(!state.pluginLoaded)say('V079');},1800);}
   });
-  backend?.addEventListener('recordingSaved',ok=>{state={...state,recording:false};if(ok)say('V042');});
+  function announceSaved(ok){
+    // Terminal save events are emitted only after the native recording gate is
+    // released. Clear the preceding UI snapshot before playing the completion.
+    state={...state,recording:false,screenRecordingBusy:false};
+    if(ok)say('REC_SAVED',{force:true,completion:true});
+  }
+  backend?.addEventListener('recordingResult',result=>announceSaved(result?.success===true));
+  // Legacy non-Windows audio recorder; Windows emits recordingResult only.
+  backend?.addEventListener('recordingSaved',ok=>announceSaved(ok===true));
   backend?.addEventListener('windowModeChanged',compact=>{if(!compact && wasCompact && !guiding)say('V032');wasCompact=!!compact;place();});
   backend?.addEventListener('videoAudioState',result=>{if(result?.ready&&!videoReady)say('V036');videoReady=!!result?.ready;});
   backend?.addEventListener('techniqueLearnResult',result=>{if(result.success)say('NEW_MAP_OK');else say('V052');});

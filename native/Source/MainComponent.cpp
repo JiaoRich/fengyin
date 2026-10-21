@@ -1591,15 +1591,19 @@ void MainComponent::timerCallback()
     if(windowRecorder.takeCompleted() && webInterface) {
         const auto message=recordingPromptError.isNotEmpty()?recordingPromptError:windowRecorder.wasCancelled()?utf8("已取消录制准备")
             :windowRecorder.error().isEmpty()?utf8(windowRecorder.isAudioOnly()?"录制成功！在这里查看录音文件":"录制成功！在这里查看录屏文件"):windowRecorder.error();
-        webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",message);
+        // Successful saves have one anchored result beside My Recordings.
+        // Keep the general notification only for cancellation or failure.
+        if(windowRecorder.wasCancelled() || recordingPromptError.isNotEmpty() || windowRecorder.error().isNotEmpty())
+            webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",message);
         auto result=std::make_unique<juce::DynamicObject>();
         result->setProperty("success",!windowRecorder.wasCancelled()&&recordingPromptError.isEmpty()&&windowRecorder.error().isEmpty());
         result->setProperty("message",message);
         result->setProperty("canRecover",!windowRecorder.wasCancelled()&&windowRecorder.hasRecoverableVideo()&&windowRecorder.error().isNotEmpty());
         result->setProperty("cleanupWarning",windowRecorder.hasCleanupWarning());
+        result->setProperty("videoQualityWarning",windowRecorder.hasVideoQualityWarning());
+        result->setProperty("kind",windowRecorder.isAudioOnly()?"audio":"video");
         webInterface->emitEventIfBrowserIsVisible("recordingResult",juce::var(result.release()));
         recordingStatus.setText(message,juce::dontSendNotification);
-        if(windowRecorder.isAudioOnly())webInterface->emitEventIfBrowserIsVisible("recordingSaved",!windowRecorder.wasCancelled()&&recordingPromptError.isEmpty()&&windowRecorder.error().isEmpty());
         recordingPromptError.clear();
         lastWebStateAtMs=0;
     }

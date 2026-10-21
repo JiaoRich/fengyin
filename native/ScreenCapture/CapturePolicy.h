@@ -12,8 +12,14 @@ inline Size canvas(int w,int h) {
     const double scale=std::min({1.0,1920.0/w,1080.0/h});
     return {std::max(2,int(w*scale)/2*2),std::max(2,int(h*scale)/2*2)};
 }
-// Never infer smoothness from the nominal MP4 frame rate. Count missed slots
-// against capture timestamps, not encoder completion timestamps.
+// Absolute pacing avoids accumulating scheduler jitter. Skip expired slots,
+// rather than burst-encoding old frames and competing with live audio.
+inline std::int64_t nextFrameDeadline(std::int64_t origin,std::int64_t now) {
+    auto slot=(now-origin)*fps/second+1;
+    if(origin+slot*second/fps<=now)++slot;
+    return origin+slot*second/fps;
+}
+// Submission timestamps measure delivered pacing, not Windows capture latency.
 struct FrameHealth {
     std::int64_t previous=-1;
     std::uint64_t frames=0,late=0,maxGap=0;
@@ -23,10 +29,9 @@ struct FrameHealth {
             const auto gap=static_cast<std::uint64_t>(time-previous);
             maxGap=std::max(maxGap,gap);
             if(gap>second/fps*3/2)++late;
-            if(gap>second/5)throw std::runtime_error("Video stalled for over 200ms; partial recording retained");
         }
         previous=time;++frames;
-        if(frames>=300 && late*100>frames)throw std::runtime_error("Over one percent late video intervals; partial recording retained");
     }
+    bool degraded() const {return maxGap>second/5 || (frames>=300 && late*100>frames);}
 };
 }

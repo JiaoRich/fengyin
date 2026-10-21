@@ -1,6 +1,8 @@
 from pathlib import Path
 import unittest
 import wave
+import json
+import hashlib
 
 ROOT=Path(__file__).resolve().parents[1]
 def read(path):return (ROOT/path).read_text(encoding='utf-8-sig')
@@ -65,9 +67,19 @@ class RecordingInteraction128(unittest.TestCase):
         self.assertIn('body:not(.compact-mode) .compact-action-row #music-tempo',css)
 
     def test_new_cues_are_offline_pcm_not_runtime_network_speech(self):
-        for filename in ['REC_PREP_AUDIO.wav','REC_PREP_SCREEN.wav','REC_BEGIN_BEEP.wav']:
+        for filename in ['REC_PREP_AUDIO.wav','REC_PREP_SCREEN.wav','REC_BEGIN_BEEP.wav','REC_SAVED.wav']:
             with wave.open(str(ROOT/'assets/voice'/filename),'rb') as stream:
                 self.assertEqual((stream.getnchannels(),stream.getsampwidth(),stream.getframerate()),(1,2,24000))
                 self.assertGreater(stream.getnframes(),2000)
+
+    def test_recording_speech_is_verified_original_xfyun_voice(self):
+        audit=json.loads(read('assets/voice/recording-xfyun-audit.json'))
+        self.assertEqual({x['id'] for x in audit},{'REC_PREP_AUDIO','REC_PREP_SCREEN','REC_SAVED'})
+        for item in audit:
+            self.assertEqual(item['voice'],'x6_wuyediantai_mini')
+            self.assertEqual(hashlib.sha256((ROOT/'assets/voice'/f"{item['id']}.wav").read_bytes()).hexdigest(),item['sha256'])
+        main=read('native/Source/MainComponent.cpp')
+        timer=main.split('void MainComponent::timerCallback()',1)[1].split('\nvoid ',1)[0]
+        self.assertNotIn('"recordingSaved"',timer)  # No duplicate Windows completion event.
 
 if __name__=='__main__':unittest.main()

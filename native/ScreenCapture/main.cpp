@@ -66,14 +66,30 @@ static void record(HWND hwnd,const std::filesystem::path& folder,HANDLE parent,i
     }
     std::int64_t origin=0,lastFrame=0,next=0;auto checkAt=GetTickCount64()+1000;
     std::int64_t maxNewFrameAge=0;bool newSurface=false;
-    const auto stop=[&]{return std::filesystem::exists(folder/L"stop")||WaitForSingleObject(parent,0)!=WAIT_TIMEOUT
-        ||(origin&&qpc()-origin>=std::int64_t(maxSeconds)*second);};
+    std::int64_t maxAcquire=0,maxSubmit=0;
+    const auto writeMetrics=[&]{
+        std::ofstream report(folder/L"metrics.txt");
+        report<<"encoder="<<gpu.encoder<<"\nframes="<<gpu.health.frames<<"\nlateIntervals="<<gpu.health.late
+              <<"\nmaxFrameGap100ns="<<gpu.health.maxGap<<"\nreusedSurfaceFrames="<<reusedFrames
+              <<"\nmaxNewFrameAge100ns="<<maxNewFrameAge<<"\nmaxAcquire100ns="<<maxAcquire
+              <<"\nmaxSubmit100ns="<<maxSubmit<<"\nqualityWarning="<<gpu.health.degraded()
+              <<"\nvideoFirstQpc="<<origin<<"\naudioFirstQpc="<<audio->firstQpc()
+              <<"\naudioEndQpc="<<audio->endQpc()<<"\naudioFrames="<<audio->frames()<<"\n";
+        report.flush();if(!report)throw std::runtime_error("Cannot save session metrics");
+    };
+    ULONGLONG nextStopCheck=0;bool requestedStop=false;
+    const auto stop=[&]{
+        const auto tick=GetTickCount64();
+        if(tick>=nextStopCheck){nextStopCheck=tick+50;requestedStop=std::filesystem::exists(folder/L"stop")||WaitForSingleObject(parent,0)!=WAIT_TIMEOUT;}
+        return requestedStop||(origin&&qpc()-origin>=std::int64_t(maxSeconds)*second);
+    };
     status(folder,"starting");
     try{
         deadline=qpc()+8*second;
         while(!stop()){
             audio->checkError();
-            auto frame=pool.TryGetNextFrame();
+            if(origin && qpc()<next){Sleep(1);continue;}
+            const auto acquireStarted=qpc();auto frame=pool.TryGetNextFrame();
             if(frame){
                 for(int n=0;n<2;++n){auto newer=pool.TryGetNextFrame();if(!newer)break;frame.Close();frame=std::move(newer);}
                 const auto size=frame.ContentSize();
@@ -81,7 +97,7 @@ static void record(HWND hwnd,const std::filesystem::path& folder,HANDLE parent,i
                 const auto time=frame.SystemRelativeTime().count();
                 if(held)held.Close();held=std::move(frame);heldStamp=time;newSurface=true;
             }
-            const auto now=qpc();
+            const auto now=qpc();maxAcquire=std::max(maxAcquire,now-acquireStarted);
             if(held&&now>=next){
                     // WGC need not send unchanged desktop frames. Hold one
                     // frame-pool lease. Report every reuse separately: lack of
@@ -90,13 +106,14 @@ static void record(HWND hwnd,const std::filesystem::path& folder,HANDLE parent,i
                     // one prepared surface at the actual start time, rather
                     // than waiting forever for a post-cue desktop change.
                     const auto time=origin?now:std::max(heldStamp,beginQpc);
-                    if(newSurface){maxNewFrameAge=std::max(maxNewFrameAge,now-heldStamp);
-                        if(now-heldStamp>second/5)throw std::runtime_error("New capture frame is over 200ms stale");}
+                    if(newSurface){maxNewFrameAge=std::max(maxNewFrameAge,now-heldStamp);}
                     else ++reusedFrames;
                     auto access=held.Surface().as<::Windows::Graphics::DirectX::Direct3D11::IDirect3DDxgiInterfaceAccess>();
                     ComPtr<ID3D11Texture2D> texture;checked(access->GetInterface(IID_PPV_ARGS(&texture)));
                     if(!origin){origin=time;status(folder,"recording");}
-                    gpu.submit(texture.Get(),time-origin);lastFrame=time;next=time+second/fps;newSurface=false;
+                    const auto submitStarted=qpc();gpu.submit(texture.Get(),time-origin);
+                    const auto submitted=qpc();maxSubmit=std::max(maxSubmit,submitted-submitStarted);
+                    lastFrame=time;next=nextFrameDeadline(origin,submitted);newSurface=false;
             }else Sleep(1);
             if(!origin&&qpc()>deadline)throw std::runtime_error("No screen frames");
             if(origin&&qpc()-lastFrame>second/2)throw std::runtime_error("Capture stopped providing frames");
@@ -111,11 +128,7 @@ static void record(HWND hwnd,const std::filesystem::path& folder,HANDLE parent,i
         const auto end=lastFrame+second/fps,waitUntil=qpc()+second;
         while(audio->endQpc()<end&&qpc()<waitUntil){audio->checkError();Sleep(3);}
         audio->stop();audio->checkError();gpu.close();
-        std::ofstream report(folder/L"metrics.txt");
-        report<<"encoder="<<gpu.encoder<<"\nframes="<<gpu.health.frames<<"\nlateIntervals="<<gpu.health.late
-              <<"\nmaxFrameGap100ns="<<gpu.health.maxGap<<"\nreusedSurfaceFrames="<<reusedFrames<<"\nmaxNewFrameAge100ns="<<maxNewFrameAge<<"\nvideoFirstQpc="<<origin<<"\naudioFirstQpc="<<audio->firstQpc()
-              <<"\naudioEndQpc="<<audio->endQpc()<<"\naudioFrames="<<audio->frames()<<"\n";
-        report.flush();if(!report)throw std::runtime_error("Cannot save session metrics");
+        writeMetrics();
         if(!origin)throw std::runtime_error("Recording cancelled before first frame");
         const auto duration=end-origin;
         const auto audioSpan=audio->endQpc()-audio->firstQpc();
@@ -125,7 +138,16 @@ static void record(HWND hwnd,const std::filesystem::path& folder,HANDLE parent,i
         status(folder,"captured; run --mux-session after returning to idle");
         std::ofstream alignment(folder/L"alignment.txt");alignment<<origin-audio->firstQpc()<<" "<<duration<<"\n";
         alignment.flush();if(!alignment)throw std::runtime_error("Cannot save alignment");
-    }catch(...){if(held)held.Close();session.Close();pool.Close();audio->stop();try{gpu.close();}catch(...){}throw;}
+    }catch(...){
+        // Cleanup must not replace the original capture/encoder error.
+        try{if(held)held.Close();}catch(...){}
+        try{session.Close();}catch(...){}
+        try{pool.Close();}catch(...){}
+        try{audio->stop();}catch(...){}
+        try{gpu.close();}catch(...){}
+        try{writeMetrics();}catch(...){}
+        throw;
+    }
 }
 int wmain(int argc,wchar_t** argv){
     std::filesystem::path folder;

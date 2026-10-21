@@ -39,7 +39,7 @@ WindowRecordingService::~WindowRecordingService() {
 }
 bool WindowRecordingService::startAudio(bool prepareOnly) {
     poll();if(busy())return false;
-    screen=false;captured=false;muxing=false;armed=prepareOnly;cancelled=false;
+    screen=false;captured=false;muxing=false;armed=prepareOnly;cancelled=false;videoQualityWarning=false;
     lastError.clear();completed=false;finishing=false;ready=false;
    #if JUCE_WINDOWS
     const auto executable=juce::File::getSpecialLocation(juce::File::currentApplicationFile)
@@ -68,7 +68,7 @@ bool WindowRecordingService::startAudio(bool prepareOnly) {
 }
 bool WindowRecordingService::startScreen(std::uintptr_t window,bool prepareOnly) {
     poll();if(busy())return false;
-    screen=true;captured=false;muxing=false;armed=prepareOnly;cancelled=false;completed=false;finishing=false;ready=false;lastError.clear();
+    screen=true;captured=false;muxing=false;armed=prepareOnly;cancelled=false;completed=false;finishing=false;ready=false;lastError.clear();videoQualityWarning=false;
    #if JUCE_WINDOWS
     const auto executable=juce::File::getSpecialLocation(juce::File::currentApplicationFile).getSiblingFile("FengYinScreenCapture.exe");
     const auto folder=videoFolder();
@@ -106,6 +106,7 @@ bool WindowRecordingService::resumeScreenSession(const juce::File& folder) {
     }
     if(videoFolder().createDirectory().failed()){lastError=juce::String::fromUTF8("无法创建录屏文件目录，原始素材未改动");return false;}
     screen=true;captured=true;muxing=false;armed=false;cancelled=false;cleanupWarning=false;completed=false;finishing=false;ready=false;lastError.clear();sessionFolder=folder;
+    videoQualityWarning=folder.getChildFile("metrics.txt").loadFileAsString().contains("qualityWarning=1");
     stateFile=folder.getChildFile("state.txt");stopFile=folder.getChildFile("stop");
     partialFile=folder.getChildFile("recording.mp4");
     destination=RecordingPaths::next(videoFolder(),"mp4");return true;
@@ -159,6 +160,9 @@ void WindowRecordingService::poll() {
     if(cancelled){armed=false;completed=true;lastError.clear();cleanCompletedSession();return;}
     if(screen && !muxing && process.getExitCode()==0 && status.startsWith("captured;")
         && sessionFolder.getChildFile("alignment.txt").existsAsFile()){
+        const auto metrics=sessionFolder.getChildFile("metrics.txt").loadFileAsString();
+        videoQualityWarning=metrics.contains("qualityWarning=1");
+        juce::Logger::writeToLog("Screen recording capture metrics:\n"+metrics.substring(0,4096));
         captured=true;lastError.clear();return;
     }
     completed=true;muxing=false;

@@ -23,6 +23,22 @@ class Release118(unittest.TestCase):
         self.assertIn('knownPlugins.removeFromBlacklist(path)', scanner)
         self.assertIn('return !result.isEmpty()', scanner)
 
+    def test_failed_vst3_retry_is_brand_independent_and_isolated(self):
+        scanner = self.read('native/Source/PluginCatalogService.cpp')
+        start = scanner.split('void PluginCatalogService::startScan(', 1)[1].split(
+            'bool PluginCatalogService::needsDependencyRefresh()', 1)[0]
+        # Clear imported historical failures only after JUCE has imported the
+        # dead-man file; otherwise its constructor silently restores the block.
+        self.assertLess(start.index('make_unique<juce::PluginDirectoryScanner>'),
+                        start.index('knownPlugins.getBlacklistedFiles()'))
+        retry = start.split('const auto blocked', 1)[1].split('shouldRescanExisting', 1)[0]
+        self.assertRegex(retry, r'for \(const auto& path : blocked\)\s+knownPlugins.removeFromBlacklist\(path\);')
+        self.assertNotIn('containsIgnoreCase', retry)
+        self.assertIn('scanner->scanNextFile(! shouldRescanExisting, current)', scanner)
+        self.assertIn('"--scan-plugin", path', scanner)
+        self.assertIn('45000.0', scanner)
+        self.assertIn('child.kill()', scanner)
+
     def test_deferred_three_mode_breath_changes_are_not_reintroduced(self):
         self.assertNotIn('setBreathResponseMode', self.read('native/Source/MainComponent.cpp'))
         self.assertNotIn('breath-response-mode', self.read('prototype/app.js'))

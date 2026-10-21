@@ -1991,6 +1991,7 @@ window.__JUCE__?.backend?.addEventListener('recordingResult',result=>{
   const banner=$('#record-success');banner.hidden=!result?.success&&!result?.canRecover;if(banner.hidden)return;
   $('#record-recover').hidden=!result?.canRecover;
   banner.querySelector('span').textContent=String(result.message||'录制成功！在这里查看录制文件');
+  if(result.success && result.videoQualityWarning)banner.querySelector('span').textContent+='（部分画面可能不够流畅）';
   const anchor=$('#recording-manager').getBoundingClientRect(),left=Math.max(8,Math.min(innerWidth-banner.offsetWidth-8,anchor.left));
   banner.style.left=`${left}px`;banner.style.top=`${Math.max(8,anchor.top-banner.offsetHeight-12)}px`;
   banner.querySelector('i').style.left=`${Math.max(12,Math.min(banner.offsetWidth-18,anchor.left+anchor.width/2-left))}px`;
@@ -2611,11 +2612,6 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   setAudioOptions($('#audio-output-select'), state?.outputs, state?.output, value => String(value));
   setAudioOptions($('#audio-rate-select'), state?.sampleRates, Number(state?.sampleRate), value => `${Math.round(Number(value))} Hz${Number(value) === 48000 ? '（推荐）' : ''}`);
   setAudioOptions($('#audio-buffer-select'), state?.bufferSizes, Number(state?.bufferSize), value => `${Number(value)}${Number(value) === 128 ? '（推荐）' : Number(value) === 256 ? '（更稳定）' : ''}`);
-  const rates = Array.isArray(state?.sampleRates) ? state.sampleRates : [];
-  const buffers = Array.isArray(state?.bufferSizes) ? state.bufferSizes : [];
-  const lowLatency = !!state?.lowLatencyMode;
-  const rawTest = /RAW Test Mode/i.test(String(state?.type || ''));
-  const sharedAsioActive = state?.sharedAsioActive === true;
   const asioBridge = String(state?.type || '').includes('ASIO4ALL');
   $('#audio-output-select').hidden = asioBridge;
   // Keep the recovery entry available even after ASIO startup falls back.
@@ -2623,32 +2619,13 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   $('#configure-asio4all').innerHTML = '打开 ASIO4ALL 面板（选择输出端点） <span aria-hidden="true">↗</span>';
   $('#configure-asio4all').style.marginTop = asioBridge ? '0' : '10px';
   $('#audio-output-label').htmlFor = asioBridge ? 'configure-asio4all' : 'audio-output-select';
-  $('#audio-output-help').textContent = asioBridge
-    ? '面板中选择实际声卡输出，不要启用虚拟线缆或麦克风；关闭后尝试恢复声音。'
-    : '选择实际扬声器或耳机；Windows共享输出不需要ASIO4ALL。';
-  $('#audio-driver-help').textContent = asioBridge
-    ? '默认低延迟方案：ASIO4ALL 输出，VB-CABLE 接收网页声音；浏览器输出保持“默认”'
-    : sharedAsioActive
-    ? '风吟通过 KoordASIO 共享输出；网页、微信等仍使用 Windows 默认扬声器'
-    : rawTest
-    ? '仅风吟绕过可选系统音效；不修改驱动、不独占设备，可随时切回'
-    : lowLatency
-    ? '已使用 Windows 共享低延迟，不影响其他软件发声'
-    : '当前为 Windows 共享兼容模式；可点击“自动优化”降低延迟';
-  $('#audio-rate-help').textContent = rates.length <= 1
-    ? '当前设备仅上报这一个可用采样率'
-    : '伴奏视频和软音源推荐使用 48000 Hz';
-  $('#audio-buffer-help').textContent = asioBridge
-    ? '直接选择缓冲区并自动保存：128 延迟低，256 更稳定，512 适合较高负载；不支持时恢复原设置。'
-    : buffers.length <= 1
-    ? (lowLatency ? '当前设备驱动仅上报这一个可用缓冲值' : '当前声音模式由系统固定缓冲；可在上方选择其他声音模式')
-    : '128 延迟低；出现爆音时可改为 256';
   const latency = Number(state?.latency);
   const latencyText = Number.isFinite(latency) && latency > 0 ? `${latency.toFixed(1)} ms · ${latency <= 10 ? '优秀' : latency <= 20 ? '良好' : '偏高'}` : '音频未运行 · 暂无延迟数据';
   $('#audio-latency-value').textContent = latencyText;
   $('#audio-latency-value').classList.toggle('green', Number.isFinite(latency) && latency > 0 && latency <= 20);
   const status = $('#audio-apply-status');
-  status.textContent = state?.message || (state?.automatic ? '当前声音配置已生效；上方选项可手动调整。' : '已使用手动设置，软件不会自动覆盖。');
+  status.textContent = state?.success === false ? (state.message || '声音设置未能应用，请重新选择。') : '';
+  status.hidden = state?.success !== false;
   status.classList.toggle('audio-error', state?.success === false);
   if (state?.autoTuning) {
     if ($('#audio-optimization-dialog').hidden) showAudioOptimisationProgress();
@@ -2688,7 +2665,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.28 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.29 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},
@@ -3064,6 +3041,10 @@ studioCss.textContent=`
 .studio-login{position:fixed;inset:0;z-index:10000;background:#020915bb;display:grid;place-items:center}
 .studio-login[hidden]{display:none}.studio-login>div{width:min(400px,calc(100vw - 60px));padding:28px;background:#102238;border:1px solid var(--line);border-radius:20px}
 .studio-login footer{display:flex;justify-content:flex-end;gap:12px;margin-top:24px}.studio-login p{color:var(--muted)}
+.studio-login footer button{appearance:none;box-sizing:border-box;min-width:96px;min-height:44px;padding:10px 24px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text);font:inherit;font-weight:600;cursor:pointer}
+.studio-login footer button.primary-button{background:linear-gradient(135deg,var(--accent),var(--accent-2));border-color:transparent;color:white}
+.studio-login footer button:hover{filter:brightness(1.08)}
+.studio-login footer button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 #studio-drafts:empty::before{content:'暂无草稿';color:var(--muted)}
 .studio-final-label{margin:28px 0 12px;color:var(--accent,#43d9ff)}
 `;

@@ -51,7 +51,7 @@ class KoordAsioSharedModeTests(unittest.TestCase):
         html = (ROOT / "prototype" / "index.html").read_text(encoding="utf-8")
         js = (ROOT / "prototype" / "app.js").read_text(encoding="utf-8")
         self.assertNotIn('id="shared-asio-status"', html)
-        self.assertIn("VB-CABLE 接收网页声音", js)
+        self.assertNotIn('id="audio-driver-help"', html)  # User removed explanatory footnotes.
         self.assertNotIn('id="download-vbcable"', html)
         self.assertNotIn("state?.sharedAsioAvailable", js)
 

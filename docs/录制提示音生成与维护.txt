@@ -1,0 +1,18 @@
+录制提示音（2026-10-21）
+
+统一使用讯飞超拟人语音合成 x6_wuyediantai_mini（午夜电台）。
+参数：speed=50、volume=50、pitch=50，24000Hz、单声道、16bit PCM。
+不使用系统语音回退。应用运行时只播放内置 WAV，不请求云端。
+
+生成器：scripts/generate_recording_prompts.mjs
+官方协议：https://www.xfyun.cn/doc/spark/super%20smart-tts.html
+输入凭证字段为 APPID、APIKey、APISecret，只从私有 stdin 接收一行 JSON。
+密钥不得写入脚本、命令行参数、日志或仓库；可从讯飞控制台现有风吟应用读取。
+Node 22 或更高版本；可选第三个命令行参数传入 ws 包的 wrapper.mjs。
+命令结构：node scripts/generate_recording_prompts.mjs <暂存输出目录> [ws/wrapper.mjs]
+每条生成结果保存无凭证的参数、文本、SHA256 校验记录；相同请求已有校验通过的 WAV 时复用，不重复扣额度。
+
+现有文件：REC_PREP_AUDIO.wav、REC_PREP_SCREEN.wav、REC_SAVED.wav。
+文本及校验记录：assets/voice/recording-xfyun-audit.json。
+REC_BEGIN_BEEP.wav 为已有提示短音，不是语音合成。
+不要重新生成其他已经审核的提示音；发布前检查文本、音色、音量、PCM 格式与结束事件只播报一次。

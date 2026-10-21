@@ -44,7 +44,9 @@ int main(){
         require(!session.getChildFile("recording.mp4").existsAsFile()); // no automatic encode
     }
     {
+        require(session.getChildFile("metrics.txt").replaceWithText("qualityWarning=1\nlate=12\n"));
         WindowRecordingService resumed(root);require(resumed.resumeScreenSession(session));
+        require(resumed.hasVideoQualityWarning());
         require(session.getChildFile("fail-once").replaceWithText("fail"));
         require(resumed.generateVideo());wait(resumed,[&]{return !resumed.busy();});
         require(resumed.takeCompleted()&&resumed.error().isNotEmpty());
@@ -52,6 +54,7 @@ int main(){
         require(resumed.resumeScreenSession(session));require(resumed.generateVideo());
         wait(resumed,[&]{return !resumed.busy();});require(resumed.takeCompleted()&&resumed.error().isEmpty());
         require(resumed.lastFile().getSize()==4096);
+        require(resumed.hasVideoQualityWarning()); // successful save retains the quality warning
         require(!session.exists()); // successful owned session is automatically cleaned
     }
     {
@@ -60,7 +63,8 @@ int main(){
         require(external.getChildFile("audio.wav").replaceWithText(juce::String::repeatedString("a",4096)));
         require(external.getChildFile("video.partial.mp4").replaceWithText(juce::String::repeatedString("v",4096)));
         require(external.getChildFile("alignment.txt").replaceWithText("0 20000000"));
-        WindowRecordingService recovery(root);require(recovery.resumeScreenSession(external));require(recovery.generateVideo());
+        WindowRecordingService recovery(root);require(recovery.resumeScreenSession(external));
+        require(!recovery.hasVideoQualityWarning());require(recovery.generateVideo());
         wait(recovery,[&]{return !recovery.busy();});require(recovery.error().isEmpty());
         require(external.getChildFile("audio.wav").existsAsFile());
     }

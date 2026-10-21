@@ -15,6 +15,7 @@ public:
     bool prepared() const noexcept {return preparing() && ready;}
     bool wasCancelled() const noexcept {return cancelled;}
     bool hasCleanupWarning() const noexcept {return cleanupWarning;}
+    bool hasVideoQualityWarning() const noexcept {return videoQualityWarning;}
     bool hasRecoverableVideo() const {return screen && sessionFolder.getChildFile("alignment.txt").existsAsFile()
         && sessionFolder.getChildFile("audio.wav").existsAsFile() && sessionFolder.getChildFile("video.partial.mp4").existsAsFile();}
     bool generateVideo();
@@ -41,7 +42,7 @@ private:
     juce::String lastError;
     bool running=false,finishing=false,ready=false,completed=false;
     bool screen=false,captured=false,muxing=false;
-    bool armed=false,cancelled=false,cleanupWarning=false;
+    bool armed=false,cancelled=false,cleanupWarning=false,videoQualityWarning=false;
     double startedAt=0,stoppedAt=0,lastPollAt=0;
 };
 }

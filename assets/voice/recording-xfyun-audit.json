@@ -1,0 +1,77 @@
+[
+  {
+    "id": "REC_PREP_AUDIO",
+    "text": "准备录音，将在滴声后开始。",
+    "voice": "x6_wuyediantai_mini",
+    "settings": {
+      "vcn": "x6_wuyediantai_mini",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "76c545a2f9f90edaeb1bf9dc2d1bca28aa94e587617e63c2f38d040e77c84a1a",
+    "sha256": "583d01990241423a56a60e98e7e1bb6ab99c0bc6e2593cc4f26fd3ce8b5610b8",
+    "seconds": 3.14
+  },
+  {
+    "id": "REC_PREP_SCREEN",
+    "text": "准备录屏，将在滴声后开始。",
+    "voice": "x6_wuyediantai_mini",
+    "settings": {
+      "vcn": "x6_wuyediantai_mini",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "a022947ac2f512fea1e139c722e380d8a6d65d3a674f001eae7e3116a0459ef1",
+    "sha256": "05d8e3ef4a80aeb2b43891eb0be6082a787e0e173671dc3bb2421b6c4a6deccb",
+    "seconds": 3.26
+  },
+  {
+    "id": "REC_SAVED",
+    "text": "录制已保存，可以在我的录制中查看。",
+    "voice": "x6_wuyediantai_mini",
+    "settings": {
+      "vcn": "x6_wuyediantai_mini",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "384fb79fd5a25f36e7831b6636dce737cfd201bfa26de8638d21432454d4785e",
+    "sha256": "c64263442201ca96d4da9afaa28068e7ab55c6e4d43d980dbc67ff1e85c171dd",
+    "seconds": 3.98
+  }
+]

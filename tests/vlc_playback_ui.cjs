@@ -153,12 +153,27 @@ const path=require('node:path');
  assert.equal(await page.locator('#record').isDisabled(),true);
  await page.evaluate(()=>{listeners.backendState({activated:true,pluginLoaded:false,presets:[],publishedTones:[],availableInstruments:[]});listeners.recordingResult({success:true,message:'录制成功！在这里查看录屏文件'});});
  assert.equal(await page.locator('#record-success').isVisible(),true);
+ // Both recording modes announce a successful save exactly once, even while
+ // accompaniment is playing. Failure/cancellation and disabled speech stay quiet.
+ await page.evaluate(()=>{document.querySelector('#fy-voice-enabled').checked=true;document.querySelector('#fy-voice-enabled').dispatchEvent(new Event('change'));sent.length=0;
+   listeners.backendState({activated:true,screenRecordingBusy:true,recordingSaving:true});
+   listeners.recordingResult({success:true,kind:'video',videoQualityWarning:true,message:'录制成功！在这里查看录屏文件'});});
+ assert.equal(await page.evaluate(()=>sent.filter(x=>x.name==='playVoice'&&x.payload.id==='REC_SAVED').length),1);
+ assert((await page.locator('#record-success').innerText()).includes('部分画面'));
+ await page.evaluate(()=>{listeners.voiceFinished(sent.find(x=>x.name==='playVoice').payload.token);sent.length=0;
+   listeners.recordingResult({success:false,message:'录制失败'});});
+ assert.equal(await page.evaluate(()=>sent.filter(x=>x.name==='playVoice').length),0);
+ await page.evaluate(()=>{listeners.recordingResult({success:true,kind:'audio',message:'录制成功！在这里查看录音文件'});});
+ assert.equal(await page.evaluate(()=>sent.filter(x=>x.name==='playVoice'&&x.payload.id==='REC_SAVED').length),1);
+ await page.evaluate(()=>{document.querySelector('#fy-voice-enabled').checked=false;document.querySelector('#fy-voice-enabled').dispatchEvent(new Event('change'));sent.length=0;listeners.recordingResult({success:true,kind:'video'});});
+ assert.equal(await page.evaluate(()=>sent.filter(x=>x.name==='playVoice').length),0);
  await page.evaluate(()=>showPage('settings'));
  assert.equal(await page.locator('[data-page="audio"]').count(),0);
  assert.equal(await page.locator('#page-title').innerText(),'高级设置');
  assert.equal(await page.locator('#audio-driver-select').isVisible(),true);
  assert.equal(await page.locator('#license-code').isVisible(),false);
  assert.equal(await page.locator('#audio-auto-optimize').count(),0);
+ assert.equal(await page.locator('#audio-driver-help,#audio-output-help,#audio-rate-help,#audio-buffer-help').count(),0);
  assert.equal(await page.locator('#low-performance').count(),0);
  assert.equal(await page.locator('.advanced-card:has(#fy-voice-enabled)').count(),0);
  assert.equal(await page.locator('.advanced-card:has(#studio-entry)').count(),0);
@@ -194,6 +209,20 @@ const path=require('node:path');
  assert.equal(recordRect.width,managerRect.width);
  assert(Math.abs(recordRect.y+recordRect.height/2-volumeRect.y-volumeRect.height/2)<3,'recording and volume must remain one row');
  await page.screenshot({path:'/private/tmp/fy128-normal-toolbar.png'});
+ await page.evaluate(()=>{videoWantsPlaying=false;listeners.nativeVideoState({generation:videoGeneration,ready:true,playing:false,position:0,duration:120});showPage('settings');});
+ assert(await page.locator('#fy-guide-open').isVisible());
+ const guideButton=await page.locator('#fy-guide-open').boundingBox(),studioButton=await page.locator('#studio-entry').boundingBox();
+ assert.equal(guideButton.height,studioButton.height);
+ await page.locator('#fy-guide-open').click();
+ assert(await page.locator('#fy-guide').isVisible());
+ const guideTitles=[];
+ for(let i=0;i<40&&await page.locator('#fy-guide').isVisible();i++){
+   guideTitles.push(await page.locator('#fy-guide h3').innerText());
+   assert((await page.locator('#fy-guide p').innerText()).trim().length>0);
+   await page.locator('#fy-guide [data-guide=skip]').click();
+ }
+ assert.equal(await page.locator('#fy-guide').isVisible(),false);
+ for(const title of ['录音与录屏','我的录制','声音设置','授权与激活','语音与音色播报','调音师工作台','混响','吹奏音量','伴奏音量','精简模式'])assert(guideTitles.includes(title),title);
  assert.equal(await page.evaluate(()=>sent.some(x=>x.name==='toggleWindowRecording')),false);
  assert.deepEqual(errors,[]);
  console.log('PASS VLC UI no HTML decoder/audio/clock, viewport avoids controls and hides for pages/dialogs, single explicit seeks, stale rejection, EOF replay and errors');

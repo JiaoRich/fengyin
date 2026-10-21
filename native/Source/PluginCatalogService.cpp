@@ -95,13 +95,14 @@ void PluginCatalogService::startScan(juce::FileSearchPath paths, bool rescanExis
     scanner = std::make_unique<juce::PluginDirectoryScanner>(knownPlugins, *vst3, std::move(paths),
                                                               true, getDeadMansPedalFile(), false);
     // The scanner constructor imports the previous dead-man blacklist first.
-    // Retry core dependencies once per explicit/startup scan, in isolation.
-    // An old validation failure must not permanently exclude a required engine.
+    // Retry every previously failed plug-in once per scan, regardless of brand.
+    // Discovery runs in a disposable, time-bounded child process. A historical
+    // failure must not permanently hide an installed or repaired VST3 plug-in.
+    // Keep the scanner's queue (including failed entries ordered last), and
+    // retain incremental caching for successfully discovered, unchanged files.
     const auto blocked = knownPlugins.getBlacklistedFiles();
     for (const auto& path : blocked)
-        if (rescanExisting || path.containsIgnoreCase("SWAM") || path.containsIgnoreCase("Fresh Air") || path.containsIgnoreCase("magic.CURVE")
-            || path.containsIgnoreCase("Qin") || path.containsIgnoreCase("Kong"))
-            knownPlugins.removeFromBlacklist(path);
+        knownPlugins.removeFromBlacklist(path);
 
     shouldRescanExisting = rescanExisting;
     {
