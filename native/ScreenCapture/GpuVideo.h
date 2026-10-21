@@ -55,6 +55,13 @@ public:
     std::string encoder;
     FrameHealth health;
     ID3D11Device* getDevice() const{return device.Get();}
+    static ComPtr<IMFMediaBuffer> surfaceBuffer(ID3D11Texture2D* texture){
+        ComPtr<IMFMediaBuffer> buffer;checked(MFCreateDXGISurfaceBuffer(__uuidof(ID3D11Texture2D),texture,0,FALSE,&buffer));
+        // A DXGI wrapper does not by itself publish the valid sample length.
+        // Query plane-aware contiguous size without mapping/copying pixels.
+        ComPtr<IMF2DBuffer> plane;checked(buffer.As(&plane));DWORD length=0;
+        checked(plane->GetContiguousLength(&length));checked(buffer->SetCurrentLength(length));return buffer;
+    }
     void initialise(int w,int h,bool allowWarpForConversionTest=false){
         sourceW=w;sourceH=h;output=canvas(w,h);
         auto hr=D3D11CreateDevice(nullptr,D3D_DRIVER_TYPE_HARDWARE,nullptr,
@@ -145,7 +152,7 @@ public:
         try{
             health.observe(time);convert(source,slot);
             ComPtr<IMFSample> sample;checked(MFCreateVideoSampleFromSurface(nullptr,&sample));
-            ComPtr<IMFMediaBuffer> buffer;checked(MFCreateDXGISurfaceBuffer(__uuidof(ID3D11Texture2D),textures[slot].Get(),0,FALSE,&buffer));
+            auto buffer=surfaceBuffer(textures[slot].Get());
             checked(sample->AddBuffer(buffer.Get()));checked(sample->SetSampleTime(time));checked(sample->SetSampleDuration(second/fps));
             ComPtr<IMFTrackedSample> tracking;checked(sample.As(&tracking));
             ComPtr<IMFAsyncCallback> callback;callback.Attach(new Recycle(slots,slot));checked(tracking->SetAllocator(callback.Get(),nullptr));tracked=true;

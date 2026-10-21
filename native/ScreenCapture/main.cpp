@@ -117,6 +117,19 @@ int wmain(int argc,wchar_t** argv){
                 const auto hr=MFStartup(MF_VERSION);if(FAILED(hr)){winrt::uninit_apartment();checked(hr);}}
             ~MediaRuntime(){MFShutdown();winrt::uninit_apartment();}
         } runtime;
+        if(argc==2&&std::wstring(argv[1])==L"--surface-buffer-selftest"){
+            ComPtr<ID3D11Device> device;ComPtr<ID3D11DeviceContext> context;
+            auto hr=D3D11CreateDevice(nullptr,D3D_DRIVER_TYPE_HARDWARE,nullptr,D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+                nullptr,0,D3D11_SDK_VERSION,&device,nullptr,&context);
+            if(FAILED(hr))hr=D3D11CreateDevice(nullptr,D3D_DRIVER_TYPE_WARP,nullptr,D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+                nullptr,0,D3D11_SDK_VERSION,&device,nullptr,&context);
+            checked(hr);D3D11_TEXTURE2D_DESC desc{};desc.Width=64;desc.Height=64;desc.MipLevels=1;desc.ArraySize=1;
+            desc.Format=DXGI_FORMAT_B8G8R8A8_UNORM;desc.SampleDesc.Count=1;desc.BindFlags=D3D11_BIND_RENDER_TARGET;
+            ComPtr<ID3D11Texture2D> texture;checked(device->CreateTexture2D(&desc,nullptr,&texture));
+            auto buffer=GpuVideo::surfaceBuffer(texture.Get());DWORD length=0;checked(buffer->GetCurrentLength(&length));
+            if(length!=64*64*4)throw std::runtime_error("DXGI sample length contract failed");
+            std::cout<<"DXGI surface sample length="<<length<<"; no CPU readback, not hardware encode acceptance\n";return 0;
+        }
         if(argc==2&&std::wstring(argv[1])==L"--gpu-selftest"){
             GpuVideo gpu;gpu.initialise(1920,1080,true);auto texture=pattern(gpu,1920,1080);
             for(int i=0;i<120;++i)gpu.convert(texture.Get(),i%4);

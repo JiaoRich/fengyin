@@ -10,6 +10,12 @@ def report(helper, directory):
     directory = Path(directory).resolve()
     directory.mkdir(parents=True, exist_ok=True)
     results = {}
+    contract = subprocess.run([str(helper), '--surface-buffer-selftest'], capture_output=True, timeout=60)
+    (directory/'surface-buffer-contract.stdout.txt').write_bytes(contract.stdout)
+    (directory/'surface-buffer-contract.stderr.txt').write_bytes(contract.stderr)
+    if contract.returncode != 0:
+        raise RuntimeError('DXGI buffer contract failed; this check must pass even without hardware encoding')
+    results['surfaceBufferContractExit'] = contract.returncode
     for name, arguments in [('gpuConversion', ['--gpu-selftest']),
                             ('hardwareEncoder', ['--encode-selftest', str(directory/'hardware.mp4')])]:
         result = subprocess.run([str(helper), *arguments], capture_output=True, timeout=60)

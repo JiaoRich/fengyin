@@ -19,6 +19,8 @@ class ScreenCaptureCandidate(unittest.TestCase):
         self.assertNotIn('D3D11_USAGE_STAGING', gpu)
         self.assertNotIn('context->Map(', gpu)
         self.assertIn('MFCreateDXGISurfaceBuffer', gpu)
+        self.assertIn('GetContiguousLength(&length)', gpu)
+        self.assertIn('buffer->SetCurrentLength(length)', gpu)
         self.assertIn('MFT_ENUM_HARDWARE_URL_Attribute', gpu)
         self.assertIn('MF_SA_D3D11_AWARE', gpu)
         self.assertIn('tracking->SetAllocator', gpu)

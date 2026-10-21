@@ -9,6 +9,14 @@ template<class Predicate>void wait(WindowRecordingService& service,Predicate pre
 int main(){
     const auto root=juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("fy-service-"+juce::Uuid().toString());
     require(root.createDirectory().wasOk());
+    juce::File exitAudio;
+    {
+        WindowRecordingService service(root);require(service.startAudio());
+        wait(service,[&]{return service.recording();});exitAudio=service.lastFile();
+        // Destructor must stop, wait, then force a final poll even if the last
+        // UI poll was <200ms ago. No orphan partial WAV on normal app exit.
+    }
+    require(exitAudio.getSize()==4096);
     {
         WindowRecordingService service(root);
         require(service.startAudio());require(!service.startScreen(1));

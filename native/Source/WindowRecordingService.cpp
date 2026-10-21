@@ -10,6 +10,7 @@ juce::File WindowRecordingService::videoFolder() const {return baseFolder==juce:
 WindowRecordingService::~WindowRecordingService() {
     stop();
     if(running && !process.waitForProcessToFinish(10000))process.kill();
+    lastPollAt=0; // Shutdown must collect completion even inside the 200ms poll interval.
     poll(); // Preserve partial files on failure; never delete user recordings.
 }
 bool WindowRecordingService::startAudio() {
