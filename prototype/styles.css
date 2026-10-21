@@ -105,6 +105,7 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
 @media(max-width:1050px){#adapter-technique-grid #technique-list{grid-template-columns:1fr;}}
 /* One small shared recording control; does not add a compact-layout column. */
 .record-control{display:flex;min-width:0;gap:0}
+.record-control #record-kind{width:66px;min-width:54px;padding:0 3px;border-top-left-radius:0;border-bottom-left-radius:0}
 .record-control #record{flex:1;min-width:0;border-top-right-radius:0;border-bottom-right-radius:0}
 .record-control #record-options{flex:0 0 27px;min-width:27px;padding:0;border-left:0;border-top-left-radius:0;border-bottom-left-radius:0}
 #record-menu{width:170px;z-index:2100}

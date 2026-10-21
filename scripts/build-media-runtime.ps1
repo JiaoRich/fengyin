@@ -23,7 +23,7 @@ if ($JuceSource) {
 }
 Checked 'Configure development runtime' { cmake @ConfigureArgs }
 Checked 'Build runtime targets only' {
-    cmake --build $BuildDir --config Release --target FengYin FengYinRecorder FengYinAudioEngine FengYinAudioWatchdog FengYinDriverSetup --parallel 4
+    cmake --build $BuildDir --config Release --target FengYin FengYinRecorder FengYinAudioEngine FengYinAudioWatchdog FengYinDriverSetup FengYinScreenCapture --parallel 4
 }
 $Revision = (& git -C $Root rev-parse --short=12 HEAD).Trim()
 if ($LASTEXITCODE -ne 0) { throw 'Cannot identify runtime source revision' }
@@ -32,7 +32,7 @@ if (Test-Path -LiteralPath $Package) { throw 'Use a new output directory; do not
 New-Item -ItemType Directory -Path $Package -Force | Out-Null
 $Main = Join-Path $BuildDir 'FengYin_artefacts/Release/FengYin.exe'
 Copy-Item -LiteralPath $Main -Destination (Join-Path $Package 'FengYin.exe')
-foreach ($Name in @('FengYinRecorder','FengYinAudioEngine','FengYinAudioWatchdog','FengYinDriverSetup')) {
+foreach ($Name in @('FengYinRecorder','FengYinAudioEngine','FengYinAudioWatchdog','FengYinDriverSetup','FengYinScreenCapture')) {
     Copy-Item -LiteralPath (Join-Path $BuildDir "Release/$Name.exe") -Destination $Package
 }
 New-Item -ItemType Directory -Path (Join-Path $Package 'components') -Force | Out-Null

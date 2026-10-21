@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.1.26",
+    [string]$Version = "1.1.27",
     [switch]$SkipInstaller
 )
 
@@ -94,7 +94,7 @@ Invoke-Checked "CMake 配置" {
         "-DJUCE_WEBVIEW2_PACKAGE_LOCATION=$NugetPackageDir" "-DFENGYIN_VLC_ROOT=$VlcRoot" "-DFENGYIN_RECORDING_ROOT=$RecordingRoot" -DFENGYIN_ARCHIVED_VIDEO_RECORDING=OFF
 }
 
-# Release has no video recorder. Archived media diagnostics remain opt-in.
+# The release WAV recorder stays unchanged. GPU recording is a separate helper.
 $RecorderFfmpeg = if (-not $UsePreparedFfmpeg) { $FfmpegPath } else { Join-Path $PreparedFfmpeg "ffmpeg.exe" }
 Invoke-Checked "Audio-only recorder preflight build" { cmake --build $BuildDir --config Release --target FengYinRecorder --parallel 4 }
 $ThirdPartyRecorder = Join-Path $BuildDir "Release\FengYinRecorder.exe"
@@ -109,6 +109,16 @@ Invoke-Checked "Miniaudio real WAV encoding selftest" {
     if ($LASTEXITCODE -eq 0 -and -not (Test-Path $ThirdPartyAudio)) { throw "Audio recorder produced no WAV" }
 }
 Invoke-Checked "Miniaudio actual PCM continuity" { python (Join-Path $PSScriptRoot "verify_system_recording.py") $ThirdPartyAudio }
+Invoke-Checked "GPU recorder helper build" { cmake --build $BuildDir --config Release --target FengYinScreenCapture --parallel 4 }
+$GpuCaptureExe = Join-Path $BuildDir "Release\FengYinScreenCapture.exe"
+Invoke-Checked "GPU recorder actual deferred mux verification" {
+    python (Join-Path $PSScriptRoot "test_screen_capture_mux.py") $GpuCaptureExe (Split-Path $RecorderFfmpeg) (Join-Path $BuildDir "evidence\gpu-recorder-mux")
+}
+# Capability failures on the cloud VM are recorded, not called hardware passes.
+# Actual GPU capture + real instrument acceptance remains a target-machine test.
+Invoke-Checked "GPU recorder capability report" {
+    python (Join-Path $PSScriptRoot "report_screen_capture_capabilities.py") $GpuCaptureExe (Join-Path $BuildDir "evidence\gpu-recorder-capabilities")
+}
 # Build playback fixtures independently: removing capture must not remove real
 # VLC first-frame / decoded PCM / lifecycle acceptance.
 $VlcFixture = Join-Path $BuildDir "vlc-playback-fixture.mp4"
@@ -163,6 +173,7 @@ if (-not (Test-Path $AudioWatchdogExe)) { throw "未找到音频恢复守护程�
 Copy-Item $AudioEngineExe (Join-Path $PackageDir "FengYinAudioEngine.exe") -Force
 Copy-Item $AudioWatchdogExe (Join-Path $PackageDir "FengYinAudioWatchdog.exe") -Force
 Copy-Item $ThirdPartyRecorder (Join-Path $PackageDir "FengYinRecorder.exe") -Force
+Copy-Item $GpuCaptureExe (Join-Path $PackageDir "FengYinScreenCapture.exe") -Force
 New-Item -ItemType Directory -Force -Path (Join-Path $PackageDir "components\Recording") | Out-Null
 Copy-Item (Join-Path $RecordingRoot "licenses\*") (Join-Path $PackageDir "components\Recording") -Force
 Copy-Item (Join-Path $RecordingRoot "versions.json") (Join-Path $PackageDir "components\Recording") -Force

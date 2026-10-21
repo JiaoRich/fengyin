@@ -879,6 +879,8 @@ void MainComponent::setupWebInterface()
             voicePrompts.stop();
             if(isActivated || recorder.isRecording() || windowRecorder.busy())toggleRecording();
         })
+        .withEventListener("toggleScreenRecording", [this](juce::var) {toggleScreenRecording();})
+        .withEventListener("resumeScreenRecording", [this](juce::var) {resumeScreenRecording();})
         .withEventListener("showRecordings", [](juce::var)
         {
             if(fengyin::RecordingPaths::ensureFolders())fengyin::RecordingPaths::root().revealToUser();
@@ -1867,6 +1869,12 @@ void MainComponent::timerCallback()
         state->setProperty("screenRecordingBusy",windowRecorder.busy() && !windowRecorder.isAudioOnly());
         state->setProperty("screenRecording",windowRecorder.recording() && !windowRecorder.isAudioOnly());
         state->setProperty("screenRecordingStopping",windowRecorder.stopping() && !windowRecorder.isAudioOnly());
+        state->setProperty("screenRecordingPending",windowRecorder.needsVideoGeneration());
+       #if JUCE_WINDOWS
+        state->setProperty("screenRecordingSupported",true);
+       #else
+        state->setProperty("screenRecordingSupported",false);
+       #endif
         state->setProperty("audioRecordingReady",windowRecorder.recording() && windowRecorder.isAudioOnly());
         state->setProperty("audioRecordingStopping",windowRecorder.stopping() && windowRecorder.isAudioOnly());
        #if JUCE_WINDOWS
@@ -4082,6 +4090,57 @@ void MainComponent::showActivationDialog()
     }), false);
 }
 
+void MainComponent::resumeScreenRecording()
+{
+    if(!isActivated || windowRecorder.busy() || recorder.isRecording())return;
+    recordingFolderChooser=std::make_unique<juce::FileChooser>(utf8("选择待生成视频的录屏会话文件夹"),fengyin::RecordingPaths::video());
+    auto safe=juce::Component::SafePointer<MainComponent>(this);
+    recordingFolderChooser->launchAsync(juce::FileBrowserComponent::openMode|juce::FileBrowserComponent::canSelectDirectories,
+        [safe](const juce::FileChooser& chooser){if(!safe)return;const auto folder=chooser.getResult();if(!folder.isDirectory())return;
+            if(safe->windowRecorder.resumeScreenSession(folder))safe->toggleScreenRecording();
+            else if(safe->webInterface)safe->webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",safe->windowRecorder.error());
+            safe->lastWebStateAtMs=0;
+        });
+}
+void MainComponent::toggleScreenRecording()
+{
+    auto tell=[this](const juce::String& message){if(webInterface)webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",message);};
+    if(windowRecorder.needsVideoGeneration()){
+        if(midi.getSnapshot().breath>0.01f){tell(utf8("请先停止吹奏，再生成视频；原始音视频已保存"));return;}
+        auto safe=juce::Component::SafePointer<MainComponent>(this);
+        juce::AlertWindow::showOkCancelBox(juce::MessageBoxIconType::InfoIcon,utf8("生成录屏视频"),
+            utf8("采集已结束，原始音视频已保存。请暂停吹奏和伴奏，点击生成后再合成为MP4；视频不会二次压缩。取消可稍后生成。"),
+            utf8("生成视频"),utf8("稍后生成"),this,juce::ModalCallbackFunction::create([safe](int result){
+                if(!safe || result==0)return;
+                if(!safe->windowRecorder.generateVideo() && safe->webInterface)
+                    safe->webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",safe->windowRecorder.error());
+                safe->lastWebStateAtMs=0;
+            }));return;
+    }
+    if(windowRecorder.busy()){
+        if(!windowRecorder.isAudioOnly())windowRecorder.stop();
+        else tell(utf8("请先停止录音，再开始录屏"));
+        lastWebStateAtMs=0;return;
+    }
+    if(!isActivated){tell(utf8("请先激活或开启试用"));return;}
+    if(recorder.isRecording()){tell(utf8("请先停止录音，再开始录屏"));return;}
+    const auto type=audio.getStatus().deviceType;
+    if(superLowLatencyRunning || type.containsIgnoreCase("ASIO") || type.containsIgnoreCase("Exclusive")){
+        tell(utf8("录屏采集系统扬声器，请使用Windows共享输出，并让吹奏和伴奏从同一默认扬声器播放"));return;
+    }
+    interruptIdleVideoPreparation();voicePrompts.stop();
+    auto safe=juce::Component::SafePointer<MainComponent>(this);
+    juce::AlertWindow::showOkCancelBox(juce::MessageBoxIconType::WarningIcon,utf8("开始录屏"),
+        utf8("将录制风吟所在的整块显示器和系统扬声器声音，包括其他窗口、通知和任务栏。全屏及精简模式均保持整屏录制。需要可用的GPU硬件编码，不支持时不会转为软件编码。"),
+        utf8("开始录屏"),utf8("取消"),this,juce::ModalCallbackFunction::create([safe](int result){
+            if(!safe || result==0 || safe->windowRecorder.busy() || !safe->isActivated)return;
+            const auto* peer=safe->getPeer();
+            const auto handle=peer?reinterpret_cast<std::uintptr_t>(peer->getNativeHandle()):0;
+            if(!safe->windowRecorder.startScreen(handle) && safe->webInterface)
+                safe->webInterface->emitEventIfBrowserIsVisible("screenRecordingMessage",safe->windowRecorder.error());
+            safe->lastWebStateAtMs=0;
+        }));
+}
 void MainComponent::toggleRecording()
 {
     interruptIdleVideoPreparation();

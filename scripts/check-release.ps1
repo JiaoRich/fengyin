@@ -7,6 +7,7 @@ $ErrorActionPreference = "Stop"
 $RequiredFiles = @(
     "FengYin.exe",
     "FengYinRecorder.exe",
+    "FengYinScreenCapture.exe",
     "components\Recording\versions.json",
     "components\Recording\miniaudio-license.txt",
     "components\Recording\miniaudio-0.11.23.h",

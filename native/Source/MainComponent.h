@@ -114,6 +114,8 @@ private:
     void refreshLicenseUi();
     void emitLicenseState(const fengyin::LicenseStatus& status);
     void toggleRecording();
+    void toggleScreenRecording();
+    void resumeScreenRecording();
     void showDeviceSettings();
     void emitAudioSettingsState(bool success = true, const juce::String& message = {});
     void logAudioDiagnostic(const fengyin::AudioDeviceStatus& status);
@@ -235,6 +237,7 @@ private:
     double webVideoPrepareAfterMs = 0;
     std::unique_ptr<juce::FileChooser> webVideoChooser;
     std::unique_ptr<juce::FileChooser> pluginFolderChooser;
+    std::unique_ptr<juce::FileChooser> recordingFolderChooser;
     juce::File webVideoFile;
     int webVideoGeneration = 0;
     int webVideoSeekRevision = 0;

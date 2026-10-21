@@ -17,7 +17,9 @@ class Recording123(unittest.TestCase):
         self.assertNotIn('FENGYIN_RECORDING_BACKEND',service)
         self.assertIn('.getSiblingFile("FengYinRecorder.exe")',service)
         self.assertNotIn('FengYinScreenRecorder.exe',service)
-        self.assertEqual(service.count('process.start('),1)
+        audio=service.split('bool WindowRecordingService::startAudio()',1)[1].split('bool WindowRecordingService::startScreen',1)[0]
+        self.assertEqual(audio.count('process.start('),1)
+        self.assertEqual(service.count('process.start('),3) # WAV, GPU capture, deferred mux only.
         self.assertNotIn('"screen:"+',service)
         for filename in ['Use-new-recording.cmd','Use-legacy-recording.cmd']:
             cmd=read('scripts/recording-backends/'+filename)

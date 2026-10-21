@@ -5,10 +5,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ScreenCaptureCandidate(unittest.TestCase):
-    def test_candidate_cannot_enter_release_or_link_into_host(self):
+    def test_gpu_helper_is_separate_process_not_linked_into_host(self):
         cmake = (ROOT / 'native/ScreenCapture/CMakeLists.txt').read_text(encoding='utf-8')
         production = (ROOT / 'CMakeLists.txt').read_text(encoding='utf-8')
         self.assertNotIn('add_subdirectory(native/ScreenCapture)', production)
+        self.assertIn('add_executable(FengYinScreenCapture native/ScreenCapture/main.cpp)',production)
         self.assertNotIn('install(TARGETS', cmake)
         service = (ROOT / 'native/Source/WindowRecordingService.cpp').read_text(encoding='utf-8')
         self.assertNotIn('FengYinScreenCaptureProbe', service)

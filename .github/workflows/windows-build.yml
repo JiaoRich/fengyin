@@ -575,6 +575,7 @@ jobs:
           path: |
             dist/FengYin/FengYin.exe
             dist/FengYin/FengYinRecorder.exe
+            dist/FengYin/FengYinScreenCapture.exe
             dist/FengYin/components/Recording/
             dist/FengYin/components/VLC/
           if-no-files-found: error

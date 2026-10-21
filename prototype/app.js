@@ -1960,6 +1960,10 @@ $('#cancel-technique-learning').addEventListener('click', () => {
 });
 
 async function toggleAudioRecording() {
+  if(screenRecordingBusy || $('#record-kind').value==='video') {
+    if(!window.__JUCE__?.backend)return toast('录屏需要Windows原生组件');
+    nativeEvent('toggleScreenRecording');return;
+  }
   if (!recording && !latestBackendState.systemOutputRecordingSupported && video.src && window.__JUCE__?.backend?.emitEvent && !nativeAccompanimentReady) {
     return toast('伴奏音轨尚未准备好，请稍候再开始录音');
   }
@@ -1972,6 +1976,10 @@ async function toggleAudioRecording() {
   toast(recording ? '已开始模拟录音' : '模拟录音已保存');
 }
 $('#record').addEventListener('click',toggleAudioRecording);
+$('#record-kind').addEventListener('change',event=>{
+  if(event.target.value==='recover'){event.target.value='audio';nativeEvent('resumeScreenRecording');return;}
+  if(!recording && !screenRecordingBusy)$('#record').textContent=event.target.value==='video'?'● 开始录屏':'● 开始录音';
+});
 window.__JUCE__?.backend?.addEventListener('screenRecordingMessage',message=>toast(String(message)));
 $('#recording-manager').addEventListener('click', () => nativeEvent('showRecordings'));
 $('#low-performance').addEventListener('change', event => {
@@ -2417,9 +2425,13 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
     if (versionNode) versionNode.textContent = `风吟 ${state.appVersion} · 本地运行，不会保存或上传个人资料。`;
   }
   recording = !!state.recording;
-  screenRecordingBusy=false; // Video recording is withdrawn from this release.
+  screenRecordingBusy=!!state.screenRecordingBusy;
   applyPreparedVideoSource();
   $('#record').textContent = recording ? (state.audioRecordingStopping?'正在保存…':state.systemOutputRecordingSupported&&!state.audioRecordingReady?'录音启动中…':'■ 停止录音') : '● 开始录音';
+  if(screenRecordingBusy)$('#record').textContent=state.screenRecordingPending?'生成视频':state.screenRecordingStopping?'正在保存…':state.screenRecording?'■ 停止录屏':'录屏启动中…';
+  else if(!recording && $('#record-kind').value==='video')$('#record').textContent='● 开始录屏';
+  $('#record-kind').disabled=recording||screenRecordingBusy;
+  $('#record-kind').querySelector('option[value="video"]').disabled=state.screenRecordingSupported===false;
   $('#record').style.color = recording||screenRecordingBusy ? 'var(--danger)' : '';
   $('#record').disabled=!!state.screenRecordingStopping || !!state.audioRecordingStopping;
 });
@@ -2668,7 +2680,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.26 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.27 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

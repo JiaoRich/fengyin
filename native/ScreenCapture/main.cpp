@@ -143,7 +143,7 @@ int wmain(int argc,wchar_t** argv){
         }
         if((argc!=5&&argc!=6)||std::wstring(argv[1])!=L"--capture")throw std::runtime_error("Use --capture <HWND hex> <new session directory> <parent PID> [seconds]; diagnostic component, not production integration");
         const int seconds=argc==6?std::stoi(argv[5]):45;
-        if(seconds<5||seconds>1800)throw std::runtime_error("Capture duration must be between 5 and 1800 seconds");
+        if(seconds<5||seconds>21600)throw std::runtime_error("Capture duration must be between 5 and 21600 seconds");
         folder=argv[3];if(!std::filesystem::create_directory(folder))throw std::runtime_error("Session directory must be new");
         if(std::filesystem::space(folder).available<1024ULL*1024*1024)throw std::runtime_error("At least 1GB free space required");
         HANDLE parent=OpenProcess(SYNCHRONIZE,FALSE,DWORD(std::stoul(argv[4])));

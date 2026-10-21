@@ -38,14 +38,16 @@ class Release125(unittest.TestCase):
         self.assertNotIn('recording-backends\\*', build)
         self.assertIn('if ($RetiredCapture)', read('scripts/check-release.ps1'))
 
-    def test_video_bridge_removed_and_audio_only_service(self):
+    def test_old_video_bridge_removed_new_gpu_helper_separate(self):
         self.assertNotIn('toggleWindowRecording', read('native/Source/MainComponent.cpp'))
         self.assertNotIn('toggleWindowRecording', read('prototype/app.js'))
         service = read('native/Source/WindowRecordingService.cpp')
         self.assertIn('bool WindowRecordingService::startAudio()', service)
         self.assertNotIn('screen:', service)
         self.assertNotIn('FENGYIN_RECORDING_BACKEND', service)
-        self.assertNotIn('RecordingPaths::video()', service)
+        self.assertIn('RecordingPaths::video()', service)
+        self.assertIn('FengYinScreenCapture.exe',service)
+        self.assertNotIn('FengYinScreenRecorder.exe',service)
 
     def test_old_misleading_guide_audio_not_played(self):
         voice = read('prototype/voice-guide.js')
