@@ -27,11 +27,43 @@ int main(){
     {
         WindowRecordingService service(root);
         require(service.startAudio());require(!service.startScreen(1));
-        wait(service,[&]{return service.recording();});service.stop();
+        wait(service,[&]{return service.recording();});
+        const auto directories=root.getChildFile("temporary").findChildFiles(juce::File::findDirectories,false);
+        require(directories.size()==1);require(directories[0].getChildFile("state.txt").deleteFile());
+        juce::Thread::sleep(250);service.poll();require(service.recording());
+        service.stop();
         wait(service,[&]{return !service.busy();});require(service.takeCompleted());require(service.error().isEmpty());
         require(service.lastFile().getSize()==4096);
     }
     juce::File session;
+    {
+        WindowRecordingService failing(root);require(failing.startScreen(1));
+        wait(failing,[&]{return failing.recording();});
+        auto dirs=root.getChildFile("temporary").findChildFiles(juce::File::findDirectories,false);
+        require(dirs.size()==1);const auto failedSession=dirs[0];
+        // Real elapsed-time regression: the original code mislabelled this
+        // failure as startup timeout after a perfectly valid recording start.
+        for(int n=0;n<105;++n){juce::Thread::sleep(200);failing.poll();require(failing.recording());}
+        require(failedSession.getChildFile("inject-failure").replaceWithText("fail"));
+        wait(failing,[&]{return !failing.busy();});
+        require(failing.takeCompleted()&&!failing.wasCancelled());
+        require(failing.error().contains("injected encoder failure"));
+        require(!failing.error().contains(juce::String::fromUTF8("启动超时")));
+        require(failedSession.getChildFile("audio.wav").getSize()==4096);
+        require(failedSession.getChildFile("failure.txt").existsAsFile());
+        require(failedSession.deleteRecursively()); // UUID test fixture only
+    }
+    {
+        WindowRecordingService failing(root);require(failing.startScreen(1,true));
+        wait(failing,[&]{return failing.prepared();});
+        const auto dirs=root.getChildFile("temporary").findChildFiles(juce::File::findDirectories,false);
+        require(dirs.size()==1);require(dirs[0].getChildFile("inject-failure").replaceWithText("fail"));
+        wait(failing,[&]{return !failing.busy();});
+        require(failing.takeCompleted()&&!failing.wasCancelled());
+        require(failing.error().contains("injected preparation failure"));
+        require(dirs[0].getChildFile("failure.txt").existsAsFile());
+        require(dirs[0].deleteRecursively());
+    }
     {
         WindowRecordingService service(root);require(service.startScreen(1,true));
         wait(service,[&]{return service.prepared();});require(!service.recording());

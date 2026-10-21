@@ -18,7 +18,7 @@ void WindowRecordingService::cleanCompletedSession() {
     // user-selected directory; failed/recoverable originals remain untouched.
     if(sessionFolder.getParentDirectory()!=temporaryFolder() || sessionFolder.isSymbolicLink()
        || sessionFolder.getChildFile("fengyin-session-v2").loadFileAsString()!="FengYin recording session v2")return;
-    const juce::StringArray owned{"audio.partial.wav","audio.wav","video.partial.mp4","alignment.txt","metrics.txt","state.txt","state.tmp","state.txt.tmp","stop","begin"};
+    const juce::StringArray owned{"audio.partial.wav","audio.wav","video.partial.mp4","alignment.txt","metrics.txt","failure.txt","state.txt","state.tmp","state.txt.tmp","stop","begin"};
     for(const auto& file:sessionFolder.findChildFiles(juce::File::findFiles,false)){
         if(file.isSymbolicLink())continue;
         const auto name=file.getFileName();
@@ -40,7 +40,7 @@ WindowRecordingService::~WindowRecordingService() {
 bool WindowRecordingService::startAudio(bool prepareOnly) {
     poll();if(busy())return false;
     screen=false;captured=false;muxing=false;armed=prepareOnly;cancelled=false;videoQualityWarning=false;
-    lastError.clear();completed=false;finishing=false;ready=false;
+    lastError.clear();completed=false;finishing=false;ready=false;startupGuard.reset();lastPollAt=0;
    #if JUCE_WINDOWS
     const auto executable=juce::File::getSpecialLocation(juce::File::currentApplicationFile)
         .getSiblingFile("FengYinRecorder.exe");
@@ -69,6 +69,7 @@ bool WindowRecordingService::startAudio(bool prepareOnly) {
 bool WindowRecordingService::startScreen(std::uintptr_t window,bool prepareOnly) {
     poll();if(busy())return false;
     screen=true;captured=false;muxing=false;armed=prepareOnly;cancelled=false;completed=false;finishing=false;ready=false;lastError.clear();videoQualityWarning=false;
+    startupGuard.reset();
    #if JUCE_WINDOWS
     const auto executable=juce::File::getSpecialLocation(juce::File::currentApplicationFile).getSiblingFile("FengYinScreenCapture.exe");
     const auto folder=videoFolder();
@@ -95,7 +96,7 @@ bool WindowRecordingService::beginCapture() {
     if(!sessionFolder.getChildFile("begin").replaceWithText("begin")){
         lastError=juce::String::fromUTF8("无法开始录制，未保存提示音");stop();return false;
     }
-    armed=false;ready=false;startedAt=juce::Time::getMillisecondCounterHiRes();lastPollAt=0;
+    armed=false;ready=false;startupGuard.reset();startedAt=juce::Time::getMillisecondCounterHiRes();lastPollAt=0;
     return true;
 }
 bool WindowRecordingService::resumeScreenSession(const juce::File& folder) {
@@ -134,11 +135,14 @@ bool WindowRecordingService::generateVideo() {
 }
 void WindowRecordingService::stop() {
     if(running && !finishing && !muxing){
-        cancelled=armed||!ready;
+        // Only an explicit cancellation before begin may discard temporary data.
+        // An error or a delayed first frame must never be treated as cancellation.
+        cancelled=armed&&lastError.isEmpty();
         finishing=true;
         stoppedAt=juce::Time::getMillisecondCounterHiRes();
         if(!stopFile.replaceWithText("stop")) {
             lastError=juce::String::fromUTF8("无法写入录制停止标记，已停止采集并保留临时文件");
+            cancelled=false;
             process.kill();
         }
     }
@@ -148,16 +152,39 @@ void WindowRecordingService::poll() {
     const auto now=juce::Time::getMillisecondCounterHiRes();
     if(now-lastPollAt<200)return;
     lastPollAt=now;
-    const auto status=stateFile.loadFileAsString().trim();
-    ready=status==(armed?"ready":"recording");
-    if(!ready && !finishing && now-startedAt>20000){lastError=juce::String::fromUTF8("录制启动超时，未正常开始采集");stop();cancelled=false;}
+    auto status=stateFile.loadFileAsString().trim();
+    const bool failed=status.startsWith("failed:");
+    const bool terminal=failed||status=="saved"||status=="cancelled"||status.startsWith("captured;");
+    // Atomic state-file replacement can briefly be unreadable. A successful
+    // handshake is latched; missing text is not evidence of a new startup.
+    if(status==(armed?"ready":"recording"))ready=true;
+    startupGuard.observe(ready);
+    if(failed){
+        if(lastError.isEmpty()||lastError==juce::String::fromUTF8("录制启动超时，未正常开始采集"))lastError=juce::String::fromUTF8(muxing?"录屏保存失败：":ready&&!armed?"录制中断：":"录制准备或启动失败：")+status.substring(7);
+        cancelled=false;
+    }
+    if(terminal&&!finishing){finishing=true;stoppedAt=now;}
+    if(startupGuard.timedOut(now-startedAt,finishing,terminal,process.isRunning())){
+        lastError=juce::String::fromUTF8("录制启动超时，未正常开始采集");stop();cancelled=false;
+    }
     if(finishing && now-stoppedAt>(muxing?600000:15000) && process.isRunning()) {
-        lastError=juce::String::fromUTF8("录制保存超时，已停止采集；如有临时文件将保留");
+        if(lastError.isEmpty())lastError=juce::String::fromUTF8("录制保存超时，已停止采集；如有临时文件将保留");
+        cancelled=false;
         process.kill();
     }
     if(process.isRunning())return;
+    // The helper may publish its final state between the first read and exit.
+    const auto finalStatus=stateFile.loadFileAsString().trim();
+    if(finalStatus.isNotEmpty())status=finalStatus;
+    if(status.startsWith("failed:")){
+        cancelled=false;
+        if(lastError.isEmpty()||lastError==juce::String::fromUTF8("录制启动超时，未正常开始采集"))lastError=juce::String::fromUTF8(muxing?"录屏保存失败：":ready&&!armed?"录制中断：":"录制准备或启动失败：")+status.substring(7);
+    }
     running=false;finishing=false;ready=false;
-    if(cancelled){armed=false;completed=true;lastError.clear();cleanCompletedSession();return;}
+    if(cancelled&&process.getExitCode()==0&&status=="cancelled"){
+        armed=false;completed=true;lastError.clear();cleanCompletedSession();return;
+    }
+    cancelled=false;
     if(screen && !muxing && process.getExitCode()==0 && status.startsWith("captured;")
         && sessionFolder.getChildFile("alignment.txt").existsAsFile()){
         const auto metrics=sessionFolder.getChildFile("metrics.txt").loadFileAsString();
@@ -170,7 +197,12 @@ void WindowRecordingService::poll() {
         && partialFile.moveFileTo(destination)){lastError.clear();cleanCompletedSession();}
     else if(lastError.isEmpty())lastError=juce::String::fromUTF8("录制未成功保存：")
         +(status.isNotEmpty()?status:juce::String::fromUTF8("组件未启动或Windows媒体组件不可用"))
-        +juce::String::fromUTF8("。如有临时文件已保留，请检查磁盘、Windows媒体组件与音频输出设备。");
+        +juce::String::fromUTF8("。临时素材已保留。");
+    if(lastError.isNotEmpty()){
+        const auto diagnostic="state="+status+"\nexit="+juce::String(process.getExitCode())+"\nerror="+lastError+"\n";
+        sessionFolder.getChildFile("failure.txt").replaceWithText(diagnostic);
+        juce::Logger::writeToLog("Recording failure session="+sessionFolder.getFullPathName()+"\n"+diagnostic);
+    }
     stopFile.deleteFile(); // Own per-session control marker, not user data.
 }
 }

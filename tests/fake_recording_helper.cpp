@@ -24,12 +24,23 @@ int wmain(int argc,wchar_t** argv){
     const fs::path begin=audio&&armed?fs::path(argv[8]):folder/L"begin";
     if(armed){
         write(state,"ready");
-        for(int n=0;n<1000&&!fs::exists(begin)&&!fs::exists(stop);++n)std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        for(int n=0;n<1000&&!fs::exists(begin)&&!fs::exists(stop);++n){
+            if(fs::exists(folder/L"inject-failure")){
+                fs::remove(folder/L"inject-failure");write(state,"failed: injected preparation failure");return 1;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
         if(fs::exists(stop)){write(state,"cancelled");return 0;}
         if(!fs::exists(begin)){write(state,"failed: preparation timeout");return 1;}
     }
     write(state,"recording");
-    for(int n=0;n<1000&&!fs::exists(stop);++n)std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    for(int n=0;n<6000&&!fs::exists(stop);++n){
+        if(fs::exists(folder/L"inject-failure")){
+            fs::remove(folder/L"inject-failure");write(folder/L"audio.wav",std::string(4096,'a'));
+            write(state,"failed: injected encoder failure");return 1;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
     if(!fs::exists(stop)){write(state,"failed: fixture timeout");return 1;}
     if(audio){write(fs::path(argv[2]),std::string(4096,'a'));write(state,"saved");}
     else{write(folder/L"audio.wav",std::string(4096,'a'));write(folder/L"video.partial.mp4",std::string(4096,'v'));

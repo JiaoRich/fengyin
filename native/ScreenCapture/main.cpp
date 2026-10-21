@@ -116,7 +116,10 @@ static void record(HWND hwnd,const std::filesystem::path& folder,HANDLE parent,i
                     lastFrame=time;next=nextFrameDeadline(origin,submitted);newSurface=false;
             }else Sleep(1);
             if(!origin&&qpc()>deadline)throw std::runtime_error("No screen frames");
-            if(origin&&qpc()-lastFrame>second/2)throw std::runtime_error("Capture stopped providing frames");
+            // WriteSample is documented to throttle/block its calling thread.
+            // Time spent submitting a successful frame is not evidence that
+            // WGC stopped. Pacing degradation is measured in FrameHealth and
+            // reported on save; do not discard the recording for one slow call.
             if(GetTickCount64()>checkAt){MONITORINFO current{};current.cbSize=sizeof(current);
                 if(!GetMonitorInfoW(monitor,&current)||!EqualRect(&info.rcMonitor,&current.rcMonitor))throw std::runtime_error("Display changed; recording stopped");
                 if(std::filesystem::space(folder).available<256ULL*1024*1024)throw std::runtime_error("Low disk space; partial files retained");

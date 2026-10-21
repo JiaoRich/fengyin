@@ -50,19 +50,20 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int) {
             const auto id=endpoint(enumerator.Get());
             auto nextCheck=GetTickCount64()+1000;
             MiniAudioRecorder audio;const bool armed=argc==9;
+            bool cancelled=false;
             audio.setRecordingEnabled(!armed);audio.start(output,id);
             if(armed){
                 if(!status(state,"ready"))throw std::runtime_error("Cannot write ready status");
                 const auto limit=GetTickCount64()+30000;
                 while(!std::filesystem::exists(args[8])){
-                    if(std::filesystem::exists(stop)||WaitForSingleObject(parent,0)!=WAIT_TIMEOUT)throw std::runtime_error("Recording preparation cancelled");
+                    if(std::filesystem::exists(stop)||WaitForSingleObject(parent,0)!=WAIT_TIMEOUT){cancelled=true;break;}
                     if(GetTickCount64()>limit)throw std::runtime_error("Recording preparation timed out");
                     Sleep(10);
                 }
-                audio.setRecordingEnabled(true);
+                if(!cancelled)audio.setRecordingEnabled(true);
             }
-            if(!status(state,"recording"))throw std::runtime_error("Cannot write recording status");
-            while(!std::filesystem::exists(stop) && WaitForSingleObject(parent,0)==WAIT_TIMEOUT) {
+            if(!cancelled&&!status(state,"recording"))throw std::runtime_error("Cannot write recording status");
+            while(!cancelled&&!std::filesystem::exists(stop) && WaitForSingleObject(parent,0)==WAIT_TIMEOUT) {
                 audio.drain();
                 if(GetTickCount64()>=nextCheck) {
                     if(endpoint(enumerator.Get())!=id)throw std::runtime_error("System output changed; recording stopped");
@@ -71,7 +72,7 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int) {
                 Sleep(10);
             }
             audio.finish();
-            if(!status(state,"saved"))throw std::runtime_error("Cannot write completion status");
+            if(!status(state,cancelled?"cancelled":"saved"))throw std::runtime_error("Cannot write completion status");
         }
     } catch(const std::exception& e) {
         if(!state.empty())status(state,std::string("failed: ")+e.what());

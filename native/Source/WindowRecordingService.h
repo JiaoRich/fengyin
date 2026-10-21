@@ -1,6 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <cstdint>
+#include "RecordingStartupGuard.h"
 
 namespace fengyin {
 // Separate audio-only and GPU-video helpers; neither runs in the audio graph.
@@ -40,6 +41,7 @@ private:
     bool createSession();
     void cleanCompletedSession();
     juce::String lastError;
+    RecordingStartupGuard startupGuard;
     bool running=false,finishing=false,ready=false,completed=false;
     bool screen=false,captured=false,muxing=false;
     bool armed=false,cancelled=false,cleanupWarning=false,videoQualityWarning=false;

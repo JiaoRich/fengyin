@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.29 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.30 LANGUAGES C CXX)
 option(FENGYIN_ARCHIVED_VIDEO_RECORDING "Build archived video-recording diagnostics, never for release" OFF)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
@@ -379,6 +379,8 @@ install(FILES
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(FengYinRecordingStartupTests tests/test_recording_startup_guard.cpp)
+    add_test(NAME recording_startup_phase_guard COMMAND FengYinRecordingStartupTests)
     add_executable(FengYinScreenCapturePolicyTests tests/test_screen_capture_policy.cpp)
     add_test(NAME gpu_capture_bounded_policy COMMAND FengYinScreenCapturePolicyTests)
     add_executable(FengYinRecorderPolicyTests tests/test_recorder_policy.cpp)
