@@ -119,6 +119,12 @@ Invoke-Checked "GPU recorder actual deferred mux verification" {
 Invoke-Checked "GPU recorder capability report" {
     python (Join-Path $PSScriptRoot "report_screen_capture_capabilities.py") $GpuCaptureExe (Join-Path $BuildDir "evidence\gpu-recorder-capabilities")
 }
+Invoke-Checked "Recording service preflight build" {
+    cmake --build $BuildDir --config Release --target FengYinRecordingServiceTests --parallel 4
+}
+Invoke-Checked "Recording service dual-file lifecycle preflight" {
+    ctest --test-dir $BuildDir -C Release -R '^recording_service_lifecycle$' -V --output-on-failure
+}
 # Build playback fixtures independently: removing capture must not remove real
 # VLC first-frame / decoded PCM / lifecycle acceptance.
 $VlcFixture = Join-Path $BuildDir "vlc-playback-fixture.mp4"

@@ -1,12 +1,14 @@
 #include "../native/Source/WindowRecordingService.h"
 #include <stdexcept>
+#include <iostream>
 using fengyin::WindowRecordingService;
-void require(bool value){if(!value)throw std::runtime_error("Recording lifecycle regression");}
+void check(bool value,int line){if(!value)throw std::runtime_error("Recording lifecycle regression at line "+std::to_string(line));}
+#define require(value) check((value),__LINE__)
 template<class Predicate>void wait(WindowRecordingService& service,Predicate predicate){
     for(int n=0;n<300;++n){service.poll();if(predicate())return;juce::Thread::sleep(20);}
     throw std::runtime_error("Recording lifecycle timeout: "+service.error().toStdString());
 }
-int main(){
+int main() try {
     const auto root=juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("fy-service-"+juce::Uuid().toString());
     require(root.createDirectory().wasOk());
     juce::File exitAudio;
@@ -78,6 +80,7 @@ int main(){
     {
         require(session.getChildFile("metrics.txt").replaceWithText("qualityWarning=1\nlate=12\n"));
         WindowRecordingService resumed(root);require(resumed.resumeScreenSession(session));
+        require(!root.getChildFile("audio").getChildFile(resumed.lastFile().getFileNameWithoutExtension()+".wav").exists());
         require(resumed.hasVideoQualityWarning());
         require(session.getChildFile("fail-once").replaceWithText("fail"));
         require(resumed.generateVideo());wait(resumed,[&]{return !resumed.busy();});
@@ -120,4 +123,6 @@ int main(){
         require(root.getChildFile("audio").getChildFile(recovery.lastFile().getFileNameWithoutExtension()+".wav").getSize()==4096);
     }
     require(root.deleteRecursively()); // only this test's fresh UUID temp directory
+} catch(const std::exception& error) {
+    std::cerr<<error.what()<<std::endl;return 1;
 }

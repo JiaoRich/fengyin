@@ -111,7 +111,11 @@ bool WindowRecordingService::resumeScreenSession(const juce::File& folder) {
     videoQualityWarning=folder.getChildFile("metrics.txt").loadFileAsString().contains("qualityWarning=1");
     stateFile=folder.getChildFile("state.txt");stopFile=folder.getChildFile("stop");
     partialFile=folder.getChildFile("recording.mp4");
-    destination=RecordingPaths::next(videoFolder(),"mp4");return true;
+    // Audio-only recordings have their own sequence. A recovered video's WAV
+    // must not collide with an existing audio recording with that same number.
+    const auto name=RecordingPaths::next(videoFolder(),"mp4");
+    destination=name.getSiblingFile(name.getFileNameWithoutExtension()+"-"+juce::Uuid().toString().substring(0,8)+".mp4");
+    return true;
 }
 bool WindowRecordingService::publishFiles() {
     if(partialFile.getSize()<=1024||destination.exists())return false;
