@@ -226,7 +226,6 @@ let appFocused = document.hasFocus();
 let unfocusedFrame = 0;
 let selectedTargetKey = 0;
 let techniqueSensitivity = 'standard';
-let optimisationTimer = 0;
 let lastDrawAt = 0;
 let currentToneStyleIndex = 0;
 let currentToneStyleInstrument = '';
@@ -1991,7 +1990,6 @@ window.__JUCE__?.backend?.addEventListener('recordingResult',result=>{
   const banner=$('#record-success');banner.hidden=!result?.success&&!result?.canRecover;if(banner.hidden)return;
   $('#record-recover').hidden=!result?.canRecover;
   banner.querySelector('span').textContent=String(result.message||'录制成功！在这里查看录制文件');
-  if(result.success && result.videoQualityWarning)banner.querySelector('span').textContent+='（部分画面可能不够流畅）';
   const anchor=$('#recording-manager').getBoundingClientRect(),left=Math.max(8,Math.min(innerWidth-banner.offsetWidth-8,anchor.left));
   banner.style.left=`${left}px`;banner.style.top=`${Math.max(8,anchor.top-banner.offsetHeight-12)}px`;
   banner.querySelector('i').style.left=`${Math.max(12,Math.min(banner.offsetWidth-18,anchor.left+anchor.width/2-left))}px`;
@@ -2215,13 +2213,6 @@ window.__JUCE__?.backend?.addEventListener('pauseForDriverChange', () => {
   video.pause();
 });
 
-function showAudioOptimisationProgress() {
-  clearInterval(optimisationTimer);
-  $('#audio-optimization-dialog').hidden = false;
-  $('#optimization-message').textContent = '正在检测当前音源与缓冲区…';
-  $('#optimization-progress-bar').style.width = '0%';
-  $('#optimization-percent').textContent = '0%';
-}
 
 function renderSmartAdapter(state) {
   const connected = !!state.deviceConnected;
@@ -2600,9 +2591,8 @@ window.__JUCE__?.backend?.addEventListener('videoAudioState', result => {
   video.muted = true;
   if (result?.message) toast(result.message);
 });
-window.__JUCE__?.backend?.addEventListener('audioOptimisationResult', message => toast(String(message || '')));
 window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
-  setAudioControlsBusy(!!state?.autoTuning);
+  setAudioControlsBusy(false);
   setAudioOptions($('#audio-driver-select'), state?.types, state?.type, value => {
     const name = String(value);
     if (name.includes('ASIO4ALL')) return name;
@@ -2627,16 +2617,6 @@ window.__JUCE__?.backend?.addEventListener('audioSettingsState', state => {
   status.textContent = state?.success === false ? (state.message || '声音设置未能应用，请重新选择。') : '';
   status.hidden = state?.success !== false;
   status.classList.toggle('audio-error', state?.success === false);
-  if (state?.autoTuning) {
-    if ($('#audio-optimization-dialog').hidden) showAudioOptimisationProgress();
-    const percent = Math.floor(Math.min(.99,Math.max(0,Number(state.tuningProgress)||0))*100);
-    $('#optimization-progress-bar').style.width = percent+'%';
-    $('#optimization-percent').textContent = percent+'%';
-  }
-  if (!state?.autoTuning && !$('#audio-optimization-dialog').hidden) {
-    clearInterval(optimisationTimer);
-    $('#audio-optimization-dialog').hidden = true;
-  }
   if (state?.message) toast(state.message);
 });
 window.__JUCE__?.backend?.addEventListener('techniqueLearnResult', result => {

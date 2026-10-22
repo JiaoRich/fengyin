@@ -256,7 +256,6 @@ MainComponent::~MainComponent()
     stopTimer();
     windowRecorder.stop();
     audio.getDeviceManager().removeAudioCallback(&voicePrompts);
-    pluginHost.setLatencyProbeActive(false);
     webVideoAudioExtractor.cancel();
     webVideoPlaybackCache.interrupt();
     pauseAccompaniment();
@@ -315,8 +314,7 @@ void MainComponent::setupWebInterface()
             invalidateVlcViewport();
             lastVlcStateAtMs=0;
             updateVlcPlayback();
-            emitAudioSettingsState(true, audio.isAutomaticLatencyTuning()
-                ? utf8("正在自动优化声音，无需操作…") : juce::String());
+            emitAudioSettingsState();
             emitSuperLowLatencyState();
         })
         .withEventListener("requestBackendState",[this](juce::var){lastWebStateAtMs=0;})
@@ -1040,7 +1038,7 @@ void MainComponent::updateIdleVideoPreparation()
     const bool busy=videoPlaybackActive || recorder.isRecording() || windowRecorder.busy()
         || snapshot.breath>.01f || snapshot.lastNote>=0 || pluginLoading || effectLoading
         || pluginHost.warmingContainerCount()>0
-        || audio.isAutomaticLatencyTuning() || pluginCatalog.getProgress().scanning;
+        || pluginCatalog.getProgress().scanning;
     if(busy) {
         interruptIdleVideoPreparation();return;
     }
@@ -1661,38 +1659,11 @@ void MainComponent::timerCallback()
     if (snapshot.breath > 0.01f || snapshot.lastNote >= 0)
         lastPerformanceActivityMs = juce::Time::getMillisecondCounterHiRes();
     updateIdleVideoPreparation();
-    if (audio.isAutomaticLatencyTuning()
-        && (videoPlaybackActive || recorder.isRecording() || windowRecorder.busy() || snapshot.breath > 0.01f || snapshot.lastNote >= 0))
-    {
-        pluginHost.setLatencyProbeActive(false);
-        audio.cancelAutomaticLatencyTuning();
-        emitAudioSettingsState(false, utf8("已停止声音优化，恢复演奏"));
-    }
     if (++audioOutputSyncTicks >= 60)
     {
         audioOutputSyncTicks = 0;
-        const auto outputChanged = audio.systemDefaultOutputChanged();
-        const auto safeToReconfigure = ! videoPlaybackActive && ! recorder.isRecording() && !windowRecorder.busy()
-            && juce::Time::getMillisecondCounterHiRes() - lastPerformanceActivityMs > 3000.0;
-        if (outputChanged)
+        if (audio.systemDefaultOutputChanged())
             followSystemAudioOutputIfNeeded();
-        if (! outputChanged && safeToReconfigure && ! pluginLoading
-            && pluginHost.hasPlugin()
-            && audio.needsAutomaticLatencyTuning()
-            && audio.beginAutomaticLatencyTuning())
-        {
-            pluginHost.setLatencyProbeActive(true);
-            emitAudioSettingsState(true, utf8("正在验证声音设置…"));
-        }
-    }
-    if (audio.isAutomaticLatencyTuning()) emitAudioSettingsState();
-    audio.updateProbeEvidence(pluginHost.getCallbackCount(), pluginHost.getCallbackOverruns(), pluginHost.getSignalBlocks());
-    if (const auto tuningResult = audio.pollAutomaticLatencyTuning(); tuningResult.has_value())
-    {
-        pluginHost.setLatencyProbeActive(false);
-        if (webInterface != nullptr)
-            webInterface->emitEventIfBrowserIsVisible("audioOptimisationResult", *tuningResult);
-        emitAudioSettingsState(! tuningResult->contains(utf8("未")), *tuningResult);
     }
     const auto midiConnectionGeneration = midi.getConnectionGeneration();
     if (breathDetectionActive && (!snapshot.deviceConnected
@@ -2238,8 +2209,6 @@ void MainComponent::startSuperLowLatencyOptimisation(bool restore)
     if (recorder.isRecording()) toggleRecording();
     pauseAccompaniment();
     videoPlaybackActive = false;
-    audio.cancelAutomaticLatencyTuning();
-    pluginHost.setLatencyProbeActive(false);
     pluginHost.resetPerformance();
     testSynth.resetPerformance();
     if (webInterface != nullptr)
@@ -2282,8 +2251,6 @@ void MainComponent::followSystemAudioOutputIfNeeded()
 
     const auto status = audio.getStatus();
     const auto message = utf8("已自动切换声音输出：") + status.deviceName;
-    if (webInterface != nullptr)
-        webInterface->emitEventIfBrowserIsVisible("audioOptimisationResult", message);
     emitAudioSettingsState(true, message);
 }
 
@@ -4245,8 +4212,6 @@ void MainComponent::emitAudioSettingsState(bool success, const juce::String& mes
     result->setProperty("cpuUsage", status.cpuUsage);
     result->setProperty("droppedMidiEvents", static_cast<juce::int64>(pluginHost.getDroppedMidiEventCount()));
     result->setProperty("automatic", audio.isAutomaticMode());
-    result->setProperty("autoTuning", audio.isAutomaticLatencyTuning());
-    result->setProperty("tuningProgress", audio.getTuningProgress());
     result->setProperty("callbackOverruns", static_cast<juce::int64>(pluginHost.getCallbackOverruns()));
     result->setProperty("lowLatencyMode", status.deviceType.containsIgnoreCase("Low Latency Mode")
                                               || status.deviceType.containsIgnoreCase("RAW Test Mode")
@@ -4278,7 +4243,6 @@ void MainComponent::applyAudioSettingsFromWeb(const juce::var& payload)
     if(windowRecorder.busy()) {
         emitAudioSettingsState(false,utf8("请先停止并保存录制，再更改音频设备"));return;
     }
-    pluginHost.setLatencyProbeActive(false);
     const auto previous = audio.getStatus();
     const auto previousWasSharedAsio = previous.deviceType.equalsIgnoreCase("ASIO")
         && previous.deviceName.containsIgnoreCase("KoordASIO");

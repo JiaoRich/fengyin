@@ -66,20 +66,14 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("nativeEvent('cancelCustomTone')", JS)
         self.assertNotIn('exportCurrentToneDiagnostic', MAIN)
 
-    def test_endpoint_switch_does_not_start_or_invalidate_tuning(self):
-        follow = AUDIO.split("bool AudioDeviceService::followSystemDefaultOutput()", 1)[1].split(
-            "bool AudioDeviceService::systemDefaultOutputChanged()", 1)[0]
-        self.assertNotIn("removeValue(\"automaticLatencyTunedDevice\")", follow)
-        timer = MAIN.split("if (++audioOutputSyncTicks", 1)[1].split("if (const auto tuningResult", 1)[0]
-        self.assertIn("if (! outputChanged", timer)
-        self.assertIn("audioHardwareIdentity", AUDIO)
+    def test_endpoint_switch_never_starts_tuning(self):
+        self.assertIn("followSystemAudioOutputIfNeeded();", MAIN)
+        self.assertNotIn("beginAutomaticLatencyTuning", MAIN)
+        self.assertNotIn("needsAutomaticLatencyTuning", AUDIO)
 
-    def test_audio_tuning_stops_for_real_performance_activity(self):
-        timer = MAIN.split("snapshot = midi.getSnapshot();", 1)[1].split("if (const auto tuningResult", 1)[0]
-        self.assertIn("snapshot.breath > 0.01f", timer)
-        self.assertIn("snapshot.lastNote >= 0", timer)
-        self.assertNotIn("snapshot.breath < 4", timer)
-        self.assertIn("cancelAutomaticLatencyTuning", timer)
+    def test_recording_success_has_no_video_quality_warning_text(self):
+        self.assertNotIn("部分画面可能不够流畅", JS)
+        self.assertNotIn("result.videoQualityWarning", JS)
 
     def test_pitch_wheel_is_not_scaled_by_saved_sensitivity(self):
         handler = MIDI.split("void MidiInputService::handleIncomingMidiMessage", 1)[1]
@@ -235,23 +229,17 @@ class HostRegressionTests(unittest.TestCase):
         self.assertNotIn("stabiliseAfterXRuns", audio_device)
         self.assertNotIn("candidate <= 1024", audio_device)
 
-    def test_first_run_audio_tuning_is_automatic_but_manual_controls_remain(self):
-        audio_header = (ROOT / "native" / "Source" / "AudioDeviceService.h").read_text(encoding="utf-8")
-        audio_device = (ROOT / "native" / "Source" / "AudioDeviceService.cpp").read_text(encoding="utf-8")
-        self.assertIn("beginAutomaticLatencyTuning", audio_header)
-        self.assertIn("pollAutomaticLatencyTuning", audio_header)
-        self.assertIn("latencyCandidateTestMs", audio_device)
-        self.assertIn("isWindowsSharedType", audio_device)
-        self.assertIn("Test only periods the active IAudioClient3 endpoint explicitly reports", audio_device)
-        self.assertIn("addedXRuns == 0", audio_device)
-        self.assertIn("tuningCandidateMaximumCpu < 0.65", audio_device)
-        self.assertIn("tuningCandidateMaximumCpu", audio_device)
-        self.assertIn('automaticLatencyTunedDevice', audio_device)
-        self.assertIn("pluginHost.setLatencyProbeActive(true)", MAIN)
-        self.assertIn("pluginHost.setLatencyProbeActive(false)", MAIN)
-        constructor = MAIN.split("MainComponent::MainComponent", 1)[1].split("MainComponent::~MainComponent", 1)[0]
-        self.assertNotIn("audio.beginAutomaticLatencyTuning();", constructor)
+    def test_automatic_tuning_removed_manual_controls_remain(self):
+        header = (ROOT / "native/Source/AudioDeviceService.h").read_text(encoding="utf-8")
+        host = (ROOT / "native/Source/PluginHostEngine.cpp").read_text(encoding="utf-8")
+        html = (ROOT / "prototype/index.html").read_text(encoding="utf-8")
+        for token in ("AutomaticLatencyTuning", "LatencyCandidate", "tuningActive"):
+            self.assertNotIn(token, header + AUDIO + MAIN)
+        self.assertNotIn("LatencyProbe", host)
+        self.assertNotIn("audio-optimization-dialog", html + JS)
+        self.assertNotIn("autoTuning", JS)
         self.assertIn('withEventListener("applyAudioSettings"', MAIN)
+        self.assertIn("audio.applyBestInitialSetup();", MAIN)
 
     def test_asio_panel_restores_audio_after_exit(self):
         source = (ROOT / "native/Source/AudioDeviceService.cpp").read_text(encoding="utf-8")

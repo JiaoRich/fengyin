@@ -12,8 +12,6 @@
 namespace
 {
 constexpr int currentAudioSetupRevision = 10;
-constexpr int currentTuningRevision = 8;
-constexpr double latencyCandidateTestMs = 3500.0;
 const auto engineModeName = juce::String::fromUTF8("风吟低延迟（ASIO4ALL）");
 
 bool isWindowsSharedType(const juce::String& typeName)
@@ -380,7 +378,6 @@ juce::String AudioDeviceService::configureAsio4All()
     if (auto* settings = properties.getUserSettings())
         resumeEngineBuffer = settings->getIntValue("audioEngineBuffer", 128);
     stopTimer();
-    tuningActive = false;
     manager.closeAudioDevice();
     engineProcess.stop();
     const auto executable = juce::File::getSpecialLocation(juce::File::currentExecutableFile)
@@ -532,9 +529,6 @@ juce::String AudioDeviceService::applyOutputSetup(const juce::String& outputName
     if (!engineProcess.isRunning() && isVirtualAudioOutput(outputName))
         return juce::String::fromUTF8("请选择实际扬声器或耳机，不能将虚拟线缆作为最终声音输出。");
    #endif
-    tuningActive = false;
-    tuningCandidates.clear();
-    tuningResults.clear();
    #if JUCE_WINDOWS
     if (engineProcess.isRunning())
     {
@@ -632,7 +626,7 @@ juce::String AudioDeviceService::applyBestInitialSetup()
     if (preferredType.isEmpty())
         preferredType = manager.getCurrentAudioDeviceType();
 
-    // 恢复 Windows 当前默认端点；低延迟验证另按物理声卡与驱动版本记录。
+    // 恢复 Windows 当前默认端点，保留已保存的声音设置。
     juce::String desiredSignature;
     if (auto* type = findType(preferredType))
     {
@@ -645,7 +639,7 @@ juce::String AudioDeviceService::applyBestInitialSetup()
     if (revision >= currentAudioSetupRevision && settings != nullptr && desiredSignature.isNotEmpty()
         && settings->getValue("automaticAudioDevice") == desiredSignature
         && currentDeviceSignature() == desiredSignature)
-        return juce::String::fromUTF8("已恢复自动优化的声音设置");
+        return juce::String::fromUTF8("已恢复声音设置");
 
     const auto fallbackType = manager.getCurrentAudioDeviceType();
     auto result = configureAutomaticType(preferredType);
@@ -735,8 +729,6 @@ juce::String AudioDeviceService::currentDeviceSignature() const
 bool AudioDeviceService::followSystemDefaultOutput()
 {
    #if JUCE_WINDOWS
-    if (tuningActive)
-        return false;
     auto* current = manager.getCurrentAudioDevice();
     if (current == nullptr || ! isWindowsSharedType(current->getTypeName()))
         return false;
@@ -785,7 +777,6 @@ bool AudioDeviceService::followSystemDefaultOutput()
 bool AudioDeviceService::systemDefaultOutputChanged()
 {
    #if JUCE_WINDOWS
-    if (tuningActive) return false;
     auto* current = manager.getCurrentAudioDevice();
     if (current == nullptr || ! isWindowsSharedType(current->getTypeName())) return false;
     auto* type = findType(manager.getCurrentAudioDeviceType());
@@ -800,57 +791,8 @@ bool AudioDeviceService::systemDefaultOutputChanged()
    #endif
 }
 
-juce::String AudioDeviceService::optimiseForLivePerformance()
-{
-    auto* device = manager.getCurrentAudioDevice();
-    if (device == nullptr || ! device->isOpen())
-        return juce::String::fromUTF8("声音设备尚未准备好");
-
-   #if JUCE_WINDOWS
-    // 优先进入 IAudioClient3 支持的 Windows 共享低延迟类型。
-    {
-        const auto preferredType = preferredLiveDeviceType();
-        if (preferredType.isNotEmpty() && preferredType != manager.getCurrentAudioDeviceType())
-        {
-            if (const auto error = configureAutomaticType(preferredType); error.isNotEmpty())
-                return error;
-            device = manager.getCurrentAudioDevice();
-            if (device == nullptr || ! device->isOpen())
-                return juce::String::fromUTF8("低延迟声音驱动打开失败");
-        }
-    }
-   #endif
-
-    auto setup = manager.getAudioDeviceSetup();
-    setup.inputDeviceName.clear();
-    setup.useDefaultInputChannels = false;
-    setup.useDefaultOutputChannels = true;
-
-    setup.sampleRate = sharedMixRate(*device);
-    setup.bufferSize = minimumLegalBuffer(device->getAvailableBufferSizes(),
-                                          device->getCurrentBufferSizeSamples());
-
-    lastError = manager.setAudioDeviceSetup(setup, true);
-    observedXRunCount = manager.getXRunCount();
-    unstablePolls = 0;
-    if (lastError.isNotEmpty())
-        return lastError;
-    if (auto* settings = properties.getUserSettings())
-    {
-        settings->setValue("audioSetupMode", "automatic");
-        settings->setValue("automaticAudioDevice", currentDeviceSignature());
-        settings->setValue("audioSetupRevision", currentAudioSetupRevision);
-    }
-    saveSettings();
-    const auto applied = getStatus();
-    return juce::String::fromUTF8("实时演奏模式已启用：") + applied.deviceType + "、"
-         + juce::String(juce::roundToInt(applied.sampleRate)) + " Hz、缓冲区 "
-         + juce::String(applied.bufferSize) + juce::String::fromUTF8(" 采样");
-}
-
 bool AudioDeviceService::hasSustainedRuntimeInstability()
 {
-    if (tuningActive) return false;
     auto* device = manager.getCurrentAudioDevice();
     if (device == nullptr || ! device->isOpen()) return false;
     const auto xruns = manager.getXRunCount();
@@ -867,236 +809,11 @@ bool AudioDeviceService::hasSustainedRuntimeInstability()
     return true;
 }
 
-bool AudioDeviceService::needsAutomaticLatencyTuning()
-{
-    if (engineProcess.isRunning()) return false;
-    auto* settings = properties.getUserSettings();
-    if (settings == nullptr || settings->getValue("audioSetupMode") == "manual")
-        return false;
-    const auto identity = tuningIdentity();
-    if (identity.isEmpty() || identity == attemptedTuningIdentity) return false;
-    return settings->getIntValue("audioTuningRevision", 0) < currentTuningRevision
-        || settings->getValue("audioTunedHardware") != identity;
-}
-
-juce::String AudioDeviceService::tuningIdentity()
-{
-    const auto now = juce::Time::getMillisecondCounterHiRes();
-    if (now - hardwareIdentityCheckedAt > 10000.0)
-    {
-        cachedHardwareIdentity = audioHardwareIdentity();
-        hardwareIdentityCheckedAt = now;
-    }
-    return cachedHardwareIdentity.isEmpty() ? juce::String()
-        : manager.getCurrentAudioDeviceType() + "|" + cachedHardwareIdentity;
-}
-
-double AudioDeviceService::getTuningProgress() const noexcept
-{
-    if (! tuningActive || tuningCandidates.empty()) return 0.0;
-    const auto fraction = juce::jlimit(0.0, 1.0,
-        (juce::Time::getMillisecondCounterHiRes() - tuningCandidateStartedAtMs) / latencyCandidateTestMs);
-    return juce::jlimit(0.0, 0.99, (tuningCandidateIndex + fraction) / static_cast<double>(tuningCandidates.size()));
-}
-
-void AudioDeviceService::cancelAutomaticLatencyTuning()
-{
-    if (! tuningActive) return;
-    tuningActive = false;
-    (void) applyLatencyCandidate({ tuningFallbackType, tuningFallbackOutput, tuningFallbackBuffer, 0 });
-    tuningCandidates.clear();
-    tuningCandidateIndex = -1;
-}
-
 bool AudioDeviceService::isAutomaticMode()
 {
     if (auto* settings = properties.getUserSettings())
         return settings->getValue("audioSetupMode") != "manual";
     return true;
-}
-
-void AudioDeviceService::buildLatencyCandidates()
-{
-    tuningCandidates.clear();
-    auto add = [this](const juce::String& typeName, const juce::String& outputName,
-                      int preferredBuffer, int priority)
-    {
-        if (typeName.isEmpty() || outputName.isEmpty()) return;
-        for (const auto& existing : tuningCandidates)
-            if (existing.typeName == typeName && existing.outputName == outputName
-                && existing.preferredBuffer == preferredBuffer) return;
-        tuningCandidates.push_back({ typeName, outputName, preferredBuffer, priority });
-    };
-
-    const auto current = getStatus();
-    if (! current.ready) return;
-    auto legal = sortedLegalBuffers(getAvailableBufferSizes());
-    if (legal.isEmpty())
-    {
-        add(current.deviceType, current.deviceName, current.bufferSize, 0);
-        return;
-    }
-    // Test only periods the active IAudioClient3 endpoint explicitly reports.
-    // Never label a larger driver period as "128", and never add a hidden 512/1024 fallback.
-    add(current.deviceType, current.deviceName, legal.getFirst(), 0);
-    for (const auto size : legal)
-        if (size > legal.getFirst() && size <= 256)
-            add(current.deviceType, current.deviceName, size, 1);
-}
-
-bool AudioDeviceService::applyLatencyCandidate(const LatencyCandidate& candidate)
-{
-    manager.setCurrentAudioDeviceType(candidate.typeName, true);
-    if (manager.getCurrentAudioDeviceType() != candidate.typeName)
-        return false;
-
-    auto setup = manager.getAudioDeviceSetup();
-    setup.outputDeviceName = candidate.outputName;
-    setup.inputDeviceName.clear();
-    setup.useDefaultInputChannels = false;
-    setup.useDefaultOutputChannels = true;
-    if (auto* device = manager.getCurrentAudioDevice())
-    {
-        setup.sampleRate = sharedMixRate(*device);
-        const auto legal = sortedLegalBuffers(device->getAvailableBufferSizes());
-        if (! legal.isEmpty() && ! legal.contains(candidate.preferredBuffer))
-            return false;
-        setup.bufferSize = candidate.preferredBuffer;
-    }
-    else
-    {
-        setup.sampleRate = 48000.0;
-        setup.bufferSize = candidate.preferredBuffer;
-    }
-    lastError = manager.setAudioDeviceSetup(setup, true);
-    const auto status = getStatus();
-    return lastError.isEmpty() && status.ready && status.bufferSize == candidate.preferredBuffer;
-}
-
-bool AudioDeviceService::startNextLatencyCandidate()
-{
-    while (++tuningCandidateIndex < static_cast<int>(tuningCandidates.size()))
-    {
-        if (! applyLatencyCandidate(tuningCandidates[static_cast<size_t>(tuningCandidateIndex)]))
-            continue;
-        tuningCandidateStartedAtMs = juce::Time::getMillisecondCounterHiRes();
-        startCallbacks = probeCallbacks;
-        startOverruns = probeOverruns;
-        startSignals = probeSignals;
-        tuningCandidateStartXRuns = juce::jmax(0, manager.getXRunCount());
-        tuningCandidateMaximumCpu = manager.getCpuUsage();
-        return true;
-    }
-    return false;
-}
-
-bool AudioDeviceService::beginAutomaticLatencyTuning(bool force)
-{
-    if (asioPanelOpen) return false;
-    if (engineProcess.isRunning()) return false;
-    if (tuningActive) return false;
-    auto* settings = properties.getUserSettings();
-    if (! force && ! needsAutomaticLatencyTuning()) return false;
-    if (force && settings != nullptr)
-        settings->setValue("audioSetupMode", "automatic");
-
-    const auto fallback = getStatus();
-    tuningFallbackType = fallback.deviceType;
-    tuningFallbackOutput = fallback.deviceName;
-    tuningFallbackRate = fallback.sampleRate;
-    tuningFallbackBuffer = fallback.bufferSize;
-    if (force)
-    {
-        const auto preferred = preferredLiveDeviceType();
-        if (preferred.isNotEmpty() && preferred != fallback.deviceType)
-            if (configureAutomaticType(preferred).isNotEmpty()) return false;
-    }
-    attemptedTuningIdentity = tuningIdentity();
-    tuningResults.clear();
-    tuningCandidateIndex = -1;
-    buildLatencyCandidates();
-    if (tuningCandidates.empty()) return false;
-    tuningActive = true;
-    if (! startNextLatencyCandidate())
-    {
-        tuningActive = false;
-        return false;
-    }
-    return true;
-}
-
-std::optional<juce::String> AudioDeviceService::pollAutomaticLatencyTuning()
-{
-    if (! tuningActive) return std::nullopt;
-    tuningCandidateMaximumCpu = juce::jmax(tuningCandidateMaximumCpu, manager.getCpuUsage());
-    if (juce::Time::getMillisecondCounterHiRes() - tuningCandidateStartedAtMs < latencyCandidateTestMs)
-        return std::nullopt;
-
-    const auto status = getStatus();
-    const auto xrunsNow = manager.getXRunCount();
-    const auto addedXRuns = xrunsNow < 0 ? 0 : juce::jmax(0, xrunsNow - tuningCandidateStartXRuns);
-    // 留出至少约 35% 实时音频余量，避免用户开始播放伴奏后才暴露丢音。
-    const auto stable = status.ready && addedXRuns == 0 && tuningCandidateMaximumCpu < 0.65
-        && probeCallbacks > startCallbacks + 20 && probeSignals > startSignals + 5
-        && probeOverruns == startOverruns;
-    const auto score = status.estimatedBufferLatencyMs
-        + tuningCandidateMaximumCpu * 10.0
-        + static_cast<double>(tuningCandidates[static_cast<size_t>(tuningCandidateIndex)].priority) * 0.15
-        + (stable ? 0.0 : 1000.0);
-    tuningResults.push_back({ tuningCandidates[static_cast<size_t>(tuningCandidateIndex)], status,
-                              tuningCandidateMaximumCpu, addedXRuns, stable, score });
-    if (startNextLatencyCandidate()) return std::nullopt;
-    return finishAutomaticLatencyTuning();
-}
-
-juce::String AudioDeviceService::finishAutomaticLatencyTuning()
-{
-    const LatencyResult* best = nullptr;
-    for (const auto& result : tuningResults)
-        if (result.status.ready && result.stable && (best == nullptr || result.score < best->score)) best = &result;
-
-    bool restoredFallback = false;
-    if (best != nullptr)
-    {
-        if (! applyLatencyCandidate({ best->candidate.typeName, best->candidate.outputName,
-                                      best->status.bufferSize, best->candidate.priority })) best = nullptr;
-        else restoredFallback = true;
-    }
-    if (best == nullptr && tuningFallbackType.isNotEmpty())
-    {
-        restoredFallback = applyLatencyCandidate({ tuningFallbackType, tuningFallbackOutput,
-                                                   tuningFallbackBuffer, 9 });
-        if (restoredFallback && tuningFallbackRate > 0.0)
-        {
-            auto setup = manager.getAudioDeviceSetup();
-            setup.sampleRate = tuningFallbackRate;
-            (void) manager.setAudioDeviceSetup(setup, true);
-        }
-    }
-
-    tuningActive = false;
-    tuningCandidates.clear();
-    tuningCandidateIndex = -1;
-    const auto applied = getStatus();
-    observedXRunCount = juce::jmax(0, manager.getXRunCount());
-    unstablePolls = 0;
-    if (best == nullptr && ! restoredFallback)
-        return juce::String::fromUTF8("未找到可用的声音输出，请检查耳机或音响");
-    if (best != nullptr)
-      if (auto* settings = properties.getUserSettings())
-    {
-        settings->setValue("audioSetupMode", "automatic");
-        settings->setValue("automaticAudioDevice", currentDeviceSignature());
-        settings->setValue("automaticLatencyTunedDevice", currentDeviceSignature());
-        settings->setValue("audioTunedHardware", tuningIdentity());
-        settings->setValue("audioTuningRevision", currentTuningRevision);
-        settings->setValue("audioSetupRevision", currentAudioSetupRevision);
-    }
-    saveSettings();
-    if (best == nullptr)
-        return juce::String::fromUTF8("未通过稳定性验证，未保存为已优化；请调整缓冲后重试");
-    return juce::String::fromUTF8("声音已自动优化，可以开始吹奏（预计延迟 ")
-         + juce::String(applied.estimatedBufferLatencyMs, 1) + " ms）";
 }
 
 void AudioDeviceService::saveSettings()

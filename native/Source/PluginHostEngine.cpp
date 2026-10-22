@@ -141,57 +141,6 @@ void RecordingAudioProcessorPlayer::addResetMessages(double timestampSeconds)
     sendPerformanceReset(kongResetMode.load(std::memory_order_acquire), send);
 }
 
-void RecordingAudioProcessorPlayer::setLatencyProbeActive(bool active) noexcept
-{
-    latencyProbeActive.store(active, std::memory_order_release);
-    if (active)
-    {
-        probeSamplesUntilChange = 0;
-        probeNoteIsOn = false;
-        probeNoteIndex = 0;
-        probeCurrentNote = 67;
-    }
-    if (! active)
-        requestPerformanceReset();
-}
-
-void RecordingAudioProcessorPlayer::addLatencyProbeMessages(int numSamples, double timestampSeconds)
-{
-    probeSamplesUntilChange -= numSamples;
-    auto& collector = getMidiMessageCollector();
-    auto send = [&collector, timestampSeconds](juce::MidiMessage message)
-    {
-        message.setTimeStamp(timestampSeconds);
-        collector.addMessageToQueue(message);
-    };
-
-    const auto phase = 1.0 - juce::jlimit(0.0, 1.0,
-        static_cast<double>(juce::jmax(0, probeSamplesUntilChange)) / (currentSampleRate * 0.8));
-    const auto breath = juce::jlimit(18, 105, 18 + juce::roundToInt(87.0 * phase));
-    send(juce::MidiMessage::controllerEvent(1, 11, breath));
-    send(juce::MidiMessage::controllerEvent(1, 2, breath));
-    send(juce::MidiMessage::controllerEvent(1, 1, breath));
-
-    if (probeSamplesUntilChange > 0)
-        return;
-    probeNoteIsOn = ! probeNoteIsOn;
-    if (probeNoteIsOn)
-    {
-        // Cover low, middle and high mappings. Container sample players may
-        // expose a narrow playable range or map percussion to only part of the
-        // keyboard, so probing only G4 can incorrectly report silence.
-        static constexpr std::array<int, 6> probeNotes { 48, 55, 60, 67, 72, 79 };
-        probeCurrentNote = probeNotes[static_cast<size_t>(probeNoteIndex++ % static_cast<int>(probeNotes.size()))];
-        send(juce::MidiMessage::noteOn(1, probeCurrentNote, static_cast<juce::uint8>(82)));
-        probeSamplesUntilChange = juce::roundToInt(currentSampleRate * 0.8);
-    }
-    else
-    {
-        send(juce::MidiMessage::noteOff(1, probeCurrentNote));
-        probeSamplesUntilChange = juce::roundToInt(currentSampleRate * 0.15);
-    }
-}
-
 class PluginHostEngine::PluginEditorWindow final : public juce::DocumentWindow
 {
 public:
@@ -252,9 +201,6 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
         onsetTrace.record(message, event.timestampSeconds);
         getMidiMessageCollector().addMessageToQueue(message);
     }
-    const auto probing = latencyProbeActive.load(std::memory_order_acquire);
-    if (probing)
-        addLatencyProbeMessages(numSamples, nowSeconds);
     midiTime.finish();
 
     {
@@ -297,10 +243,6 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
         stageTiming.record(AudioStageTiming::accompaniment,afterAccompaniment-afterInstrument,budget);
         stageTiming.record(AudioStageTiming::master,afterMaster-afterAccompaniment,budget);
     }
-    if (probing)
-        for (int channel = 0; channel < numOutputs; ++channel)
-            if (outputs[channel] != nullptr)
-                juce::FloatVectorOperations::clear(outputs[channel], numSamples);
     if (recorder != nullptr)
         recorder->push(outputs, numOutputs, numSamples);
     callbackCount.fetch_add(1, std::memory_order_relaxed);
@@ -362,10 +304,6 @@ void RecordingAudioProcessorPlayer::audioDeviceAboutToStart(juce::AudioIODevice*
     getMidiMessageCollector().ensureStorageAllocated(256 * 1024);
     currentSampleRate = device != nullptr && device->getCurrentSampleRate() > 0.0
         ? device->getCurrentSampleRate() : 48000.0;
-    probeSamplesUntilChange = 0;
-    probeNoteIsOn = false;
-    probeNoteIndex = 0;
-    probeCurrentNote = 67;
     if (accompaniment != nullptr && device != nullptr)
         accompaniment->prepare(device->getCurrentSampleRate(), device->getCurrentBufferSizeSamples());
     if (masterOutput != nullptr && device != nullptr)

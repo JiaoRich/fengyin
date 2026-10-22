@@ -45,7 +45,6 @@ public:
     void setRecordingService(RecordingService* service) noexcept { recorder = service; }
     void setAccompanimentService(AccompanimentAudioService* service) noexcept { accompaniment = service; }
     void setMasterOutputService(MasterOutputService* service) noexcept { masterOutput = service; }
-    void setLatencyProbeActive(bool active) noexcept;
     bool enqueueMidi(const juce::MidiMessage& message, double timestampSeconds) noexcept;
     void beginOnsetTrace() noexcept { onsetTrace.begin(); }
     void flushOnsetTrace() { onsetTrace.flush("audio-collector"); }
@@ -69,16 +68,10 @@ private:
     static constexpr std::size_t midiQueueSize = 8192;
     MidiOnsetTrace onsetTrace;
     void addResetMessages(double timestampSeconds);
-    void addLatencyProbeMessages(int numSamples, double timestampSeconds);
 
     OrderedMidiQueue<midiQueueSize> midiQueue;
     std::atomic<bool> resetRequested { false };
     std::atomic<bool> kongResetMode { false };
-    std::atomic<bool> latencyProbeActive { false };
-    int probeSamplesUntilChange = 0;
-    bool probeNoteIsOn = false;
-    int probeNoteIndex = 0;
-    int probeCurrentNote = 67;
     double currentSampleRate = 48000.0;
     RecordingService* recorder = nullptr;
     AccompanimentAudioService* accompaniment = nullptr;
@@ -135,7 +128,6 @@ public:
     bool isStageTimingEnabled() const noexcept {return player.timingEnabled;}
     void setAccompanimentService(AccompanimentAudioService* service) noexcept { player.setAccompanimentService(service); }
     void setMasterOutputService(MasterOutputService* service) noexcept { player.setMasterOutputService(service); }
-    void setLatencyProbeActive(bool active) noexcept { player.setLatencyProbeActive(active); }
     [[nodiscard]] uint64_t getDroppedMidiEventCount() const noexcept { return player.getDroppedMidiEventCount(); }
     [[nodiscard]] uint64_t getCallbackCount() const noexcept { return player.callbackCount.load(); }
     [[nodiscard]] uint64_t getCallbackOverruns() const noexcept { return player.callbackOverruns.load(); }
