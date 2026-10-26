@@ -11,7 +11,6 @@
 #include "ScopedGraphPause.h"
 #include "KongInstrumentCatalog.h"
 #include "KongProjectFile.h"
-#include "KongTechniqueMap.h"
 #include "KongPerformancePolicy.h"
 #include "BendRangeParameters.h"
 #include "PerformanceReset.h"
@@ -425,7 +424,7 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
             auto processingGraph = std::make_unique<TechniqueProcessingGraph>();
             processingGraph->applyTechniqueValues = [this] { flushTechniqueValues(); };
             processingGraph->transformPerformanceMidi = [this](juce::MidiBuffer& messages,int count,double rate) {
-                suonaDualVoice.process(messages,count,rate);
+                juce::ignoreUnused(count);
                 const double now = juce::Time::getMillisecondCounterHiRes() * .001;
                 for (const auto event : messages)
                     destinationTrace.record(event.getMessage(), now + event.samplePosition / juce::jmax(1.0,rate));
@@ -582,7 +581,10 @@ void PluginHostEngine::unload()
     midiInputNode = nullptr;
     graph.reset();
     currentDescription = {};
-    suonaDualVoice.configure(false);
+    {
+        const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
+        kongDualSlot.configure(false);
+    }
     kontaktStandardControls.store(false);
     stringTremolo.clear();
     for (auto& parameter : techniqueParameters) parameter.store(nullptr);
@@ -1113,34 +1115,18 @@ void PluginHostEngine::noteOn(int noteNumber, float velocity, double timestampSe
     velocity = performanceVelocity(kong, velocity);
     if (kong)
     {
-        queue(kongBreathExpression(performanceChannel.load(std::memory_order_relaxed),
+        queueKongPerformance(kongBreathExpression(performanceChannel.load(std::memory_order_relaxed),
             lastBreathMidiValue.load(std::memory_order_relaxed)), timestampSeconds);
         if(kongVibratoCC.load()==1)
-            queue(juce::MidiMessage::controllerEvent(performanceChannel.load(),1,
+            queueKongPerformance(juce::MidiMessage::controllerEvent(performanceChannel.load(),1,
                 juce::roundToInt(kongTechniqueInputs[static_cast<size_t>(PerformanceTechnique::vibrato)].load()*127.f)),timestampSeconds);
-        bool playing = false;
-        for (const auto& held : activeNotes) playing |= held.load(std::memory_order_relaxed);
-        if (!playing)
-            for (int channel = 1; channel <= 16; ++channel)
-            {
-                int selected = -1;
-                for (const auto& route : kongTechniqueRoutes)
-                    if (route.channel == channel && route.normalKey >= 0) { selected = route.normalKey; break; }
-                for (size_t i = 0; i < kongTechniqueRoutes.size(); ++i)
-                    if (kongTechniqueRoutes[i].channel == channel && kongTechniqueRoutes[i].keyswitch >= 0
-                        && kongTechniqueInputs[i].load(std::memory_order_relaxed) > 0.5f)
-                        selected = kongTechniqueRoutes[i].keyswitch;
-                if (selected >= 0)
-                {
-                    queue(juce::MidiMessage::noteOn(channel, selected, static_cast<juce::uint8>(100)), timestampSeconds);
-                    queue(juce::MidiMessage::noteOff(channel, selected), timestampSeconds);
-                }
-            }
     }
     activeNotes[static_cast<size_t>(note)].store(true, std::memory_order_relaxed);
     activeVelocities[static_cast<size_t>(note)].store(juce::jlimit(0.0f, 1.0f, velocity), std::memory_order_relaxed);
-    queue(juce::MidiMessage::noteOn(performanceChannel.load(std::memory_order_relaxed), note,
-                                    juce::jlimit(0.0f, 1.0f, velocity)), timestampSeconds);
+    const auto message = juce::MidiMessage::noteOn(performanceChannel.load(std::memory_order_relaxed), note,
+                                                 juce::jlimit(0.0f, 1.0f, velocity));
+    if (kong) queueKongPerformance(message, timestampSeconds);
+    else queue(message, timestampSeconds);
 }
 
 void PluginHostEngine::noteOff(int noteNumber, double timestampSeconds) noexcept
@@ -1148,20 +1134,16 @@ void PluginHostEngine::noteOff(int noteNumber, double timestampSeconds) noexcept
     const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
     const auto note = juce::jlimit(0, 127, noteNumber);
     activeNotes[static_cast<size_t>(note)].store(false, std::memory_order_relaxed);
-    queue(juce::MidiMessage::noteOff(performanceChannel.load(std::memory_order_relaxed), note), timestampSeconds);
+    const auto message = juce::MidiMessage::noteOff(performanceChannel.load(std::memory_order_relaxed), note);
+    if (kongExpressionMode.load()) queueKongPerformance(message, timestampSeconds);
+    else queue(message, timestampSeconds);
     if (kongExpressionMode.load(std::memory_order_relaxed))
     {
         bool playing = false;
         for (const auto& held : activeNotes) playing |= held.load(std::memory_order_relaxed);
         // End the phrase, not each articulation change. Clear any sampler-held
         // notes in all configured slots without resetting pitch or effect tails.
-        if (!playing)
-            for (int channel = 1; channel <= 16; ++channel)
-            {
-                bool used = channel == performanceChannel.load(std::memory_order_relaxed);
-                for (const auto& route : kongTechniqueRoutes) used |= route.channel == channel;
-                if (used) queue(juce::MidiMessage::allNotesOff(channel), timestampSeconds);
-            }
+        if (!playing) queueKongPerformance(juce::MidiMessage::allNotesOff(1), timestampSeconds);
     }
 }
 
@@ -1176,7 +1158,7 @@ void PluginHostEngine::breathChanged(float value, double timestampSeconds) noexc
     // SWAM and is the main cause of plateaus and conflicting expression curves.
     const auto channel = performanceChannel.load(std::memory_order_relaxed);
     if (kongExpressionMode.load(std::memory_order_relaxed))
-        queue(kongBreathExpression(channel, midiValue), timestampSeconds);
+        queueKongPerformance(kongBreathExpression(channel, midiValue), timestampSeconds);
     else
         queue(juce::MidiMessage::controllerEvent(swamExpressionChannel.load(std::memory_order_relaxed),
             swamExpressionController.load(std::memory_order_relaxed), midiValue), timestampSeconds);
@@ -1189,7 +1171,9 @@ void PluginHostEngine::pitchBendChanged(float bipolarValue, double timestampSeco
         juce::roundToInt(8192.0f + juce::jlimit(-1.0f, 1.0f, bipolarValue)
                          * (bipolarValue < 0.0f ? 8192.0f : 8191.0f)));
     lastPitchWheel.store(pitch, std::memory_order_relaxed);
-    queue(juce::MidiMessage::pitchWheel(performanceChannel.load(std::memory_order_relaxed), pitch), timestampSeconds);
+    const auto message = juce::MidiMessage::pitchWheel(performanceChannel.load(std::memory_order_relaxed), pitch);
+    if (kongExpressionMode.load()) queueKongPerformance(message, timestampSeconds);
+    else queue(message, timestampSeconds);
 }
 
 void PluginHostEngine::prepareTempoVibrato(juce::AudioPluginInstance& plugin)
@@ -1253,59 +1237,15 @@ void PluginHostEngine::routeTechnique(PerformanceTechnique technique, float valu
     }
     if (kongExpressionMode.load(std::memory_order_relaxed))
     {
-        const auto previous = kongTechniqueInputs[index].exchange(safeValue, std::memory_order_relaxed);
-        if (suonaDualVoice.active() && technique==PerformanceTechnique::flutter) {
-            suonaDualVoice.setFlutter(safeValue>.5f);
-            return;
+        kongTechniqueInputs[index].store(safeValue, std::memory_order_relaxed);
+        if (technique == PerformanceTechnique::vibrato) {
+            if (kongVibratoCC.load() == 1)
+                queueKongPerformance(juce::MidiMessage::controllerEvent(1, 1,
+                    juce::roundToInt(safeValue * 127.f)), 0.0);
+        } else if (technique == PerformanceTechnique::flutter) {
+            kongDualSlot.setTechnique(safeValue > .5f,
+                [this](const auto& message) { queue(message, 0.0); });
         }
-        if(kongProfile.enabled && technique==PerformanceTechnique::vibrato) {
-            if(kongVibratoCC.load()==1)
-                queue(juce::MidiMessage::controllerEvent(performanceChannel.load(),1,juce::roundToInt(safeValue*127.f)),0.0);
-            return; // Continuous modulation, never a vibrato keyswitch/restart.
-        }
-        const auto route = kongTechniqueRoutes[index];
-        // A secondary slot already contains its chosen articulation. On
-        // release, switch back without restarting the outgoing technique slot.
-        if (route.keyswitch >= 0 && (route.channel <= 1 || safeValue > 0.5f)
-            && (previous <= 0.5f) != (safeValue <= 0.5f))
-        {
-            int selected = route.normalKey;
-            for (size_t i = 0; i < kongTechniqueRoutes.size(); ++i)
-                if (kongTechniqueRoutes[i].channel == route.channel
-                    && kongTechniqueRoutes[i].keyswitch >= 0
-                    && kongTechniqueInputs[i].load(std::memory_order_relaxed) > 0.5f)
-                    selected = kongTechniqueRoutes[i].keyswitch;
-            if (selected >= 0)
-            {
-                // An inactive destination slot needs its articulation selected
-                // before switchPerformanceChannel starts the held note there.
-                if (performanceChannel.load(std::memory_order_relaxed) != route.channel)
-                {
-                    bool playing = false;
-                    for (const auto& held : activeNotes) playing |= held.load(std::memory_order_relaxed);
-                    if (playing)
-                    {
-                        queue(juce::MidiMessage::noteOn(route.channel, selected, static_cast<juce::uint8>(100)), 0.0);
-                        queue(juce::MidiMessage::noteOff(route.channel, selected), 0.0);
-                    }
-                }
-                changeKongArticulation(route.channel, selected,
-                    [this, &route](int note) { return performanceChannel.load(std::memory_order_relaxed) == route.channel
-                        && activeNotes[static_cast<size_t>(note)].load(std::memory_order_relaxed); },
-                    [this](const auto& message) { queue(message, 0.0); },
-                    [this](int note) { return activeVelocities[static_cast<size_t>(note)].load(std::memory_order_relaxed); });
-            }
-        }
-        if (route.channel > 1)
-        {
-            int desired = 1;
-            for (size_t routeIndex = 0; routeIndex < kongTechniqueRoutes.size(); ++routeIndex)
-                if (kongTechniqueRoutes[routeIndex].channel > desired
-                    && kongTechniqueInputs[routeIndex].load(std::memory_order_relaxed) > 0.5f)
-                    desired = kongTechniqueRoutes[routeIndex].channel;
-            switchPerformanceChannel(desired);
-        }
-        // Never fall through to guessed generic parameters for unsupported Qin techniques.
         return;
     }
     techniqueValues[index].store(safeValue, std::memory_order_relaxed);
@@ -1336,99 +1276,59 @@ void PluginHostEngine::routeTechnique(PerformanceTechnique technique, float valu
     techniqueDirty[index].store(true, std::memory_order_release);
 }
 
-void PluginHostEngine::switchPerformanceChannel(int channel) noexcept
-{
-    channel = juce::jlimit(1, 16, channel);
-    const auto previous = performanceChannel.exchange(channel, std::memory_order_relaxed);
-    if (previous == channel) return;
-    const auto breathValue = juce::jmax(0, lastBreathMidiValue.load(std::memory_order_relaxed));
-    changeKongChannel(previous, channel, breathValue, lastPitchWheel.load(std::memory_order_relaxed),
-        [this](int note) { return activeNotes[static_cast<size_t>(note)].load(std::memory_order_relaxed); },
-        [this](const auto& message) { queue(message, 0.0); },
-        [this](int note) { return activeVelocities[static_cast<size_t>(note)].load(std::memory_order_relaxed); },
-        kongVibratoCC.load()==1 ? juce::roundToInt(kongTechniqueInputs[static_cast<size_t>(PerformanceTechnique::vibrato)].load()*127.f) : -1);
-}
-
 void PluginHostEngine::configureKongTechniqueProfile(const juce::String& key,const KongTechniqueProfile& profile) noexcept
 {
-    const auto state=key.isEmpty()?juce::MemoryBlock():captureContainerState();
-    const auto tree=KongProjectFile::readPluginComponentState(state);
+    const auto state = key.isEmpty() ? juce::MemoryBlock() : captureContainerState();
+    const auto tree = KongProjectFile::readPluginComponentState(state);
     const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
-    kongProfile=profile;
-    suonaDualVoice.configure(false);
+    kongDualSlot.reset([this](const auto& message) { queue(message, 0.0); });
+    kongDualSlot.configure(false);
+    kongProfile = profile;
     kongVibratoCC.store(-1);
-    for (auto& route : kongTechniqueRoutes) route = {};
     for (auto& value : kongTechniqueInputs) value.store(0.0f, std::memory_order_relaxed);
-    switchPerformanceChannel(1);
+    performanceChannel.store(1, std::memory_order_relaxed);
     if (key.isEmpty()) return;
     player.beginOnsetTrace();
     destinationTrace.begin();
-    juce::Logger::writeToLog("ONSET begin 30s bounded capture: " + key);
-    if (!tree.isValid() || tree.getChildWithName("PresetList").getNumChildren()==0)
-    {
-        juce::Logger::writeToLog("Kong technique binding failed: unsupported state; instrument=" + key);
+    const auto slots = tree.getChildWithName("PresetList");
+    if (!tree.isValid() || slots.getNumChildren() == 0) {
+        juce::Logger::writeToLog("Qin channel routing unavailable: unsupported state; instrument=" + key);
         return;
     }
-    if(profile.enabled) {
-        // Exact verified two-slot articulation pair only; other/custom suona
-        // packages keep established routing. Environment switch is diagnostic
-        // rollback, not a new user-facing configuration requirement.
-        const auto slots=tree.getChildWithName("PresetList");
-        bool main=false,flutter=false;
-        for(auto slot:slots){const auto text=slot.toXmlString();
-            main|=int(slot.getProperty("MIDI",0))==0 && text.contains("Suona2_Main_Layers");
-            flutter|=int(slot.getProperty("MIDI",0))==1 && text.contains("Suona2_Flutter");}
-        suonaDualVoice.configure((key=="kong-suona" || key=="kong-suona-2") && slots.getNumChildren()==2 && profile.otherChannel==2 && main && flutter
-            && juce::SystemStats::getEnvironmentVariable("FENGYIN_SUONA_LEGACY","0")!="1");
-        if (key=="kong-suona" || key=="kong-suona-2")
-        {
-            juce::Logger::writeToLog("Suona dual route=" + juce::String(suonaDualVoice.active() ? "enabled" : "legacy")
-                + " slots=" + juce::String(slots.getNumChildren()) + " main=" + juce::String(main ? 1 : 0)
-                + " flutter=" + juce::String(flutter ? 1 : 0) + " otherChannel=" + juce::String(profile.otherChannel));
-            for (auto slot : slots)
-                juce::Logger::writeToLog("Suona slot ch=" + juce::String(int(slot.getProperty("MIDI",0))+1)
-                    + " preset=" + slot.getProperty("Preset").toString());
-        }
-        if(profile.vibratoCC==1) {
-            kongVibratoCC.store(1);
-            for(auto slot:tree.getChildWithName("PresetList")) {
-                const int channel=int(slot.getProperty("MIDI",0))+1;
-                if(channel>=1&&channel<=16)queue(juce::MidiMessage::controllerEvent(channel,1,0),0.0);
-            }
-        }
-        const auto target=simpleOther(key.toStdString());
-        if(target!=PerformanceTechnique::count && profile.otherChannel>0) {
-            const auto binding=findKongTechniqueAt(tree,profile.otherChannel,profile.otherKeyswitchIndex);
-            kongTechniqueRoutes[static_cast<size_t>(target)]={binding.channel,binding.keyswitch,binding.normalKey};
-            if(binding.channel==0) juce::Logger::writeToLog("Explicit Qin technique binding rejected: "+key);
-        }
-        return;
+    int mainSlots = 0, techniqueSlots = 0;
+    bool otherChannels = false;
+    for (auto slot : slots) {
+        const int channel = int(slot.getProperty("MIDI", -1)) + 1;
+        if (channel == 1) ++mainSlots;
+        else if (channel == 2) ++techniqueSlots;
+        else otherChannels = true;
     }
-    const auto bind = [this, &tree](PerformanceTechnique technique, const juce::StringArray& names)
-    {
-        const auto binding = findKongTechnique(tree, names);
-        kongTechniqueRoutes[static_cast<size_t>(technique)] = {binding.channel, binding.keyswitch, binding.normalKey};
-    };
-    // Older/custom Qin packages have no explicit route metadata. Their
-    // continuous vibrato uses the same native CC1 as the verified new packs,
-    // never a Vib_Main/Vib_Mellow sample keyswitch and held-note restart.
-    if(simpleVibrato(key.toStdString())) {
+    // One shared CH1/CH2 contract. Never infer a preset, library or keyswitch
+    // from an instrument name; restore the tuner's saved selection as-is.
+    const bool dual = mainSlots == 1 && techniqueSlots == 1 && !otherChannels;
+    kongDualSlot.configure(dual);
+    kongProfile.enabled = true;
+    kongProfile.otherChannel = dual ? 2 : 0;
+    kongProfile.otherKeyswitchIndex = -1;
+    // Preserve verified continuous-vibrato capability separately from the gate.
+    if ((profile.enabled && profile.vibratoCC == 1)
+        || (!profile.enabled && simpleVibrato(key.toStdString()))) {
         kongVibratoCC.store(1);
-        for(auto slot:tree.getChildWithName("PresetList")) {
-            const int channel=int(slot.getProperty("MIDI",0))+1;
-            if(channel>=1&&channel<=16)queue(juce::MidiMessage::controllerEvent(channel,1,0),0.0);
+        for (auto slot : slots) {
+            const int channel = int(slot.getProperty("MIDI", -1)) + 1;
+            if (channel >= 1 && channel <= 16)
+                queue(juce::MidiMessage::controllerEvent(channel, 1, 0), 0.0);
         }
     }
-    bind(PerformanceTechnique::flutter, {"Flutter", "Flutter2"});
-    bind(PerformanceTechnique::tremolo, {"Main_Shake_Mellow", "Roll", "Sus_Main_Roll", "Tremolo"});
-    bind(PerformanceTechnique::pizzicato, {"Pizz"});
+    juce::Logger::writeToLog("Qin CH1 main + CH2 technique: "
+        + juce::String(dual ? "enabled" : "requires CH1/CH2 scheme") + " instrument=" + key);
 }
 
 void PluginHostEngine::resetPerformance() noexcept
 {
     stringTremolo.request(false);
     const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
-    suonaDualVoice.setFlutter(false);
+    kongDualSlot.reset([this](const auto& message) { queue(message, 0.0); });
     if(kontaktStandardControls.load())queue(juce::MidiMessage::controllerEvent(1,1,0),0.0);
     if(kongVibratoCC.load()==1) {
         queue(juce::MidiMessage::controllerEvent(1,1,0),0.0);
@@ -1818,6 +1718,16 @@ void PluginHostEngine::resolveInstrumentModelParameter()
         instrumentModelNames = names;
         instrumentModelValues = std::move(values);
     }
+}
+
+bool PluginHostEngine::queueKongPerformance(const juce::MidiMessage& message, double timestampSeconds) noexcept
+{
+    bool accepted = true;
+    kongDualSlot.route(message, [this, timestampSeconds, &accepted](const auto& output) {
+        if (!queue(output, timestampSeconds)) accepted = false;
+    });
+    if (!accepted) kongDualSlot.configure(kongDualSlot.active());
+    return accepted;
 }
 
 bool PluginHostEngine::queue(juce::MidiMessage message, double timestampSeconds) noexcept

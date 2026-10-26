@@ -1,8 +1,8 @@
 #include "TonePackage.h"
+#include "KongProjectFile.h"
 #include "SerialEffectRouting.h"
 #include "ScopedGraphPause.h"
 #include "ToneRestorePlan.h"
-#include "SuonaDualVoiceRouter.h"
 #include "SwamStringTremolo.h"
 #include "KensaBendRange.h"
 #include "AudioCallbackTrace.h"
@@ -82,31 +82,6 @@ int main()
         tremolo.clear();assert(!tremolo.available());
         TestEffect unsupported(1,0);assert(!tremolo.prepare(unsupported));
     }
-    // Exercise the exact production MIDI transform, not a mock crossfade.
-    {
-        fengyin::SuonaDualVoiceRouter router;router.configure(true);
-        juce::MidiBuffer midi;
-        midi.addEvent(juce::MidiMessage::controllerEvent(1,11,100),0);
-        midi.addEvent(juce::MidiMessage::noteOn(1,67,juce::uint8(90)),1);
-        router.process(midi,128,44100);
-        int ons=0;for(const auto m:midi)if(m.getMessage().isNoteOn())++ons;
-        assert(ons==2);
-        router.setFlutter(true);int main=-1,flutter=-1;
-        for(int b=0;b<16;++b){midi.clear();router.process(midi,128,44100);
-            for(const auto item:midi){const auto m=item.getMessage();assert(!m.isNoteOnOrOff());
-                if(m.isController()&&m.getControllerNumber()==11){if(m.getChannel()==1)main=m.getControllerValue();else if(m.getChannel()==2)flutter=m.getControllerValue();}}}
-        assert(main==0&&flutter==100);
-        router.setFlutter(false);
-        for(int b=0;b<16;++b){midi.clear();router.process(midi,128,44100);for(const auto item:midi)assert(!item.getMessage().isNoteOnOrOff());}
-        midi.clear();midi.addEvent(juce::MidiMessage::noteOff(1,67),0);
-        midi.addEvent(juce::MidiMessage::pitchWheel(1,9000),2);
-        midi.addEvent(juce::MidiMessage::controllerEvent(1,1,70),3);
-        router.process(midi,128,44100);int offs=0,bends=0,mods=0;
-        for(const auto item:midi){const auto m=item.getMessage();offs+=m.isNoteOff();bends+=m.isPitchWheel();mods+=m.isController()&&m.getControllerNumber()==1;}
-        assert(offs==2&&bends==2&&mods==2);
-        router.configure(false);midi.clear();midi.addEvent(juce::MidiMessage::noteOn(1,67,juce::uint8(90)),0);
-        router.process(midi,128,44100);assert(midi.getNumEvents()==1);
-    }
     const juce::Array<fengyin::ToneParameterValue> baseline {
         fengyin::ToneParameterValue{"timbre", .5f},
         fengyin::ToneParameterValue{"room", .2f},
@@ -128,6 +103,30 @@ int main()
     assert(fengyin::toneValueNeedsWrite(.5f, .6f));
     assert(!fengyin::toneValueNeedsWrite(.5f, 2.0f));
     juce::ScopedJuceInitialiser_GUI init;
+    // Current two-slot migrations preserve the original full CH1 and rack;
+    // the new secondary slot keeps the same library/mix with its saved technique.
+    const auto repository = juce::File(juce::String::fromUTF8(__FILE__)).getParentDirectory().getParentDirectory();
+    struct Migration { const char* file; const char* articulation; int selected; };
+    for (const auto& migration : {Migration{"folk-pipa.fytonepack", "Roll_3", 10},
+                                  Migration{"folk-liuqin.fytonepack", "Roll_2", 7},
+                                  Migration{"folk-jinghu.fytonepack", "Tremolo", 9}}) {
+        juce::String error;
+        const auto before = fengyin::TonePackage::read(repository.getChildFile("tests/fixtures/kong-dual-slot-before-133").getChildFile(migration.file), error);
+        const auto after = fengyin::TonePackage::read(repository.getChildFile("assets/tone-packages").getChildFile(migration.file), error);
+        assert(before && after);
+        const auto original = fengyin::KongProjectFile::readPluginComponentState(before->samplerState);
+        const auto migrated = fengyin::KongProjectFile::readPluginComponentState(after->samplerState);
+        const auto originalMain = original.getChildWithName("PresetList").getChild(0);
+        const auto list = migrated.getChildWithName("PresetList");
+        assert(list.getNumChildren() == 2 && list.getChild(0).isEquivalentTo(originalMain));
+        assert(migrated.getChildWithName("RackParam").isEquivalentTo(original.getChildWithName("RackParam")));
+        const auto technique = list.getChild(1);
+        assert(int(technique["MIDI"]) == 1 && int(technique["IndexSelectedKeyswitch"]) == migration.selected);
+        assert(technique["KeyswitchNames"][migration.selected].toString() == migration.articulation);
+        for (const auto* field : {"KAI", "Preset", "Audio", "Volume", "Tone", "Balance", "FXAUX"})
+            assert(technique[field] == originalMain[field]);
+        assert(after->kongTechniques.otherChannel == 2 && after->kongTechniques.otherKeyswitchIndex == -1);
+    }
     juce::AudioProcessorGraph graph;
     graph.setPlayConfigDetails(2,2,48000,64);
     const auto input=graph.addNode(std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(juce::AudioProcessorGraph::AudioGraphIOProcessor::audioInputNode));

@@ -40,6 +40,6 @@ assert(!buildTechniquePlan('kong-pipa')[0].pluginSupported);
         self.assertIn('midi.cancelTechniqueLearn()',backend)
         host=(ROOT/'native/Source/PluginHostEngine.cpp').read_text(encoding='utf-8')
         profile=host.split('void PluginHostEngine::configureKongTechniqueProfile',1)[1].split('void PluginHostEngine::resetPerformance',1)[0]
-        self.assertIn('if(simpleVibrato(key.toStdString()))',profile)
+        self.assertIn('simpleVibrato(key.toStdString())',profile)
         self.assertNotIn('bind(PerformanceTechnique::vibrato',profile)
 if __name__=='__main__':unittest.main()

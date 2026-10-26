@@ -27,11 +27,8 @@ class Release116(unittest.TestCase):
         self.assertIn('lastWebStateAtMs = 0',main)
         visibility=main.split('void MainComponent::setWebPresentationVisible',1)[1].split('void MainComponent::setupWebInterface',1)[0]
         for unsafe in ['stopTimer','webInterface.reset','suspendProcessing','pause()']:self.assertNotIn(unsafe,visibility)
-    def test_suona_is_opt_in_and_kontakt_does_not_guess_frequency(self):
+    def test_kontakt_does_not_guess_frequency(self):
         host=(ROOT/'native/Source/PluginHostEngine.cpp').read_text(encoding='utf-8')
-        self.assertIn('FENGYIN_SUONA_LEGACY',host)
-        self.assertIn('slots.getNumChildren()==2',host)
-        self.assertIn('suonaDualVoice.setFlutter(safeValue>.5f)',host)
         self.assertIn('controllerEvent(1,1,midiValue)',host)
         # 1.1.18 adds a Kensa-only rate conversion derived from the supplied
         # script; arbitrary Kontakt libraries must still not receive this CC.

@@ -408,13 +408,14 @@ function instrumentFamily(key = '') {
 }
 
 function buildTechniquePlan(key = '') {
-  const other = {violin:'抖弓',cello:'抖弓','kong-erhu':'颤弓','kong-erhu-2':'颤弓','kong-jinghu':'颤弓','kong-guzheng':'摇指','kong-liuqin':'轮音','kong-pipa':'轮指','kong-sanxian':'轮音','kong-dizi':'花舌','kong-dizi-2':'吐音','kong-suona':'花舌','kong-suona-2':'花舌','kong-sheng':'花舌',flute:'花舌',piccolo:'花舌'}[key];
+  const kong = key.startsWith('kong-');
+  const other = {violin:'抖弓',cello:'抖弓',flute:'花舌',piccolo:'花舌'}[key];
   const folkVibrato = ['kong-erhu','kong-erhu-2','kong-matouqin','kong-hulusi','kong-hulusi-2','kong-xun','kong-nanxiao','kong-xiao','kong-dizi','kong-dizi-2','kong-suona','kong-suona-2','kong-jinghu'].includes(key);
   return [
     {id:'vibrato',name:/violin|viola|cello|double-bass|kong-erhu|kong-matouqin|kong-jinghu/.test(key)?'揉弦':'颤音',icon:'≈',index:1,pluginSupported:key==='kontakt-kensa' || folkVibrato || /sax|violin|viola|cello|double-bass|flute|piccolo|clarinet|oboe|english-horn|bassoon|trumpet|trombone|flugelhorn|tuba|euphonium|horn-f|horn-bb/.test(key)},
     {id:'growl',name:'嘶吼音',icon:'≋',index:0,pluginSupported:['alto-sax','tenor-sax','baritone-sax'].includes(key)},
-    {id:'mute',name:other?`其他技巧：${other}`:'其他技巧',icon:'✦',index:8,pluginSupported:!!other}
-  ].map(item=>({...item,description:item.id==='mute'?'按住触发，松开恢复':item.id==='vibrato'?'咬嘴控制，或按乐曲速度在长音中渐入':'按键触发，或气息控制',mode:'off',strength:100,featured:true}));
+    {id:'mute',name:kong?'技巧音色':other?`其他技巧：${other}`:'其他技巧',icon:'✦',index:8,pluginSupported:kong || !!other}
+  ].map(item=>({...item,description:item.id==='mute'?(kong?'按住加入技巧音色，松开结束；主奏持续演奏':'按住触发，松开恢复'):item.id==='vibrato'?'咬嘴控制，或按乐曲速度在长音中渐入':'按键触发，或气息控制',mode:'off',strength:100,featured:true}));
 }
 
 function buildAdaptiveTechniquePlan(key = '', state = {}) {
@@ -1672,7 +1673,7 @@ function renderTechniqueMappings(force = false) {
     const hardware = item.mode === 'hardware';
     const mapped = sourceDescription(item) !== '未设置';
     const modeLabels = item.id === 'mute' ? {off:'关闭',hardware:'按键控制'} : item.id === 'vibrato' ? {off:'关闭',breath:'自动',hardware:'咬嘴控制'} : {off:'关闭',breath:'自动',hardware:'按键控制'};
-    const heading = item.id === 'vibrato' ? '颤音' : item.id === 'growl' ? '嘶吼音' : '其他技巧';
+    const heading = item.id === 'vibrato' ? '颤音' : item.id === 'growl' ? '嘶吼音' : item.name === '技巧音色' ? item.name : '其他技巧';
     return `<article class="technique-card ${item.featured ? '' : 'secondary'}" data-technique-id="${item.id}">
       <div class="technique-card-head"><div class="technique-card-title"><h3>${heading}</h3></div><span class="technique-card-state">${item.mode === 'off' ? '已关闭' : hardware ? (mapped ? '已映射' : '待映射') : '自动控制'}</span></div>
       <div class="technique-control"><div class="technique-mode-buttons" role="group" aria-label="${heading}控制方式">${Object.entries(modeLabels).map(([value,label]) => `<button type="button" data-technique-mode="${value}" aria-pressed="${item.mode === value}" ${!item.routeMissing ? '' : 'disabled'}>${label}</button>`).join('')}</div><div class="technique-map-actions" aria-label="${item.id === 'vibrato' ? '咬嘴控制' : '按键控制'}的映射设置" ${hardware ? '' : 'hidden'}><button type="button" class="learn-source" ${item.routeMissing ? 'disabled' : ''}>${Number(window.fengyinTechniqueLearning) === item.index ? '等待操作…' : mapped ? '重新映射' : '点击映射'}</button><button type="button" class="clear-source" ${mapped?'':'hidden'}>清除映射</button></div></div>
@@ -2645,7 +2646,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.31 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.33 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

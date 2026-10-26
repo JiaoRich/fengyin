@@ -325,15 +325,15 @@ int main() {
         cc(0,45.2+mode);service.tickTechniqueAutomation();assert(sink.events.back().value==0);
     }
     assert(fengyin::simpleGrowl("alto-sax") && !fengyin::simpleGrowl("soprano-sax"));
-    assert(fengyin::simpleOther("kong-pipa")==fengyin::PerformanceTechnique::tremolo);
+    assert(fengyin::simpleOther("kong-pipa")==fengyin::PerformanceTechnique::flutter);
     assert(fengyin::simpleOther("violin")==fengyin::PerformanceTechnique::tremolo);
     assert(fengyin::simpleOther("cello")==fengyin::PerformanceTechnique::tremolo);
     assert(fengyin::simpleVibrato("kong-erhu-2") && fengyin::simpleVibrato("kong-jinghu"));
     assert(!fengyin::simpleVibrato("kong-pipa"));
     for(const char* key:{"flute","piccolo","alto-flute","bass-flute","clarinet","bass-clarinet","oboe","english-horn","bassoon","contrabassoon","trumpet","piccolo-trumpet","alto-trombone","bass-trombone","horn-f","euphonium","bass-tuba"})
         assert(fengyin::simpleVibrato(key));
-    assert(fengyin::simpleOther("kong-erhu-2")==fengyin::PerformanceTechnique::tremolo);
-    assert(fengyin::simpleOther("kong-matouqin")==fengyin::PerformanceTechnique::count);
+    assert(fengyin::simpleOther("kong-erhu-2")==fengyin::PerformanceTechnique::flutter);
+    assert(fengyin::simpleOther("kong-matouqin")==fengyin::PerformanceTechnique::flutter);
     assert(fengyin::automaticVibratoFade(600)==0 && fengyin::automaticVibratoFade(1000)==1);
     service.setPerformanceSink(nullptr);
     // Exercise the real JUCE collector after FengYin's realtime queue, including

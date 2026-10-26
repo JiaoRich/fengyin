@@ -1,0 +1,26 @@
+{
+  "version": "1.1.33",
+  "targets": [
+    {
+      "file": "folk-pipa.fytonepack",
+      "beforeSha256": "20a65fe3a43e9209aef607b2da5fd880ea8e10c11cd0b37c70bebf0fe23cadec",
+      "afterSha256": "bfb85c7569002955df28615d6c40817faf308bc5eb2b5c1a785655b8f30d51bf",
+      "mainAndEffectsPreserved": true,
+      "baseline": "tests/fixtures/kong-dual-slot-before-133/folk-pipa.fytonepack"
+    },
+    {
+      "file": "folk-liuqin.fytonepack",
+      "beforeSha256": "57cce14cd9ee8af99509a42b87429320aae88707bab624f6128391879e44f1f6",
+      "afterSha256": "135b4e5132a1d06aad38211947362467140419b113b475baca95c2f5e8848fa8",
+      "mainAndEffectsPreserved": true,
+      "baseline": "tests/fixtures/kong-dual-slot-before-133/folk-liuqin.fytonepack"
+    },
+    {
+      "file": "folk-jinghu.fytonepack",
+      "beforeSha256": "937500855e124af3b77f9658ae18cb9b15d87112a2ad62e1957d9a5a0d679d0d",
+      "afterSha256": "e20f5b18dc4dadf300a9cf710472a2d33f7bb175258b928a570f7a81f2253abf",
+      "mainAndEffectsPreserved": true,
+      "baseline": "tests/fixtures/kong-dual-slot-before-133/folk-jinghu.fytonepack"
+    }
+  ]
+}

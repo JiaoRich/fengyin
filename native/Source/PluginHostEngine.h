@@ -1,5 +1,5 @@
 #pragma once
-#include "SuonaDualVoiceRouter.h"
+#include "KongDualSlotRouter.h"
 #include "SwamToneApplication.h"
 #include "MusicTempoPolicy.h"
 #include "KongTechniqueProfile.h"
@@ -97,8 +97,7 @@ public:
         if(index>=nativeTechniqueRoutes.size())return false;
         if(kongExpressionMode.load()) {
             if(technique==PerformanceTechnique::vibrato&&kongVibratoCC.load()==1)return true;
-            const auto& route=kongTechniqueRoutes[index];
-            return route.channel>0 && (route.keyswitch>=0 || route.channel>1);
+            return technique==PerformanceTechnique::flutter && kongDualSlot.active();
         }
         const int route=nativeTechniqueRoutes[index].load();
         if(route==0 || route==((swamExpressionChannel.load()<<8)|(swamExpressionController.load()+1)))return false;
@@ -205,6 +204,7 @@ private:
     float originalVibratoRate=0;std::array<float,3> tempoVibratoRates {{-1,-1,-1}};
     juce::var swamToneAudit;
     bool queue(juce::MidiMessage message, double timestampSeconds) noexcept;
+    bool queueKongPerformance(const juce::MidiMessage& message, double timestampSeconds) noexcept;
     bool rebuildConnections();
     void resolveTechniqueParameters();
     void resolveInstrumentModelParameter();
@@ -258,7 +258,7 @@ private:
     std::array<std::atomic<int>, static_cast<size_t>(PerformanceTechnique::count)> lastNativeTechniqueMessages {};
     std::atomic<int> lastBreathMidiValue { -1 };
     KongTechniqueProfile kongProfile;
-    SuonaDualVoiceRouter suonaDualVoice;
+    KongDualSlotRouter kongDualSlot;
     std::atomic<bool> kontaktStandardControls{false};
 public:
     void configureKontaktControls(bool enabled) noexcept {
@@ -267,15 +267,12 @@ public:
     }
 private:
     std::atomic<int> kongVibratoCC {-1};
-    struct KongTechniqueRoute { int channel = 0; int keyswitch = -1; int normalKey = -1; };
-    std::array<KongTechniqueRoute, static_cast<size_t>(PerformanceTechnique::count)> kongTechniqueRoutes {};
     std::array<std::atomic<float>, static_cast<size_t>(PerformanceTechnique::count)> kongTechniqueInputs {};
     std::array<std::atomic<bool>, 128> activeNotes {};
     juce::SpinLock performanceEventLock;
     std::array<std::atomic<float>, 128> activeVelocities {};
     std::atomic<int> performanceChannel { 1 };
     std::atomic<int> lastPitchWheel { 8192 };
-    void switchPerformanceChannel(int channel) noexcept;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginHostEngine)
 };

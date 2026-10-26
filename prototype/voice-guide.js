@@ -83,7 +83,7 @@
     ['弯音范围','G004','#bend-range-button','play'],
     ['视频伴奏','V035','#choose-video','play'],
     ['录音与录屏',null,'.record-control','play',null,null,'点击“开始录制”，选择录音或录屏。风吟立即准备，准备好后播放“滴”声并开始录制；准备中可取消。再次点击停止后自动保存，按钮显示“正在保存，请稍等”。保存期间暂时不能吹奏，完成后恢复。'],
-    ['我的录制',null,'#recording-manager','play',null,null,'点击“我的录制”查看文件。录音文件为 WAV，录屏文件为 MP4；临时文件单独存放，成功保存后自动清理。若保存失败，请按提示恢复保存。'],
+    ['我的录制',null,'#recording-manager','play',null,null,'点击“我的录制”查看文件。录音保存为 WAV；录屏自动保存 MP4，同时在录音文件夹保留同名无损 WAV，无需额外操作。临时文件单独存放，成功保存后自动清理。若保存失败，请按提示恢复保存。'],
     ['精简模式','V030','#window-mode-toggle','play'],
     ['更换主题','G013','#theme-button','play']
   ];

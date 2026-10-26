@@ -210,9 +210,10 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         mapping = self.read("native/Source/KongTechniqueMap.h")
         self.assertIn('slot.getProperty("KeyswitchNames")', mapping)
         self.assertIn('slot.getProperty("IndexSelectedKeyswitch", 0)', mapping)
-        self.assertIn("switchPerformanceChannel", host)
-        self.assertIn('bind(PerformanceTechnique::flutter, {"Flutter", "Flutter2"})', host)
-        self.assertIn('int selected = route.normalKey', host)
+        self.assertIn('queueKongPerformance', host)
+        self.assertIn('kongDualSlot.setTechnique', host)
+        self.assertNotIn('switchPerformanceChannel', host)
+        self.assertNotIn('changeKongArticulation(', host)
         self.assertIn('techniqueContext == "kong-suona"', midi)
         self.assertIn('techniqueContext == "kong-pipa"', midi)
 

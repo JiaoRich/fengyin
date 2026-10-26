@@ -20,10 +20,10 @@ const { pathToFileURL } = require('node:url');
     for (const edge of ['n','s','e','w','ne','nw','se','sw']) {
       const handle=page.locator(`.resize-${edge}`);
       assert(await handle.isVisible());
-      await handle.dispatchEvent('pointerdown',{button:0});
+      await handle.dispatchEvent('pointerdown',{button:0,pointerType:'mouse',isPrimary:true,pointerId:1});
     }
-    await page.locator('.window-mode-bar').dispatchEvent('pointerdown',{button:0});
-    await page.locator('#window-mode-toggle').dispatchEvent('pointerdown',{button:0});
+    await page.locator('.window-mode-bar').dispatchEvent('pointerdown',{button:0,pointerType:'mouse',isPrimary:true,pointerId:1});
+    await page.locator('#window-mode-toggle').dispatchEvent('pointerdown',{button:0,pointerType:'mouse',isPrimary:true,pointerId:1});
     assert.deepEqual(await page.evaluate(()=>gestures.map(e=>e.action)),
       ['resize-n','resize-s','resize-e','resize-w','resize-ne','resize-nw','resize-se','resize-sw','drag']);
     await page.evaluate(()=>{nativeEvent=window.savedNativeEvent;});
@@ -32,14 +32,16 @@ const { pathToFileURL } = require('node:url');
     assert.equal(await page.locator('.video-card').isVisible(),false);
     assert.equal(await page.locator('.sidebar').isVisible(),false);
     for(const theme of ['neon','spring','summer','autumn','winter','china-red','gold','minimal']){
-      await page.selectOption('#theme',theme);
+      const label=await page.locator(`#theme option[value="${theme}"]`).textContent();
+      await page.locator('#theme-button').click();
+      await page.getByRole('menuitemradio',{name:label,exact:true}).click();
       assert.equal(await page.getAttribute('body','data-theme'),theme);
     }
-    await page.selectOption('#theme','neon');
+    await page.locator('#theme').evaluate(el=>{el.value='neon';el.dispatchEvent(new Event('change'));});
     for(const [width,height] of [[480,560],[480,700],[600,700],[680,700]]){
       await page.setViewportSize({width,height});
       assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'horizontal overflow');
-      const rect=await page.locator('#theme').boundingBox();assert(rect && rect.x>=0 && rect.x+rect.width<=width);
+      const rect=await page.locator('#theme-button').boundingBox();assert(rect && rect.x>=0 && rect.x+rect.width<=width);
       assert(rect.y+rect.height<=height,'theme control must fit vertically');
     }
     await page.waitForTimeout(500);
@@ -49,10 +51,10 @@ const { pathToFileURL } = require('node:url');
     await page.waitForTimeout(200);
     assert.equal(await page.locator('#preset-grid .instrument-preset-card').count(),7);
     assert.equal(await page.locator('#preset-grid .active').count(),1);
-    assert(await page.locator('#preset-grid .active .tone-level').isVisible());
+    assert.equal(await page.locator('#preset-grid .active .tone-level').isVisible(),false,'library meters stay hidden to preserve performance');
     await page.evaluate(()=>{latestBackendState.instrumentPeak=0;});
     await page.waitForTimeout(200);
-    assert.equal(await page.locator('#preset-grid .active .tone-level i').first().evaluate(e=>e.style.transform),'scaleY(0.05)');
+    assert.equal(await page.locator('#preset-grid .active .tone-level').isVisible(),false);
     const reverse=await page.locator('#preset-grid [data-card-key]').evaluateAll(es=>es.map(e=>e.dataset.cardKey).reverse());
     await page.evaluate(order=>{localStorage.setItem('fengyin-card-order-swam',JSON.stringify(order));renderPresets();applyWindowMode(true);},reverse);
     const fullNames=await page.locator('#preset-grid h3').allTextContents();

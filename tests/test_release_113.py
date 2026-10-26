@@ -18,7 +18,7 @@ class Release113(unittest.TestCase):
         self.assertIn('suppressTechniqueMidi',source)
         self.assertIn('messages.swapWith(filteredMidi)',source)
         self.assertIn('activeVelocities[static_cast<size_t>(note)]',source)
-        self.assertIn('Vib_Mellow',source)
+        self.assertIn('kongDualSlot.setTechnique',source)
         policy=self.read('native/Source/KongPerformancePolicy.h')
         self.assertLess(policy.index('noteOff(channel, note)'),policy.index('noteOn(channel, key'))
         self.assertLess(policy.index('noteOff(channel, key)'),policy.index('noteOn(channel, note, velocity'))

@@ -10,9 +10,16 @@ class FolkLevels119(unittest.TestCase):
         audit=json.loads((ROOT/'assets/tone-packages/folk-engine-levels-119-audit.json').read_text(encoding='utf-8'))
         self.assertEqual(audit['nativeGain'],6);self.assertEqual(audit['nativeSlotFXAUX'],50)
         self.assertEqual(len(audit['targets']),13)
+        migration=json.loads((ROOT/'assets/tone-packages/kong-dual-slot-133-audit.json').read_text(encoding='utf-8'))
+        migrated={row['file']:row for row in migration['targets']}
         with zipfile.ZipFile(ROOT/audit['baseline']) as base:
             for row in audit['targets']:
                 path=ROOT/'assets/tone-packages'/row['file']
+                if row['file'] in migrated:
+                    newer=migrated[row['file']]
+                    self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),newer['afterSha256'])
+                    path=ROOT/newer['baseline']
+                    self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),newer['beforeSha256'])
                 self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),row['afterSha256'])
                 self.assertEqual(hashlib.sha256(base.read(row['file'])).hexdigest(),row['beforeSha256'])
                 with zipfile.ZipFile(io.BytesIO(base.read(row['file']))) as z:a=ET.fromstring(z.read('tone.xml'))

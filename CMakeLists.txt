@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.32 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.33 LANGUAGES C CXX)
 option(FENGYIN_ARCHIVED_VIDEO_RECORDING "Build archived video-recording diagnostics, never for release" OFF)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
@@ -379,6 +379,23 @@ install(FILES
 
 include(CTest)
 if(BUILD_TESTING)
+    if(APPLE)
+        add_executable(PrepareKongDualSlotPackages EXCLUDE_FROM_ALL tools/prepare-kong-dual-slot-packages.cpp native/Source/SoundPresetStore.cpp)
+        target_include_directories(PrepareKongDualSlotPackages PRIVATE native/Source)
+        target_compile_definitions(PrepareKongDualSlotPackages PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_PLUGINHOST_VST3=1)
+        target_link_libraries(PrepareKongDualSlotPackages PRIVATE juce::juce_audio_processors juce::juce_cryptography)
+    endif()
+    add_executable(AuditKongPackages EXCLUDE_FROM_ALL tools/audit-kong-packages.cpp native/Source/SoundPresetStore.cpp)
+    target_include_directories(AuditKongPackages PRIVATE native/Source)
+    target_compile_definitions(AuditKongPackages PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+    target_link_libraries(AuditKongPackages PRIVATE juce::juce_audio_processors juce::juce_cryptography)
+    add_executable(FengYinKongDualSlotTests tests/test_kong_dual_slot_router.cpp)
+    target_include_directories(FengYinKongDualSlotTests PRIVATE native/Source)
+    target_link_libraries(FengYinKongDualSlotTests PRIVATE juce::juce_audio_basics)
+    target_compile_options(FengYinKongDualSlotTests PRIVATE
+        $<$<CXX_COMPILER_ID:MSVC>:/UNDEBUG>
+        $<$<CXX_COMPILER_ID:AppleClang,Clang,GNU>:-UNDEBUG>)
+    add_test(NAME kong_dual_slot_additive_routing COMMAND FengYinKongDualSlotTests)
     add_executable(FengYinExportWaveTests tests/test_export_wave.cpp)
     add_test(NAME recording_aligned_30min_wave COMMAND FengYinExportWaveTests)
     find_package(Threads REQUIRED)

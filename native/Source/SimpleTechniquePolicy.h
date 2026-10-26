@@ -21,15 +21,11 @@ inline bool simpleGrowl(std::string_view key) {
     return key == "alto-sax" || key == "tenor-sax" || key == "baritone-sax";
 }
 inline PerformanceTechnique simpleOther(std::string_view key) {
+    // All Qin packages use the same secondary-channel gate. The tuner owns
+    // the actual articulation; this enum is only the common hardware role.
+    if (key.substr(0,5)=="kong-") return PerformanceTechnique::flutter;
     if(key=="violin" || key=="cello")return PerformanceTechnique::tremolo;
-    if (key == "kong-erhu-2") key = "kong-erhu";
-    if (key == "kong-guzheng-2") key = "kong-guzheng";
-    if (key == "kong-dizi-2") key = "kong-dizi";
-    if (key == "kong-hulusi-2") key = "kong-hulusi";
-    if (key == "kong-suona-2") key = "kong-suona";
-    if (key == "flute" || key == "piccolo" || key == "kong-dizi" || key == "kong-suona" || key == "kong-sheng") return PerformanceTechnique::flutter;
-    if (key == "kong-guzheng" || key == "kong-liuqin" || key == "kong-pipa" || key == "kong-sanxian"
-        || key=="kong-erhu" || key=="kong-jinghu") return PerformanceTechnique::tremolo;
+    if (key == "flute" || key == "piccolo") return PerformanceTechnique::flutter;
     return PerformanceTechnique::count;
 }
 inline bool simpleRoleSupported(std::string_view key, PerformanceTechnique role) {
