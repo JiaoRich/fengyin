@@ -770,5 +770,6 @@
     "overloadSamples": 0,
     "droppedMidi": 0,
     "scope": "Offline instrument bus, all 13 current bundled Qin packages; no physical Windows device or arbitrary external accompaniment acceptance"
-  }
+  },
+  "sourceHashNewlines": "LF"
 }

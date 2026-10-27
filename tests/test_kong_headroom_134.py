@@ -71,8 +71,12 @@ class KongHeadroom134(unittest.TestCase):
                 self.assertLessEqual(max(evidence['peak'], evidence['oversampledPeak4x']), self.audit['verificationCeiling'])
 
     def test_signal_path_and_other_builtins_are_unchanged(self):
+        self.assertEqual(self.audit['sourceHashNewlines'], 'LF')
         for path, expected in self.audit['signalPathSha256'].items():
-            self.assertEqual(sha((ROOT / path).read_bytes()), expected, path)
+            # Git's Windows checkout may convert LF to CRLF. Ignore only that
+            # code-line ending conversion; package/binary hashes remain exact.
+            source=(ROOT / path).read_bytes().replace(b'\r\n',b'\n')
+            self.assertEqual(sha(source), expected, path)
         for name, expected in self.audit['unchangedPackages'].items():
             self.assertFalse(name.startswith('folk-'))
             self.assertEqual(sha((ASSETS / name).read_bytes()), expected, name)
