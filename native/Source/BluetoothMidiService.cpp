@@ -4,6 +4,7 @@
 #include <map>
 #include <atomic>
 #include <optional>
+#include <exception>
 #if JUCE_WINDOWS
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Devices.Bluetooth.h>
@@ -92,7 +93,14 @@ struct BluetoothMidiService::Impl : juce::Thread
         // selector returns a different identity kind; neither may be guessed by name.
         try {info=await(Info::CreateFromIdAsync(id,props),ticket);}
         catch(const winrt::hresult_error& error) {if(error.code()==E_ACCESSDENIED || error.code()==HRESULT_FROM_WIN32(ERROR_CANCELLED))throw;}
-        if(!info)info=await(Info::CreateFromIdAsync(id,props,winrt::Windows::Devices::Enumeration::DeviceInformationKind::AssociationEndpoint),ticket);
+        if(!info) {
+            try {info=await(Info::CreateFromIdAsync(id,props,winrt::Windows::Devices::Enumeration::DeviceInformationKind::AssociationEndpoint),ticket);}
+            catch(const winrt::hresult_error& error) {
+                const auto code=error.code();
+                if(code!=HRESULT_FROM_WIN32(ERROR_NOT_FOUND) && code!=HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)
+                    && code!=HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND) && code!=E_INVALIDARG)throw;
+            }
+        }
         return info;
     }
     static juce::String str(const winrt::hstring& value) { return juce::String(value.c_str()); }
@@ -106,11 +114,11 @@ struct BluetoothMidiService::Impl : juce::Thread
         if(persistSettings) settings.setStorageParameters(options);
         juce::var savedHistory;
         if(auto* file=settings.getUserSettings()) savedHistory=juce::JSON::parse(file->getValue("history"));
-            if(auto* rows=savedHistory.getArray())
-                for(const auto& row:*rows) {
-                    Device d { row["id"].toString(), row["name"].toString(), false, false };
-                    if(d.id.isNotEmpty()) devices[d.id]=d;
-                }
+        if(auto* rows=savedHistory.getArray())
+            for(const auto& row:*rows) {
+                Device d { row["id"].toString(), row["name"].toString(), false, false };
+                if(d.id.isNotEmpty()) devices[d.id]=d;
+            }
         startThread();
     }
     ~Impl() override { signalThreadShouldExit(); notify(); stopThread(-1); }
@@ -218,6 +226,7 @@ struct BluetoothMidiService::Impl : juce::Thread
     {
         using namespace winrt::Windows::Devices;
         stopScan();
+        closePort(); // Release a previous BLE input before reopening; USB is managed independently.
         {std::lock_guard lock(mutex);connecting=command.id;message=juce::String::fromUTF8("正在连接，首次使用时请确认系统配对提示");}changed();
         auto candidate=await(beginOnUi([id=wide(command.id)]{return Ble::FromIdAsync(id);},command.generation),command.generation);
         if(!candidate)throw winrt::hresult_error(E_ACCESSDENIED);
@@ -254,7 +263,7 @@ struct BluetoothMidiService::Impl : juce::Thread
         }
         if(!opened)throw winrt::hresult_error(E_FAIL,L"Bluetooth MIDI input port is not available");
         if(generation.load()!=command.generation){opened.Close();throw winrt::hresult_canceled();}
-        closePort();ble=candidate;port=opened;
+        ble=candidate;port=opened;
         const auto epoch=transportEpoch.load();
         try {
         midiToken=port.MessageReceived([this, guard=lifetime,epoch](const auto&,const Midi::MidiMessageReceivedEventArgs& args) {
@@ -324,7 +333,7 @@ struct BluetoothMidiService::Impl : juce::Thread
                     :juce::String::fromUTF8("连接未完成，请检查电吹管蓝牙与配对状态后重试");
                 juce::Logger::writeToLog("Bluetooth MIDI: "+juce::String::toHexString(static_cast<int>(error.code()))+" "+str(error.message()));changed();
             } catch(...) {std::lock_guard lock(mutex);connecting.clear();message=juce::String::fromUTF8("蓝牙操作未完成，请重试或使用 USB 连接");changed();}
-            wait(60);
+            wait(250);
         }
         stopScan();closePort();winrt::uninit_apartment();
 #else
@@ -335,14 +344,15 @@ struct BluetoothMidiService::Impl : juce::Thread
 BluetoothMidiService::BluetoothMidiService(bool persistSettings) : impl(std::make_unique<Impl>(*this,persistSettings))
 {
 #if JUCE_WINDOWS
-    uiApartmentInitialised = SUCCEEDED(RoInitialize(RO_INIT_SINGLETHREADED));
+    try {winrt::init_apartment(winrt::apartment_type::single_threaded);uiApartmentInitialised=true;}
+    catch(const winrt::hresult_error&) { /* An existing MTA apartment remains valid. */ }
 #endif
 }
 BluetoothMidiService::~BluetoothMidiService()
 {
     shutdown();
 #if JUCE_WINDOWS
-    if(uiApartmentInitialised)RoUninitialize();
+    if(uiApartmentInitialised)winrt::uninit_apartment();
 #endif
 }
 void BluetoothMidiService::shutdown() { if(impl){{std::lock_guard lock(impl->lifetime->mutex);impl->lifetime->alive=false;}impl->generation++;impl->clearReceiver();impl.reset();}cancelPendingUpdate(); }

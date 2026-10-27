@@ -21,6 +21,6 @@ private:
     void handleAsyncUpdate() override;
     struct Impl;
     std::unique_ptr<Impl> impl;
-    bool uiApartmentInitialised = false;
+    [[maybe_unused]] bool uiApartmentInitialised = false;
 };
 }
