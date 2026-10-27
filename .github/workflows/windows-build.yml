@@ -4,6 +4,10 @@ run-name: ${{ inputs.screen_capture_probe && 'Windows isolated GPU recording can
 on:
   workflow_dispatch:
     inputs:
+      bluetooth_midi_test:
+        description: Validate stable Windows Bluetooth MIDI backend only
+        type: boolean
+        default: false
       screen_capture_probe:
         description: Build isolated GPU recording candidate, never installer or production app
         type: boolean
@@ -49,6 +53,21 @@ permissions:
   contents: read
 
 jobs:
+  bluetooth-midi:
+    if: ${{ inputs.bluetooth_midi_test }}
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Compile and test stable Windows BLE MIDI backend
+        shell: powershell
+        run: |
+          cmake -S tools/bluetooth-midi-check -B build-bluetooth -G "Visual Studio 17 2022" -A x64
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cmake --build build-bluetooth --config Release --parallel 4
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ctest --test-dir build-bluetooth -C Release --output-on-failure
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
   screen-capture-probe:
     if: ${{ inputs.screen_capture_probe }}
     runs-on: windows-2022
@@ -465,7 +484,7 @@ jobs:
           name: FengYin-Crash-Capture
           path: diagnostic/FengYin-Crash-Capture.zip
   windows-release:
-    if: ${{ !inputs.screen_capture_probe && !inputs.media_runtime_test && !inputs.vlc_webview_test && !inputs.media_integration_test && !inputs.diagnostic_only && !inputs.startup_comparison && !inputs.kong_test && !inputs.native_window_test }}
+    if: ${{ !inputs.bluetooth_midi_test && !inputs.screen_capture_probe && !inputs.media_runtime_test && !inputs.vlc_webview_test && !inputs.media_integration_test && !inputs.diagnostic_only && !inputs.startup_comparison && !inputs.kong_test && !inputs.native_window_test }}
     name: Windows x64 Release
     runs-on: windows-2022
     timeout-minutes: 60
