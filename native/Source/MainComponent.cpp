@@ -4579,6 +4579,14 @@ void MainComponent::handleMidiConnectionAction(const juce::var& payload)
         activeBluetoothId.clear(); desiredBluetoothId.clear(); midi.suspendAutomaticConnection(true);
         midi.connect(id); lastWebStateAtMs = 0; emitMidiConnectionState(); return;
     }
+    if (action == "connect" || action == "forget")
+    {
+        bool known = false;
+        const auto state = bluetoothMidi.snapshot();
+        if (const auto* rows = state["devices"].getArray())
+            for (const auto& row : *rows) known |= row["id"].toString() == id;
+        if (!known) { emitMidiConnectionState(); return; }
+    }
     if (action == "connect") desiredBluetoothId = id;
     if (action == "disconnect" || action == "cancel" || (action == "forget" && id == desiredBluetoothId)) desiredBluetoothId.clear();
     if (action == "connect" || action == "disconnect" || action == "cancel" || action == "forget")

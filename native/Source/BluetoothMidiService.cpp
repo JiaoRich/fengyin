@@ -50,7 +50,7 @@ struct BluetoothMidiService::Impl : juce::Thread
     std::deque<Advert> adverts;
     std::map<uint64_t, double> checked;
     std::atomic<bool> linkLost { false };
-    std::atomic<uint64_t> transportEpoch { 0 };
+    std::atomic<uint64_t> transportEpoch { 0 }, scanEpoch { 0 };
     const winrt::guid midiUuid { 0x03b80e5a, 0xede8, 0x4b33, { 0xa7,0x51,0x6c,0xe3,0x4e,0xc4,0xc7,0x00 } };
     // Only the asynchronous API *start* runs on the UI thread (Windows consent
     // requirement). No .get(), pairing wait, discovery or port I/O blocks that thread.
@@ -153,6 +153,7 @@ struct BluetoothMidiService::Impl : juce::Thread
     }
     void stopScan()
     {
+        ++scanEpoch;
         if(watcher) {try{watcher.Received(receivedToken);watcher.Stopped(stoppedToken);watcher.Stop();}catch(...){}watcher=nullptr;}
         std::lock_guard lock(mutex); scanning=false; adverts.clear();
     }
@@ -172,16 +173,19 @@ struct BluetoothMidiService::Impl : juce::Thread
             scanning=true;message=juce::String::fromUTF8("正在搜索蓝牙 MIDI 电吹管，请开启设备蓝牙并靠近电脑");
         }
         checked.clear();scanUntil=juce::Time::getMillisecondCounterHiRes()+20000;
+        const auto epoch=scanEpoch.load();
         watcher=Watcher();watcher.ScanningMode(Bluetooth::Advertisement::BluetoothLEScanningMode::Active);
-        receivedToken=watcher.Received([this, guard=lifetime](const auto&,const Bluetooth::Advertisement::BluetoothLEAdvertisementReceivedEventArgs& args) {
+        receivedToken=watcher.Received([this, guard=lifetime,epoch](const auto&,const Bluetooth::Advertisement::BluetoothLEAdvertisementReceivedEventArgs& args) {
             std::lock_guard callbackLock(guard->mutex);if(!guard->alive)return;
+            if(scanEpoch.load()!=epoch)return;
             bool midi=false;for(const auto& uuid:args.Advertisement().ServiceUuids())midi|=uuid==midiUuid;
             std::lock_guard lock(mutex);
             if(scanning && adverts.size()<128)adverts.push_back({args.BluetoothAddress(),str(args.Advertisement().LocalName()),midi});
             notify();
         });
-        stoppedToken=watcher.Stopped([this, guard=lifetime](const auto&,const Bluetooth::Advertisement::BluetoothLEAdvertisementWatcherStoppedEventArgs& args) {
+        stoppedToken=watcher.Stopped([this, guard=lifetime,epoch](const auto&,const Bluetooth::Advertisement::BluetoothLEAdvertisementWatcherStoppedEventArgs& args) {
             std::lock_guard callbackLock(guard->mutex);if(!guard->alive)return;
+            if(scanEpoch.load()!=epoch)return;
             if(args.Error()!=Bluetooth::BluetoothError::Success) {
                 std::lock_guard lock(mutex);scanning=false;message=juce::String::fromUTF8("蓝牙搜索已停止，请检查蓝牙权限或开关后重试");changed();
             }
