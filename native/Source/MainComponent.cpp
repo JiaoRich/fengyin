@@ -217,6 +217,29 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
     addAndMakeVisible(expressionButton);
     addAndMakeVisible(helpButton);
 
+    bluetoothMidi.onChange = [this]
+    {
+        const auto state = bluetoothMidi.snapshot();
+        const auto rawId = state["connectedId"].toString();
+        const auto id = rawId == desiredBluetoothId ? rawId : juce::String();
+        const auto epoch = static_cast<juce::int64>(state["portEpoch"]);
+        if (id != activeBluetoothId || (id.isNotEmpty() && epoch != activeBluetoothEpoch))
+        {
+            bluetoothMidi.setReceiver({});
+            if (id.isNotEmpty())
+            {
+                juce::String name;
+                if (const auto* rows = state["devices"].getArray())
+                    for (const auto& row : *rows) if (row["id"].toString() == id) name = row["name"].toString();
+                midi.attachExternal("ble:" + id, name);
+                bluetoothMidi.setReceiver([this](const juce::MidiMessage& message) { midi.acceptExternalMessage(message); });
+            }
+            else if (midi.isExternalConnected()) midi.disconnect();
+            activeBluetoothId = id; activeBluetoothEpoch = epoch;
+            lastWebStateAtMs = 0;
+        }
+        emitMidiConnectionState();
+    };
     midi.refreshAndConnectFirstAvailable();
     audio.initialise();
     audio.applyBestInitialSetup();
@@ -254,6 +277,8 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
 MainComponent::~MainComponent()
 {
     stopTimer();
+    bluetoothMidi.onChange = {};
+    bluetoothMidi.shutdown();
     windowRecorder.stop();
     audio.getDeviceManager().removeAudioCallback(&voicePrompts);
     webVideoAudioExtractor.cancel();
@@ -317,6 +342,7 @@ void MainComponent::setupWebInterface()
             emitAudioSettingsState();
             emitSuperLowLatencyState();
         })
+        .withEventListener("midiConnection", [this](juce::var payload) { handleMidiConnectionAction(payload); })
         .withEventListener("requestBackendState",[this](juce::var){lastWebStateAtMs=0;})
         .withEventListener("scanPlugins", [this](juce::var) { if (isActivated) startPluginScan(); })
         .withEventListener("choosePluginFolder", [this](juce::var)
@@ -1630,6 +1656,7 @@ void MainComponent::timerCallback()
     {
         midiConnectionPollCounter = 0;
         midi.pollConnection();
+        emitMidiConnectionState();
     }
     snapshot = midi.getSnapshot();
     if (videoPlaybackActive && webVideoAudioReady && accompanimentFinished())
@@ -4519,4 +4546,52 @@ juce::String MainComponent::midiNoteName(int note)
 {
     static constexpr const char* names[] { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
     return juce::String(names[note % 12]) + juce::String(note / 12 - 1);
+}
+
+void MainComponent::emitMidiConnectionState()
+{
+    if (!webInterface || !webInterfaceReady) return;
+    auto state = bluetoothMidi.snapshot();
+    auto* object = state.getDynamicObject();
+    object->setProperty("inputConnected", midi.getSnapshot().deviceConnected);
+    object->setProperty("connectedId", activeBluetoothId);
+    object->setProperty("inputName", midi.getConnectedDeviceName());
+    object->setProperty("inputId", midi.getConnectedDeviceIdentifier());
+    object->setProperty("inputTransport", midi.isExternalConnected() ? "bluetooth" : "usb");
+    juce::Array<juce::var> usb;
+    for (const auto& device : midi.getLastAvailableDevices())
+    {
+        auto* row = new juce::DynamicObject();
+        row->setProperty("id", device.identifier); row->setProperty("name", device.name);
+        usb.add(juce::var(row));
+    }
+    object->setProperty("usbDevices", juce::var(usb));
+    webInterface->emitEventIfBrowserIsVisible("midiConnectionState", state);
+}
+
+void MainComponent::handleMidiConnectionAction(const juce::var& payload)
+{
+    const auto action = payload["action"].toString(), id = payload["id"].toString();
+    if (action == "state") { emitMidiConnectionState(); return; }
+    if (action == "usb")
+    {
+        bluetoothMidi.setReceiver({}); bluetoothMidi.command("disconnect");
+        activeBluetoothId.clear(); desiredBluetoothId.clear(); midi.suspendAutomaticConnection(true);
+        midi.connect(id); lastWebStateAtMs = 0; emitMidiConnectionState(); return;
+    }
+    if (action == "connect") desiredBluetoothId = id;
+    if (action == "disconnect" || action == "cancel" || (action == "forget" && id == desiredBluetoothId)) desiredBluetoothId.clear();
+    if (action == "connect" || action == "disconnect" || action == "cancel" || action == "forget")
+    {
+        midi.suspendAutomaticConnection(true);
+        if (action == "disconnect" || action == "cancel" || (action == "forget" && id == activeBluetoothId))
+        {
+            bluetoothMidi.setReceiver({});
+            if (midi.isExternalConnected() || action == "disconnect") midi.disconnect();
+            activeBluetoothId.clear(); lastWebStateAtMs = 0;
+        }
+    }
+    if (action == "connect" || action == "disconnect" || action == "cancel" || action == "forget"
+        || action == "scan" || action == "stopScan") bluetoothMidi.command(action, id);
+    emitMidiConnectionState();
 }

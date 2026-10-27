@@ -1,3 +1,4 @@
+#include "BluetoothMidiService.h"
 #pragma once
 #include <array>
 
@@ -137,7 +138,12 @@ private:
     void showExpressionSettings();
     static juce::String midiNoteName(int note);
 
+    void emitMidiConnectionState();
+    void handleMidiConnectionAction(const juce::var&);
     fengyin::MidiInputService midi;
+    fengyin::BluetoothMidiService bluetoothMidi;
+    juce::String activeBluetoothId, desiredBluetoothId;
+    juce::int64 activeBluetoothEpoch = 0;
     fengyin::AudioDeviceService audio;
     fengyin::WindowsLowLatencyOptimizer windowsLowLatencyOptimizer;
     fengyin::AccompanimentAudioService accompaniment;

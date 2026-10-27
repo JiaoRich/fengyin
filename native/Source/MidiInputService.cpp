@@ -51,24 +51,7 @@ bool MidiInputService::connect(const juce::String& identifier)
         if (input == nullptr)
             return false;
 
-        connectedName = device.name;
-        connectedIdentifier = device.identifier;
-        activeProfile = DeviceProfileMatcher::match(device.name.toStdString());
-        restoreBreathController();
-        updateEffectiveTranspose();
-        if (auto* settingsFile = properties.getUserSettings())
-        {
-            pitchSensitivity.store(static_cast<float>(settingsFile->getDoubleValue(controllerSettingKey() + ".pitch", 1.0)));
-            const auto savedSensitivity = juce::jlimit(0, 2,
-                settingsFile->getIntValue(controllerSettingKey() + ".growlSensitivity", 1));
-            growlSensitivity.store(savedSensitivity, std::memory_order_relaxed);
-            if (savedSensitivity == 0) intelligentTechniques.setGrowlThresholds(0.82f, 0.74f);
-            else if (savedSensitivity == 2) intelligentTechniques.setGrowlThresholds(0.94f, 0.86f);
-            else intelligentTechniques.setGrowlThresholds(0.89f, 0.80f);
-        }
-        loadTechniqueMappings();
-        intelligentTechniques.reset();
-        activeNoteCount = 0;
+        prepareDevice(device.name, device.identifier);
         input->start();
         if (auto* sink = performanceSink.load(std::memory_order_acquire))
             sink->resetPerformance();
@@ -78,11 +61,48 @@ bool MidiInputService::connect(const juce::String& identifier)
     return false;
 }
 
+void MidiInputService::prepareDevice(const juce::String& name, const juce::String& identifier)
+{
+    connectedName = name;
+    connectedIdentifier = identifier;
+    activeProfile = DeviceProfileMatcher::match(name.toStdString());
+    restoreBreathController();
+    updateEffectiveTranspose();
+    if (auto* settingsFile = properties.getUserSettings())
+    {
+        pitchSensitivity.store(static_cast<float>(settingsFile->getDoubleValue(controllerSettingKey() + ".pitch", 1.0)));
+        const auto savedSensitivity = juce::jlimit(0, 2,
+        settingsFile->getIntValue(controllerSettingKey() + ".growlSensitivity", 1));
+        growlSensitivity.store(savedSensitivity, std::memory_order_relaxed);
+        if (savedSensitivity == 0) intelligentTechniques.setGrowlThresholds(0.82f, 0.74f);
+        else if (savedSensitivity == 2) intelligentTechniques.setGrowlThresholds(0.94f, 0.86f);
+        else intelligentTechniques.setGrowlThresholds(0.89f, 0.80f);
+    }
+    loadTechniqueMappings();
+    intelligentTechniques.reset();
+    activeNoteCount = 0;
+}
+
+void MidiInputService::attachExternal(const juce::String& identifier, const juce::String& name)
+{
+    disconnect();
+    prepareDevice(name, identifier);
+    externalConnected = true;
+    savePreferences();
+}
+
+void MidiInputService::acceptExternalMessage(const juce::MidiMessage& message)
+{
+    // The BLE service serialises delivery and stops it before lifecycle changes.
+    if (externalConnected) handleIncomingMidiMessage(nullptr, message);
+}
+
 void MidiInputService::disconnect()
 {
     if (input != nullptr)
         input->stop();
     input.reset();
+    externalConnected = false;
     cancelBreathDetection();
     ++connectionGeneration;
     {
@@ -108,9 +128,10 @@ void MidiInputService::disconnect()
 
 void MidiInputService::refreshAndConnectFirstAvailable()
 {
-    if (input != nullptr)
+    if (input != nullptr || externalConnected || automaticConnectionSuspended)
         return;
     const auto devices = juce::MidiInput::getAvailableDevices();
+    availableDeviceCache.assign(devices.begin(), devices.end());
     if (devices.isEmpty()) return;
     if (auto* settingsFile = properties.getUserSettings())
     {
@@ -123,7 +144,9 @@ void MidiInputService::refreshAndConnectFirstAvailable()
 
 void MidiInputService::pollConnection()
 {
+    if (externalConnected) return;
     const auto devices = juce::MidiInput::getAvailableDevices();
+    availableDeviceCache.assign(devices.begin(), devices.end());
     if (input != nullptr)
     {
         for (const auto& device : devices)
@@ -132,6 +155,7 @@ void MidiInputService::pollConnection()
         disconnect();
     }
 
+    if (automaticConnectionSuspended) return;
     const auto preferred = properties.getUserSettings() != nullptr
         ? properties.getUserSettings()->getValue("preferredDevice") : juce::String();
     if (preferred.isNotEmpty())
@@ -151,7 +175,7 @@ void MidiInputService::pollConnection()
 MidiSnapshot MidiInputService::getSnapshot() const noexcept
 {
     return {
-        input != nullptr,
+        input != nullptr || externalConnected,
         lastNote.load(std::memory_order_relaxed),
         velocity.load(std::memory_order_relaxed),
         breath.load(std::memory_order_relaxed),

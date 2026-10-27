@@ -50,6 +50,29 @@ struct Sink : fengyin::MidiPerformanceSink {
     void techniqueChanged(fengyin::PerformanceTechnique, float v) noexcept override { events.push_back({'T',v,0}); }
 };
 int main() {
+    {
+        fengyin::MidiInputService input(false); Sink sink;
+        input.setPerformanceSink(&sink); input.suspendAutomaticConnection(true);
+        input.attachExternal("ble:stable-id", "Bluetooth controller");
+        input.setBreathController(11);
+        assert(input.getSnapshot().deviceConnected && input.isExternalConnected());
+        const auto generation=input.getConnectionGeneration();
+        input.acceptExternalMessage(juce::MidiMessage::controllerEvent(1,11,100));
+        input.acceptExternalMessage(juce::MidiMessage::noteOn(1,64,juce::uint8(100)));
+        assert(input.getSnapshot().lastNote==64 && input.getSnapshot().breath>.7f);
+        input.pollConnection(); // An open external MIDI port must not be replaced by WinMM polling.
+        assert(input.getConnectionGeneration()==generation && input.isExternalConnected());
+        input.disconnect();
+        assert(!input.getSnapshot().deviceConnected && input.getSnapshot().lastNote==-1);
+        assert(input.getSnapshot().breath==0 && input.getConnectionGeneration()!=generation);
+        input.acceptExternalMessage(juce::MidiMessage::noteOn(1,65,juce::uint8(100)));
+        assert(input.getSnapshot().lastNote==-1);
+        input.pollConnection();
+        assert(!input.getSnapshot().deviceConnected); // Manual disconnect stays disconnected.
+        input.attachExternal("ble:stable-id", "Bluetooth controller");
+        assert(input.getConnectionGeneration()!=generation);
+        input.setPerformanceSink(nullptr);
+    }
     // Real persisted preferences, isolated from the user's settings. Reconnection
     // restores breath/mouthpiece independently; motion must never replace breath.
     const auto reconnectSettings=juce::File::getSpecialLocation(juce::File::tempDirectory)

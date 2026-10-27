@@ -1,0 +1,19 @@
+name: Bluetooth MIDI native checks
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bluetooth:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Compile stable Windows BLE MIDI APIs
+        run: |
+          cmake -S tools/bluetooth-midi-check -B build-bluetooth -G "Visual Studio 17 2022" -A x64
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cmake --build build-bluetooth --config Release --parallel 4
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ctest --test-dir build-bluetooth -C Release --output-on-failure
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }

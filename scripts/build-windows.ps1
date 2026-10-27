@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.1.34",
+    [string]$Version = "1.1.35",
     [switch]$SkipInstaller
 )
 
@@ -93,6 +93,10 @@ Invoke-Checked "CMake 配置" {
     cmake -S $ProjectRoot -B $BuildDir -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTING=ON `
         "-DJUCE_WEBVIEW2_PACKAGE_LOCATION=$NugetPackageDir" "-DFENGYIN_VLC_ROOT=$VlcRoot" "-DFENGYIN_RECORDING_ROOT=$RecordingRoot" -DFENGYIN_ARCHIVED_VIDEO_RECORDING=OFF
 }
+
+# Validate the stable Windows BLE MIDI backend before the expensive application build.
+Invoke-Checked "Bluetooth MIDI backend preflight build" { cmake --build $BuildDir --config Release --target FengYinBluetoothMidiTests --parallel 4 }
+Invoke-Checked "Bluetooth MIDI lifecycle preflight" { ctest --test-dir $BuildDir -C Release -R '^bluetooth_midi_lifecycle$' --output-on-failure }
 
 # The release WAV recorder stays unchanged. GPU recording is a separate helper.
 $RecorderFfmpeg = if (-not $UsePreparedFfmpeg) { $FfmpegPath } else { Join-Path $PreparedFfmpeg "ffmpeg.exe" }

@@ -49,8 +49,13 @@ public:
     ~MidiInputService() override;
 
     std::vector<juce::MidiDeviceInfo> getAvailableDevices() const;
+    const std::vector<juce::MidiDeviceInfo>& getLastAvailableDevices() const { return availableDeviceCache; }
     bool connect(const juce::String& identifier);
     void disconnect();
+    void attachExternal(const juce::String& identifier, const juce::String& name);
+    void acceptExternalMessage(const juce::MidiMessage&);
+    bool isExternalConnected() const noexcept { return externalConnected; }
+    void suspendAutomaticConnection(bool suspended) { automaticConnectionSuspended = suspended; }
     void refreshAndConnectFirstAvailable();
     void pollConnection();
     [[nodiscard]] MidiSnapshot getSnapshot() const noexcept;
@@ -93,6 +98,7 @@ private:
     juce::String techniqueSettingKey() const;
     void savePreferences();
     void restoreBreathController();
+    void prepareDevice(const juce::String& name, const juce::String& identifier);
     void saveTechniqueMappings();
     void loadTechniqueMappings();
     bool handleTechniqueMessage(const juce::MidiMessage& message, MidiPerformanceSink* sink);
@@ -101,7 +107,9 @@ private:
     static float techniqueMessageValue(const juce::MidiMessage& message) noexcept;
     void updateEffectiveTranspose();
 
+    std::vector<juce::MidiDeviceInfo> availableDeviceCache;
     std::unique_ptr<juce::MidiInput> input;
+    bool externalConnected = false, automaticConnectionSuspended = false;
     juce::String connectedName;
     juce::String connectedIdentifier;
     uint64_t connectionGeneration = 0; // Message-thread connection lifecycle, including same-ID reconnects.

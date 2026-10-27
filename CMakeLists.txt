@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.34 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.35 LANGUAGES C CXX)
 option(FENGYIN_ARCHIVED_VIDEO_RECORDING "Build archived video-recording diagnostics, never for release" OFF)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
@@ -148,6 +148,8 @@ target_sources(FengYin PRIVATE
     native/Source/MainComponent.h
     native/Source/WindowRecordingService.cpp
     native/Source/WindowRecordingService.h
+    native/Source/BluetoothMidiService.cpp
+    native/Source/BluetoothMidiService.h
     native/Source/MidiInputService.cpp
     native/Source/MidiInputService.h
     native/Source/BreathMapper.h
@@ -291,7 +293,7 @@ if(WIN32)
     target_link_libraries(FengYinScreenCapture PRIVATE windowsapp d3d11 dxgi dxguid mfplat mfreadwrite mfuuid evr ole32 uuid avrt)
     install(TARGETS FengYinScreenCapture RUNTIME DESTINATION .)
     target_sources(FengYin PRIVATE native/Source/WindowsCompatibility.manifest)
-    target_link_libraries(FengYin PRIVATE setupapi advapi32 shell32 avrt dwmapi)
+    target_link_libraries(FengYin PRIVATE setupapi advapi32 shell32 avrt dwmapi windowsapp)
     if(FENGYIN_ARCHIVED_VIDEO_RECORDING)
     add_executable(FengYinScreenRecorder WIN32 native/ScreenRecorder/main.cpp)
     target_compile_definitions(FengYinScreenRecorder PRIVATE WINVER=0x0A00 _WIN32_WINNT=0x0A00)
@@ -527,6 +529,15 @@ if(BUILD_TESTING)
     add_test(NAME realtime_midi_queue COMMAND FengYinRealtimeMidiQueueTests)
     add_executable(FengYinCaptureAudioTimelineTests tests/test_capture_audio_timeline.cpp)
     add_test(NAME capture_audio_timeline COMMAND FengYinCaptureAudioTimelineTests)
+    add_executable(FengYinBluetoothMidiTests tests/test_bluetooth_midi.cpp native/Source/BluetoothMidiService.cpp)
+    target_include_directories(FengYinBluetoothMidiTests PRIVATE native/Source)
+    target_link_libraries(FengYinBluetoothMidiTests PRIVATE juce::juce_audio_basics juce::juce_data_structures juce::juce_events juce::juce_recommended_config_flags)
+    if(WIN32)
+        target_link_libraries(FengYinBluetoothMidiTests PRIVATE windowsapp)
+        target_compile_options(FengYinBluetoothMidiTests PRIVATE /utf-8)
+    endif()
+    add_test(NAME bluetooth_midi_lifecycle COMMAND FengYinBluetoothMidiTests)
+    set_tests_properties(bluetooth_midi_lifecycle PROPERTIES TIMEOUT 20)
     add_executable(FengYinMidiOnsetTests tests/test_midi_onset.cpp native/Source/MidiInputService.cpp)
     target_include_directories(FengYinMidiOnsetTests PRIVATE native/Source)
     target_link_libraries(FengYinMidiOnsetTests PRIVATE juce::juce_audio_devices juce::juce_data_structures juce::juce_recommended_config_flags)

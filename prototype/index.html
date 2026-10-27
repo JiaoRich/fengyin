@@ -262,7 +262,19 @@ body.compact-mode .compact-action-row>button{width:100%!important}
 body.compact-mode #music-tempo{grid-column:1/-1;justify-content:center;flex-wrap:wrap}
 .global-controls #theme-button{margin-left:auto}
 </style>
-</head>
+<style>
+.sidebar-status{cursor:pointer}.sidebar-status:focus-visible{outline:2px solid var(--accent)}
+.midi-dialog{width:min(620px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto}
+.midi-dialog h2{margin:0 0 12px}.midi-dialog p{color:var(--muted);line-height:1.6}
+.midi-device-list{display:grid;gap:10px;margin:14px 0}.midi-device{display:flex;gap:12px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+.midi-device .device-label{flex:1;min-width:0}.midi-device b{display:block;overflow-wrap:anywhere}.midi-device small{display:block;margin-top:5px;color:var(--muted)}
+.midi-device.unavailable .device-label{opacity:.45}.midi-device.connected{border-color:var(--accent)}
+.midi-device button,.midi-toolbar button,.midi-confirm button{border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--text);padding:10px 14px;cursor:pointer}
+.midi-device button:disabled{opacity:.45;cursor:default}.midi-toolbar{display:flex;gap:12px;justify-content:space-between;align-items:center}.midi-toolbar button{flex-shrink:0}
+#midi-connection-message{min-height:25px;margin:12px 0;font-size:14px}.midi-confirm{padding:14px;background:var(--panel);border:1px solid var(--accent);border-radius:12px;margin:12px 0}.midi-confirm footer{display:flex;gap:12px;justify-content:flex-end}
+#midi-usb-list:empty{display:none}#compact-midi-connect{font-size:12px;flex-shrink:0;touch-action:manipulation}
+@media(max-width:540px){.midi-device{gap:8px;padding:10px}.midi-device button{padding:10px}.compact-brand span{display:none!important}}
+</style></head>
 <body data-theme="neon">
   <div class="ambient ambient-a"></div>
   <div class="ambient ambient-b"></div>
@@ -280,14 +292,14 @@ body.compact-mode #music-tempo{grid-column:1/-1;justify-content:center;flex-wrap
         <button class="nav-item" data-page="wind"><span>✦</span>智能适配</button>
         <button class="nav-item" data-page="settings"><span>⚙</span>高级设置</button>
       </nav>
-      <div class="sidebar-status">
+      <div class="sidebar-status" role="button" tabindex="0" aria-label="连接电吹管">
         <span class="status-dot"></span>
-        <div><b>尚未连接电吹管</b><small>连接电吹管后即可演奏</small></div>
+        <div><b>尚未连接电吹管</b><small>点击连接</small></div>
       </div>
     </aside>
 
     <main>
-      <div class="window-mode-bar"><div class="compact-brand"><strong>风吟 · 精简模式</strong><span>更好用的智能软音源平台 · 公众号：风吟软音源</span></div><button id="window-mode-toggle" type="button">精简模式</button></div>
+      <div class="window-mode-bar"><div class="compact-brand"><strong>风吟 · 精简模式</strong><span>更好用的智能软音源平台 · 公众号：风吟软音源</span></div><button id="compact-midi-connect" type="button">连接电吹管</button><button id="window-mode-toggle" type="button">精简模式</button></div>
       <header>
         <div><p class="eyebrow" id="time-greeting">您好</p><h1 id="page-title">开始演奏</h1></div>
         <div class="top-brand-message" aria-label="风吟品牌说明"><strong>更好用的智能软音源平台</strong><span>公众号：风吟软音源</span></div>
@@ -391,7 +403,7 @@ body.compact-mode #music-tempo{grid-column:1/-1;justify-content:center;flex-wrap
       </div><div class="audio-summary"><div><span>预计延迟</span><strong class="green" id="audio-latency-value">正在检测…</strong></div><p id="audio-apply-status" role="status"></p></div>
       <div class="super-latency-card" hidden><div><span>板载声卡进阶优化</span><strong>超级低延迟优化</strong><p id="super-latency-status">正在检查系统声卡…</p></div><div class="super-latency-actions"><button id="restore-audio-driver" type="button" hidden>恢复原驱动</button><button id="super-latency-optimize" class="primary-button" type="button">开始优化</button></div></div></section>
       <section class="advanced-card glass"><h3>授权与激活</h3><div class="activation"><div><h3 id="license-title">可开始1小时完整试用</h3><div class="machine-code-row"><span id="machine-code">本机识别码：正在读取…</span><button id="copy-machine-code" type="button">复制</button></div></div><div class="license-actions"><button id="start-trial" type="button">开始1小时完整试用</button><label class="license-code-label" for="license-code">激活码</label><input id="license-code" placeholder="请输入此设备的激活码"><button id="activate" class="primary-button">激活</button></div></div></section></div>
-      <div class="advanced-extras"><div id="advanced-voice"></div><div id="advanced-studio"></div></div><p class="prototype-note">风吟 1.1.34</p></div></section>
+      <div class="advanced-extras"><div id="advanced-voice"></div><div id="advanced-studio"></div></div><p class="prototype-note">风吟 1.1.35</p></div></section>
     </main>
   </div>
   <div id="record-menu" class="inline-choice" role="menu" aria-label="选择录制类型" hidden><button type="button" role="menuitem" data-record-kind="audio">录音</button><button type="button" role="menuitem" data-record-kind="video">录屏</button></div>
