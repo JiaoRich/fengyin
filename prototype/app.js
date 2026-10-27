@@ -3158,6 +3158,11 @@ function confirmMidiAction(text,action){
   $('#midi-confirm-text').textContent=text;$('#midi-confirm').hidden=false;
   midiConfirmation=action;$('#midi-confirm-cancel').focus();
 }
+function midiDeviceDisambiguator(id){
+  // Windows IDs often end with the same interface GUID; a suffix cannot identify a device.
+  let hash=2166136261;for(const character of String(id)){hash^=character.codePointAt(0);hash=Math.imul(hash,16777619);}
+  return (hash>>>0).toString(16).padStart(8,'0').toUpperCase();
+}
 function renderMidiConnection(state){
   midiConnectionState=state;
   const busy=!!state.connectingId;
@@ -3173,7 +3178,7 @@ function renderMidiConnection(state){
       const connected=row.id===state.connectedId,connecting=row.id===state.connectingId;
       const card=document.createElement('div');card.className='midi-device'+(connected?' connected':!row.available?' unavailable':'');
       const label=document.createElement('div');label.className='device-label';
-      const name=document.createElement('b');name.textContent=(row.name||'蓝牙 MIDI 电吹管')+((state.devices||[]).filter(d=>d.name===row.name).length>1?` · ${row.id.slice(-6)}`:'');
+      const name=document.createElement('b');name.title=row.id;name.textContent=(row.name||'蓝牙 MIDI 电吹管')+((state.devices||[]).filter(d=>d.name===row.name).length>1?` · ${midiDeviceDisambiguator(row.id)}`:'');
       const status=document.createElement('small');status.textContent=connected?'已连接 · 蓝牙 MIDI':connecting?'正在连接…':row.available?'已发现 · 可连接':'历史设备 · 当前未发现';
       label.append(name,status);card.append(label);
       const button=document.createElement('button');button.type='button';button.textContent=connected?'断开':connecting?'取消连接':'连接';

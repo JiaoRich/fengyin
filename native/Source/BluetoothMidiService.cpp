@@ -153,6 +153,7 @@ struct BluetoothMidiService::Impl : juce::Thread
     }
     void stopScan()
     {
+        scanUntil=0; // No stale scan timeout may overwrite a later connected/disconnected state.
         ++scanEpoch;
         if(watcher) {try{watcher.Received(receivedToken);watcher.Stopped(stoppedToken);watcher.Stop();}catch(...){}watcher=nullptr;}
         std::lock_guard lock(mutex); scanning=false; adverts.clear();

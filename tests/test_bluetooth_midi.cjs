@@ -8,6 +8,7 @@ await page.goto(pathToFileURL(path.resolve('prototype/index.html')).href);
 await page.evaluate(()=>{$('#license-lock').hidden=true;});
 await page.locator('.sidebar-status').click();assert(await page.locator('#midi-connection-dialog').isVisible());
 const state={supported:true,devices:[{id:'a',name:'同名电吹管',available:false,remembered:true},{id:'b',name:'同名电吹管',available:true,remembered:true},{id:'c',name:'<script>bad()</script>',available:true}],usbDevices:[{id:'usb-a',name:'USB MIDI'}]};
+assert.notEqual(await page.evaluate(()=>midiDeviceDisambiguator('BluetoothLE#deviceA#{781AEE18-7733-4CE4-ADD0-91F41C67B592}')),await page.evaluate(()=>midiDeviceDisambiguator('BluetoothLE#deviceB#{781AEE18-7733-4CE4-ADD0-91F41C67B592}')));
 await page.evaluate(state=>renderMidiConnection(state),state);
 let cards=page.locator('#midi-device-list .midi-device');assert.equal(await cards.count(),3);
 assert.equal(await page.locator('.midi-device.unavailable').count(),1);
