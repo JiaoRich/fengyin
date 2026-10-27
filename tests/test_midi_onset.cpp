@@ -12,6 +12,7 @@
 
 namespace fengyin {
 struct MidiInputServiceTestAccess {
+    static void seedDeviceCache(MidiInputService& service) { service.availableDeviceCache={{"test-only stale USB", "test-only-stale-usb"}}; }
     static void useTestSettings(MidiInputService& service, const juce::File& folder) {
         juce::PropertiesFile::Options options;
         options.applicationName="ReconnectTests";options.filenameSuffix=".settings";
@@ -60,7 +61,9 @@ int main() {
         input.acceptExternalMessage(juce::MidiMessage::controllerEvent(1,11,100));
         input.acceptExternalMessage(juce::MidiMessage::noteOn(1,64,juce::uint8(100)));
         assert(input.getSnapshot().lastNote==64 && input.getSnapshot().breath>.7f);
-        input.pollConnection(); // An open external MIDI port must not be replaced by WinMM polling.
+        fengyin::MidiInputServiceTestAccess::seedDeviceCache(input);
+        input.pollConnection(); // Refresh USB choices without replacing an open external input.
+        for(const auto& device:input.getLastAvailableDevices())assert(device.identifier!="test-only-stale-usb");
         assert(input.getConnectionGeneration()==generation && input.isExternalConnected());
         input.disconnect();
         assert(!input.getSnapshot().deviceConnected && input.getSnapshot().lastNote==-1);

@@ -144,9 +144,10 @@ void MidiInputService::refreshAndConnectFirstAvailable()
 
 void MidiInputService::pollConnection()
 {
-    if (externalConnected) return;
     const auto devices = juce::MidiInput::getAvailableDevices();
     availableDeviceCache.assign(devices.begin(), devices.end());
+    // Refresh the selectable USB list even while BLE owns the active input.
+    if (externalConnected) return;
     if (input != nullptr)
     {
         for (const auto& device : devices)
