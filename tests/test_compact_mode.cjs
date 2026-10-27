@@ -7,6 +7,9 @@ const { pathToFileURL } = require('node:url');
   try {
     const page = await browser.newPage({viewport:{width:600,height:800}});
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
+    // This test exercises compact controls. The onboarding flow has its own
+    // complete interaction test; its delayed offer must not race theme clicks.
+    await page.addInitScript(()=>{localStorage.setItem('fy-guide-seen','yes');localStorage.setItem('fy-voice-enabled','no');});
     await page.goto(pathToFileURL(path.resolve('prototype/index.html')).href);
     await page.evaluate(()=>{
       document.querySelector('#license-lock').hidden=true;

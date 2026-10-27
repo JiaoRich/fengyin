@@ -28,7 +28,8 @@ int main(int argc, char** argv)
         juce::Array<juce::var> slots;
         for (auto slot : state.getChildWithName("PresetList")) {
             auto* item = new juce::DynamicObject();
-            for (const auto* name : {"KAI", "Preset", "IndexSelectedKeyswitch", "KeyswitchNames"})
+            for (const auto* name : {"KAI", "Preset", "IndexSelectedKeyswitch", "KeyswitchNames",
+                                     "NoteRanges", "KeyswitchLo", "KeyswitchHi"})
                 item->setProperty(name, slot.getProperty(name));
             item->setProperty("channel", int(slot.getProperty("MIDI", -1)) + 1);
             const auto names = slot.getProperty("KeyswitchNames");

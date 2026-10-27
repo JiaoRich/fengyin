@@ -1,0 +1,774 @@
+{
+  "version": "1.1.34",
+  "userAuthorized": true,
+  "method": "Existing preset outputGain only; no new limiter, compressor, AGC or per-note gain",
+  "baseline": "tests/fixtures/kong-gain-before-134.zip",
+  "performanceFaderTested": 1.5,
+  "targetPeak": 0.6,
+  "verificationCeiling": 0.63,
+  "scope": "13 bundled Qin instruments; external/custom packages and accompaniment are not rewritten",
+  "targets": [
+    {
+      "file": "folk-bangdi.fytonepack",
+      "beforeSha256": "c1893cf49d74c048f3593930d9aea569eaff4fd3068e46fdf12767222e20544b",
+      "afterSha256": "1142c6de2652c709bc9ac7979ab47acaef439f044fe8cf07b58586a492701db5",
+      "beforeGainText": "1.9952623149688795",
+      "afterGainText": "0.11677065445047281",
+      "gainDeltaDb": -24.653325714937004,
+      "measuredPeakBefore": 10.234933853149414,
+      "oversampledPeak4xBefore": 10.25221100810984,
+      "cases": 708,
+      "preservedEntries": {
+        "instrument.KAM": "69fde6308bc8643e52155b8685abdf53fce4ccb1f0819a1ced05067fb444f2a2"
+      },
+      "lastRefinement": {
+        "measuredPackageSha256": "1142c6de2652c709bc9ac7979ab47acaef439f044fe8cf07b58586a492701db5",
+        "measuredGain": 0.11677065445047281,
+        "peak": 0.6000000307261446,
+        "protocol": 2
+      },
+      "initialCases": 144,
+      "verification": {
+        "44100": {
+          "packageSha256": "1142c6de2652c709bc9ac7979ab47acaef439f044fe8cf07b58586a492701db5",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.598988890647888,
+          "oversampledPeak4x": 0.6000000307261446,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 708,
+          "fullExpressionAttackCases": 564,
+          "preHeldTechniqueAttackCases": 282,
+          "longToneCases": 3
+        },
+        "48000": {
+          "packageSha256": "1142c6de2652c709bc9ac7979ab47acaef439f044fe8cf07b58586a492701db5",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.585112571716309,
+          "oversampledPeak4x": 0.5863063530822754,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 708,
+          "fullExpressionAttackCases": 564,
+          "preHeldTechniqueAttackCases": 282,
+          "longToneCases": 3
+        }
+      }
+    },
+    {
+      "file": "folk-dongxiao.fytonepack",
+      "beforeSha256": "09eace54847034229018ce749a342c6b248a3abefcd05139760cbddd214f5b57",
+      "afterSha256": "6b01d5ee6ece6b38454f6a0b6d5ba67c7d973059f822a3c98870a6bdb95dc574",
+      "beforeGainText": "1.9952623149688795",
+      "afterGainText": "0.20014088735740845",
+      "gainDeltaDb": -19.97328358062424,
+      "measuredPeakBefore": 5.961596965789795,
+      "oversampledPeak4xBefore": 5.98157330462647,
+      "cases": 399,
+      "preservedEntries": {
+        "instrument.KAM": "309faa89a47970fbf846efbcf7ea875cf1f8064933bce8e0ce8dae9db4243185"
+      },
+      "lastRefinement": {
+        "measuredPackageSha256": "6b01d5ee6ece6b38454f6a0b6d5ba67c7d973059f822a3c98870a6bdb95dc574",
+        "measuredGain": 0.20014088735740845,
+        "peak": 0.6222209023691653,
+        "protocol": 2
+      },
+      "initialCases": 135,
+      "verification": {
+        "44100": {
+          "packageSha256": "6b01d5ee6ece6b38454f6a0b6d5ba67c7d973059f822a3c98870a6bdb95dc574",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.597996234893799,
+          "oversampledPeak4x": 0.6000000278708493,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 399,
+          "fullExpressionAttackCases": 264,
+          "preHeldTechniqueAttackCases": 0,
+          "longToneCases": 3
+        },
+        "48000": {
+          "packageSha256": "6b01d5ee6ece6b38454f6a0b6d5ba67c7d973059f822a3c98870a6bdb95dc574",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.618971705436707,
+          "oversampledPeak4x": 0.6222209023691653,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 399,
+          "fullExpressionAttackCases": 264,
+          "preHeldTechniqueAttackCases": 0,
+          "longToneCases": 3
+        }
+      }
+    },
+    {
+      "file": "folk-erhu.fytonepack",
+      "beforeSha256": "83d0580a474301e5848b34d036bc1d70181822864a256eb4756f628465f8d275",
+      "afterSha256": "6552a5e1bad08c5c219b24df872f4bc74996430185804905ce252b37bba2af79",
+      "beforeGainText": "1.9952623149688795",
+      "afterGainText": "0.20749745299408703",
+      "gainDeltaDb": -19.65974459661871,
+      "measuredPeakBefore": 5.758787155151367,
+      "oversampledPeak4xBefore": 5.769504018998453,
+      "cases": 633,
+      "preservedEntries": {
+        "instrument.KAM": "edc8b347a399e673eb6ffe2a129717dda510cf31c4d172eb81e3023379b206be"
+      },
+      "lastRefinement": {
+        "measuredPackageSha256": "6552a5e1bad08c5c219b24df872f4bc74996430185804905ce252b37bba2af79",
+        "measuredGain": 0.20749745299408703,
+        "peak": 0.6084284764053741,
+        "protocol": 2
+      },
+      "initialCases": 129,
+      "verification": {
+        "44100": {
+          "packageSha256": "6552a5e1bad08c5c219b24df872f4bc74996430185804905ce252b37bba2af79",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.608088433742523,
+          "oversampledPeak4x": 0.6084284764053741,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 633,
+          "fullExpressionAttackCases": 504,
+          "preHeldTechniqueAttackCases": 252,
+          "longToneCases": 3
+        },
+        "48000": {
+          "packageSha256": "6552a5e1bad08c5c219b24df872f4bc74996430185804905ce252b37bba2af79",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.58935022354126,
+          "oversampledPeak4x": 0.5897627650200229,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 633,
+          "fullExpressionAttackCases": 504,
+          "preHeldTechniqueAttackCases": 252,
+          "longToneCases": 3
+        }
+      }
+    },
+    {
+      "file": "folk-hulusi.fytonepack",
+      "beforeSha256": "c7891ba44239100f1ae57b0d815304b597c0630b9a7dd25650b248e11144bf2a",
+      "afterSha256": "7c90b47be829db3b8e5807c14ea5da1192cfc73045aaf587511ff5f0d7cefd08",
+      "beforeGainText": "1.9952623149688795",
+      "afterGainText": "0.1601913247694868",
+      "gainDeltaDb": -21.907220140411077,
+      "measuredPeakBefore": 6.134505271911621,
+      "oversampledPeak4xBefore": 6.140603709408409,
+      "cases": 291,
+      "preservedEntries": {
+        "instrument.KAM": "1c000e289fc4a082fbed9255f9606e51a6a788223bd58ba3d44c308cc4da1971"
+      },
+      "lastRefinement": {
+        "measuredPackageSha256": "035f9dbfd1841d6c7a0a134c7ba7cf4c7b8c4122614fcdad4e9322bca6317e5b",
+        "measuredGain": 0.1949576044366919,
+        "peak": 0.6693663504841997,
+        "protocol": 2
+      },
+      "initialCases": 99,
+      "verification": {
+        "44100": {
+          "packageSha256": "7c90b47be829db3b8e5807c14ea5da1192cfc73045aaf587511ff5f0d7cefd08",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.549658060073853,
+          "oversampledPeak4x": 0.550000015676524,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 291,
+          "fullExpressionAttackCases": 192,
+          "preHeldTechniqueAttackCases": 0,
+          "longToneCases": 3
+        },
+        "48000": {
+          "packageSha256": "7c90b47be829db3b8e5807c14ea5da1192cfc73045aaf587511ff5f0d7cefd08",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.548436045646667,
+          "oversampledPeak4x": 0.5484402302070732,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 291,
+          "fullExpressionAttackCases": 192,
+          "preHeldTechniqueAttackCases": 0,
+          "longToneCases": 3
+        }
+      }
+    },
+    {
+      "file": "folk-jinghu.fytonepack",
+      "beforeSha256": "e20f5b18dc4dadf300a9cf710472a2d33f7bb175258b928a570f7a81f2253abf",
+      "afterSha256": "28800ff52cfbe5f20dd80873e72e37a7bd9f48189062ef72cfb06d88ff1a1e72",
+      "beforeGainText": "1.995262265205383",
+      "afterGainText": "0.14722051612733819",
+      "gainDeltaDb": -22.640633064311512,
+      "measuredPeakBefore": 6.292939186096191,
+      "oversampledPeak4xBefore": 6.397233481081086,
+      "cases": 588,
+      "preservedEntries": {
+        "instrument.KAM": "888ada05a7894fda04afcf319cdf995263fa0931418f9861dba0a4c2e61d4bf5"
+      },
+      "lastRefinement": {
+        "measuredPackageSha256": "7af38780c6821d73346180c0e25db834e1adccdf68ded0844221ab525d316971",
+        "measuredGain": 0.18713673069204892,
+        "peak": 0.699122680643246,
+        "protocol": 2
+      },
+      "initialCases": 120,
+      "verification": {
+        "44100": {
+          "packageSha256": "28800ff52cfbe5f20dd80873e72e37a7bd9f48189062ef72cfb06d88ff1a1e72",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.540390133857727,
+          "oversampledPeak4x": 0.5496974320958541,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 588,
+          "fullExpressionAttackCases": 468,
+          "preHeldTechniqueAttackCases": 234,
+          "longToneCases": 3
+        },
+        "48000": {
+          "packageSha256": "28800ff52cfbe5f20dd80873e72e37a7bd9f48189062ef72cfb06d88ff1a1e72",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.547845602035522,
+          "oversampledPeak4x": 0.5500000068921489,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 588,
+          "fullExpressionAttackCases": 468,
+          "preHeldTechniqueAttackCases": 234,
+          "longToneCases": 3
+        }
+      }
+    },
+    {
+      "file": "folk-liuqin.fytonepack",
+      "beforeSha256": "135b4e5132a1d06aad38211947362467140419b113b475baca95c2f5e8848fa8",
+      "afterSha256": "e93eb3176ceaed322d5b88e887a037660ce278ca4e6636e8218fab4005904358",
+      "beforeGainText": "1.995262265205383",
+      "afterGainText": "0.17926806350998128",
+      "gainDeltaDb": -20.929941239949574,
+      "measuredPeakBefore": 6.673556327819824,
+      "oversampledPeak4xBefore": 6.678029179785135,
+      "cases": 444,
+      "preservedEntries": {
+        "instrument.KAM": "d12b72b6f49c447f34335394338bf3e45af5fb4829bee0c4dd11cdf72816bd83"
+      },
+      "lastRefinement": {
+        "measuredPackageSha256": "e93eb3176ceaed322d5b88e887a037660ce278ca4e6636e8218fab4005904358",
+        "measuredGain": 0.17926806350998128,
+        "peak": 0.6058768985563497,
+        "protocol": 2
+      },
+      "initialCases": 150,
+      "verification": {
+        "44100": {
+          "packageSha256": "e93eb3176ceaed322d5b88e887a037660ce278ca4e6636e8218fab4005904358",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.605258941650391,
+          "oversampledPeak4x": 0.6058768985563497,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 444,
+          "fullExpressionAttackCases": 294,
+          "preHeldTechniqueAttackCases": 147,
+          "longToneCases": 3
+        },
+        "48000": {
+          "packageSha256": "e93eb3176ceaed322d5b88e887a037660ce278ca4e6636e8218fab4005904358",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.600701808929443,
+          "oversampledPeak4x": 0.6010296722598979,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 444,
+          "fullExpressionAttackCases": 294,
+          "preHeldTechniqueAttackCases": 147,
+          "longToneCases": 3
+        }
+      }
+    },
+    {
+      "file": "folk-matouqin.fytonepack",
+      "beforeSha256": "50f38a4653ba328bc7d6fd3ea95156784719abc66a961ee6866df6c442973641",
+      "afterSha256": "c41be2772d51376f198556a36bc94ae99e4355cd42125c8839c8d08c65417570",
+      "beforeGainText": "1.9952623149688795",
+      "afterGainText": "0.29374456021362616",
+      "gainDeltaDb": -16.64060334486064,
+      "measuredPeakBefore": 4.075473785400391,
+      "oversampledPeak4xBefore": 4.07550488121616,
+      "cases": 372,
+      "preservedEntries": {
+        "instrument.KAM": "948ae1db3f6e05f7cd17b85d140c14d296b647a1aa7eccb349c0efcde80aa676"
+      },
+      "lastRefinement": {
+        "measuredPackageSha256": "c41be2772d51376f198556a36bc94ae99e4355cd42125c8839c8d08c65417570",
+        "measuredGain": 0.29374456021362616,
+        "peak": 0.6288911404438408,
+        "protocol": 2
+      },
+      "initialCases": 126,
+      "verification": {
+        "44100": {
+          "packageSha256": "c41be2772d51376f198556a36bc94ae99e4355cd42125c8839c8d08c65417570",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.599995374679565,
+          "oversampledPeak4x": 0.5999999526370291,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 372,
+          "fullExpressionAttackCases": 246,
+          "preHeldTechniqueAttackCases": 0,
+          "longToneCases": 3
+        },
+        "48000": {
+          "packageSha256": "c41be2772d51376f198556a36bc94ae99e4355cd42125c8839c8d08c65417570",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.628886342048645,
+          "oversampledPeak4x": 0.6288911404438408,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 372,
+          "fullExpressionAttackCases": 246,
+          "preHeldTechniqueAttackCases": 0,
+          "longToneCases": 3
+        }
+      }
+    },
+    {
+      "file": "folk-nanxiao.fytonepack",
+      "beforeSha256": "4912425545cd8b720f2e0822a6704dae7b245bb23cc6b4b0e2ab77dc5b9b0257",
+      "afterSha256": "c19400bd67d8fc5d398e849222eda24cdf273a639a73a4025496663b1d65aa00",
+      "beforeGainText": "1.9952623149688795",
+      "afterGainText": "0.16855485811755386",
+      "gainDeltaDb": -21.46517451302447,
+      "measuredPeakBefore": 7.102425098419189,
+      "oversampledPeak4xBefore": 7.102479289836926,
+      "cases": 336,
+      "preservedEntries": {
+        "instrument.KAM": "ed7413eca8c0e0cbd286ef4a4c58acde48e0f45ce0a98f27ca266bc90add4a2a"
+      },
+      "lastRefinement": {
+        "measuredPackageSha256": "c19400bd67d8fc5d398e849222eda24cdf273a639a73a4025496663b1d65aa00",
+        "measuredGain": 0.16855485811755386,
+        "peak": 0.5999999526370291,
+        "protocol": 2
+      },
+      "initialCases": 114,
+      "verification": {
+        "44100": {
+          "packageSha256": "c19400bd67d8fc5d398e849222eda24cdf273a639a73a4025496663b1d65aa00",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.599995374679565,
+          "oversampledPeak4x": 0.5999999526370291,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 336,
+          "fullExpressionAttackCases": 222,
+          "preHeldTechniqueAttackCases": 0,
+          "longToneCases": 3
+        },
+        "48000": {
+          "packageSha256": "c19400bd67d8fc5d398e849222eda24cdf273a639a73a4025496663b1d65aa00",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.594658374786377,
+          "oversampledPeak4x": 0.5957178021068604,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 336,
+          "fullExpressionAttackCases": 222,
+          "preHeldTechniqueAttackCases": 0,
+          "longToneCases": 3
+        }
+      }
+    },
+    {
+      "file": "folk-pipa.fytonepack",
+      "beforeSha256": "bfb85c7569002955df28615d6c40817faf308bc5eb2b5c1a785655b8f30d51bf",
+      "afterSha256": "9353171077fe902f1f9437ef43b5518d4737b9706b1c7a72c06cbdb83707f0a8",
+      "beforeGainText": "1.995262265205383",
+      "afterGainText": "0.18498350909621919",
+      "gainDeltaDb": -20.657339510197126,
+      "measuredPeakBefore": 6.469841957092285,
+      "oversampledPeak4xBefore": 6.47169774739503,
+      "cases": 417,
+      "preservedEntries": {
+        "instrument.KAM": "d2e35d0907feb1132676761f9ec0385c41e079627a1142ba94f2429bb4e82d2b"
+      },
+      "lastRefinement": {
+        "measuredPackageSha256": "9353171077fe902f1f9437ef43b5518d4737b9706b1c7a72c06cbdb83707f0a8",
+        "measuredGain": 0.1849835090962192,
+        "peak": 0.6182385262369802,
+        "protocol": 2
+      },
+      "initialCases": 141,
+      "verification": {
+        "44100": {
+          "packageSha256": "9353171077fe902f1f9437ef43b5518d4737b9706b1c7a72c06cbdb83707f0a8",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.599827945232391,
+          "oversampledPeak4x": 0.6000000010959495,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 417,
+          "fullExpressionAttackCases": 276,
+          "preHeldTechniqueAttackCases": 138,
+          "longToneCases": 3
+        },
+        "48000": {
+          "packageSha256": "9353171077fe902f1f9437ef43b5518d4737b9706b1c7a72c06cbdb83707f0a8",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.613115072250366,
+          "oversampledPeak4x": 0.6182385262369802,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 417,
+          "fullExpressionAttackCases": 276,
+          "preHeldTechniqueAttackCases": 138,
+          "longToneCases": 3
+        }
+      }
+    },
+    {
+      "file": "folk-qudi.fytonepack",
+      "beforeSha256": "7bee01d06ab1cd3e02b956d0396837a4b1714152f6cb4fe7ec0d00aa69be81f3",
+      "afterSha256": "d2eb04f9a5267944aa8d56f1dfc1bed2ce19ffec1941978756539eb4c4fc9aab",
+      "beforeGainText": "1.9952623149688795",
+      "afterGainText": "0.10375603996800009",
+      "gainDeltaDb": -25.679732244428884,
+      "measuredPeakBefore": 11.51963996887207,
+      "oversampledPeak4xBefore": 11.538194685827918,
+      "cases": 768,
+      "preservedEntries": {
+        "instrument.KAM": "40c20fd0e4ab4d4fb2895c30c460d304e8d0fc4fdbc9b0f6cd80fffc909b2203"
+      },
+      "lastRefinement": {
+        "measuredPackageSha256": "d2eb04f9a5267944aa8d56f1dfc1bed2ce19ffec1941978756539eb4c4fc9aab",
+        "measuredGain": 0.10375603996800009,
+        "peak": 0.6000000187143888,
+        "protocol": 2
+      },
+      "initialCases": 156,
+      "verification": {
+        "44100": {
+          "packageSha256": "d2eb04f9a5267944aa8d56f1dfc1bed2ce19ffec1941978756539eb4c4fc9aab",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.599035143852234,
+          "oversampledPeak4x": 0.6000000187143888,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 768,
+          "fullExpressionAttackCases": 612,
+          "preHeldTechniqueAttackCases": 306,
+          "longToneCases": 3
+        },
+        "48000": {
+          "packageSha256": "d2eb04f9a5267944aa8d56f1dfc1bed2ce19ffec1941978756539eb4c4fc9aab",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.586744070053101,
+          "oversampledPeak4x": 0.5881004385353695,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 768,
+          "fullExpressionAttackCases": 612,
+          "preHeldTechniqueAttackCases": 306,
+          "longToneCases": 3
+        }
+      }
+    },
+    {
+      "file": "folk-sanxian.fytonepack",
+      "beforeSha256": "2f5bb4fa33a108820e65921ac44d976a38897362be98567c841219d04944fed1",
+      "afterSha256": "6f365bb47e1df9f4df1e46e3201ec3be80ecf838ac5dc427f8d1327899fe9fc2",
+      "beforeGainText": "1.9952623149688795",
+      "afterGainText": "0.15552990209894474",
+      "gainDeltaDb": -22.16372202751873,
+      "measuredPeakBefore": 7.697039604187012,
+      "oversampledPeak4xBefore": 7.697281184037023,
+      "cases": 444,
+      "preservedEntries": {
+        "instrument.KAM": "82f46aae06dfd48b0fd414f010ee2e910ee8b018bdaed9ec73e007a3f26640ba"
+      },
+      "lastRefinement": {
+        "measuredPackageSha256": "6f365bb47e1df9f4df1e46e3201ec3be80ecf838ac5dc427f8d1327899fe9fc2",
+        "measuredGain": 0.15552990209894474,
+        "peak": 0.6154887557085922,
+        "protocol": 2
+      },
+      "initialCases": 150,
+      "verification": {
+        "44100": {
+          "packageSha256": "6f365bb47e1df9f4df1e46e3201ec3be80ecf838ac5dc427f8d1327899fe9fc2",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.599981129169464,
+          "oversampledPeak4x": 0.5999999618896713,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 444,
+          "fullExpressionAttackCases": 294,
+          "preHeldTechniqueAttackCases": 147,
+          "longToneCases": 3
+        },
+        "48000": {
+          "packageSha256": "6f365bb47e1df9f4df1e46e3201ec3be80ecf838ac5dc427f8d1327899fe9fc2",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.615298569202423,
+          "oversampledPeak4x": 0.6154887557085922,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 444,
+          "fullExpressionAttackCases": 294,
+          "preHeldTechniqueAttackCases": 147,
+          "longToneCases": 3
+        }
+      }
+    },
+    {
+      "file": "folk-suona.fytonepack",
+      "beforeSha256": "06d6865cd971bf4c508e440d985081ceaa70804c8fdc6ed4f001b17f16b92574",
+      "afterSha256": "9e6b1f271e94cc910e4b9e40e52b9abf24de950115d5584cc5475ac357b3ece1",
+      "beforeGainText": "1.9952623149688795",
+      "afterGainText": "0.077718664154919417",
+      "gainDeltaDb": -28.18949345509745,
+      "measuredPeakBefore": 15.32989501953125,
+      "oversampledPeak4xBefore": 15.403730905551733,
+      "cases": 663,
+      "preservedEntries": {
+        "instrument.KAM": "2b9d183aa8c2db5ab8469bdbb908271fc3c050319fb8fb185a22b7064a7aab7f"
+      },
+      "lastRefinement": {
+        "measuredPackageSha256": "9e6b1f271e94cc910e4b9e40e52b9abf24de950115d5584cc5475ac357b3ece1",
+        "measuredGain": 0.07771866415491942,
+        "peak": 0.6000000332831655,
+        "protocol": 2
+      },
+      "initialCases": 135,
+      "verification": {
+        "44100": {
+          "packageSha256": "9e6b1f271e94cc910e4b9e40e52b9abf24de950115d5584cc5475ac357b3ece1",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.597123980522156,
+          "oversampledPeak4x": 0.6000000332831655,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 663,
+          "fullExpressionAttackCases": 528,
+          "preHeldTechniqueAttackCases": 264,
+          "longToneCases": 3
+        },
+        "48000": {
+          "packageSha256": "9e6b1f271e94cc910e4b9e40e52b9abf24de950115d5584cc5475ac357b3ece1",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.530446231365204,
+          "oversampledPeak4x": 0.5305388180574097,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 663,
+          "fullExpressionAttackCases": 528,
+          "preHeldTechniqueAttackCases": 264,
+          "longToneCases": 3
+        }
+      }
+    },
+    {
+      "file": "folk-xun.fytonepack",
+      "beforeSha256": "d1cbe0d61f29038c9157baffb9504f937292f3bd82ea18abf8a322314d6f0de6",
+      "afterSha256": "8bc105dec362d35ffde6bdb0b16ed66b5305eda5f737e991b0a8062f9908899a",
+      "beforeGainText": "1.9952623149688795",
+      "afterGainText": "0.25675759718446117",
+      "gainDeltaDb": -17.809533944566876,
+      "measuredPeakBefore": 4.660129547119141,
+      "oversampledPeak4xBefore": 4.662597726840618,
+      "cases": 336,
+      "preservedEntries": {
+        "instrument.KAM": "e26f2e90280e7daa06c9b3df414caa6ea828517fd127d66a640581408ebfc6eb"
+      },
+      "lastRefinement": {
+        "measuredPackageSha256": "8bc105dec362d35ffde6bdb0b16ed66b5305eda5f737e991b0a8062f9908899a",
+        "measuredGain": 0.2567575971844612,
+        "peak": 0.6000000128214529,
+        "protocol": 2
+      },
+      "initialCases": 114,
+      "verification": {
+        "44100": {
+          "packageSha256": "8bc105dec362d35ffde6bdb0b16ed66b5305eda5f737e991b0a8062f9908899a",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.59968239068985,
+          "oversampledPeak4x": 0.6000000128214529,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 336,
+          "fullExpressionAttackCases": 222,
+          "preHeldTechniqueAttackCases": 0,
+          "longToneCases": 3
+        },
+        "48000": {
+          "packageSha256": "8bc105dec362d35ffde6bdb0b16ed66b5305eda5f737e991b0a8062f9908899a",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.589384794235229,
+          "oversampledPeak4x": 0.5895210994963324,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 336,
+          "fullExpressionAttackCases": 222,
+          "preHeldTechniqueAttackCases": 0,
+          "longToneCases": 3
+        }
+      }
+    }
+  ],
+  "signalPathSha256": {
+    "native/Source/PluginHostEngine.cpp": "f4385ce6e646c7d146bfa41c312153534d4c02b6d945e17f4f0e15b5aa92c3a8",
+    "native/Source/PluginHostEngine.h": "1b1752e6aa06116d26a12be0d296a75c0db13a0a871ec477e9802e027b2b8182",
+    "native/Source/KongDualSlotRouter.h": "965bcc033d82a0939faf3893758b2bcc3e8a39a4910306ba3cf51110392bf323",
+    "native/Source/MasterOutputService.cpp": "585ba91c1cc3e70937a21c78440bc2e0c414bced934d04c28d789be6b335e17d",
+    "native/Source/MasterOutputService.h": "aeff3c0a2e9ab4bbdaacafdad879d1c5c816c7ba0cf2f4feeff5e2eed7a187c8",
+    "native/Source/AirProcessor.h": "94f74ee2eb438875532f3729d479ba6ddedc3f9e56f60f3e6cdf0da3fd2d822a",
+    "native/Source/KongPerformancePolicy.h": "59104a6ce4beea3951a9e2a69a858b6ed92075970d20c2f34918fc0bff121883",
+    "native/Source/TonePackage.h": "1e5798d9e3f41a69febd02f9fedaf97906dfba4617f0eae52c196b7d8fd7a18a",
+    "native/Source/SoundPresetStore.cpp": "ce2fd7404292e3c97fa59354ef892217fd5ffe99e321a8f81b7c671a66de6d70"
+  },
+  "unchangedPackages": {
+    "tenor-warm.fytonepack": "5970e217e46f38657e865a27610570c3e01168b47401bcb52e8376a4fed6d5c7",
+    "trumpet.fytonepack": "e684cc85a1acdcc7f4ee2e5ff0cb55d306a6ca82776a271a25eaa2ee83130f4f",
+    "violin.fytonepack": "0afdaaa22ad6eb043538031524345ebe20938232accf803476046464b92d05d1",
+    "clarinet.fytonepack": "c167a309037e11ce4c0745caae8750883f17923c149fdf435e4d7d368c55d9b8",
+    "alto-pop.fytonepack": "23dfbb1b5bec2150cbed41f02b99d1d5fc7edef39151b0f645c9d1090a93e49e",
+    "soprano-pop.fytonepack": "5a9ec683ddf7f95306f6b2accfd6c663cbffbe62140674f80534433daaecee44",
+    "soprano-kenny.fytonepack": "d021cacda0757e640db48df05ec1674e01c9b69beb20507cebf3ca45c438ca43",
+    "alto-deep.fytonepack": "bc8369276703b79b3da8fbdc8798ec6aa1fe2f286f04f3a77f61290d12d0d1d2",
+    "piccolo-trumpet.fytonepack": "0aa5dc9c6acf4c96d0d7b5d863295783b422dd751eab108c8f50682f1fe1ef80",
+    "cello.fytonepack": "d790e492d885cbde61d9ee21a1a481847a91a95d32c9c84c9776382c73764af9",
+    "piccolo.fytonepack": "ed4530b597c77f2e5786429ffdc7031f8ae2c2f7d1ca88fe5fa5957b752e59a3",
+    "kontakt-kensa.fytonepack": "dcc34f9c6fa30bc6d7ec4fcf90e07cbb603b5d5cc5d45bd1e5228c8c0bf73a96",
+    "violin-soft.fytonepack": "13b335a663669a7fb05ef7512906249f548c79b6d38995e5edb63e2d9b6536ed",
+    "oboe.fytonepack": "52549a06da40994e61b9ffe377ab5e95af44990bc0ce371db730f2cb29981934",
+    "alto-jazz.fytonepack": "d8d79a3b1bb608c71849eedcffc1eaaa6adde5aaaf5a5692328cfa9d7f48a19f",
+    "violin-bright.fytonepack": "7ae59adc00fc5f3f6af573818987a56af93ca02ed7e9d2912ed5931bf07ee501",
+    "alto-trombone.fytonepack": "7fce4e536c89c770628c58a097cd9e1e6dc31ca34bf9cf97289701d5e8bb7978",
+    "tenor-mellow.fytonepack": "2e030da470553383072f0880723e1de846a2dfc886e07ac8ed5bfd87bc35f42e",
+    "tenor-air-pocket.fytonepack": "1d9712419f7aa05fbda836423002e2fa29904bd84ba3d27772d5a853a76741f2",
+    "flute.fytonepack": "e85210cae1c17187f76702b35f7fe7ccb7a08732a669668b58fa209f33b3bf73",
+    "bass-trombone.fytonepack": "64b0787263e8caa4013201e9d73e70d9e03de2965491a147b77822cfa3b2623a"
+  },
+  "auditToolSha256": "c1bcecae2709bc83a409b89da50c29bfc9ae901067076ddf7ca2fede1a4ea110",
+  "verificationSummary": {
+    "protocol": 2,
+    "sampleRates": [
+      44100,
+      48000
+    ],
+    "executedCases": 12798,
+    "maximumOversampledPeak4x": 0.6288911404438408,
+    "overloadSamples": 0,
+    "droppedMidi": 0,
+    "scope": "Offline instrument bus, all 13 current bundled Qin packages; no physical Windows device or arbitrary external accompaniment acceptance"
+  }
+}

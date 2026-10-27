@@ -12,18 +12,25 @@ class FolkLevels119(unittest.TestCase):
         self.assertEqual(len(audit['targets']),13)
         migration=json.loads((ROOT/'assets/tone-packages/kong-dual-slot-133-audit.json').read_text(encoding='utf-8'))
         migrated={row['file']:row for row in migration['targets']}
+        gain=json.loads((ROOT/'assets/tone-packages/kong-headroom-134-audit.json').read_text(encoding='utf-8'))
+        calibrated={row['file']:row for row in gain['targets']}
         with zipfile.ZipFile(ROOT/audit['baseline']) as base:
             for row in audit['targets']:
                 path=ROOT/'assets/tone-packages'/row['file']
+                raw=path.read_bytes()
+                newer=calibrated[row['file']]
+                self.assertEqual(hashlib.sha256(raw).hexdigest(),newer['afterSha256'])
+                with zipfile.ZipFile(ROOT/gain['baseline']) as previous:raw=previous.read(row['file'])
+                self.assertEqual(hashlib.sha256(raw).hexdigest(),newer['beforeSha256'])
                 if row['file'] in migrated:
                     newer=migrated[row['file']]
-                    self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),newer['afterSha256'])
-                    path=ROOT/newer['baseline']
-                    self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),newer['beforeSha256'])
-                self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),row['afterSha256'])
+                    self.assertEqual(hashlib.sha256(raw).hexdigest(),newer['afterSha256'])
+                    raw=(ROOT/newer['baseline']).read_bytes()
+                    self.assertEqual(hashlib.sha256(raw).hexdigest(),newer['beforeSha256'])
+                self.assertEqual(hashlib.sha256(raw).hexdigest(),row['afterSha256'])
                 self.assertEqual(hashlib.sha256(base.read(row['file'])).hexdigest(),row['beforeSha256'])
                 with zipfile.ZipFile(io.BytesIO(base.read(row['file']))) as z:a=ET.fromstring(z.read('tone.xml'))
-                with zipfile.ZipFile(path) as z:
+                with zipfile.ZipFile(io.BytesIO(raw)) as z:
                     self.assertIsNone(z.testzip());b=ET.fromstring(z.read('tone.xml'))
                     self.assertEqual(z.read('instrument.KAM'),decode(b.findtext('PRESET/KAM_PROJECT')))
                     for item in json.loads(z.read('manifest.json'))['files']:

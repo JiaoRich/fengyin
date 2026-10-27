@@ -468,7 +468,7 @@ jobs:
     if: ${{ !inputs.screen_capture_probe && !inputs.media_runtime_test && !inputs.vlc_webview_test && !inputs.media_integration_test && !inputs.diagnostic_only && !inputs.startup_comparison && !inputs.kong_test && !inputs.native_window_test }}
     name: Windows x64 Release
     runs-on: windows-2022
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - name: 获取源代码

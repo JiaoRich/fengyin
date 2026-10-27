@@ -320,6 +320,8 @@ int main()
     const auto files=bundled.findChildFiles(juce::File::findFiles,false,"*.fytonepack");
     // 33 published packages plus the retained, non-embedded legacy violin archive.
     assert(files.size()==34);
+    const auto gainAudit=juce::JSON::parse(bundled.getChildFile("kong-headroom-134-audit.json"));
+    assert(gainAudit["targets"].isArray() && gainAudit["targets"].size()==13);
     int routedFolkPackages=0, boostedPackages=0;
     for(const auto& file:files){
         juce::String error;const auto imported=fengyin::TonePackage::read(file,error);
@@ -330,6 +332,9 @@ int main()
             ++boostedPackages;
             const float expectedDb=imported->pluginBrand=="swam"?5.f:6.f;
             assert(std::abs(imported->outputGain - std::pow(10.f,expectedDb/20.f)) < 1e-6f);
+        }
+        if (imported->outputGain > 1.5f || imported->pluginBrand=="kong")
+        {
             const auto copy=directory.getChildFile("gain-roundtrip-"+file.getFileName());
             assert(fengyin::TonePackage::write(*imported,copy));
             const auto restored=fengyin::TonePackage::read(copy,error);assert(restored);
@@ -342,9 +347,18 @@ int main()
             ++routedFolkPackages;
             assert(imported->pluginBrand=="kong" && imported->kongTechniques.enabled);
             assert(imported->samplerState.getSize()>0 && imported->containerProjectState.getSize()>0);
+            bool calibrated=false;
+            for(const auto& row:*gainAudit["targets"].getArray())
+                if(row["file"].toString()==file.getFileName()) {
+                    const float expected=float(row["afterGainText"].toString().getDoubleValue());
+                    assert(expected>0 && expected<=float(row["beforeGainText"].toString().getDoubleValue()));
+                    assert(imported->outputGain==expected);
+                    calibrated=true;
+                }
+            assert(calibrated);
         }
     }
     assert(routedFolkPackages==13);
-    assert(boostedPackages==32);
+    assert(boostedPackages==19);
     assert(directory.deleteRecursively());
 }
