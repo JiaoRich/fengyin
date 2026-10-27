@@ -1,5 +1,5 @@
-#include "BluetoothMidiService.h"
 #pragma once
+#include "BluetoothMidiService.h"
 #include <array>
 
 #include <juce_gui_extra/juce_gui_extra.h>

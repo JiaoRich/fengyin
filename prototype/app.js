@@ -2321,7 +2321,7 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   const sideText = document.querySelector('.sidebar-status small');
   const windStatusPill = $('#wind-status-pill');
   const windStatusText = $('#wind-status-text');
-  if (sideTitle) sideTitle.textContent = connected ? (state.deviceName || '电吹管已连接') : '尚未连接电吹管';
+  if (sideTitle) sideTitle.textContent = connected ? `${state.deviceName || '电吹管'} · ${String(state.deviceIdentifier||'').startsWith('ble:')?'蓝牙':'USB'}` : '尚未连接电吹管';
   if (sideText) sideText.textContent = !connected ? '点击连接'
     : state.noteReceived ? '气息与音符信号正常'
     : Number(state.breath || 0) > 0.02 ? '已收到气息，尚未收到音符' : '已连接，等待吹奏信号';
@@ -3189,7 +3189,7 @@ function renderMidiConnection(state){
     }
     if(!rows.length){const empty=document.createElement('p');empty.textContent=state.scanning?'正在查找附近设备…':'尚无蓝牙 MIDI 设备。请开启电吹管蓝牙后搜索。';list.append(empty);}
     const usb=$('#midi-usb-list');usb.replaceChildren();
-    for(const row of state.usbDevices||[]){const card=document.createElement('div');card.className='midi-device';const label=document.createElement('div');label.className='device-label';const name=document.createElement('b');name.textContent=row.name;const hint=document.createElement('small');hint.textContent='有线 / 系统 MIDI 输入';label.append(name,hint);const button=document.createElement('button');button.type='button';const connected=state.inputConnected&&state.inputTransport==='usb'&&state.inputId===row.id;button.textContent=connected?'已连接':'使用此设备';button.disabled=connected||busy;button.onclick=()=>{const connect=()=>midiCommand('usb',row.id);if(state.inputConnected)confirmMidiAction('切换到此 MIDI 输入？当前演奏连接将断开。',connect);else connect();};card.append(label,button);usb.append(card);}
+    for(const row of state.usbDevices||[]){const card=document.createElement('div');card.className='midi-device';const label=document.createElement('div');label.className='device-label';const name=document.createElement('b');name.textContent=row.name;const hint=document.createElement('small');hint.textContent='有线 / 系统 MIDI 输入';label.append(name,hint);const button=document.createElement('button');button.type='button';const connected=state.inputConnected&&state.inputTransport==='usb'&&state.inputId===row.id;button.textContent=connected?'断开':'使用此设备';button.disabled=busy;button.onclick=()=>{if(connected){midiCommand('disconnect');return;}const connect=()=>midiCommand('usb',row.id);if(state.inputConnected)confirmMidiAction('切换到此 MIDI 输入？当前演奏连接将断开。',connect);else connect();};card.append(label,button);usb.append(card);}
   }
   const status=state.inputConnected?`${state.inputTransport==='bluetooth'?'蓝牙':'有线'} · ${state.inputName||'电吹管'}`:'连接电吹管';
   $('#compact-midi-connect').textContent=state.inputConnected?'管理连接':'连接电吹管';$('#compact-midi-connect').title=status;

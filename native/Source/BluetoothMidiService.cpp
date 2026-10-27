@@ -3,6 +3,7 @@
 #include <mutex>
 #include <map>
 #include <atomic>
+#include <optional>
 #if JUCE_WINDOWS
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Devices.Bluetooth.h>
@@ -48,7 +49,31 @@ struct BluetoothMidiService::Impl : juce::Thread
     std::deque<Advert> adverts;
     std::map<uint64_t, double> checked;
     std::atomic<bool> linkLost { false };
+    std::atomic<uint64_t> transportEpoch { 0 };
     const winrt::guid midiUuid { 0x03b80e5a, 0xede8, 0x4b33, { 0xa7,0x51,0x6c,0xe3,0x4e,0xc4,0xc7,0x00 } };
+    // Only the asynchronous API *start* runs on the UI thread (Windows consent
+    // requirement). No .get(), pairing wait, discovery or port I/O blocks that thread.
+    template<class Factory> auto beginOnUi(Factory factory, unsigned ticket)
+    {
+        using Operation=decltype(factory());
+        struct Pending { std::mutex mutex; std::optional<Operation> operation; std::exception_ptr error; bool ready=false; std::atomic<bool> canceled{false}; };
+        auto pending=std::make_shared<Pending>();
+        if(!juce::MessageManager::callAsync([this,guard=lifetime,pending,ticket,factory=std::move(factory)]() mutable {
+            std::lock_guard callbackLock(guard->mutex);
+            std::lock_guard resultLock(pending->mutex);
+            if(!guard->alive || pending->canceled || generation.load()!=ticket) pending->error=std::make_exception_ptr(winrt::hresult_canceled());
+            else {try{pending->operation=factory();}catch(...){pending->error=std::current_exception();}}
+            pending->ready=true;
+        }))throw winrt::hresult_canceled();
+        const auto deadline=juce::Time::getMillisecondCounterHiRes()+8000;
+        for(;;) {
+            {std::lock_guard lock(pending->mutex);if(pending->ready){if(pending->error)std::rethrow_exception(pending->error);return *pending->operation;}}
+            if(threadShouldExit() || generation.load()!=ticket || juce::Time::getMillisecondCounterHiRes()>deadline) {
+                pending->canceled=true;throw winrt::hresult_canceled();
+            }
+            wait(20);
+        }
+    }
     template<class T> auto await(T operation, unsigned ticket, int ms=8000)
     {
         const auto end=juce::Time::getMillisecondCounterHiRes()+ms;
@@ -59,6 +84,16 @@ struct BluetoothMidiService::Impl : juce::Thread
             wait(20);
         }
         return operation.GetResults();
+    }
+    Info deviceInfo(const winrt::hstring& id, const winrt::Windows::Foundation::Collections::IVector<winrt::hstring>& props, unsigned ticket)
+    {
+        Info info { nullptr };
+        // BluetoothLEDevice.DeviceId normally denotes a device interface. An AEP
+        // selector returns a different identity kind; neither may be guessed by name.
+        try {info=await(Info::CreateFromIdAsync(id,props),ticket);}
+        catch(const winrt::hresult_error& error) {if(error.code()==E_ACCESSDENIED || error.code()==HRESULT_FROM_WIN32(ERROR_CANCELLED))throw;}
+        if(!info)info=await(Info::CreateFromIdAsync(id,props,winrt::Windows::Devices::Enumeration::DeviceInformationKind::AssociationEndpoint),ticket);
+        return info;
     }
     static juce::String str(const winrt::hstring& value) { return juce::String(value.c_str()); }
     static winrt::hstring wide(const juce::String& value) { return winrt::hstring(value.toWideCharPointer()); }
@@ -101,15 +136,16 @@ struct BluetoothMidiService::Impl : juce::Thread
 #if JUCE_WINDOWS
     void closePort()
     {
+        ++transportEpoch;
         clearReceiver();
-        if(port) {port.MessageReceived(midiToken);port.Close();port=nullptr;}
-        if(ble) {ble.ConnectionStatusChanged(connectionToken);ble.Close();ble=nullptr;}
+        if(port) {try{port.MessageReceived(midiToken);port.Close();}catch(...){}port=nullptr;}
+        if(ble) {try{ble.ConnectionStatusChanged(connectionToken);ble.Close();}catch(...){}ble=nullptr;}
         linkLost=false;
         std::lock_guard lock(mutex);if(devices.count(connected))devices[connected].seen=false;connected.clear();
     }
     void stopScan()
     {
-        if(watcher) {watcher.Received(receivedToken);watcher.Stopped(stoppedToken);watcher.Stop();watcher=nullptr;}
+        if(watcher) {try{watcher.Received(receivedToken);watcher.Stopped(stoppedToken);watcher.Stop();}catch(...){}watcher=nullptr;}
         std::lock_guard lock(mutex); scanning=false; adverts.clear();
     }
     void startScan(unsigned ticket)
@@ -148,7 +184,7 @@ struct BluetoothMidiService::Impl : juce::Thread
         const auto paired=await(Info::FindAllAsync(Ble::GetDeviceSelectorFromPairingState(true)),ticket);
         for(const auto& info:paired) {
             if(generation.load()!=ticket || threadShouldExit())break;
-            auto device=await(Ble::FromIdAsync(info.Id()),ticket,1800);
+            auto device=await(beginOnUi([id=info.Id()]{return Ble::FromIdAsync(id);},ticket),ticket,1800);
             if(!device)continue;
             const auto address=device.BluetoothAddress();
             const auto present=device.ConnectionStatus()==Bluetooth::BluetoothConnectionStatus::Connected;
@@ -162,7 +198,7 @@ struct BluetoothMidiService::Impl : juce::Thread
         const auto now=juce::Time::getMillisecondCounterHiRes();
         if(checked.count(advert.address) && now-checked[advert.address]<2500)return;
         checked[advert.address]=now;
-        auto device=await(Ble::FromBluetoothAddressAsync(advert.address),ticket,1800);
+        auto device=await(beginOnUi([address=advert.address]{return Ble::FromBluetoothAddressAsync(address);},ticket),ticket,1800);
         if(!device)return;
         bool isMidi=advert.midi;
         if(!isMidi) {
@@ -183,7 +219,7 @@ struct BluetoothMidiService::Impl : juce::Thread
         using namespace winrt::Windows::Devices;
         stopScan();
         {std::lock_guard lock(mutex);connecting=command.id;message=juce::String::fromUTF8("正在连接，首次使用时请确认系统配对提示");}changed();
-        auto candidate=await(Ble::FromIdAsync(wide(command.id)),command.generation);
+        auto candidate=await(beginOnUi([id=wide(command.id)]{return Ble::FromIdAsync(id);},command.generation),command.generation);
         if(!candidate)throw winrt::hresult_error(E_ACCESSDENIED);
         auto info=candidate.DeviceInformation();
         if(!info.Pairing().IsPaired()) {
@@ -192,8 +228,8 @@ struct BluetoothMidiService::Impl : juce::Thread
                 if(args.PairingKind()==Enumeration::DevicePairingKinds::ConfirmOnly)args.Accept();
             });
             Enumeration::DevicePairingResult result { nullptr };
-            try {result=await(custom.PairAsync(Enumeration::DevicePairingKinds::ConfirmOnly,
-                       Enumeration::DevicePairingProtectionLevel::None),command.generation,45000);}
+            try {result=await(beginOnUi([custom]{return custom.PairAsync(Enumeration::DevicePairingKinds::ConfirmOnly,
+                       Enumeration::DevicePairingProtectionLevel::None);},command.generation),command.generation,45000);}
             catch(...) {custom.PairingRequested(token);throw;}
             custom.PairingRequested(token);
             if(result.Status()!=Enumeration::DevicePairingResultStatus::Paired && result.Status()!=Enumeration::DevicePairingResultStatus::AlreadyPaired)
@@ -201,7 +237,8 @@ struct BluetoothMidiService::Impl : juce::Thread
         }
         // Endpoint identity must match the Bluetooth container. Never open an unrelated USB port by name.
         const auto props=winrt::single_threaded_vector<winrt::hstring>({L"System.Devices.ContainerId"});
-        const auto source=await(Info::CreateFromIdAsync(info.Id(),props,Enumeration::DeviceInformationKind::AssociationEndpoint),command.generation);
+        const auto source=deviceInfo(info.Id(),props,command.generation);
+        if(!source)throw winrt::hresult_error(E_FAIL,L"Bluetooth device identity unavailable");
         const auto container=source.Properties().TryLookup(L"System.Devices.ContainerId");
         Port opened { nullptr };
         for(int attempt=0;attempt<16 && !opened;++attempt) {
@@ -218,8 +255,12 @@ struct BluetoothMidiService::Impl : juce::Thread
         if(!opened)throw winrt::hresult_error(E_FAIL,L"Bluetooth MIDI input port is not available");
         if(generation.load()!=command.generation){opened.Close();throw winrt::hresult_canceled();}
         closePort();ble=candidate;port=opened;
-        midiToken=port.MessageReceived([this, guard=lifetime](const auto&,const Midi::MidiMessageReceivedEventArgs& args) {
+        const auto epoch=transportEpoch.load();
+        try {
+        midiToken=port.MessageReceived([this, guard=lifetime,epoch](const auto&,const Midi::MidiMessageReceivedEventArgs& args) {
             std::lock_guard callbackLock(guard->mutex);if(!guard->alive)return;
+            if(transportEpoch.load()!=epoch)return;
+            try {
             auto buffer=args.Message().RawData();
             auto access=buffer.as<::Windows::Storage::Streams::IBufferByteAccess>();
             byte* bytes=nullptr;if(FAILED(access->Buffer(&bytes)) || !bytes)return;
@@ -227,19 +268,23 @@ struct BluetoothMidiService::Impl : juce::Thread
             std::lock_guard lock(receiverMutex);
             if(receiver && buffer.Length()>0 && buffer.Length()<=3)
                 receiver(juce::MidiMessage(bytes,static_cast<int>(buffer.Length()),juce::Time::getMillisecondCounterHiRes()*0.001));
+            } catch(...) {linkLost=true;notify();}
         });
-        connectionToken=ble.ConnectionStatusChanged([this, guard=lifetime](const auto& device,const auto&) {
+        connectionToken=ble.ConnectionStatusChanged([this, guard=lifetime,epoch](const auto& device,const auto&) {
             std::lock_guard callbackLock(guard->mutex);if(!guard->alive)return;
-            if(device.ConnectionStatus()==Bluetooth::BluetoothConnectionStatus::Disconnected){linkLost=true;notify();}
+            if(transportEpoch.load()!=epoch)return;
+            try {if(device.ConnectionStatus()==Bluetooth::BluetoothConnectionStatus::Disconnected){linkLost=true;notify();}}catch(...) {linkLost=true;notify();}
         });
         {std::lock_guard lock(mutex);connected=command.id;++portEpoch;connecting.clear();history[command.id]=true;
-            devices[command.id].paired=true;save();message=juce::String::fromUTF8("蓝牙 MIDI 已连接");}changed();
+            devices[command.id].paired=true;devices[command.id].seen=true;save();message=juce::String::fromUTF8("蓝牙 MIDI 已连接");}changed();
+        } catch(...) {closePort();throw;}
     }
 #endif
     void run() override
     {
         {std::lock_guard lock(mutex);for(const auto& [id,d]:devices)history[id]=true;}
 #if JUCE_WINDOWS
+        using namespace winrt::Windows::Devices;
         try {winrt::init_apartment(winrt::apartment_type::multi_threaded);std::lock_guard lock(mutex);supported=true;}
         catch(...) {std::lock_guard lock(mutex);message=juce::String::fromUTF8("蓝牙 MIDI 初始化失败，请使用 USB 连接");changed();return;}
         while(!threadShouldExit()) {
@@ -255,7 +300,7 @@ struct BluetoothMidiService::Impl : juce::Thread
                     }
                     else if(command.action=="forget") {
                         bool active;{std::lock_guard lock(mutex);active=connected==command.id;}if(active)closePort();
-                        auto info=await(Info::CreateFromIdAsync(wide(command.id),{},Enumeration::DeviceInformationKind::AssociationEndpoint),command.generation);
+                        auto info=deviceInfo(wide(command.id),winrt::single_threaded_vector<winrt::hstring>(),command.generation);
                         if(info && info.Pairing().IsPaired()) {
                             const auto result=await(info.Pairing().UnpairAsync(),command.generation);
                             if(result.Status()!=Enumeration::DeviceUnpairingResultStatus::Unpaired && result.Status()!=Enumeration::DeviceUnpairingResultStatus::AlreadyUnpaired)
@@ -287,8 +332,19 @@ struct BluetoothMidiService::Impl : juce::Thread
 #endif
     }
 };
-BluetoothMidiService::BluetoothMidiService(bool persistSettings) : impl(std::make_unique<Impl>(*this,persistSettings)) {}
-BluetoothMidiService::~BluetoothMidiService() { shutdown(); }
+BluetoothMidiService::BluetoothMidiService(bool persistSettings) : impl(std::make_unique<Impl>(*this,persistSettings))
+{
+#if JUCE_WINDOWS
+    uiApartmentInitialised = SUCCEEDED(RoInitialize(RO_INIT_SINGLETHREADED));
+#endif
+}
+BluetoothMidiService::~BluetoothMidiService()
+{
+    shutdown();
+#if JUCE_WINDOWS
+    if(uiApartmentInitialised)RoUninitialize();
+#endif
+}
 void BluetoothMidiService::shutdown() { if(impl){{std::lock_guard lock(impl->lifetime->mutex);impl->lifetime->alive=false;}impl->generation++;impl->clearReceiver();impl.reset();}cancelPendingUpdate(); }
 void BluetoothMidiService::command(const juce::String& action,const juce::String& id) { if(impl)impl->push(action,id); }
 void BluetoothMidiService::setReceiver(std::function<void(const juce::MidiMessage&)> receiver)
