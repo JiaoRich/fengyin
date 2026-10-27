@@ -45,6 +45,8 @@ struct BluetoothMidiService::Impl : juce::Thread
     Watcher watcher { nullptr };
     Ble ble { nullptr };
     Port port { nullptr };
+    winrt::Windows::Devices::Enumeration::DeviceWatcher portWatcher { nullptr };
+    winrt::event_token portRemovedToken {}, portStoppedToken {};
     winrt::event_token receivedToken {}, connectionToken {}, stoppedToken {}, midiToken {};
     struct Advert { uint64_t address; juce::String name; bool midi=false; };
     std::deque<Advert> adverts;
@@ -146,10 +148,11 @@ struct BluetoothMidiService::Impl : juce::Thread
     {
         ++transportEpoch;
         clearReceiver();
+        if(portWatcher) {try{portWatcher.Removed(portRemovedToken);portWatcher.Stopped(portStoppedToken);portWatcher.Stop();}catch(...){}portWatcher=nullptr;}
         if(port) {try{port.MessageReceived(midiToken);port.Close();}catch(...){}port=nullptr;}
         if(ble) {try{ble.ConnectionStatusChanged(connectionToken);ble.Close();}catch(...){}ble=nullptr;}
         linkLost=false;
-        std::lock_guard lock(mutex);if(devices.count(connected))devices[connected].seen=false;connected.clear();
+        std::lock_guard lock(mutex);connected.clear();
     }
     void stopScan()
     {
@@ -289,6 +292,16 @@ struct BluetoothMidiService::Impl : juce::Thread
             if(transportEpoch.load()!=epoch)return;
             try {if(device.ConnectionStatus()==Bluetooth::BluetoothConnectionStatus::Disconnected){linkLost=true;notify();}}catch(...) {linkLost=true;notify();}
         });
+        portWatcher=Info::CreateWatcher(Port::GetDeviceSelector());
+        portRemovedToken=portWatcher.Removed([this,guard=lifetime,epoch,id=port.DeviceId()](const auto&,const Enumeration::DeviceInformationUpdate& update) {
+            std::lock_guard callbackLock(guard->mutex);if(!guard->alive || transportEpoch.load()!=epoch)return;
+            if(update.Id()==id){linkLost=true;notify();}
+        });
+        portStoppedToken=portWatcher.Stopped([this,guard=lifetime,epoch](const auto& watcher,const auto&) {
+            std::lock_guard callbackLock(guard->mutex);if(!guard->alive || transportEpoch.load()!=epoch)return;
+            try {if(watcher.Status()==Enumeration::DeviceWatcherStatus::Aborted){linkLost=true;notify();}}catch(...) {linkLost=true;notify();}
+        });
+        portWatcher.Start();
         {std::lock_guard lock(mutex);connected=command.id;++portEpoch;connecting.clear();history[command.id]=true;
             devices[command.id].paired=true;devices[command.id].seen=true;save();message=juce::String::fromUTF8("蓝牙 MIDI 已连接");}changed();
         } catch(...) {closePort();throw;}
@@ -324,7 +337,7 @@ struct BluetoothMidiService::Impl : juce::Thread
                     }
                     changed();
                 }
-                if(linkLost.exchange(false)) {closePort();std::lock_guard lock(mutex);message=juce::String::fromUTF8("蓝牙连接已断开，请唤醒电吹管后重新连接");changed();}
+                if(linkLost.exchange(false)) {{std::lock_guard lock(mutex);if(devices.count(connected))devices[connected].seen=false;}closePort();std::lock_guard lock(mutex);message=juce::String::fromUTF8("蓝牙连接已断开，请唤醒电吹管后重新连接");changed();}
                 Advert advert{};bool inspect=false;
                 {std::lock_guard lock(mutex);if(scanning && !adverts.empty()){advert=adverts.front();adverts.pop_front();inspect=true;}}
                 if(inspect) {try{inspectAdvert(advert,generation.load());}catch(...) { /* A non-MIDI advertiser need not grant GATT access. */ }}
