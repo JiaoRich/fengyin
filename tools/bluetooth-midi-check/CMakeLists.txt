@@ -12,3 +12,8 @@ target_compile_options(BluetoothCheck PRIVATE /utf-8 /UNDEBUG)
 target_link_libraries(BluetoothCheck PRIVATE juce::juce_audio_basics juce::juce_data_structures juce::juce_events windowsapp)
 enable_testing()
 add_test(NAME bluetooth_backend COMMAND BluetoothCheck)
+
+add_executable(BleMidiDecoderCheck "${ROOT}/tests/test_ble_midi_decoder.cpp")
+target_include_directories(BleMidiDecoderCheck PRIVATE "${ROOT}/native/Source")
+target_compile_options(BleMidiDecoderCheck PRIVATE /utf-8 /UNDEBUG)
+add_test(NAME ble_midi_decoder COMMAND BleMidiDecoderCheck)

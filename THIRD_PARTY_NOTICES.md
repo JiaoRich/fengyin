@@ -41,3 +41,7 @@ SWAM 和其他 VST3 音源、效果器不随风吟提供。用户必须自行获
 - 官方项目：https://code.videolan.org/videolan/libvlc-nuget ；API：https://www.videolan.org/vlc/libvlc.html
 - `components/VLC/COPYING.txt` 保留 LGPL 文本，`components/VLC/sdk/` 保留上游许可及公开头文件，`components/VLC/source/` 随附对应上游 VLC 源码；下载来源与校验值记录在 `fengyin-source.json`。
 - 可替换兼容 ABI 的 LibVLC DLL/插件。风吟许可不限制为修改、调试这些 LGPL 组件而进行的替换及必要逆向工程。第三方组件以其自身许可为准，不提供额外保证。
+
+## BLE MIDI packet codec
+
+Microsoft Windows MIDI Services BLE MIDI 1.0 codec, copyright Microsoft Corporation, MIT License. Only the standalone source codec is used; no preview transport, driver or service binaries are distributed. Full license: components/BluetoothMIDI/LICENSE.txt. Source: https://github.com/microsoft/MIDI/blob/main/src/in-box/Transport/BluetoothMidiTransport/midi_ble_midi1_codec.h
