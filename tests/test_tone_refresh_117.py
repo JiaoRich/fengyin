@@ -35,7 +35,7 @@ class ToneRefresh117(unittest.TestCase):
         self.assertFalse((ROOT/'assets/tone-packages/violin-sweet.fytonepack').exists())
         source=(ROOT/'native/Source/PublishedToneCatalog.h').read_text(encoding='utf-8')
         self.assertNotIn('激情小提琴',source)
-        self.assertIn('"violin-bright",',source)
+        self.assertNotIn('"violin-bright",',source)  # Retired in the approved 1.1.37 catalogue.
         soft=preset(ROOT/'assets/tone-packages/violin-soft.fytonepack')
         self.assertEqual(soft.get('name'),'小提琴-柔美')
         self.assertAlmostEqual(float(soft.get('outputGain')),10**.3,places=6)

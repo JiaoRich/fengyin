@@ -13,6 +13,12 @@ ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / 'assets/tone-packages'
 
 
+def calibrated_bytes(name):
+    # Historical headroom evidence belongs to the reduced-gain packages.
+    with zipfile.ZipFile(ROOT / 'tests/fixtures/kong-calibrated-before-137.zip') as z:
+        return z.read(name)
+
+
 def sha(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -31,7 +37,7 @@ class KongHeadroom134(unittest.TestCase):
             for row in audit['targets']:
                 original = previous.read(row['file'])
                 self.assertEqual(sha(original), row['beforeSha256'])
-                current = (ASSETS / row['file']).read_bytes()
+                current = calibrated_bytes(row['file'])
                 self.assertEqual(sha(current), row['afterSha256'])
                 with zipfile.ZipFile(io.BytesIO(original)) as before, zipfile.ZipFile(io.BytesIO(current)) as after:
                     self.assertIsNone(after.testzip())
@@ -52,7 +58,7 @@ class KongHeadroom134(unittest.TestCase):
                         self.assertEqual(len(data), entry['bytes'])
                         self.assertEqual(sha(data), entry['sha256'])
 
-    def test_native_measurements_are_bound_to_current_packages(self):
+    def test_native_measurements_are_bound_to_calibrated_archive(self):
         self.assertEqual(self.audit['performanceFaderTested'], 1.5)
         for row in self.audit['targets']:
             for rate in ('44100', '48000'):
@@ -88,7 +94,7 @@ class KongHeadroom134(unittest.TestCase):
         for row in maintenance['targets']:
             self.assertEqual(set(row['verification']), {'44100', '48000'})
             for rate, v in row['verification'].items():
-                self.assertEqual(v['packageSha256'], sha((ASSETS / row['file']).read_bytes()))
+                self.assertEqual(v['packageSha256'], sha(calibrated_bytes(row['file'])))
                 self.assertEqual(v['sampleRate'], int(rate))
                 self.assertEqual(v['protocol'], 2)
                 self.assertEqual(v['fader'], 1.5)

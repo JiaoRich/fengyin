@@ -19,7 +19,7 @@ class FolkLevels119(unittest.TestCase):
                 path=ROOT/'assets/tone-packages'/row['file']
                 raw=path.read_bytes()
                 newer=calibrated[row['file']]
-                self.assertEqual(hashlib.sha256(raw).hexdigest(),newer['afterSha256'])
+                self.assertEqual(hashlib.sha256(raw).hexdigest(),newer['beforeSha256'])
                 with zipfile.ZipFile(ROOT/gain['baseline']) as previous:raw=previous.read(row['file'])
                 self.assertEqual(hashlib.sha256(raw).hexdigest(),newer['beforeSha256'])
                 if row['file'] in migrated:

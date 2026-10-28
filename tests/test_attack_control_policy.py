@@ -22,6 +22,9 @@ class AttackControlPolicyTests(unittest.TestCase):
                     self.assertEqual(len(controls), 1)
                     # Verified Windows enums differ between saxophones and strings.
                     expected=0.666666686534882 if preset.get('instrumentKey') in ('violin','cello') else 1.0
+                    # Incoming SWAM Trumpet 3.8 state was read back as Expression in the real plugin.
+                    if path.name == 'tone137-trumpet-2.fytonepack':
+                        expected=0.75
                     self.assertAlmostEqual(float(controls[0].get('value')),expected,places=6)
                 else:
                     self.assertIn(preset.get('pluginBrand'),['kong','kontakt'])

@@ -408,14 +408,14 @@ function instrumentFamily(key = '') {
 }
 
 function buildTechniquePlan(key = '') {
-  const kong = key.startsWith('kong-');
+  const kong = key.startsWith('kong-') || key.startsWith('container:kong-v3:');
   const other = {violin:'抖弓',cello:'抖弓',flute:'花舌',piccolo:'花舌'}[key];
   const folkVibrato = ['kong-erhu','kong-erhu-2','kong-matouqin','kong-hulusi','kong-hulusi-2','kong-xun','kong-nanxiao','kong-xiao','kong-dizi','kong-dizi-2','kong-suona','kong-suona-2','kong-jinghu'].includes(key);
   return [
     {id:'vibrato',name:/violin|viola|cello|double-bass|kong-erhu|kong-matouqin|kong-jinghu/.test(key)?'揉弦':'颤音',icon:'≈',index:1,pluginSupported:key==='kontakt-kensa' || folkVibrato || /sax|violin|viola|cello|double-bass|flute|piccolo|clarinet|oboe|english-horn|bassoon|trumpet|trombone|flugelhorn|tuba|euphonium|horn-f|horn-bb/.test(key)},
     {id:'growl',name:'嘶吼音',icon:'≋',index:0,pluginSupported:['alto-sax','tenor-sax','baritone-sax'].includes(key)},
     {id:'mute',name:kong?'技巧音色':other?`其他技巧：${other}`:'其他技巧',icon:'✦',index:8,pluginSupported:kong || !!other}
-  ].map(item=>({...item,description:item.id==='mute'?(kong?'按住加入技巧音色，松开结束；主奏持续演奏':'按住触发，松开恢复'):item.id==='vibrato'?'咬嘴控制，或按乐曲速度在长音中渐入':'按键触发，或气息控制',mode:'off',strength:100,featured:true}));
+  ].map(item=>({...item,description:item.id==='mute'?(kong?'按住切换到技巧音色，松开恢复主奏':'按住触发，松开恢复'):item.id==='vibrato'?'咬嘴控制，或按乐曲速度在长音中渐入':'按键触发，或气息控制',mode:'off',strength:100,featured:true}));
 }
 
 function buildAdaptiveTechniquePlan(key = '', state = {}) {
@@ -506,7 +506,10 @@ function showInstrumentArtwork(key, chineseName = '') {
     currentArtworkKey = key;
     const name = String(chineseName || '').toLowerCase();
     const artwork = kongInstrumentArtwork[key]
-      || (/二胡|高胡|中胡|马头琴/.test(name) ? 'instrument_kong_erhu.png'
+      || (/单簧管/.test(name) ? 'instrument_clarinet.png'
+        : /双簧管/.test(name) ? 'instrument_oboe.png'
+        : /小提琴/.test(name) ? 'instrument_violin.png'
+        : /二胡|高胡|中胡|马头琴/.test(name) ? 'instrument_kong_erhu.png'
         : /板胡|京胡/.test(name) ? 'instrument_kong_banhu.png'
         : /古筝/.test(name) ? 'instrument_kong_guzheng.png'
         : /古琴/.test(name) ? 'instrument_kong_guqin.png'
@@ -2646,7 +2649,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.36 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.37 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

@@ -381,6 +381,9 @@ int main() {
         assert(fengyin::simpleVibrato(key));
     assert(fengyin::simpleOther("kong-erhu-2")==fengyin::PerformanceTechnique::flutter);
     assert(fengyin::simpleOther("kong-matouqin")==fengyin::PerformanceTechnique::flutter);
+    assert(fengyin::simpleOther("container:kong-v3:winds")==fengyin::PerformanceTechnique::flutter);
+    assert(fengyin::simpleRoleSupported("container:kong-v3:winds",fengyin::PerformanceTechnique::mute));
+    assert(fengyin::simpleOther("container:kontakt:woodwinds")==fengyin::PerformanceTechnique::count);
     assert(fengyin::automaticVibratoFade(600)==0 && fengyin::automaticVibratoFade(1000)==1);
     service.setPerformanceSink(nullptr);
     // Exercise the real JUCE collector after FengYin's realtime queue, including

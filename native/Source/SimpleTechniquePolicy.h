@@ -23,7 +23,8 @@ inline bool simpleGrowl(std::string_view key) {
 inline PerformanceTechnique simpleOther(std::string_view key) {
     // All Qin packages use the same secondary-channel gate. The tuner owns
     // the actual articulation; this enum is only the common hardware role.
-    if (key.substr(0,5)=="kong-") return PerformanceTechnique::flutter;
+    if (key.starts_with("kong-") || key.starts_with("container:kong-v3:"))
+        return PerformanceTechnique::flutter;
     if(key=="violin" || key=="cello")return PerformanceTechnique::tremolo;
     if (key == "flute" || key == "piccolo") return PerformanceTechnique::flutter;
     return PerformanceTechnique::count;

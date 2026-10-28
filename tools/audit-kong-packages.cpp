@@ -41,7 +41,7 @@ int main(int argc, char** argv)
         row->setProperty("slots", slots);
         rows.add(juce::var(row));
     }
-    if (rows.size() != 13 || !output.getParentDirectory().createDirectory()) return 5;
+    if (rows.size() != 19 || !output.getParentDirectory().createDirectory()) return 5;
     if (!output.replaceWithText(juce::JSON::toString(rows))) return 6;
     std::cout << "Audited " << rows.size() << " current Qin packages: " << output.getFullPathName() << '\n';
     return 0;

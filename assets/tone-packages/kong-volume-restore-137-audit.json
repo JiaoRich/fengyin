@@ -1,0 +1,102 @@
+{
+  "version": "1.1.37",
+  "userRequested": "Restore original Qin instrument volumes; keep exclusive CH1/CH2 routing.",
+  "previousCalibration": "kong-headroom-134-audit.json",
+  "restoredBaseline": "tests/fixtures/kong-gain-before-134.zip",
+  "calibratedArchive": "tests/fixtures/kong-calibrated-before-137.zip",
+  "scope": "13 bundled Qin outputGain values only; plugin states, mappings, effects and other instruments unchanged.",
+  "measurementScope": "1.1.34/1.1.36 headroom measurements describe the archived reduced-gain packages, not these restored volumes.",
+  "targets": [
+    {
+      "file": "folk-bangdi.fytonepack",
+      "calibratedSha256": "1142c6de2652c709bc9ac7979ab47acaef439f044fe8cf07b58586a492701db5",
+      "restoredSha256": "c1893cf49d74c048f3593930d9aea569eaff4fd3068e46fdf12767222e20544b",
+      "calibratedGainText": "0.11677065445047281",
+      "restoredGainText": "1.9952623149688795"
+    },
+    {
+      "file": "folk-dongxiao.fytonepack",
+      "calibratedSha256": "6b01d5ee6ece6b38454f6a0b6d5ba67c7d973059f822a3c98870a6bdb95dc574",
+      "restoredSha256": "09eace54847034229018ce749a342c6b248a3abefcd05139760cbddd214f5b57",
+      "calibratedGainText": "0.20014088735740845",
+      "restoredGainText": "1.9952623149688795"
+    },
+    {
+      "file": "folk-erhu.fytonepack",
+      "calibratedSha256": "6552a5e1bad08c5c219b24df872f4bc74996430185804905ce252b37bba2af79",
+      "restoredSha256": "83d0580a474301e5848b34d036bc1d70181822864a256eb4756f628465f8d275",
+      "calibratedGainText": "0.20749745299408703",
+      "restoredGainText": "1.9952623149688795"
+    },
+    {
+      "file": "folk-hulusi.fytonepack",
+      "calibratedSha256": "7c90b47be829db3b8e5807c14ea5da1192cfc73045aaf587511ff5f0d7cefd08",
+      "restoredSha256": "c7891ba44239100f1ae57b0d815304b597c0630b9a7dd25650b248e11144bf2a",
+      "calibratedGainText": "0.1601913247694868",
+      "restoredGainText": "1.9952623149688795"
+    },
+    {
+      "file": "folk-jinghu.fytonepack",
+      "calibratedSha256": "28800ff52cfbe5f20dd80873e72e37a7bd9f48189062ef72cfb06d88ff1a1e72",
+      "restoredSha256": "e20f5b18dc4dadf300a9cf710472a2d33f7bb175258b928a570f7a81f2253abf",
+      "calibratedGainText": "0.14722051612733819",
+      "restoredGainText": "1.995262265205383"
+    },
+    {
+      "file": "folk-liuqin.fytonepack",
+      "calibratedSha256": "e93eb3176ceaed322d5b88e887a037660ce278ca4e6636e8218fab4005904358",
+      "restoredSha256": "135b4e5132a1d06aad38211947362467140419b113b475baca95c2f5e8848fa8",
+      "calibratedGainText": "0.17926806350998128",
+      "restoredGainText": "1.995262265205383"
+    },
+    {
+      "file": "folk-matouqin.fytonepack",
+      "calibratedSha256": "c41be2772d51376f198556a36bc94ae99e4355cd42125c8839c8d08c65417570",
+      "restoredSha256": "50f38a4653ba328bc7d6fd3ea95156784719abc66a961ee6866df6c442973641",
+      "calibratedGainText": "0.29374456021362616",
+      "restoredGainText": "1.9952623149688795"
+    },
+    {
+      "file": "folk-nanxiao.fytonepack",
+      "calibratedSha256": "c19400bd67d8fc5d398e849222eda24cdf273a639a73a4025496663b1d65aa00",
+      "restoredSha256": "4912425545cd8b720f2e0822a6704dae7b245bb23cc6b4b0e2ab77dc5b9b0257",
+      "calibratedGainText": "0.16855485811755386",
+      "restoredGainText": "1.9952623149688795"
+    },
+    {
+      "file": "folk-pipa.fytonepack",
+      "calibratedSha256": "9353171077fe902f1f9437ef43b5518d4737b9706b1c7a72c06cbdb83707f0a8",
+      "restoredSha256": "bfb85c7569002955df28615d6c40817faf308bc5eb2b5c1a785655b8f30d51bf",
+      "calibratedGainText": "0.18498350909621919",
+      "restoredGainText": "1.995262265205383"
+    },
+    {
+      "file": "folk-qudi.fytonepack",
+      "calibratedSha256": "d2eb04f9a5267944aa8d56f1dfc1bed2ce19ffec1941978756539eb4c4fc9aab",
+      "restoredSha256": "7bee01d06ab1cd3e02b956d0396837a4b1714152f6cb4fe7ec0d00aa69be81f3",
+      "calibratedGainText": "0.10375603996800009",
+      "restoredGainText": "1.9952623149688795"
+    },
+    {
+      "file": "folk-sanxian.fytonepack",
+      "calibratedSha256": "6f365bb47e1df9f4df1e46e3201ec3be80ecf838ac5dc427f8d1327899fe9fc2",
+      "restoredSha256": "2f5bb4fa33a108820e65921ac44d976a38897362be98567c841219d04944fed1",
+      "calibratedGainText": "0.15552990209894474",
+      "restoredGainText": "1.9952623149688795"
+    },
+    {
+      "file": "folk-suona.fytonepack",
+      "calibratedSha256": "9e6b1f271e94cc910e4b9e40e52b9abf24de950115d5584cc5475ac357b3ece1",
+      "restoredSha256": "06d6865cd971bf4c508e440d985081ceaa70804c8fdc6ed4f001b17f16b92574",
+      "calibratedGainText": "0.077718664154919417",
+      "restoredGainText": "1.9952623149688795"
+    },
+    {
+      "file": "folk-xun.fytonepack",
+      "calibratedSha256": "8bc105dec362d35ffde6bdb0b16ed66b5305eda5f737e991b0a8062f9908899a",
+      "restoredSha256": "d1cbe0d61f29038c9157baffb9504f937292f3bd82ea18abf8a322314d6f0de6",
+      "calibratedGainText": "0.25675759718446117",
+      "restoredGainText": "1.9952623149688795"
+    }
+  ]
+}

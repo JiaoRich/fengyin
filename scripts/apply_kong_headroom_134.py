@@ -25,6 +25,14 @@ def main():
     parser.add_argument('--measurements', required=True, type=Path)
     parser.add_argument('--refine', action='store_true', help='Refine only failed verification cases from new native measurements')
     args = parser.parse_args()
+    restored_audit = ASSETS / 'kong-volume-restore-137-audit.json'
+    if restored_audit.exists():
+        restored = json.loads(restored_audit.read_text(encoding='utf-8'))
+        assert all(sha((ASSETS / r['file']).read_bytes()) == r['restoredSha256'] for r in restored['targets'])
+        if args.refine:
+            parser.error('Historical gain calibration retired by the user; refusing to reduce restored volumes.')
+        print('Historical gain calibration retired; original volumes remain unchanged.')
+        return
     prior = None
     if AUDIT.exists():
         audit = json.loads(AUDIT.read_text(encoding='utf-8'))

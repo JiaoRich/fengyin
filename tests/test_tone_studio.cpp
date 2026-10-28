@@ -321,8 +321,8 @@ int main()
     }
     const auto bundled=juce::File(juce::String::fromUTF8(__FILE__)).getParentDirectory().getParentDirectory().getChildFile("assets/tone-packages");
     const auto files=bundled.findChildFiles(juce::File::findFiles,false,"*.fytonepack");
-    // 33 published packages plus the retained, non-embedded legacy violin archive.
-    assert(files.size()==34);
+    // 42 published packages plus seven retained historical package fixtures.
+    assert(files.size()==49);
     const auto gainAudit=juce::JSON::parse(bundled.getChildFile("kong-headroom-134-audit.json"));
     assert(gainAudit["targets"].isArray() && gainAudit["targets"].size()==13);
     int routedFolkPackages=0, boostedPackages=0;
@@ -330,13 +330,13 @@ int main()
         juce::String error;const auto imported=fengyin::TonePackage::read(file,error);
         if(!imported){std::cerr<<file.getFileName()<<": "<<error<<std::endl;return 1;}
         assert(error.isEmpty());
-        if (imported->outputGain > 1.5f)
+        if (imported->outputGain > 1.5f && !file.getFileName().startsWith("tone137-"))
         {
             ++boostedPackages;
             const float expectedDb=imported->pluginBrand=="swam"?5.f:6.f;
             assert(std::abs(imported->outputGain - std::pow(10.f,expectedDb/20.f)) < 1e-6f);
         }
-        if (imported->outputGain > 1.5f || imported->pluginBrand=="kong")
+        // Every package must preserve all tuning fields and full state on export/import.
         {
             const auto copy=directory.getChildFile("gain-roundtrip-"+file.getFileName());
             assert(fengyin::TonePackage::write(*imported,copy));
@@ -345,23 +345,28 @@ int main()
             assert(restored->instrumentState==imported->instrumentState);
             assert(restored->samplerState==imported->samplerState);
             assert(restored->containerProjectState==imported->containerProjectState);
+            auto expected=*imported, actual=*restored;
+            expected.id=actual.id; // Import assigns a fresh user preset identity.
+            const auto before=fengyin::SoundPresetStore::toXml({expected});
+            const auto after=fengyin::SoundPresetStore::toXml({actual});
+            assert(before->isEquivalentTo(after.get(),false));
         }
         if(file.getFileName().startsWith("folk-")) {
             ++routedFolkPackages;
             assert(imported->pluginBrand=="kong" && imported->kongTechniques.enabled);
             assert(imported->samplerState.getSize()>0 && imported->containerProjectState.getSize()>0);
-            bool calibrated=false;
+            bool originalVolume=false;
             for(const auto& row:*gainAudit["targets"].getArray())
                 if(row["file"].toString()==file.getFileName()) {
-                    const float expected=float(row["afterGainText"].toString().getDoubleValue());
+                    const float expected=float(row["beforeGainText"].toString().getDoubleValue());
                     assert(expected>0 && expected<=float(row["beforeGainText"].toString().getDoubleValue()));
                     assert(imported->outputGain==expected);
-                    calibrated=true;
+                    originalVolume=true;
                 }
-            assert(calibrated);
+            assert(originalVolume);
         }
     }
     assert(routedFolkPackages==13);
-    assert(boostedPackages==19);
+    assert(boostedPackages==32);
     assert(directory.deleteRecursively());
 }

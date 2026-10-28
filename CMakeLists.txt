@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.36 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.37 LANGUAGES C CXX)
 option(FENGYIN_ARCHIVED_VIDEO_RECORDING "Build archived video-recording diagnostics, never for release" OFF)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
@@ -53,37 +53,46 @@ juce_add_binary_data(FengYinWebAssets SOURCES
     assets/fengyin-app-icon.png
     assets/tone-packages/soprano-kenny.fytonepack
     assets/tone-packages/soprano-pop.fytonepack
-    assets/tone-packages/tenor-air-pocket.fytonepack
     assets/tone-packages/alto-jazz.fytonepack
     assets/tone-packages/alto-deep.fytonepack
     assets/tone-packages/alto-pop.fytonepack
+    assets/tone-packages/tone137-alto-silky.fytonepack
     assets/tone-packages/tenor-mellow.fytonepack
     assets/tone-packages/tenor-warm.fytonepack
+    assets/tone-packages/tenor-air-pocket.fytonepack
+    assets/tone-packages/tone137-tenor-silky.fytonepack
     assets/tone-packages/trumpet.fytonepack
+    assets/tone-packages/tone137-trumpet-2.fytonepack
     assets/tone-packages/piccolo-trumpet.fytonepack
     assets/tone-packages/alto-trombone.fytonepack
     assets/tone-packages/bass-trombone.fytonepack
     assets/tone-packages/flute.fytonepack
     assets/tone-packages/piccolo.fytonepack
     assets/tone-packages/clarinet.fytonepack
+    assets/tone-packages/tone137-kong-clarinet-2.fytonepack
     assets/tone-packages/oboe.fytonepack
-    assets/tone-packages/violin-bright.fytonepack
+    assets/tone-packages/tone137-kong-oboe-2.fytonepack
     assets/tone-packages/violin-soft.fytonepack
+    assets/tone-packages/tone137-kong-violin-2.fytonepack
     assets/tone-packages/cello.fytonepack
     assets/tone-packages/folk-erhu.fytonepack
-    assets/tone-packages/folk-matouqin.fytonepack
-    assets/tone-packages/folk-hulusi.fytonepack
-    assets/tone-packages/folk-xun.fytonepack
-    assets/tone-packages/folk-nanxiao.fytonepack
-    assets/tone-packages/folk-qudi.fytonepack
-    assets/tone-packages/folk-suona.fytonepack
-    assets/tone-packages/folk-pipa.fytonepack
+    assets/tone-packages/tone137-kong-erhu-new-2.fytonepack
+    assets/tone-packages/tone137-kong-hulusi-straight.fytonepack
+    assets/tone-packages/tone137-kong-hulusi-vibrato.fytonepack
     assets/tone-packages/folk-liuqin.fytonepack
+    assets/tone-packages/tone137-kong-qudi-straight.fytonepack
+    assets/tone-packages/folk-qudi.fytonepack
+    assets/tone-packages/tone137-kong-xun.fytonepack
+    assets/tone-packages/tone137-kong-suona-vibrato.fytonepack
+    assets/tone-packages/folk-suona.fytonepack
     assets/tone-packages/folk-sanxian.fytonepack
-    assets/tone-packages/folk-dongxiao.fytonepack
+    assets/tone-packages/folk-pipa.fytonepack
+    assets/tone-packages/tone137-kong-nanxiao.fytonepack
+    assets/tone-packages/tone137-kong-dongxiao.fytonepack
     assets/tone-packages/folk-bangdi.fytonepack
     assets/tone-packages/folk-jinghu.fytonepack
     assets/tone-packages/kontakt-kensa.fytonepack
+    assets/tone-packages/tone137-kontakt-kensa-2.fytonepack
     assets/tone-packages/kong/erhu.kam
     assets/tone-packages/kong/guzheng.kam
     assets/tone-packages/kong/hulusi.kam

@@ -22,7 +22,7 @@ assert(!buildTechniquePlan('soprano-sax')[1].pluginSupported);
 assert(buildTechniquePlan('alto-sax')[1].pluginSupported);
 assert(buildTechniquePlan('violin-section')[0].pluginSupported);
 assert(buildTechniquePlan('flute')[0].pluginSupported);
-for(const key of ['kong-pipa','kong-liuqin','kong-erhu-2','kong-matouqin','kong-xun','kong-nanxiao','kong-xiao','kong-hulusi','kong-dizi','kong-suona','kong-jinghu','kong-custom']) {
+for(const key of ['kong-pipa','kong-liuqin','kong-erhu-2','kong-matouqin','kong-xun','kong-nanxiao','kong-xiao','kong-hulusi','kong-dizi','kong-suona','kong-jinghu','kong-custom','container:kong-v3:winds','container:kong-v3:khka_woodwinds']) {
   assert.equal(buildTechniquePlan(key)[2].name,'技巧音色');
   assert(buildTechniquePlan(key)[2].pluginSupported);
 }
