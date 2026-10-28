@@ -170,14 +170,16 @@ public:
     bool selectInstrumentModel(int index);
     int applySwamToneProfile(const SwamToneProfile& profile, bool restoreModel = true);
     [[nodiscard]] juce::var getSwamToneAudit() const { return swamToneAudit; }
-    bool applyStandardSwamExpressionCurve();
+    bool applyStandardSwamExpressionCurve(bool initialiseNewInstrument = false);
     bool applyExpressionAttackControl();
     bool setBendRange(int semitones);
+    int getBendRange() const;
     void configureKongTechniqueProfile(const juce::String& instrumentKey,
                                        const KongTechniqueProfile& profile = {}) noexcept;
     [[nodiscard]] KongTechniqueProfile getKongTechniqueProfile() const { return kongProfile; }
     void flushOnsetTrace() { player.flushOnsetTrace(); destinationTrace.flush("plugin-input"); }
 
+    void channelPressureChanged(int value, double timestampSeconds = 0.0) noexcept override;
     void noteOn(int noteNumber, float velocity, double timestampSeconds = 0.0) noexcept override;
     void noteOff(int noteNumber, double timestampSeconds = 0.0) noexcept override;
     void breathChanged(float value, double timestampSeconds = 0.0) noexcept override;
@@ -259,6 +261,7 @@ private:
     std::atomic<int> lastBreathMidiValue { -1 };
     KongTechniqueProfile kongProfile;
     KongDualSlotRouter kongDualSlot;
+    std::atomic<bool> nativePressureEnabled { false }, nativePortamentoInput { false };
     std::atomic<bool> kontaktStandardControls{false};
 public:
     void configureKontaktControls(bool enabled) noexcept {

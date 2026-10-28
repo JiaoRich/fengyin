@@ -1,3 +1,4 @@
+#include "SwamTechniqueParameterPolicy.h"
 #include "SwamToneApplication.h"
 #include <cassert>
 #include <memory>
@@ -36,6 +37,13 @@ public:
 
 int main()
 {
+    using P = fengyin::SwamTechniqueParameterPolicy;
+    assert(P::isPortamentoTime("Portamento Time"));
+    for(const auto* name:{"Portamento Control","Portamento Max Time","PortamSplit Ratio","Portamento Mode"})assert(!P::isPortamentoTime(name));
+    juce::XmlElement mapping("MIDIRemappingTable");
+    auto* entry=mapping.createNewChildElement("MIDIRemappingEntry");entry->setAttribute("parameterId","portamentoTime");entry->setAttribute("enabled",1);
+    assert(P::hasNativePortamentoInput(mapping));entry->setAttribute("enabled",0);assert(!P::hasNativePortamentoInput(mapping));
+    entry->setAttribute("parameterId","portamentoCtrl");entry->setAttribute("enabled",1);assert(!P::hasNativePortamentoInput(mapping));
     using A = fengyin::SwamToneApplication;
     assert(! A::number("OFF")); assert(! A::number("3 frogs"));
     assert(! A::matches("nan", "0")); assert(! A::matches("0.00", "-0.08"));

@@ -4,69 +4,61 @@
 #include <atomic>
 
 namespace fengyin {
-// Called under PluginHostEngine::performanceEventLock. CH1 always passes
-// unchanged; only the technique gate controls musical notes on CH2.
+// Called under PluginHostEngine::performanceEventLock. Only one slot receives
+// musical notes: CH1 normally, CH2 while the technique key is held.
 class KongDualSlotRouter {
 public:
     void configure(bool enabled) noexcept {
-        configured.store(enabled); held.fill(0); sounding.fill(false);
+        configured.store(enabled); held.fill(0);
         technique = false; expression = 0; pitch = 8192; vibrato = -1;
     }
     bool active() const noexcept { return configured.load(); }
 
     template <typename Send>
     void route(const juce::MidiMessage& message, Send&& send) noexcept {
-        send(message);
-        if (!active() || message.getChannel() != 1) return;
-        const auto copy = [&] { auto second = message; second.setChannel(2); send(second); };
+        if (!active() || message.getChannel() != 1) { send(message); return; }
+        const auto copyTo = [&](int channel) { auto copy = message; copy.setChannel(channel); send(copy); };
         if (message.isNoteOn()) {
             const auto note = static_cast<size_t>(message.getNoteNumber());
+            if (held[note] != 0) send(juce::MidiMessage::noteOff(technique ? 2 : 1, static_cast<int>(note)));
             held[note] = message.getVelocity();
-            if (technique) {
-                if (sounding[note]) send(juce::MidiMessage::noteOff(2, static_cast<int>(note)));
-                copy(); sounding[note] = true;
-            }
+            copyTo(technique ? 2 : 1);
         } else if (message.isNoteOff()) {
-            const auto note = static_cast<size_t>(message.getNoteNumber());
-            held[note] = 0;
-            if (sounding[note]) { copy(); sounding[note] = false; }
+            held[static_cast<size_t>(message.getNoteNumber())] = 0;
+            copyTo(technique ? 2 : 1);
         } else if (message.isAllNotesOff() || message.isAllSoundOff()) {
-            copy(); held.fill(0); sounding.fill(false);
-        } else if (message.isPitchWheel()) {
-            pitch = message.getPitchWheelValue(); copy();
-        } else if (message.isController()) {
-            const auto controller = message.getControllerNumber();
-            if (controller == 11) { expression = message.getControllerValue(); copy(); }
-            else if (controller == 1) { vibrato = message.getControllerValue(); copy(); }
-        } else if (message.isAftertouch() || message.isChannelPressure()) copy();
+            send(message); copyTo(2); held.fill(0);
+        } else {
+            send(message);
+            if (message.isPitchWheel()) { pitch = message.getPitchWheelValue(); copyTo(2); }
+            else if (message.isController()) {
+                if (message.getControllerNumber() == 11) { expression = message.getControllerValue(); copyTo(2); }
+                else if (message.getControllerNumber() == 1) { vibrato = message.getControllerValue(); copyTo(2); }
+            } else if (message.isAftertouch() || message.isChannelPressure()) copyTo(2);
+        }
     }
 
     template <typename Send>
     void setTechnique(bool enabled, Send&& send) noexcept {
         if (!active() || technique == enabled) return;
+        const int previous = technique ? 2 : 1, next = enabled ? 2 : 1;
+        // Stop outgoing notes before starting the destination. No sustained
+        // layering or added gain fades; each slot retains its native release.
+        for (size_t note = 0; note < held.size(); ++note)
+            if (held[note] != 0) send(juce::MidiMessage::noteOff(previous, static_cast<int>(note)));
         technique = enabled;
-        if (enabled) {
-            send(juce::MidiMessage::controllerEvent(2, 11, expression));
-            send(juce::MidiMessage::pitchWheel(2, pitch));
-            if (vibrato >= 0) send(juce::MidiMessage::controllerEvent(2, 1, vibrato));
-            for (size_t note = 0; note < held.size(); ++note)
-                if (held[note] != 0) {
-                    send(juce::MidiMessage::noteOn(2, static_cast<int>(note), held[note]));
-                    sounding[note] = true;
-                }
-        } else {
-            for (size_t note = 0; note < sounding.size(); ++note)
-                if (sounding[note]) {
-                    send(juce::MidiMessage::noteOff(2, static_cast<int>(note)));
-                    sounding[note] = false;
-                }
-        }
+        send(juce::MidiMessage::controllerEvent(next, 11, expression));
+        send(juce::MidiMessage::pitchWheel(next, pitch));
+        if (vibrato >= 0) send(juce::MidiMessage::controllerEvent(next, 1, vibrato));
+        for (size_t note = 0; note < held.size(); ++note)
+            if (held[note] != 0) send(juce::MidiMessage::noteOn(next, static_cast<int>(note), held[note]));
     }
 
     template <typename Send>
     void reset(Send&& send) noexcept {
-        setTechnique(false, send);
-        held.fill(0); sounding.fill(false);
+        if (active()) for (size_t note = 0; note < held.size(); ++note)
+            if (held[note] != 0) send(juce::MidiMessage::noteOff(technique ? 2 : 1, static_cast<int>(note)));
+        held.fill(0); technique = false;
         expression = 0; pitch = 8192; vibrato = -1;
     }
 private:
@@ -74,6 +66,5 @@ private:
     bool technique = false;
     int expression = 0, pitch = 8192, vibrato = -1;
     std::array<juce::uint8, 128> held {};
-    std::array<bool, 128> sounding {};
 };
 }

@@ -193,3 +193,10 @@ replace_exact("${wasapi}"
     "        if (mode == WASAPIDeviceMode::sharedLowLatency)  return \"Windows Audio (Low Latency Mode)\";\n        if (mode == WASAPIDeviceMode::sharedLowLatencyRaw) return \"Windows Audio (RAW Test Mode)\";")
 
 include("${CMAKE_CURRENT_LIST_DIR}/patch-juce-audio-trace.cmake")
+
+# Retain the selected audio period when a removed endpoint causes JUCE's
+# XML restore to fall back to a new default output. The unpatched fallback
+# drops every setup option, so 128 silently becomes a driver's 480 default.
+replace_exact("${JUCE_SOURCE_DIR}/modules/juce_audio_devices/audio_io/juce_AudioDeviceManager.cpp"
+    "        error = initialise (numInputChansNeeded, numOutputChansNeeded, nullptr, false, preferredDefaultDeviceName);"
+    "       #if FENGYIN_RETAIN_AUDIO_SETUP\n        {\n            AudioDeviceSetup fallbackOptions;\n            fallbackOptions.bufferSize = setup.bufferSize;\n            fallbackOptions.sampleRate = setup.sampleRate;\n            error = initialise (numInputChansNeeded, numOutputChansNeeded, nullptr, false, preferredDefaultDeviceName, &fallbackOptions);\n        }\n       #else\n        error = initialise (numInputChansNeeded, numOutputChansNeeded, nullptr, false, preferredDefaultDeviceName);\n       #endif")

@@ -47,10 +47,28 @@ struct Sink : fengyin::MidiPerformanceSink {
     void noteOn(int n, float v, double t) noexcept override { onNotes.push_back(n); events.push_back({'N',v,t}); }
     void noteOff(int n, double t) noexcept override { offNotes.push_back(n); events.push_back({'O',0,t}); }
     void breathChanged(float v, double t) noexcept override { events.push_back({'B',v,t}); }
+    void channelPressureChanged(int v,double t) noexcept override { events.push_back({'A',static_cast<float>(v),t}); }
     void pitchBendChanged(float v, double t) noexcept override { events.push_back({'P',v,t}); }
     void techniqueChanged(fengyin::PerformanceTechnique, float v) noexcept override { events.push_back({'T',v,0}); }
 };
 int main() {
+    {
+        fengyin::MidiInputService input(false);Sink sink;input.setPerformanceSink(&sink);
+        input.attachExternal("ble:pressure-test","Pressure controller");input.setBreathController(11);
+        fengyin::TechniqueMapping mapping;mapping.technique=fengyin::PerformanceTechnique::portamento;
+        mapping.mode=fengyin::TechniqueControlMode::hardware;mapping.sourceType=fengyin::TechniqueSourceType::channelPressure;
+        input.setTechniqueMappings({mapping});
+        for(int pressure:{0,20,64,100,127,0}) {
+            const auto count=sink.events.size();
+            fengyin::MidiInputServiceTestAccess::send(input,juce::MidiMessage::channelPressureChange(1,pressure),2.0);
+            assert(sink.events.size()>count && sink.events[count].type=='A' && sink.events[count].value==pressure);
+        }
+        input.acceptExternalMessage(juce::MidiMessage::controllerEvent(1,11,100));
+        input.acceptExternalMessage(juce::MidiMessage::noteOn(1,64,juce::uint8(80)));
+        assert(input.getSnapshot().lastNote==64 && input.getSnapshot().breath>.7f);
+        input.setPerformanceSink(nullptr);
+    }
+
     {
         fengyin::MidiInputService input(false); Sink sink;
         input.setPerformanceSink(&sink); input.suspendAutomaticConnection(true);
@@ -201,6 +219,9 @@ int main() {
         mapping.sourceType=source;mapping.sourceNumber=74;input.setTechniqueMappings({mapping});routed.events.clear();
         for(int value:{0,64,127,0})fengyin::MidiInputServiceTestAccess::send(input,
             source==fengyin::TechniqueSourceType::controller?juce::MidiMessage::controllerEvent(1,74,value):juce::MidiMessage::channelPressureChange(1,value),1);
+        const auto rawCount=std::count_if(routed.events.begin(),routed.events.end(),[](const auto& e){return e.type=='A';});
+        assert(rawCount==(source==fengyin::TechniqueSourceType::channelPressure?4:0));
+        std::erase_if(routed.events,[](const auto& e){return e.type=='A';});
         assert(routed.events.size()==4);
         for(const auto& event:routed.events)assert(event.type=='T');
         assert(routed.events.front().value==0&&routed.events[2].value==1&&routed.events.back().value==0);

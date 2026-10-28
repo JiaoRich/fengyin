@@ -219,9 +219,12 @@ MainComponent::MainComponent() : license(licensePublicKey), machineCode(license.
 
     bluetoothMidi.onChange = [this]
     {
+        reconcileMidiInputs();
         const auto state = bluetoothMidi.snapshot();
         const auto rawId = state["connectedId"].toString();
         const auto id = rawId == desiredBluetoothId ? rawId : juce::String();
+        // USB stays plug-and-play even while BLE discovery or connection is pending.
+        midi.suspendAutomaticConnection(false);
         const auto epoch = static_cast<juce::int64>(state["portEpoch"]);
         if (id != activeBluetoothId || (id.isNotEmpty() && epoch != activeBluetoothEpoch))
         {
@@ -1655,7 +1658,7 @@ void MainComponent::timerCallback()
     if (++midiConnectionPollCounter >= 30)
     {
         midiConnectionPollCounter = 0;
-        midi.pollConnection();
+        reconcileMidiInputs();
         emitMidiConnectionState();
     }
     snapshot = midi.getSnapshot();
@@ -3487,6 +3490,7 @@ void MainComponent::restoreToneBeforePresetEdit()
     const auto initialState = brand == "kong"
         ? samplerState
         : editingReturnInstrumentState;
+    const bool hasFullState = initialState.getSize() > 0;
     if (brand == "kong" && initialState.getSize() == 0)
     {
         pluginStatus.setText(utf8("无法恢复：缺少原厂音源状态"), juce::dontSendNotification);
@@ -3498,7 +3502,7 @@ void MainComponent::restoreToneBeforePresetEdit()
                          status.bufferSize > 0 ? status.bufferSize : 128,
                          initialState,
                          [this, presetId, presetName, styleId, brand, instrumentKey, instrumentName,
-                          wasCustom, modelIndex, parameters, toneSettings, effectStates, kongTechniques]
+                          wasCustom, modelIndex, parameters, toneSettings, effectStates, kongTechniques, hasFullState]
                          (bool success, const juce::String& message)
                          {
                              if (! success) { pluginLoading = false; return; }
@@ -3507,11 +3511,11 @@ void MainComponent::restoreToneBeforePresetEdit()
                              currentInstrumentChineseName = instrumentName;
                              auto finish = [safe = juce::Component::SafePointer<MainComponent>(this),
                                             presetId, presetName, styleId, brand, wasCustom,
-                                            modelIndex, parameters, toneSettings, kongTechniques]
+                                            modelIndex, parameters, toneSettings, kongTechniques, hasFullState]
                              {
                                  if (safe == nullptr) return;
-                                 if (modelIndex >= 0) safe->pluginHost.selectInstrumentModel(modelIndex);
-                                 if (brand != "kong")
+                                 if (!hasFullState && modelIndex >= 0) safe->pluginHost.selectInstrumentModel(modelIndex);
+                                 if (!hasFullState && brand != "kong")
                                      safe->pluginHost.restoreToneParameters(parameters);
                                  safe->masterOutput.setToneStyle(toneSettings);
                                  safe->currentToneStyleId = styleId;
@@ -3520,7 +3524,7 @@ void MainComponent::restoreToneBeforePresetEdit()
                                  safe->currentPresetIsCustom = wasCustom;
                                  safe->currentBaseToneSettings = toneSettings;
                                  safe->currentSwamToneParameterCount = parameters.size();
-                                 safe->applyInstrumentBendRange();
+                                 safe->applyInstrumentBendRange(hasFullState);
                                  if(brand=="kong") {
                                      if(safe->pluginHost.getKongTechniqueProfile()!=kongTechniques)
                                          safe->pluginHost.configureKongTechniqueProfile(safe->currentInstrumentKey,kongTechniques);
@@ -3764,7 +3768,7 @@ void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
     currentPresetDisplayName = preset.name;
     currentPresetId = preset.id;
     currentPresetIsCustom = preset.customTone;
-    applyInstrumentBendRange();
+    applyInstrumentBendRange(hasFullState);
     // Final controls must follow all preset/model/parameter restoration, for
     // built-in and user-created packages alike. Full states are not flattened.
     if(currentPluginBrand=="kong" && pluginHost.getKongTechniqueProfile()!=preset.kongTechniques) {
@@ -3819,7 +3823,7 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName, bool ap
     pluginHost.setMusicTempoMode(midi.getMusicTempoMode());masterOutput.setReverbPreDelay(fengyin::MusicTempoPolicy::forMode(midi.getMusicTempoMode()).predelayMs);
     pluginHost.configureKongTechniqueProfile(currentPluginBrand == "kong" ? currentInstrumentKey : juce::String(),kongProfile);
     if (currentPluginBrand == "swam" && configureRoutes)
-        pluginHost.applyStandardSwamExpressionCurve();
+        pluginHost.applyStandardSwamExpressionCurve(applyDefaults);
     // Complete all plugin-state changes before the real-time callback begins.
     pluginHost.attachTo(audio.getDeviceManager());
     juce::Logger::writeToLog("Plugin output attached");
@@ -3848,7 +3852,7 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName, bool ap
     masterOutput.setToneStyle(defaultStyle.settings);
     currentSwamToneParameterCount = currentPluginBrand == "swam" && applyDefaults
         ? pluginHost.applySwamToneProfile(defaultStyle.swam) : 0;
-    applyInstrumentBendRange();
+    applyInstrumentBendRange(!applyDefaults);
     pluginStatus.setText(utf8("当前音源：") + pluginName, juce::dontSendNotification);
     juce::Logger::writeToLog("Plugin output activation complete");
     if (! pluginHost.hasEffect())
@@ -3887,7 +3891,7 @@ juce::String MainComponent::bendPreferenceKey() const
     return pluginHost.getPluginIdentifier() + "|" + currentInstrumentKey;
 }
 
-void MainComponent::applyInstrumentBendRange()
+void MainComponent::applyInstrumentBendRange(bool preservePluginState)
 {
     // Called after preset/state restoration and style/model changes, including
     // old user presets. Never apply this SWAM-only policy to Kong or effects.
@@ -3896,6 +3900,12 @@ void MainComponent::applyInstrumentBendRange()
     bendRangeRemembered = false;
     bendRange = currentPluginBrand == "kong" ? 3 : 1;
     if (! pluginHost.hasPlugin() || currentInstrumentKey.isEmpty()) return;
+    if (preservePluginState)
+    {
+        const auto savedRange = pluginHost.getBendRange();
+        if (savedRange > 0) { bendRange = savedRange; bendRangeApplied = true; }
+        return; // Loading a scheme must not replace its native range with a global default.
+    }
     const auto values = readBendPreferences();
     const auto saved = static_cast<int>(values.getProperty(bendPreferenceKey(), 0));
     if (saved >= 1 && saved <= 4) { bendRange = saved; bendRangeRemembered = true; }
@@ -4016,7 +4026,11 @@ void MainComponent::refreshLicenseUi()
             audio.getDeviceManager().removeAudioCallback(&testSynth);
         }
         else if (pluginHost.hasPlugin())
-            activatePluginOutput(pluginHost.getPluginName());
+        {
+            // Resuming entitlement restores output only, not a fresh instrument's defaults.
+            pluginHost.attachTo(audio.getDeviceManager());
+            midi.setPerformanceSink(recordingPerformancePaused?nullptr:&pluginHost);
+        }
         else
         {
             audio.getDeviceManager().addAudioCallback(&testSynth);
@@ -4556,6 +4570,8 @@ void MainComponent::emitMidiConnectionState()
     object->setProperty("inputConnected", midi.getSnapshot().deviceConnected);
     object->setProperty("connectedId", activeBluetoothId);
     object->setProperty("inputName", midi.getConnectedDeviceName());
+    object->setProperty("inputGeneration", static_cast<juce::int64>(midi.getConnectionGeneration()));
+    if (midiConnectionNotice.isNotEmpty()) object->setProperty("notice", midiConnectionNotice);
     object->setProperty("inputId", midi.getConnectedDeviceIdentifier());
     object->setProperty("inputTransport", midi.isExternalConnected() ? "bluetooth" : "usb");
     juce::Array<juce::var> usb;
@@ -4576,9 +4592,19 @@ void MainComponent::handleMidiConnectionAction(const juce::var& payload)
     if (action == "usb")
     {
         bluetoothMidi.setReceiver({}); bluetoothMidi.command("disconnect");
-        activeBluetoothId.clear(); desiredBluetoothId.clear(); midi.suspendAutomaticConnection(true);
+        activeBluetoothId.clear(); desiredBluetoothId.clear(); midi.suspendAutomaticConnection(false);
         midi.connect(id); lastWebStateAtMs = 0; emitMidiConnectionState(); return;
     }
+    if (action == "connect")
+    {
+        reconcileMidiInputs();
+        if (midi.getSnapshot().deviceConnected && !midi.isExternalConnected())
+        {
+            midiConnectionNotice = utf8("当前已通过USB连接电吹管，请拔掉USB数据线再使用蓝牙连接");
+            emitMidiConnectionState(); return;
+        }
+    }
+    midiConnectionNotice.clear();
     if (action == "connect" || action == "forget")
     {
         bool known = false;
@@ -4591,7 +4617,7 @@ void MainComponent::handleMidiConnectionAction(const juce::var& payload)
     if (action == "disconnect" || action == "cancel" || (action == "forget" && id == desiredBluetoothId)) desiredBluetoothId.clear();
     if (action == "connect" || action == "disconnect" || action == "cancel" || action == "forget")
     {
-        midi.suspendAutomaticConnection(true);
+        midi.suspendAutomaticConnection(false);
         if (action == "disconnect" || action == "cancel" || (action == "forget" && id == activeBluetoothId))
         {
             bluetoothMidi.setReceiver({});
@@ -4602,4 +4628,22 @@ void MainComponent::handleMidiConnectionAction(const juce::var& payload)
     if (action == "connect" || action == "disconnect" || action == "cancel" || action == "forget"
         || action == "scan" || action == "stopScan") bluetoothMidi.command(action, id);
     emitMidiConnectionState();
+}
+
+void MainComponent::reconcileMidiInputs()
+{
+    midi.suspendAutomaticConnection(false);
+    midi.pollConnection();
+    const bool usbPresent = !midi.getLastAvailableDevices().empty();
+    if (!usbPresent) midiConnectionNotice.clear();
+    if (usbPresent && (midi.isExternalConnected() || activeBluetoothId.isNotEmpty() || desiredBluetoothId.isNotEmpty()))
+    {
+        // Stop delivery and invalidate the BLE request before opening USB.
+        bluetoothMidi.setReceiver({});
+        bluetoothMidi.command("disconnect");
+        desiredBluetoothId.clear(); activeBluetoothId.clear();
+        if (midi.isExternalConnected()) midi.disconnect();
+        midi.refreshAndConnectFirstAvailable();
+        lastWebStateAtMs = 0;
+    }
 }

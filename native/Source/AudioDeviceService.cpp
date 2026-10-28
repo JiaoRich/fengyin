@@ -754,10 +754,11 @@ bool AudioDeviceService::followSystemDefaultOutput()
     lastError = manager.setAudioDeviceSetup(setup, true);
     if (lastError.isNotEmpty())
     {
-        // 新端点可能不接受旧设备的采样率/周期。先用它自己的共享默认值打开，
-        // 随后的静默预检再选出最低稳定周期。
+        // A new endpoint may have a different mix rate. Retry its mix rate,
+        // but retain the requested period: buffer=0 silently enlarges 128 to 480.
+        // If this period is unsupported, report the actual open error instead
+        // of changing the user's latency setting behind their back.
         setup.sampleRate = 0.0;
-        setup.bufferSize = 0;
         lastError = manager.setAudioDeviceSetup(setup, true);
     }
     if (lastError.isNotEmpty())

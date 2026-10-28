@@ -73,11 +73,14 @@ int main()
         auto* pressure=new juce::AudioParameterFloat("bow","Bow Pressure",0.f,1.f,.62f);
         fake.addParameter(selector);fake.addParameter(mode);fake.addParameter(speed);fake.addParameter(pressure);
         fengyin::SwamStringTremolo tremolo;assert(tremolo.prepare(fake));
-        assert(mode->getIndex()==0 && std::abs(speed->get()-10.f)<.05f);
+        assert(mode->getIndex()==1 && std::abs(speed->get()-8.f)<.05f);
+        tremolo.request(false);tremolo.flush();assert(mode->getIndex()==1);
         tremolo.request(true);tremolo.flush();assert(selector->getIndex()==1);
         tremolo.setTempoMode(0);tremolo.flush();assert(std::abs(speed->get()-7.f)<.05f);
         tremolo.setTempoMode(2);tremolo.flush();assert(selector->getIndex()==2 && std::abs(speed->get()-140.f/15)<.05f);
-        tremolo.request(false);tremolo.flush();assert(selector->getIndex()==0);
+        tremolo.captureWithoutPerformanceOverride([&]{assert(selector->getIndex()==0 && mode->getIndex()==1 && std::abs(speed->get()-8.f)<.05f);});
+        assert(selector->getIndex()==2);
+        tremolo.request(false);tremolo.flush();assert(selector->getIndex()==0 && mode->getIndex()==1 && std::abs(speed->get()-8.f)<.05f);
         assert(std::abs(pressure->get()-.62f)<1e-6f);
         tremolo.clear();assert(!tremolo.available());
         TestEffect unsupported(1,0);assert(!tremolo.prepare(unsupported));

@@ -9,7 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 class DirectTonePolicy(unittest.TestCase):
     def test_activation_is_read_only_and_editor_close_does_not_capture_state(self):
         host = (ROOT / 'native/Source/PluginHostEngine.cpp').read_text(encoding='utf-8')
-        body = host.split('bool PluginHostEngine::applyStandardSwamExpressionCurve()', 1)[1].split('\nvoid ', 1)[0]
+        body = host.split('bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstrument)', 1)[1].split('\nvoid ', 1)[0]
+        self.assertIn('const auto configured=initialiseNewInstrument', body)
         self.assertIn('SwamTechniqueRouting::prepare', body)
         self.assertIn('if(configured.supported && configured.changed)', body)
         self.assertIn('state=original', body)
@@ -38,6 +39,11 @@ class DirectTonePolicy(unittest.TestCase):
         body = main.split('void MainComponent::completeLoadedPreset', 1)[1].split('\nvoid MainComponent::', 1)[0]
         self.assertIn('if (! hasFullState && preset.instrumentModelName', body)
         self.assertIn('if (! hasFullState)', body)
+        self.assertIn('applyInstrumentBendRange(hasFullState)', body)
+        cancel = main.split('void MainComponent::restoreToneBeforePresetEdit()', 1)[1].split('\nvoid MainComponent::', 1)[0]
+        self.assertIn('if (!hasFullState && modelIndex >= 0)', cancel)
+        self.assertIn('if (!hasFullState && brand !=', cancel)
+        self.assertIn('applyInstrumentBendRange(hasFullState)', cancel)
 
     def test_native_curve_routes_are_not_direct_parameter_overrides(self):
         host = (ROOT / 'native/Source/PluginHostEngine.cpp').read_text(encoding='utf-8')
@@ -58,7 +64,7 @@ class DirectTonePolicy(unittest.TestCase):
 
     def test_native_routes_do_not_leak_between_instruments(self):
         host = (ROOT / 'native/Source/PluginHostEngine.cpp').read_text(encoding='utf-8')
-        for method in ('void PluginHostEngine::unload()', 'bool PluginHostEngine::applyStandardSwamExpressionCurve()'):
+        for method in ('void PluginHostEngine::unload()', 'bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstrument)'):
             body = host.split(method, 1)[1].split('\n}', 1)[0]
             self.assertIn('swamExpressionChannel.store(1', body)
             self.assertIn('nativeTechniqueRoutes) route.store(0', body)

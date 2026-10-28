@@ -103,7 +103,7 @@ private:
     void activatePluginOutput(const juce::String& pluginName, bool applyDefaults = true, bool configureRoutes = true,
                               const fengyin::KongTechniqueProfile& kongProfile = {});
     void applyCurrentSwamToneStyle();
-    void applyInstrumentBendRange();
+    void applyInstrumentBendRange(bool preservePluginState = false);
     void changeInstrumentBendRange(const juce::var& payload);
     juce::String bendPreferenceKey() const;
     int bendRange = 0;
@@ -138,6 +138,8 @@ private:
     void showExpressionSettings();
     static juce::String midiNoteName(int note);
 
+    void reconcileMidiInputs();
+    juce::String midiConnectionNotice;
     void emitMidiConnectionState();
     void handleMidiConnectionAction(const juce::var&);
     fengyin::MidiInputService midi;

@@ -43,7 +43,7 @@ class HostRegressionTests(unittest.TestCase):
     def test_bulk_tone_changes_pause_live_processing(self):
         for signature in (
             'int PluginHostEngine::restoreToneParameters(',
-            'bool PluginHostEngine::applyStandardSwamExpressionCurve()',
+            'bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstrument)',
             'bool PluginHostEngine::selectInstrumentModel(',
             'int PluginHostEngine::applySwamToneProfile(',
         ):
@@ -317,7 +317,8 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("当前版本尚未支持所选音源", MAIN)
         self.assertIn("SwamFamily::notSwam", MAIN)
         self.assertIn('return "technique.roles.v2."', MIDI)
-        self.assertIn('name.contains("portamento")', HOST)
+        self.assertIn('SwamTechniqueParameterPolicy::isPortamentoTime(parameter->getName(128))', HOST)
+        self.assertNotIn('name.contains("portamento") &&', HOST)
         self.assertIn('name.contains("bowpressure")', HOST)
 
     def test_container_instruments_are_created_only_after_user_selection(self):

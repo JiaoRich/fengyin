@@ -95,6 +95,7 @@ public:
     virtual void noteOff(int noteNumber, double timestampSeconds = 0.0) noexcept = 0;
     virtual void breathChanged(float value, double timestampSeconds = 0.0) noexcept = 0;
     virtual void pitchBendChanged(float bipolarValue, double timestampSeconds = 0.0) noexcept = 0;
+    virtual void channelPressureChanged(int, double = 0.0) noexcept {}
     virtual void techniqueChanged(PerformanceTechnique, float) noexcept {}
     virtual void automaticVibratoChanged(float input, float fade) noexcept { techniqueChanged(PerformanceTechnique::vibrato,input*fade); }
     virtual void resetPerformance() noexcept {}

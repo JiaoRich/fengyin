@@ -1,0 +1,531 @@
+{
+  "version": "1.1.36",
+  "method": "Installed QinEngineV3 offline render through production PluginHostEngine and MasterOutputService; exclusive CH1/CH2 routing, unchanged gain calibration.",
+  "previousCalibration": "kong-headroom-134-audit.json",
+  "sourceHashNewlines": "LF",
+  "signalPathSha256": {
+    "native/Source/PluginHostEngine.cpp": "e0632332331871bcdba0b4ea38e050b4b729af52d32cf19a34a955c352811128",
+    "native/Source/PluginHostEngine.h": "f0b714929f5d0b3711ce8a29ab95a93ecfe1dfc899d5dfa5767865bad087ecd4",
+    "native/Source/KongDualSlotRouter.h": "b3018d8e818c50d361ad2ec111113a558a5734790c96a539b00ff564477fcd23",
+    "native/Source/MasterOutputService.cpp": "585ba91c1cc3e70937a21c78440bc2e0c414bced934d04c28d789be6b335e17d",
+    "native/Source/MasterOutputService.h": "aeff3c0a2e9ab4bbdaacafdad879d1c5c816c7ba0cf2f4feeff5e2eed7a187c8",
+    "native/Source/AirProcessor.h": "94f74ee2eb438875532f3729d479ba6ddedc3f9e56f60f3e6cdf0da3fd2d822a",
+    "native/Source/KongPerformancePolicy.h": "59104a6ce4beea3951a9e2a69a858b6ed92075970d20c2f34918fc0bff121883",
+    "native/Source/TonePackage.h": "1e5798d9e3f41a69febd02f9fedaf97906dfba4617f0eae52c196b7d8fd7a18a",
+    "native/Source/SoundPresetStore.cpp": "ce2fd7404292e3c97fa59354ef892217fd5ffe99e321a8f81b7c671a66de6d70"
+  },
+  "verificationCeiling": 0.63,
+  "performanceFaderTested": 1.5,
+  "targets": [
+    {
+      "file": "folk-bangdi.fytonepack",
+      "verification": {
+        "44100": {
+          "packageSha256": "1142c6de2652c709bc9ac7979ab47acaef439f044fe8cf07b58586a492701db5",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.399455070495605,
+          "oversampledPeak4x": 0.40322150884506786,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 708,
+          "caseKinds": {
+            "phrase": 144,
+            "full-expression-attack": 564
+          }
+        },
+        "48000": {
+          "packageSha256": "1142c6de2652c709bc9ac7979ab47acaef439f044fe8cf07b58586a492701db5",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.400209665298462,
+          "oversampledPeak4x": 0.40021271889337545,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 708,
+          "caseKinds": {
+            "phrase": 144,
+            "full-expression-attack": 564
+          }
+        }
+      }
+    },
+    {
+      "file": "folk-dongxiao.fytonepack",
+      "verification": {
+        "44100": {
+          "packageSha256": "6b01d5ee6ece6b38454f6a0b6d5ba67c7d973059f822a3c98870a6bdb95dc574",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.597996234893799,
+          "oversampledPeak4x": 0.6000000278708493,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 399,
+          "caseKinds": {
+            "phrase": 135,
+            "full-expression-attack": 264
+          }
+        },
+        "48000": {
+          "packageSha256": "6b01d5ee6ece6b38454f6a0b6d5ba67c7d973059f822a3c98870a6bdb95dc574",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.592857718467712,
+          "oversampledPeak4x": 0.5928622419649453,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 399,
+          "caseKinds": {
+            "phrase": 135,
+            "full-expression-attack": 264
+          }
+        }
+      }
+    },
+    {
+      "file": "folk-erhu.fytonepack",
+      "verification": {
+        "44100": {
+          "packageSha256": "6552a5e1bad08c5c219b24df872f4bc74996430185804905ce252b37bba2af79",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.493669509887695,
+          "oversampledPeak4x": 0.4943529479460812,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 633,
+          "caseKinds": {
+            "phrase": 129,
+            "full-expression-attack": 504
+          }
+        },
+        "48000": {
+          "packageSha256": "6552a5e1bad08c5c219b24df872f4bc74996430185804905ce252b37bba2af79",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.492184400558472,
+          "oversampledPeak4x": 0.4921881559195046,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 633,
+          "caseKinds": {
+            "phrase": 129,
+            "full-expression-attack": 504
+          }
+        }
+      }
+    },
+    {
+      "file": "folk-hulusi.fytonepack",
+      "verification": {
+        "44100": {
+          "packageSha256": "7c90b47be829db3b8e5807c14ea5da1192cfc73045aaf587511ff5f0d7cefd08",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.549658060073853,
+          "oversampledPeak4x": 0.550000015676524,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 291,
+          "caseKinds": {
+            "phrase": 99,
+            "full-expression-attack": 192
+          }
+        },
+        "48000": {
+          "packageSha256": "7c90b47be829db3b8e5807c14ea5da1192cfc73045aaf587511ff5f0d7cefd08",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.548436045646667,
+          "oversampledPeak4x": 0.5484402302070732,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 291,
+          "caseKinds": {
+            "phrase": 99,
+            "full-expression-attack": 192
+          }
+        }
+      }
+    },
+    {
+      "file": "folk-jinghu.fytonepack",
+      "verification": {
+        "44100": {
+          "packageSha256": "28800ff52cfbe5f20dd80873e72e37a7bd9f48189062ef72cfb06d88ff1a1e72",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.377529859542847,
+          "oversampledPeak4x": 0.3825111272434772,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 588,
+          "caseKinds": {
+            "phrase": 120,
+            "full-expression-attack": 468
+          }
+        },
+        "48000": {
+          "packageSha256": "28800ff52cfbe5f20dd80873e72e37a7bd9f48189062ef72cfb06d88ff1a1e72",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.375457525253296,
+          "oversampledPeak4x": 0.3760405694989159,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 588,
+          "caseKinds": {
+            "phrase": 120,
+            "full-expression-attack": 468
+          }
+        }
+      }
+    },
+    {
+      "file": "folk-liuqin.fytonepack",
+      "verification": {
+        "44100": {
+          "packageSha256": "e93eb3176ceaed322d5b88e887a037660ce278ca4e6636e8218fab4005904358",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.563194096088409,
+          "oversampledPeak4x": 0.5672493026460642,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 444,
+          "caseKinds": {
+            "phrase": 150,
+            "full-expression-attack": 294
+          }
+        },
+        "48000": {
+          "packageSha256": "e93eb3176ceaed322d5b88e887a037660ce278ca4e6636e8218fab4005904358",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.546332120895386,
+          "oversampledPeak4x": 0.5479313048051279,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 444,
+          "caseKinds": {
+            "phrase": 150,
+            "full-expression-attack": 294
+          }
+        }
+      }
+    },
+    {
+      "file": "folk-matouqin.fytonepack",
+      "verification": {
+        "44100": {
+          "packageSha256": "c41be2772d51376f198556a36bc94ae99e4355cd42125c8839c8d08c65417570",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.599995374679565,
+          "oversampledPeak4x": 0.5999999526370291,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 372,
+          "caseKinds": {
+            "phrase": 126,
+            "full-expression-attack": 246
+          }
+        },
+        "48000": {
+          "packageSha256": "c41be2772d51376f198556a36bc94ae99e4355cd42125c8839c8d08c65417570",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.628886342048645,
+          "oversampledPeak4x": 0.6288911404438408,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 372,
+          "caseKinds": {
+            "phrase": 126,
+            "full-expression-attack": 246
+          }
+        }
+      }
+    },
+    {
+      "file": "folk-nanxiao.fytonepack",
+      "verification": {
+        "44100": {
+          "packageSha256": "c19400bd67d8fc5d398e849222eda24cdf273a639a73a4025496663b1d65aa00",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.599995374679565,
+          "oversampledPeak4x": 0.5999999526370291,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 336,
+          "caseKinds": {
+            "phrase": 114,
+            "full-expression-attack": 222
+          }
+        },
+        "48000": {
+          "packageSha256": "c19400bd67d8fc5d398e849222eda24cdf273a639a73a4025496663b1d65aa00",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.594658374786377,
+          "oversampledPeak4x": 0.5957178021068604,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 336,
+          "caseKinds": {
+            "phrase": 114,
+            "full-expression-attack": 222
+          }
+        }
+      }
+    },
+    {
+      "file": "folk-pipa.fytonepack",
+      "verification": {
+        "44100": {
+          "packageSha256": "9353171077fe902f1f9437ef43b5518d4737b9706b1c7a72c06cbdb83707f0a8",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.484829306602478,
+          "oversampledPeak4x": 0.48591625481415246,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 417,
+          "caseKinds": {
+            "phrase": 141,
+            "full-expression-attack": 276
+          }
+        },
+        "48000": {
+          "packageSha256": "9353171077fe902f1f9437ef43b5518d4737b9706b1c7a72c06cbdb83707f0a8",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.484466910362244,
+          "oversampledPeak4x": 0.48447060683891957,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 417,
+          "caseKinds": {
+            "phrase": 141,
+            "full-expression-attack": 276
+          }
+        }
+      }
+    },
+    {
+      "file": "folk-qudi.fytonepack",
+      "verification": {
+        "44100": {
+          "packageSha256": "d2eb04f9a5267944aa8d56f1dfc1bed2ce19ffec1941978756539eb4c4fc9aab",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.345985651016235,
+          "oversampledPeak4x": 0.347478062564413,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 768,
+          "caseKinds": {
+            "phrase": 156,
+            "full-expression-attack": 612
+          }
+        },
+        "48000": {
+          "packageSha256": "d2eb04f9a5267944aa8d56f1dfc1bed2ce19ffec1941978756539eb4c4fc9aab",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.343264997005463,
+          "oversampledPeak4x": 0.34333664919437046,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 768,
+          "caseKinds": {
+            "phrase": 156,
+            "full-expression-attack": 612
+          }
+        }
+      }
+    },
+    {
+      "file": "folk-sanxian.fytonepack",
+      "verification": {
+        "44100": {
+          "packageSha256": "6f365bb47e1df9f4df1e46e3201ec3be80ecf838ac5dc427f8d1327899fe9fc2",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.477101236581802,
+          "oversampledPeak4x": 0.47769107868449895,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 444,
+          "caseKinds": {
+            "phrase": 150,
+            "full-expression-attack": 294
+          }
+        },
+        "48000": {
+          "packageSha256": "6f365bb47e1df9f4df1e46e3201ec3be80ecf838ac5dc427f8d1327899fe9fc2",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.469444781541824,
+          "oversampledPeak4x": 0.4698674458281993,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 444,
+          "caseKinds": {
+            "phrase": 150,
+            "full-expression-attack": 294
+          }
+        }
+      }
+    },
+    {
+      "file": "folk-suona.fytonepack",
+      "verification": {
+        "44100": {
+          "packageSha256": "9e6b1f271e94cc910e4b9e40e52b9abf24de950115d5584cc5475ac357b3ece1",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.34645801782608,
+          "oversampledPeak4x": 0.34779302569403814,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 663,
+          "caseKinds": {
+            "phrase": 135,
+            "full-expression-attack": 528
+          }
+        },
+        "48000": {
+          "packageSha256": "9e6b1f271e94cc910e4b9e40e52b9abf24de950115d5584cc5475ac357b3ece1",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": true,
+          "finite": true,
+          "peak": 0.285160630941391,
+          "oversampledPeak4x": 0.2861382778746378,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 663,
+          "caseKinds": {
+            "phrase": 135,
+            "full-expression-attack": 528
+          }
+        }
+      }
+    },
+    {
+      "file": "folk-xun.fytonepack",
+      "verification": {
+        "44100": {
+          "packageSha256": "8bc105dec362d35ffde6bdb0b16ed66b5305eda5f737e991b0a8062f9908899a",
+          "protocol": 2,
+          "sampleRate": 44100,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.59968239068985,
+          "oversampledPeak4x": 0.6000000128214529,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 336,
+          "caseKinds": {
+            "phrase": 114,
+            "full-expression-attack": 222
+          }
+        },
+        "48000": {
+          "packageSha256": "8bc105dec362d35ffde6bdb0b16ed66b5305eda5f737e991b0a8062f9908899a",
+          "protocol": 2,
+          "sampleRate": 48000,
+          "fader": 1.5,
+          "dual": false,
+          "finite": true,
+          "peak": 0.589384794235229,
+          "oversampledPeak4x": 0.5895210994963324,
+          "overloadSamples": 0,
+          "droppedMidi": 0,
+          "cases": 336,
+          "caseKinds": {
+            "phrase": 114,
+            "full-expression-attack": 222
+          }
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "Offline macOS installed-plugin rendering; does not certify Windows hardware latency or subjective technique transitions."
+  ]
+}

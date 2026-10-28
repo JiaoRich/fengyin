@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.1.35",
+    [string]$Version = "1.1.36",
     [switch]$SkipInstaller
 )
 
@@ -190,6 +190,8 @@ Copy-Item (Join-Path $RecordingRoot "versions.json") (Join-Path $PackageDir "com
 # The public installer uses VB-CABLE. Never package or invoke the experimental driver.
 Copy-Item (Join-Path $ProjectRoot "README.md") $PackageDir -Force
 Copy-Item (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES.md") $PackageDir -Force
+New-Item -ItemType Directory -Force -Path (Join-Path $PackageDir "components\BluetoothMIDI") | Out-Null
+Copy-Item (Join-Path $ProjectRoot "third_party\ble-midi\LICENSE.txt") (Join-Path $PackageDir "components\BluetoothMIDI") -Force
 & (Join-Path $PSScriptRoot "prepare-vbcable.ps1") -Destination (Join-Path $PackageDir "components\VB-CABLE")
 & (Join-Path $PSScriptRoot "prepare-asio4all.ps1") -Destination (Join-Path $PackageDir "components\ASIO4ALL")
 & (Join-Path $PSScriptRoot "prepare-fresh-air.ps1") -Destination (Join-Path $PackageDir "components\Fresh Air")

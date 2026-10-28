@@ -1,3 +1,4 @@
+#include "SwamTechniqueParameterPolicy.h"
 #include "PluginHostEngine.h"
 #include "KensaVibratoRange.h"
 #include "KensaBendRange.h"
@@ -48,9 +49,8 @@ bool isProtectedPerformanceParameter(const juce::String& name)
 
 bool isMidiRoutingParameter(const juce::String& name)
 {
-    // A custom tone may legitimately include growl, vibrato, breath-noise and
-    // expression-curve parameters.  Only controller routing is owned by the
-    // smart wind-controller layer and must never travel with a tone preset.
+    // Legacy scalar fallback cannot safely reconstruct a plugin MIDI table.
+    // Complete native state carries the tuner's mappings and curves instead.
     static const juce::StringArray routingWords {
         "midi", "midicc", "controller", "mapping", "keyswitch", "channel",
         "ccnumber", "ccassign", "ccassignment", "learncc"
@@ -470,6 +470,9 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
             setKongExpressionMode(fengyin::SupportedInstrumentClassifier::classify(
                 description.name, description.manufacturerName, description.fileOrIdentifier)
                     == fengyin::SupportedInstrumentClassifier::Brand::kong);
+            nativePressureEnabled.store(fengyin::SupportedInstrumentClassifier::classify(
+                description.name, description.manufacturerName, description.fileOrIdentifier)
+                    == fengyin::SupportedInstrumentClassifier::Brand::swam);
             // Keep the entire caller's initialization transaction silent, not
             // just individual parameter writes. The device may already be live.
             graph->suspendProcessing(true);
@@ -586,6 +589,8 @@ void PluginHostEngine::unload()
         kongDualSlot.configure(false);
     }
     kontaktStandardControls.store(false);
+    nativePressureEnabled.store(false);
+    nativePortamentoInput.store(false);
     stringTremolo.clear();
     for (auto& parameter : techniqueParameters) parameter.store(nullptr);
     for (auto& dirty : techniqueDirty) dirty.store(false, std::memory_order_relaxed);
@@ -734,7 +739,7 @@ bool PluginHostEngine::applyExpressionAttackControl()
     return false;
 }
 
-bool PluginHostEngine::applyStandardSwamExpressionCurve()
+bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstrument)
 {
     // The player may still be attached after replacing an instrument. Never
     // restore opaque plugin state concurrently with its audio callback.
@@ -753,7 +758,11 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve()
     const std::string_view key=SwamPluginClassifier::instrumentKey(plugin->getName().toStdString());
     const bool wantFlutter=simpleOther(key)==PerformanceTechnique::flutter;
     const bool ownTremolo=key=="violin" || key=="cello";
-    const auto configured=SwamTechniqueRouting::prepare(state,simpleVibrato(key),simpleGrowl(key),wantFlutter,true,ownTremolo);
+    // Saved plugin state is authoritative. Only a newly inserted instrument
+    // receives default mappings; reloading a scheme never rewrites its MIDI table.
+    const auto configured=initialiseNewInstrument
+        ? SwamTechniqueRouting::prepare(state,simpleVibrato(key),simpleGrowl(key),wantFlutter,true,ownTremolo)
+        : SwamTechniqueRouting::Result{};
     if(configured.supported && configured.changed)
     {
         // Once per activation, while the graph is paused, never on each CC or mode switch.
@@ -769,6 +778,8 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve()
         }
         else {state=verified;juce::Logger::writeToLog("SWAM automatic technique routes verified; curves preserved");}
     }
+    const auto mappingState = SwamStateCompatibility::read(state);
+    nativePortamentoInput.store(mappingState && SwamTechniqueParameterPolicy::hasNativePortamentoInput(*mappingState));
     const auto result = SwamExpressionCurve::applyToState(state);
     for (const auto& route : result.routes)
     {
@@ -776,7 +787,7 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve()
         if (parameter == "expression") swamExpressionChannel.store(route.channel);
         const std::pair<const char*, PerformanceTechnique> names[] = {
             {"vibratodepth", PerformanceTechnique::vibrato}, {"growl", PerformanceTechnique::growl},
-            {"flutter", PerformanceTechnique::flutter}, {"portamento", PerformanceTechnique::portamento},
+            {"flutter", PerformanceTechnique::flutter}, {"portamentotime", PerformanceTechnique::portamento},
             {"tremolo", PerformanceTechnique::tremolo}, {"mute", PerformanceTechnique::mute},
             {"halfvalve", PerformanceTechnique::halfValve}, {"pizzicato", PerformanceTechnique::pizzicato},
             {"breathnoise", PerformanceTechnique::breathNoise}, {"bowpressure", PerformanceTechnique::bowPressure},
@@ -802,8 +813,9 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve()
     if(key=="violin" || key=="cello")stringTremolo.prepare(*plugin);
     else stringTremolo.clear();
     prepareTempoVibrato(*plugin);
-    for (const auto technique : {PerformanceTechnique::vibrato, PerformanceTechnique::growl, PerformanceTechnique::flutter})
-        techniqueChanged(technique, 0.0f);
+    if (initialiseNewInstrument)
+        for (const auto technique : {PerformanceTechnique::vibrato, PerformanceTechnique::growl, PerformanceTechnique::flutter})
+            techniqueChanged(technique, 0.0f);
     // Activation only discovers routing. Saved/native curves remain authoritative;
     // never write a synthetic curve back into the live instrument here.
     juce::Logger::writeToLog("SWAM expression state update complete");
@@ -895,7 +907,7 @@ juce::MemoryBlock PluginHostEngine::captureInstrumentState()
         auto* rate=vibratoRateParameter.load();const float current=rate?rate->getValue():0;
         const bool overridden=rate&&automaticVibratoActive.load()&&std::abs(current-tempoVibratoRates[MusicTempoPolicy::valid(musicTempoMode.load())])<.0001f;
         if(overridden)rate->setValueNotifyingHost(originalVibratoRate);
-        plugin->getStateInformation(state);
+        stringTremolo.captureWithoutPerformanceOverride([&] { plugin->getStateInformation(state); });
         if(overridden)rate->setValueNotifyingHost(current);
     }
     // Resume without releasing the existing instrument.
@@ -1248,6 +1260,10 @@ void PluginHostEngine::routeTechnique(PerformanceTechnique technique, float valu
         }
         return;
     }
+    // The tuner owns an enabled native portamento mapping (including its curve).
+    // Original pressure reaches SWAM directly; a second linear parameter write
+    // from the same learned technique would overwrite the native mapped result.
+    if (technique == PerformanceTechnique::portamento && nativePortamentoInput.load()) return;
     techniqueValues[index].store(safeValue, std::memory_order_relaxed);
     // OFF/wait is an explicit gate, not CC0 through a potentially non-zero
     // minimum curve. Active values still travel through the original curve.
@@ -1413,6 +1429,31 @@ bool PluginHostEngine::restoreContainerState(const juce::MemoryBlock& state)
     processor->suspendProcessing(false);
     resetPerformance();
     return true; // setStateInformation has no result; soundbank availability is verified by the caller.
+}
+
+int PluginHostEngine::getBendRange() const
+{
+    auto* plugin = getPlugin();
+    if (!plugin) return 0;
+    if (kontaktStandardControls.load()) {
+        if (auto* p=KensaBendRange::boundParameter(*plugin))
+            for (int n=1;n<=4;++n)
+                if (std::abs(p->getValue()-*KensaBendRange::valueFor(n))<.0001f) return n;
+        return 0;
+    }
+    for (int semitones=1;semitones<=4;++semitones) {
+        bool up=false,down=false,matched=true;
+        for (auto* parameter:plugin->getParameters()) {
+            if (!parameter) continue;
+            const auto role=BendRangeParameters::role(parameter->getName(160));
+            if (role==BendRangeParameters::none) continue;
+            matched &= BendRangeParameters::displays(parameter->getText(parameter->getValue(),128),semitones);
+            up |= role==BendRangeParameters::up || role==BendRangeParameters::both;
+            down |= role==BendRangeParameters::down || role==BendRangeParameters::both;
+        }
+        if (matched && up && down) return semitones;
+    }
+    return 0; // Custom/asymmetric/unsupported ranges stay untouched.
 }
 
 bool PluginHostEngine::setBendRange(int semitones)
@@ -1635,7 +1676,7 @@ void PluginHostEngine::resolveTechniqueParameters()
                  && name.contains("flutter"))
             techniqueParameters[static_cast<size_t>(PerformanceTechnique::flutter)] = parameter;
         else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::portamento)] == nullptr
-                 && name.contains("portamento") && ! name.contains("split"))
+                 && SwamTechniqueParameterPolicy::isPortamentoTime(parameter->getName(128)))
             techniqueParameters[static_cast<size_t>(PerformanceTechnique::portamento)] = parameter;
         else if (techniqueParameters[static_cast<size_t>(PerformanceTechnique::fall)] == nullptr
                  && (name.contains("falldown") || name == "fall" || name.contains("doit")))
@@ -1743,4 +1784,10 @@ bool PluginHostEngine::queue(juce::MidiMessage message, double timestampSeconds)
         for (auto& value : lastNativeTechniqueMessages) value.store(0, std::memory_order_relaxed);
     return accepted;
 }
+}
+
+void fengyin::PluginHostEngine::channelPressureChanged(int value, double timestampSeconds) noexcept
+{
+    if(nativePressureEnabled.load(std::memory_order_relaxed) && !kongExpressionMode.load() && !kontaktStandardControls.load())
+        queue(juce::MidiMessage::channelPressureChange(1,juce::jlimit(0,127,value)),timestampSeconds);
 }

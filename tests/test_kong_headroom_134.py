@@ -70,9 +70,10 @@ class KongHeadroom134(unittest.TestCase):
                 self.assertGreater(evidence['peak'], 0)
                 self.assertLessEqual(max(evidence['peak'], evidence['oversampledPeak4x']), self.audit['verificationCeiling'])
 
-    def test_signal_path_and_other_builtins_are_unchanged(self):
-        self.assertEqual(self.audit['sourceHashNewlines'], 'LF')
-        for path, expected in self.audit['signalPathSha256'].items():
+    def test_current_exclusive_signal_path_and_other_builtins(self):
+        maintenance = json.loads((ASSETS / 'kong-exclusive-136-audit.json').read_text(encoding='utf-8'))
+        self.assertEqual(maintenance['sourceHashNewlines'], 'LF')
+        for path, expected in maintenance['signalPathSha256'].items():
             # Git's Windows checkout may convert LF to CRLF. Ignore only that
             # code-line ending conversion; package/binary hashes remain exact.
             source=(ROOT / path).read_bytes().replace(b'\r\n',b'\n')
@@ -80,6 +81,23 @@ class KongHeadroom134(unittest.TestCase):
         for name, expected in self.audit['unchangedPackages'].items():
             self.assertFalse(name.startswith('folk-'))
             self.assertEqual(sha((ASSETS / name).read_bytes()), expected, name)
+
+    def test_exclusive_native_measurements(self):
+        maintenance = json.loads((ASSETS / 'kong-exclusive-136-audit.json').read_text(encoding='utf-8'))
+        self.assertEqual({r['file'] for r in maintenance['targets']}, {r['file'] for r in self.audit['targets']})
+        for row in maintenance['targets']:
+            self.assertEqual(set(row['verification']), {'44100', '48000'})
+            for rate, v in row['verification'].items():
+                self.assertEqual(v['packageSha256'], sha((ASSETS / row['file']).read_bytes()))
+                self.assertEqual(v['sampleRate'], int(rate))
+                self.assertEqual(v['protocol'], 2)
+                self.assertEqual(v['fader'], 1.5)
+                self.assertTrue(v['finite'])
+                self.assertEqual(v['droppedMidi'], 0)
+                self.assertEqual(v['overloadSamples'], 0)
+                self.assertGreater(v['cases'], 250)
+                self.assertGreater(v['peak'], 0)
+                self.assertLessEqual(max(v['peak'], v['oversampledPeak4x']), maintenance['verificationCeiling'])
 
     def test_calibration_cannot_accumulate_on_repeat(self):
         paths = list(ASSETS.glob('*.fytonepack'))

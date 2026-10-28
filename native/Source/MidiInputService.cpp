@@ -675,6 +675,8 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
     const auto timestampSeconds = message.getTimeStamp() > 0.0
         ? message.getTimeStamp() : juce::Time::getMillisecondCounterHiRes() * 0.001;
     onsetTrace.record(message, timestampSeconds);
+    if (sink != nullptr && message.isChannelPressure())
+        sink->channelPressureChanged(message.getChannelPressureValue(), timestampSeconds);
     const bool techniqueConsumed = handleTechniqueMessage(message, sink);
     bool releaseExistingMusicalNote = false;
     if (techniqueConsumed && message.isNoteOff())

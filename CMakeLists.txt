@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.35 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.36 LANGUAGES C CXX)
 option(FENGYIN_ARCHIVED_VIDEO_RECORDING "Build archived video-recording diagnostics, never for release" OFF)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
@@ -166,6 +166,8 @@ target_sources(FengYin PRIVATE
     native/Source/PluginHostEngine.cpp
     native/Source/PluginHostEngine.h
     native/Source/RealtimeMidiQueue.h
+    native/Source/BleMidiInputDecoder.h
+    native/Source/SwamTechniqueParameterPolicy.h
     native/Source/SwamPluginClassifier.h
     native/Source/KongInstrumentCatalog.h
     native/Source/ContainerPluginAdapter.h
@@ -227,7 +229,7 @@ target_compile_definitions(FengYin PRIVATE
     JUCE_USE_CURL=0
     JUCE_WEB_BROWSER=1
     FENGYIN_LOCK_WEBVIEW_ZOOM=1
-    FENGYIN_TRACE_AUDIO_LOCKS=1
+    FENGYIN_TRACE_AUDIO_LOCKS=1 FENGYIN_RETAIN_AUDIO_SETUP=1
     JUCE_PLUGINHOST_VST3=1
 )
 
@@ -397,7 +399,7 @@ if(BUILD_TESTING)
     target_compile_options(FengYinKongDualSlotTests PRIVATE
         $<$<CXX_COMPILER_ID:MSVC>:/UNDEBUG>
         $<$<CXX_COMPILER_ID:AppleClang,Clang,GNU>:-UNDEBUG>)
-    add_test(NAME kong_dual_slot_additive_routing COMMAND FengYinKongDualSlotTests)
+    add_test(NAME kong_dual_slot_exclusive_routing COMMAND FengYinKongDualSlotTests)
     add_executable(FengYinExportWaveTests tests/test_export_wave.cpp)
     add_test(NAME recording_aligned_30min_wave COMMAND FengYinExportWaveTests)
     find_package(Threads REQUIRED)
@@ -465,7 +467,7 @@ if(BUILD_TESTING)
     add_test(NAME sound_preset_roundtrip COMMAND FengYinPresetTests)
     add_executable(FengYinStudioTests tests/test_tone_studio.cpp native/Source/SoundPresetStore.cpp)
     target_include_directories(FengYinStudioTests PRIVATE native/Source)
-    target_compile_definitions(FengYinStudioTests PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 FENGYIN_TRACE_AUDIO_LOCKS=1)
+    target_compile_definitions(FengYinStudioTests PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 FENGYIN_TRACE_AUDIO_LOCKS=1 FENGYIN_RETAIN_AUDIO_SETUP=1)
     target_link_libraries(FengYinStudioTests PRIVATE juce::juce_audio_processors juce::juce_cryptography juce::juce_recommended_config_flags)
     add_test(NAME tone_studio_chain_package COMMAND FengYinStudioTests)
 
@@ -529,6 +531,14 @@ if(BUILD_TESTING)
     add_test(NAME realtime_midi_queue COMMAND FengYinRealtimeMidiQueueTests)
     add_executable(FengYinCaptureAudioTimelineTests tests/test_capture_audio_timeline.cpp)
     add_test(NAME capture_audio_timeline COMMAND FengYinCaptureAudioTimelineTests)
+    add_executable(FengYinAudioSetupRetentionTests tests/test_audio_setup_retention.cpp)
+    target_compile_definitions(FengYinAudioSetupRetentionTests PRIVATE FENGYIN_RETAIN_AUDIO_SETUP=1)
+    target_link_libraries(FengYinAudioSetupRetentionTests PRIVATE juce::juce_audio_devices juce::juce_recommended_config_flags)
+    add_test(NAME audio_setup_retention COMMAND FengYinAudioSetupRetentionTests)
+
+    add_executable(FengYinBleMidiDecoderTests tests/test_ble_midi_decoder.cpp)
+    target_include_directories(FengYinBleMidiDecoderTests PRIVATE native/Source)
+    add_test(NAME ble_midi_decoder COMMAND FengYinBleMidiDecoderTests)
     add_executable(FengYinBluetoothMidiTests tests/test_bluetooth_midi.cpp native/Source/BluetoothMidiService.cpp)
     target_include_directories(FengYinBluetoothMidiTests PRIVATE native/Source)
     target_link_libraries(FengYinBluetoothMidiTests PRIVATE juce::juce_audio_basics juce::juce_data_structures juce::juce_events juce::juce_recommended_config_flags)

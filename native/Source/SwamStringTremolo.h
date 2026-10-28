@@ -7,7 +7,7 @@ namespace fengyin {
 // Native discrete bowing articulation, not a volume LFO or Vibrato.
 class SwamStringTremolo {
 public:
-    void clear() noexcept { selector.store(nullptr); speedParameter=nullptr; wanted.store(false); dirty.store(false); }
+    void clear() noexcept { selector.store(nullptr); speedParameter=nullptr; modeParameter=nullptr; engaged=false; wanted.store(false); dirty.store(false); }
     void setTempoMode(int value) noexcept { if(tempoMode.exchange(MusicTempoPolicy::valid(value))!=MusicTempoPolicy::valid(value))dirty.store(true); }
     bool prepare(juce::AudioProcessor& plugin) {
         clear();
@@ -23,26 +23,37 @@ public:
         // Six strokes per quarter note (sixteenth-note triplets). Fast is 1.5 x Slow.
         const double rates[]{7.0,10.0,140.0/15.0};
         for(int i=0;i<3;++i){rateValues[i]=findNumber(*speed,rates[i]);if(rateValues[i]<0)return false;}
-        const auto rate=rateValues[tempoMode.load()];
         if(off<0||slow<0||fast<0||hz<0)return false;
-        const auto oldMode=mode->getValue(),oldSpeed=speed->getValue();
-        mode->setValueNotifyingHost(hz);speed->setValueNotifyingHost(rate);
-        if(!mode->getText(mode->getValue(),128).equalsIgnoreCase("Hz")
-           ||std::abs(speed->getText(speed->getValue(),128).getDoubleValue()-rates[tempoMode.load()])>.05) {
-            mode->setValueNotifyingHost(oldMode);speed->setValueNotifyingHost(oldSpeed);return false;
-        }
-        offValue=off;slowValue=slow;fastValue=fast;speedParameter=speed;selector.store(trem);
-        trem->setValueNotifyingHost(offValue);return true;
+        offValue=off;slowValue=slow;fastValue=fast;hzValue=hz;
+        speedParameter=speed;modeParameter=mode;selector.store(trem);
+        // Discovery must never overwrite the tuner's saved mode, speed or articulation.
+        return true;
     }
     bool available() const noexcept { return selector.load()!=nullptr; }
-    void request(bool on) noexcept { if(wanted.exchange(on)!=on || !on)dirty.store(true); }
+    void request(bool on) noexcept { if(wanted.exchange(on)!=on)dirty.store(true); }
     void flush() noexcept {
         if(dirty.exchange(false))if(auto* p=selector.load()) {
-            const auto tempo=tempoMode.load();
-            if(speedParameter&&std::abs(speedParameter->getValue()-rateValues[tempo])>1e-6f)speedParameter->setValueNotifyingHost(rateValues[tempo]);
-            const auto target=wanted.load()?(tempo==2?fastValue:slowValue):offValue;
-            if(std::abs(p->getValue()-target)>1e-6f)p->setValueNotifyingHost(target);
+            if (wanted.load()) {
+                if (!engaged) { baselineSelector=p->getValue(); baselineSpeed=speedParameter->getValue(); baselineMode=modeParameter->getValue(); engaged=true; }
+                const auto tempo=tempoMode.load();
+                modeParameter->setValueNotifyingHost(hzValue);
+                speedParameter->setValueNotifyingHost(rateValues[tempo]);
+                p->setValueNotifyingHost(tempo==2?fastValue:slowValue);
+            } else if (engaged) {
+                p->setValueNotifyingHost(baselineSelector);
+                speedParameter->setValueNotifyingHost(baselineSpeed);
+                modeParameter->setValueNotifyingHost(baselineMode);
+                engaged=false;
+            }
         }
+    }
+    template <typename Capture> void captureWithoutPerformanceOverride(Capture&& capture) {
+        auto* p=selector.load();
+        if (!engaged || !p) { capture(); return; }
+        const auto current=p->getValue(), speed=speedParameter->getValue(), mode=modeParameter->getValue();
+        p->setValueNotifyingHost(baselineSelector);speedParameter->setValueNotifyingHost(baselineSpeed);modeParameter->setValueNotifyingHost(baselineMode);
+        capture();
+        p->setValueNotifyingHost(current);speedParameter->setValueNotifyingHost(speed);modeParameter->setValueNotifyingHost(mode);
     }
 private:
     static float findLabel(juce::AudioProcessorParameter& p,const juce::String& label) {
@@ -63,7 +74,9 @@ private:
     std::atomic<juce::AudioProcessorParameter*> selector{nullptr};
     std::atomic<bool> wanted{false},dirty{false};
     std::atomic<int> tempoMode{1};
-    juce::AudioProcessorParameter* speedParameter=nullptr;
+    juce::AudioProcessorParameter *speedParameter=nullptr,*modeParameter=nullptr;
+    bool engaged=false;
+    float baselineSelector=0,baselineSpeed=0,baselineMode=0,hzValue=0;
     float offValue=0,slowValue=.5f,fastValue=1,rateValues[3]{};
 };
 }
