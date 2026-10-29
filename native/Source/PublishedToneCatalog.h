@@ -20,6 +20,8 @@ struct PublishedToneDefinition
 // The release catalogue is deliberately explicit. Installing another plug-in
 // must never make an unreviewed tone appear in the customer-facing library.
 inline constexpr std::array<PublishedToneDefinition, 42> publishedToneCatalog {{
+    { "kontakt-kensa", "肯萨1", "kontakt-kensa", "release", PublishedToneKind::kontaktPackage, "kontakt-kensa.fytonepack" },
+    { "kontakt-kensa-2", "肯萨2", "kontakt-kensa", "release", PublishedToneKind::kontaktPackage, "tone137-kontakt-kensa-2.fytonepack" },
     { "soprano-kenny", "高萨-原声", "soprano-sax", "kenny", PublishedToneKind::swamPackage, "soprano-kenny.fytonepack" },
     { "soprano-pop", "高萨-明亮", "soprano-sax", "pop-high", PublishedToneKind::swamPackage, "soprano-pop.fytonepack" },
     { "alto-jazz", "中萨-爵士", "alto-sax", "jazz", PublishedToneKind::swamPackage, "alto-jazz.fytonepack" },
@@ -46,21 +48,19 @@ inline constexpr std::array<PublishedToneDefinition, 42> publishedToneCatalog {{
     { "cello", "大提琴", "cello", "natural", PublishedToneKind::swamPackage, "cello.fytonepack" },
     { "kong-erhu", "二胡1", "kong-erhu-2", "release", PublishedToneKind::kongPackage, "folk-erhu.fytonepack" },
     { "kong-erhu-new-2", "二胡2", "kong-erhu", "release", PublishedToneKind::kongPackage, "tone137-kong-erhu-new-2.fytonepack" },
+    { "kong-jinghu", "京胡", "kong-jinghu", "release", PublishedToneKind::kongPackage, "folk-jinghu.fytonepack" },
     { "kong-hulusi-straight", "葫芦丝-直音", "kong-hulusi", "release", PublishedToneKind::kongPackage, "tone137-kong-hulusi-straight.fytonepack" },
     { "kong-hulusi-vibrato", "葫芦丝-颤音", "kong-hulusi", "release", PublishedToneKind::kongPackage, "tone137-kong-hulusi-vibrato.fytonepack" },
-    { "kong-liuqin", "柳琴", "kong-liuqin", "release", PublishedToneKind::kongPackage, "folk-liuqin.fytonepack" },
     { "kong-qudi-straight", "曲笛1", "container:kong-v3:winds", "release", PublishedToneKind::kongPackage, "tone137-kong-qudi-straight.fytonepack" },
     { "kong-qudi", "曲笛2*", "kong-dizi", "release", PublishedToneKind::kongPackage, "folk-qudi.fytonepack" },
+    { "kong-bangdi", "梆笛*", "kong-dizi-2", "release", PublishedToneKind::kongPackage, "folk-bangdi.fytonepack" },
+    { "kong-nanxiao", "南箫", "kong-nanxiao", "release", PublishedToneKind::kongPackage, "tone137-kong-nanxiao.fytonepack" },
+    { "kong-dongxiao", "洞箫", "container:kong-v3:winds", "release", PublishedToneKind::kongPackage, "tone137-kong-dongxiao.fytonepack" },
     { "kong-xun", "埙", "kong-xun", "release", PublishedToneKind::kongPackage, "tone137-kong-xun.fytonepack" },
     { "kong-suona-vibrato", "唢呐1", "kong-suona", "release", PublishedToneKind::kongPackage, "tone137-kong-suona-vibrato.fytonepack" },
     { "kong-suona", "唢呐2*", "kong-suona-2", "release", PublishedToneKind::kongPackage, "folk-suona.fytonepack" },
+    { "kong-liuqin", "柳琴", "kong-liuqin", "release", PublishedToneKind::kongPackage, "folk-liuqin.fytonepack" },
     { "kong-sanxian", "三弦", "kong-sanxian", "release", PublishedToneKind::kongPackage, "folk-sanxian.fytonepack" },
     { "kong-pipa", "琵琶", "kong-pipa", "release", PublishedToneKind::kongPackage, "folk-pipa.fytonepack" },
-    { "kong-nanxiao", "南箫", "kong-nanxiao", "release", PublishedToneKind::kongPackage, "tone137-kong-nanxiao.fytonepack" },
-    { "kong-dongxiao", "洞箫", "container:kong-v3:winds", "release", PublishedToneKind::kongPackage, "tone137-kong-dongxiao.fytonepack" },
-    { "kong-bangdi", "梆笛*", "kong-dizi-2", "release", PublishedToneKind::kongPackage, "folk-bangdi.fytonepack" },
-    { "kong-jinghu", "京胡", "kong-jinghu", "release", PublishedToneKind::kongPackage, "folk-jinghu.fytonepack" },
-    { "kontakt-kensa", "肯萨1", "kontakt-kensa", "release", PublishedToneKind::kontaktPackage, "kontakt-kensa.fytonepack" },
-    { "kontakt-kensa-2", "肯萨2", "kontakt-kensa", "release", PublishedToneKind::kontaktPackage, "tone137-kontakt-kensa-2.fytonepack" },
 }};
 }

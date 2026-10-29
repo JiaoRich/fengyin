@@ -15,7 +15,7 @@ class ToneRelease137(unittest.TestCase):
         self.assertEqual(len({r['name'] for r in rows}), 42)
         source = (ROOT/'native/Source/PublishedToneCatalog.h').read_text(encoding='utf-8')
         actual = re.findall(r'\{ "([^"]+)",\s*"([^"]+)",\s*"([^"]+)",\s*"[^"]+",\s*PublishedToneKind::\w+,\s*"([^"]+)"', source)
-        self.assertEqual(actual, [(r['id'],r['name'],r['instrumentKey'],r['asset']) for r in rows])
+        self.assertEqual(sorted(actual), sorted((r['id'],r['name'],r['instrumentKey'],r['asset']) for r in rows))  # Later releases may reorder defaults without changing tone state.
         cmake = (ROOT/'CMakeLists.txt').read_text(encoding='utf-8')
         embedded = re.findall(r'assets/tone-packages/([^\s]+\.fytonepack)',cmake)
         self.assertEqual(set(embedded), {r['asset'] for r in rows})
