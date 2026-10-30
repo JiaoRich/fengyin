@@ -9,6 +9,7 @@
 #include <exception>
 #if JUCE_WINDOWS
 #include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Windows.Foundation.Metadata.h>
 #include <winrt/Windows.Devices.Bluetooth.h>
 #include <winrt/Windows.Devices.Bluetooth.Advertisement.h>
 #include <winrt/Windows.Devices.Bluetooth.GenericAttributeProfile.h>
@@ -201,12 +202,16 @@ struct BluetoothMidiService::Impl : juce::Thread
         scanUntil=juce::Time::getMillisecondCounterHiRes()+30000;
         const auto epoch=scanEpoch.load();
         watcher=Watcher();watcher.ScanningMode(Bluetooth::Advertisement::BluetoothLEScanningMode::Active);
-        receivedToken=watcher.Received([this, guard=lifetime,epoch](const auto&,const Bluetooth::Advertisement::BluetoothLEAdvertisementReceivedEventArgs& args) {
+        // The advertisement address-type property was added in Windows 10 2004.
+        // Keep the pre-existing single-address lookup on older systems.
+        const bool hasAddressType=winrt::Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(
+            L"Windows.Devices.Bluetooth.Advertisement.BluetoothLEAdvertisementReceivedEventArgs",L"BluetoothAddressType");
+        receivedToken=watcher.Received([this, guard=lifetime,epoch,hasAddressType](const auto&,const Bluetooth::Advertisement::BluetoothLEAdvertisementReceivedEventArgs& args) {
             std::lock_guard callbackLock(guard->mutex);if(!guard->alive)return;
             if(scanEpoch.load()!=epoch)return;
             bool midi=false;for(const auto& uuid:args.Advertisement().ServiceUuids())midi|=uuid==midiUuid;
             std::lock_guard lock(mutex);
-            if(scanning)adverts.offer({args.BluetoothAddress(),static_cast<int>(args.BluetoothAddressType()),
+            if(scanning && args.BluetoothAddress()!=0)adverts.offer({args.BluetoothAddress(),hasAddressType?static_cast<int>(args.BluetoothAddressType()):2,
                 str(args.Advertisement().LocalName()).toStdString(),midi,juce::Time::getMillisecondCounterHiRes()});
             notify();
         });
@@ -260,6 +265,7 @@ struct BluetoothMidiService::Impl : juce::Thread
         }
         checked[key]={now,advert.midi,{}};++probes;
         auto device=await(beginOnUi([address=advert.address,type=advert.addressType]{
+            if(type!=0 && type!=1)return Ble::FromBluetoothAddressAsync(address);
             return Ble::FromBluetoothAddressAsync(address,static_cast<winrt::Windows::Devices::Bluetooth::BluetoothAddressType>(type));
         },ticket),ticket,1800);
         if(!device)return;

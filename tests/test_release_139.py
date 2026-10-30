@@ -22,3 +22,9 @@ class Release139(unittest.TestCase):
         for row in new:
             if row['id']=='trumpet':continue
             self.assertEqual(row['sha256'],next(r['sha256'] for r in old if r['id']==row['id']))
+
+    def test_ble_address_type_keeps_older_windows_compatible(self):
+        source=(ROOT/'native/Source/BluetoothMidiService.cpp').read_text(encoding='utf-8')
+        self.assertIn('ApiInformation::IsPropertyPresent',source)
+        self.assertIn('hasAddressType?static_cast<int>(args.BluetoothAddressType()):2',source)
+        self.assertIn('if(type!=0 && type!=1)return Ble::FromBluetoothAddressAsync(address)',source)
