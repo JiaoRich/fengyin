@@ -973,14 +973,10 @@ juce::File MainComponent::prepareLocalWebInterface()
 
 void MainComponent::chooseVideoForWebInterface()
 {
-    webVideoChooser = std::make_unique<juce::FileChooser>(utf8("选择伴奏视频"), juce::File(), "*.mp4;*.mov;*.m4v;*.avi;*.mkv;*.webm");
     const auto safeThis = juce::Component::SafePointer<MainComponent>(this);
-    webVideoChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-        [safeThis](const juce::FileChooser& chooser)
+    webVideoChooser.open([safeThis](juce::File file)
         {
             if (safeThis == nullptr) return;
-            const auto file = chooser.getResult();
-            safeThis->webVideoChooser.reset();
             if (file.existsAsFile()) safeThis->loadVideoForWebInterface(file);
         });
 }
@@ -1141,6 +1137,12 @@ void MainComponent::updateVlcPlayback()
     const auto status=vlcVideo.getState();
     if(status.generation!=webVideoGeneration)return;
     webVideoAudioReady=status.ready && status.error.empty();
+    if((webVideoAudioReady || !status.error.empty()) && lastVideoTimingGeneration!=status.generation) {
+        lastVideoTimingGeneration=status.generation;
+        juce::Logger::writeToLog("Video open timing generation="+juce::String(status.generation)
+            +" dllMs="+juce::String(status.dllLoadMs,1)+" initialiseMs="+juce::String(status.initialiseMs,1)
+            +" firstReadyMs="+juce::String(status.firstReadyMs,1)+" success="+juce::String(webVideoAudioReady?1:0));
+    }
     if(status.finished || !status.error.empty())videoPlaybackActive=false;
     if(webInterface && webPresentationVisible && webInterfaceReady) {
         auto result=std::make_unique<juce::DynamicObject>();

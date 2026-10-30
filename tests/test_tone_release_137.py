@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class ToneRelease137(unittest.TestCase):
     def test_catalogue_matches_approved_package_inventory(self):
-        audit = json.loads((ROOT/'assets/tone-packages/release-139-audit.json').read_text(encoding='utf-8'))
+        audit = json.loads((ROOT/'assets/tone-packages/release-140-audit.json').read_text(encoding='utf-8'))
         self.assertEqual(audit['calibration'], 'deferred')
         rows = audit['tones']
         self.assertEqual(len(rows), 41)

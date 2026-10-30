@@ -10,7 +10,7 @@ class DirectTonePolicy(unittest.TestCase):
     def test_activation_is_read_only_and_editor_close_does_not_capture_state(self):
         host = (ROOT / 'native/Source/PluginHostEngine.cpp').read_text(encoding='utf-8')
         body = host.split('bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstrument)', 1)[1].split('\nvoid ', 1)[0]
-        self.assertIn('const auto configured=initialiseNewInstrument', body)
+        self.assertIn('initialiseNewInstrument&&wantFlutter,initialiseNewInstrument,initialiseNewInstrument&&ownTremolo,!initialiseNewInstrument', body)
         self.assertIn('SwamTechniqueRouting::prepare', body)
         self.assertIn('if(configured.supported && configured.changed)', body)
         self.assertIn('state=original', body)

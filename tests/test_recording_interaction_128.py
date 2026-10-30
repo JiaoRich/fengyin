@@ -77,7 +77,7 @@ class RecordingInteraction128(unittest.TestCase):
         audit=json.loads(read('assets/voice/recording-xfyun-audit.json'))
         self.assertEqual({x['id'] for x in audit},{'REC_PREP_AUDIO','REC_PREP_SCREEN','REC_SAVED'})
         for item in audit:
-            self.assertEqual(item['voice'],'x6_wuyediantai_mini')
+            self.assertEqual(item['voice'],'x6_lingyuyan_pro')
             self.assertEqual(hashlib.sha256((ROOT/'assets/voice'/f"{item['id']}.wav").read_bytes()).hexdigest(),item['sha256'])
         main=read('native/Source/MainComponent.cpp')
         timer=main.split('void MainComponent::timerCallback()',1)[1].split('\nvoid ',1)[0]

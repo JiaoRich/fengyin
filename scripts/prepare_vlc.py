@@ -7,6 +7,8 @@ import tempfile
 import tarfile
 import urllib.request
 import zipfile
+import os
+from datetime import datetime, timezone
 
 VERSION = '3.0.24'
 URL = f'https://api.nuget.org/v3-flatcontainer/videolan.libvlc.windows/{VERSION}/videolan.libvlc.windows.{VERSION}.nupkg'
@@ -41,6 +43,10 @@ def prepare(destination, archive=None, source_archive=None):
                 # Official LGPL package, not the separate Windows.GPL package.
                 target=destination/relative;target.parent.mkdir(parents=True,exist_ok=True)
                 with package.open(info) as source,target.open('wb') as out:shutil.copyfileobj(source,out)
+                # VLC's plugin index stores mtime. Keep extraction deterministic
+                # across fresh CI trees and copies into the installer layout.
+                timestamp=datetime(*info.date_time,tzinfo=timezone.utc).timestamp()
+                os.utime(target,(timestamp,timestamp))
         if source_archive is None:
             source_archive=Path(tmp)/'vlc-source.tar.xz'
             with urllib.request.urlopen(SOURCE_URL,timeout=120) as source,source_archive.open('wb') as out:

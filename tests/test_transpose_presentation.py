@@ -23,7 +23,7 @@ class TransposePresentationTests(unittest.TestCase):
         items = {i['id']:i for i in catalog['items']}
         self.assertEqual(items['V026_01']['text'], '演奏调已设为C调。')
         self.assertEqual(items['V026_12']['text'], '演奏调已设为B调。')
-        self.assertEqual(catalog['voice'],'x6_wuyediantai_mini')
+        self.assertEqual(catalog['voice'],'x6_lingyuyan_pro')
         for item in items.values():
             self.assertEqual(item.get('voice',catalog['voice']), catalog['voice'])
             self.assertGreater((ROOT/'assets/voice'/f"{item['id']}.wav").stat().st_size,4096)

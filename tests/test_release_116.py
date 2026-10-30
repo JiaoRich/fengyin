@@ -66,13 +66,13 @@ class Release116(unittest.TestCase):
         self.assertNotIn('showPluginEditor',warm)
         self.assertNotIn('setStateInformation',warm)
     def test_current_voice_assets_have_traceable_exact_synthesis_text(self):
-        audit=json.loads((ROOT/'assets/voice/release-117-audit.json').read_text(encoding='utf-8'))
-        self.assertEqual(len(audit),123)
+        audit=json.loads((ROOT/'assets/voice/release-140-audit.json').read_text(encoding='utf-8'))
+        self.assertEqual(len(audit),152)
         byid={x['id']:x for x in audit}
         self.assertEqual(byid['V014_26']['speechText'],'二胡')
         self.assertEqual(byid['NEW_TONE_GENERIC']['speechText'],'音色加载完成。')
         self.assertEqual(byid['V058_01']['speechText'],'颤音控制已关闭。')
         for x in audit:
-            self.assertEqual(x['voice'],'x6_wuyediantai_mini')
+            self.assertEqual(x['voice'],'x6_lingyuyan_pro')
             self.assertEqual(hashlib.sha256((ROOT/'assets/voice'/(x['id']+'.wav')).read_bytes()).hexdigest(),x['sha256'])
 if __name__=='__main__':unittest.main()

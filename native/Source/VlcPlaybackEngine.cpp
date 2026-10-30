@@ -143,10 +143,14 @@ void VlcPlaybackEngine::run()
 #if defined(_WIN32)
     try
     {
+        using Clock = std::chrono::steady_clock;
+        const auto initialStart=Clock::now();
         VlcApi api(directory);
+        const auto dllMs=std::chrono::duration<double,std::milli>(Clock::now()-initialStart).count();
         const char* options[] = {"--ignore-config", "--no-media-library", "--no-video-title-show",
                                  "--no-osd", "--no-interact", "--no-metadata-network-access", "--avcodec-hw=any"};
         auto* instance = api.libvlc_new(static_cast<int>(std::size(options)), options);
+        const auto initMs=std::chrono::duration<double,std::milli>(Clock::now()-initialStart).count();
         if (!instance) throw std::runtime_error("无法初始化 VLC 播放组件");
         auto* player = api.libvlc_media_player_new(instance);
         if (!player) { api.libvlc_release(instance); throw std::runtime_error("无法创建 VLC 播放器"); }
@@ -185,6 +189,8 @@ void VlcPlaybackEngine::run()
         bool previewRequested = false;
         bool terminalChecked = false;
         std::string playbackError;
+        auto mediaStart=Clock::now();
+        double firstReadyMs=0;
         while (true)
         {
             Request next;
@@ -194,6 +200,7 @@ void VlcPlaybackEngine::run()
             result.generation=next.generation; result.seekRevision=next.seekRevision;
             if (next.generation != applied.generation)
             {
+                mediaStart=Clock::now();firstReadyMs=0;
                 api.libvlc_media_player_stop(player);
                 errorEvents.failed.store(false);
                 api.libvlc_media_player_set_media(player, nullptr);
@@ -279,6 +286,8 @@ void VlcPlaybackEngine::run()
                 }
                 result.ready=started && (playbackState==libvlc_Paused || playbackState==libvlc_Playing
                     || playbackState==libvlc_Ended);
+                if(result.ready && firstReadyMs==0)
+                    firstReadyMs=std::chrono::duration<double,std::milli>(Clock::now()-mediaStart).count();
                 // Some demuxers accept non-media input then return ordinary
                 // EOF, without EncounteredError. Only inspect tracks at the
                 // terminal state: missing metadata during opening is normal.
@@ -307,6 +316,7 @@ void VlcPlaybackEngine::run()
             }
             else if(!next.path.empty())result.error="无法打开这个视频文件";
             applied=next;
+            result.dllLoadMs=dllMs;result.initialiseMs=initMs;result.firstReadyMs=firstReadyMs;
             { std::lock_guard lock(mutex);
               if(request.generation==result.generation && request.seekRevision==result.seekRevision
                  && request.playRevision==next.playRevision) state=std::move(result); }

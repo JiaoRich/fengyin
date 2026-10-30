@@ -10,9 +10,9 @@ class Performance121(unittest.TestCase):
   self.assertNotIn('setPosition(',playing)
  def test_new_voice_assets_are_exact_and_same_voice(self):
   rows=json.loads((ROOT/'assets/voice/update-121-audit.json').read_text(encoding='utf-8'))
-  self.assertEqual(len(rows),8)
+  self.assertEqual(len(rows),7)
   for row in rows:
-   self.assertEqual(row['voice'],'x6_wuyediantai_mini');self.assertEqual(row['status'],'success')
+   self.assertEqual(row['voice'],'x6_lingyuyan_pro');self.assertEqual(row['status'],'success')
    file=ROOT/'assets/voice'/(row['id']+'.wav');self.assertEqual(hashlib.sha256(file.read_bytes()).hexdigest(),row['sha256'])
    with wave.open(str(file)) as w:self.assertEqual(w.getframerate(),24000);self.assertGreater(w.getnframes(),1000)
  def test_timing_is_opt_in_no_audio_thread_disk_logging(self):

@@ -12,7 +12,7 @@ struct SwamTechniqueRouting {
         for(auto* child:root.getChildIterator())if(auto* found=findTable(*child))return found;
         return nullptr;
     }
-    static Result prepare(juce::MemoryBlock& state,bool wantVibrato,bool wantGrowl,bool wantFlutter=false,bool shareVolume=false,bool ownTremolo=false) {
+    static Result prepare(juce::MemoryBlock& state,bool wantVibrato,bool wantGrowl,bool wantFlutter=false,bool shareVolume=false,bool ownTremolo=false,bool preserveUnrequested=false) {
         Result result;
         auto outer=juce::AudioProcessor::getXmlFromBinary(state.getData(),static_cast<int>(state.getSize()));
         if(!outer||!outer->hasTagName("VST3PluginState"))return result;
@@ -56,6 +56,7 @@ struct SwamTechniqueRouting {
                 if(target)return false;target=entry;
             }
             if (!wanted) {
+                if(preserveUnrequested)return true;
                 if (target && target->getIntAttribute("enabled") != 0) {
                     target->setAttribute("enabled",0); result.changed=true;
                 }

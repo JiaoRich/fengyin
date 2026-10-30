@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.1.39",
+    [string]$Version = "1.1.40",
     [switch]$SkipInstaller
 )
 
@@ -131,6 +131,12 @@ Invoke-Checked "Recording service dual-file lifecycle preflight" {
 }
 # Build playback fixtures independently: removing capture must not remove real
 # VLC first-frame / decoded PCM / lifecycle acceptance.
+Invoke-Checked "Asynchronous video file selector preflight build" {
+    cmake --build $BuildDir --config Release --target FengYinVideoChooserTests --parallel 4
+}
+Invoke-Checked "Real video selector cancel/reopen/lifecycle check" {
+    ctest --test-dir $BuildDir -C Release -R '^video_file_selector_lifecycle$' -V --output-on-failure
+}
 $VlcFixture = Join-Path $BuildDir "vlc-playback-fixture.mp4"
 Invoke-Checked "LibVLC fixture preparation" {
     & $RecorderFfmpeg -hide_banner -loglevel error -nostdin -y -f lavfi -i "color=c=red:s=1920x1080:r=24" -f lavfi -i "sine=frequency=440:sample_rate=48000" -vf "drawbox=x=0:y=540:w=1920:h=540:color=blue:t=fill" -t 12 -c:v mpeg4 -q:v 3 -c:a aac -b:a 192k -ac 2 $VlcFixture
@@ -197,6 +203,9 @@ Copy-Item (Join-Path $ProjectRoot "third_party\ble-midi\LICENSE.txt") (Join-Path
 & (Join-Path $PSScriptRoot "prepare-fresh-air.ps1") -Destination (Join-Path $PackageDir "components\Fresh Air")
 $MagicDestination = Join-Path $PackageDir "components\magic.CURVE"
 Copy-Item -LiteralPath $VlcRoot -Destination (Join-Path $PackageDir "components\VLC") -Recurse -Force
+Invoke-Checked "Final private VLC plugin index" {
+    python (Join-Path $PSScriptRoot "prepare_vlc_cache.py") (Join-Path $PackageDir "components\VLC")
+}
 Copy-Item (Join-Path $ProjectRoot "installer\InstallNotice.txt") (Join-Path $PackageDir "InstallNotice.txt") -Force
 if ((Get-FileHash (Join-Path $ProjectRoot "assets\components\magic.CURVE-1.0.2-Windows-Setup.exe") -Algorithm SHA256).Hash -ne '5AEBF446018D5F8FCE87F332E9D8A01194A98E02536DE132BF1C64939417BDBD') { throw 'magic.CURVE installer SHA-256 mismatch' }
 New-Item -ItemType Directory -Path $MagicDestination -Force | Out-Null

@@ -1,10 +1,14 @@
 #pragma once
+#include "VideoFileChooser.h"
 // Diagnostic only. Real release HTML/CSS/JS, file:// origin, physical input,
 // production VLC/host renderer. Fake meter data is NOT an instrument DSP test.
 struct ProductionUiScene final:juce::Component,juce::Timer {
     fengyin::VlcVideoSurface surface;
     std::unique_ptr<juce::WebBrowserComponent> web;
     juce::File fixture;
+    VideoFileChooser chooser { *this };
+    bool chooserRequested=false,chooserHandled=false;
+    int chooserCompletions=0;
     std::atomic<uint64_t> ui{now()},javascript{now()};
     bool failed=false,webOnly=false,ready=false,clickPending=false,expanded=false;
     int touchPhase=0,mousePhase=0;
@@ -48,7 +52,19 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
             })
             .withEventListener("testInput",[](juce::var p){std::cout<<"web input "<<juce::JSON::toString(p,true)<<std::endl;})
             .withEventListener("chooseVideo",[this](juce::var){
-                ++generation;if(!webOnly)surface.player()->load(fixture.getFullPathName().toStdString(),generation);
+                chooserRequested=true;chooserHandled=false;
+                chooser.open([this](juce::File file){
+                    ++chooserCompletions;
+                    if(!file.existsAsFile()){failed=true;return;}
+                    ++generation;
+                    if(!webOnly){
+                        if(!surface.initialise()){failed=true;return;}
+                        surface.player()->load(file.getFullPathName().toStdString(),generation);
+                    }
+                });
+                // Duplicate browser events while a selector is open must not
+                // create another dialog or load twice.
+                chooser.open([this](juce::File){failed=true;});
             })
             .withEventListener("nativeVideoViewport",[this](juce::var p){
                 if(webOnly)return;
@@ -80,6 +96,22 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
     ~ProductionUiScene()override{stopTimer();surface.shutdown();web.reset();}
     void paint(juce::Graphics& g)override{g.fillAll(juce::Colour(0xff07101d));}
     void finish(){stopTimer();juce::MessageManager::getInstance()->stopDispatchLoop();}
+    static juce::FileBrowserComponent* findFileBrowser(juce::Component* component) {
+        if(auto* browser=dynamic_cast<juce::FileBrowserComponent*>(component))return browser;
+        for(auto* child:component->getChildren())if(auto* browser=findFileBrowser(child))return browser;
+        return nullptr;
+    }
+    void completeFileDialog() {
+        if(!chooserRequested||chooserHandled)return;
+        auto* dialog=dynamic_cast<juce::FileChooserDialogBox*>(juce::Component::getCurrentlyModalComponent());
+        if(!dialog)return;
+        if(auto* browser=findFileBrowser(dialog)){
+            browser->setFileName(fixture.getFullPathName());
+            // Exercise the actual chooser's asynchronous completion, including
+            // destruction and its queued callback, rather than bypassing it.
+            dialog->exitModalState(1);chooserHandled=true;
+        }
+    }
     void click(const juce::String& selector,double fraction=.5) {
         if(selector=="#change-video")requestedGeneration=generation+1;
         const auto script="(()=>{const e=document.querySelector("+juce::JSON::toString(selector)+");const r=e.getBoundingClientRect();"
@@ -211,10 +243,10 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
                 mousePoint=p;mousePhase=3;
             }
         }
+        completeFileDialog();
         if(ready&&now()-lastState>=100){lastState=now();sendState();}
         if(phase==0&&ready) {
             web->evaluateJavascript("window.__JUCE__.backend.emitEvent('testRuntime',{userAgent:navigator.userAgent})");
-            if(!webOnly&&!surface.initialise()){failed=true;return;}
             phase=1;click("#change-video");deadline=now()+30000;
         } else if(phase==1&&generation==requestedGeneration&&webReadyGeneration==generation&&(webOnly||(surface.getState().generation==generation&&surface.getState().ready&&firstPictureVisible()))) {
             std::cout<<(webOnly?"CONTROL fake selection generation=":"PASS real paused first picture generation=")<<generation<<std::endl;
@@ -226,7 +258,7 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
             previousVolume=volumeCommands;phase=4;click("#video-volume",cycle%2?.25:.75);
         } else if(phase==4&&volumeCommands>previousVolume) {
             std::cout<<"PASS physical click cycle="<<cycle<<" production fullscreen/play/volume, input="<<(touchInput()?"touch":"mouse")<<" PCM="<<(webOnly?0:surface.player()->testPcmNonzero.load())<<std::endl;
-            if(++cycle==20){finish();return;}
+            if(++cycle==20){if(chooserCompletions!=4){failed=true;std::cerr<<"FAIL picker completion count="<<chooserCompletions<<std::endl;}finish();return;}
             if(cycle%5==0){phase=1;click("#change-video");deadline=now()+30000;}
             else {phase=2;click("#fullscreen");}
         }

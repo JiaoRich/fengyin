@@ -17,15 +17,10 @@ try{
  await show();
  assert.deepEqual(await ids(),expected.map(id=>'builtin:'+id));
  assert.equal(await page.evaluate(()=>localStorage.getItem('fengyin-card-order-swam')),null,'default must not write user order');
- await page.locator('.instrument-preset-card .card-drag-handle').nth(0).dragTo(page.locator('.instrument-preset-card .card-drag-handle').nth(3));
- const dragged=await ids();assert.notDeepEqual(dragged,expected.map(id=>'builtin:'+id));
- assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('fengyin-card-order-swam'))),dragged);
- await page.reload();await show();assert.deepEqual(await ids(),dragged,'saved drag order survives reload');
- const custom=['builtin:kong-pipa','builtin:trumpet-2','builtin:kong-clarinet-2'];
- await page.evaluate(o=>localStorage.setItem('fengyin-card-order-swam',JSON.stringify(o)),custom);
- await page.reload();await show();const result=await ids();assert.deepEqual(result.slice(0,3),custom);
- assert.deepEqual(result.slice(3),expected.map(id=>'builtin:'+id).filter(id=>!custom.includes(id)));
- assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('fengyin-card-order-swam'))),custom,'upgrade must not overwrite saved order');
- console.log('PASS: exact 41-tone default; real drag/drop; reload persistence; existing partial user order preserved.');
+ const oldOrder=['builtin:kong-pipa','builtin:trumpet-2','builtin:kong-clarinet-2'];
+ await page.evaluate(o=>localStorage.setItem('fengyin-card-order-swam',JSON.stringify(o)),oldOrder);
+ await page.reload();await show();assert.deepEqual(await ids(),expected.map(id=>'builtin:'+id));
+ assert.equal(await page.locator('.card-drag-handle,[draggable=true],#restore-tone-order').count(),0);
+ console.log('PASS: exact 41-tone default; fixed publisher order after reload; legacy drag order ignored; no sort handles.');
 }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1)});

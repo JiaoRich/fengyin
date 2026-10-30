@@ -765,18 +765,21 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstru
     const std::string_view key=SwamPluginClassifier::instrumentKey(plugin->getName().toStdString());
     const bool wantFlutter=simpleOther(key)==PerformanceTechnique::flutter;
     const bool ownTremolo=key=="violin" || key=="cello";
-    // Saved plugin state is authoritative. Only a newly inserted instrument
-    // receives default mappings; reloading a scheme never rewrites its MIDI table.
-    const auto configured=initialiseNewInstrument
-        ? SwamTechniqueRouting::prepare(state,simpleVibrato(key),simpleGrowl(key),wantFlutter,true,ownTremolo)
-        : SwamTechniqueRouting::Result{};
+    // Full tuner state remains authoritative except for the two destinations
+    // owned by global wind techniques. Old packages bind vibrato/growl to CC11,
+    // so raw breath defeats OFF/hardware/tempo modes. Reserve independent
+    // controllers for those roles; preserve every existing response curve and
+    // all unrelated MIDI routes (especially native portamento/Aftertouch).
+    const auto configured=SwamTechniqueRouting::prepare(state,simpleVibrato(key),simpleGrowl(key),
+        initialiseNewInstrument&&wantFlutter,initialiseNewInstrument,initialiseNewInstrument&&ownTremolo,!initialiseNewInstrument);
     if(configured.supported && configured.changed)
     {
         // Once per activation, while the graph is paused, never on each CC or mode switch.
         plugin->setStateInformation(state.getData(),static_cast<int>(state.getSize()));
         juce::MemoryBlock verified;plugin->getStateInformation(verified);
         auto check=verified;
-        const auto routing=SwamTechniqueRouting::prepare(check,simpleVibrato(key),simpleGrowl(key),wantFlutter,true,ownTremolo);
+        const auto routing=SwamTechniqueRouting::prepare(check,simpleVibrato(key),simpleGrowl(key),
+            initialiseNewInstrument&&wantFlutter,initialiseNewInstrument,initialiseNewInstrument&&ownTremolo,!initialiseNewInstrument);
         if(!routing.supported || routing.changed || routing.vibrato!=configured.vibrato || routing.growl!=configured.growl || routing.flutter!=configured.flutter || routing.volume!=configured.volume)
         {
             plugin->setStateInformation(original.getData(),static_cast<int>(original.getSize()));
@@ -820,9 +823,12 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstru
     if(key=="violin" || key=="cello")stringTremolo.prepare(*plugin);
     else stringTremolo.clear();
     prepareTempoVibrato(*plugin);
-    if (initialiseNewInstrument)
-        for (const auto technique : {PerformanceTechnique::vibrato, PerformanceTechnique::growl, PerformanceTechnique::flutter})
-            techniqueChanged(technique, 0.0f);
+    // A restored patch may contain a nonzero native depth even though the global
+    // mode is OFF. Clear the performance gate before the first new MIDI phrase;
+    // the normal global policy then supplies automatic or hardware depth.
+    for (const auto technique : {PerformanceTechnique::vibrato, PerformanceTechnique::growl})
+        techniqueChanged(technique, 0.0f);
+    if(initialiseNewInstrument)techniqueChanged(PerformanceTechnique::flutter,0.0f);
     // Activation only discovers routing. Saved/native curves remain authoritative;
     // never write a synthetic curve back into the live instrument here.
     juce::Logger::writeToLog("SWAM expression state update complete");

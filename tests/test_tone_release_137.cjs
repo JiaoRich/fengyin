@@ -19,5 +19,5 @@ assert.equal((html.match(/data-card-key=/g)||[]).length,41);
 assert(!html.includes('缺少音源'));
 for(const r of rows){assert(html.includes(`data-card-key="builtin:${r.id}"`));assert(html.includes(`<h3>${r.name}</h3>`));}
 for(const id of ['violin-bright','kong-hulusi','kong-matouqin'])assert(!html.includes(`data-card-key="builtin:${id}"`));
-assert(html.indexOf('builtin:kong-bangdi')<html.indexOf('builtin:soprano-kenny')); // Keep user order for surviving identities.
+assert(html.indexOf('builtin:soprano-kenny')<html.indexOf('builtin:kong-bangdi')); // Publisher order overrides legacy drag keys.
 console.log('Release 1.1.39: 41 cards, exact names, dependency states and retired-order migration PASS');

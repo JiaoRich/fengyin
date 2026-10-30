@@ -18,7 +18,7 @@ assert.equal(result.toString('ascii', 0, 4), 'RIFF');
 assert.equal(result.readUInt32LE(24), 24000);
 assert.deepEqual([...result.subarray(44)], [1, 2, 3, 4]);
 assert.equal(Buffer.from(request.payload.text.text, 'base64').toString(), prompts[0][1]);
-assert.equal(request.parameter.tts.vcn, 'x6_wuyediantai_mini');
+assert.equal(request.parameter.tts.vcn, 'x6_lingyuyan_pro');
 assert.deepEqual(request.parameter.tts, settings);
 await assert.rejects(synthesize({}, 'test', FakeSocket), /Missing XFYUN credentials/);
 class FailureSocket extends FakeSocket {

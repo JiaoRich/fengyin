@@ -20,7 +20,7 @@ struct PublishedToneDefinition
 // The release catalogue is deliberately explicit. Installing another plug-in
 // must never make an unreviewed tone appear in the customer-facing library.
 inline constexpr std::array<PublishedToneDefinition, 41> publishedToneCatalog {{
-    { "kontakt-kensa", "肯萨1", "kontakt-kensa", "release", PublishedToneKind::kontaktPackage, "kontakt-kensa.fytonepack" },
+    { "kontakt-kensa", "肯萨", "kontakt-kensa", "release", PublishedToneKind::kontaktPackage, "kontakt-kensa.fytonepack" },
     { "soprano-kenny", "高萨-原声", "soprano-sax", "kenny", PublishedToneKind::swamPackage, "soprano-kenny.fytonepack" },
     { "soprano-pop", "高萨-明亮", "soprano-sax", "pop-high", PublishedToneKind::swamPackage, "soprano-pop.fytonepack" },
     { "alto-jazz", "中萨-爵士", "alto-sax", "jazz", PublishedToneKind::swamPackage, "alto-jazz.fytonepack" },

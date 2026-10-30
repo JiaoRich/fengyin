@@ -4,6 +4,8 @@
 #include "SimpleTechniquePolicy.h"
 #include "SwamPluginClassifier.h"
 #include "SwamStateCompatibility.h"
+#include "PublishedToneCatalog.h"
+#include "MusicTempoPolicy.h"
 
 #include <cassert>
 #include <cmath>
@@ -172,6 +174,46 @@ int main(int argc, char** argv)
         assert(!fengyin::SwamTechniqueRouting::prepare(state,true,false,false,true,true).changed);
         assert(once==state);
     }
+    // Every shipped SWAM state: global vibrato/growl must not share breath.
+    // Restoring these two control destinations must leave all other routes,
+    // curves, scalar parameters, effects, volume and native portamento intact.
+    int audited=0,repaired=0;
+    for(const auto& tone:fengyin::publishedToneCatalog) {
+        if(tone.kind!=fengyin::PublishedToneKind::swamPackage)continue;
+        juce::ZipFile zip(root.getChildFile("assets/tone-packages").getChildFile(juce::String(tone.assetName.data())));
+        std::unique_ptr<juce::InputStream> input(zip.createStreamForEntry(zip.getIndexOfFileName("tone.xml")));
+        assert(input);auto doc=juce::parseXML(input->readEntireStreamAsString());assert(doc);
+        juce::MemoryBlock before;assert(before.fromBase64Encoding(doc->getChildByName("PRESET")->getChildByName("INSTRUMENT_STATE")->getAllSubText()));
+        auto after=before;
+        const bool wantVibrato=fengyin::simpleVibrato(tone.instrumentKey),wantGrowl=fengyin::simpleGrowl(tone.instrumentKey);
+        auto result=fengyin::SwamTechniqueRouting::prepare(after,wantVibrato,wantGrowl,false,false,false,true);
+        assert(result.supported);repaired+=result.changed;
+        const auto routes=fengyin::SwamExpressionCurve::applyToState(after);
+        if(wantVibrato)assert(result.vibrato>=0&&result.vibrato!=routes.controller);
+        if(wantGrowl)assert(result.growl>=0&&result.growl!=result.vibrato&&result.growl!=routes.controller);
+        auto oldXml=fengyin::SwamStateCompatibility::read(before),newXml=fengyin::SwamStateCompatibility::read(after);assert(oldXml&&newXml);
+        auto* oldTable=fengyin::SwamTechniqueRouting::findTable(*oldXml);
+        auto* newTable=fengyin::SwamTechniqueRouting::findTable(*newXml);assert(oldTable&&newTable);
+        for(const auto* id:{"vibratoDepth","growl"}) {
+            const bool managed=juce::String(id)=="vibratoDepth"?wantVibrato:wantGrowl;
+            if(!managed)continue;
+            juce::XmlElement *oldEntry=nullptr,*newEntry=nullptr;
+            for(auto* e:oldTable->getChildIterator())if(e->getStringAttribute("parameterId")==id)oldEntry=e;
+            for(auto* e:newTable->getChildIterator())if(e->getStringAttribute("parameterId")==id)newEntry=e;
+            assert(newEntry);
+            if(oldEntry) {
+                assert(oldEntry->getChildByName("MIDIRemappingCurve")->isEquivalentTo(newEntry->getChildByName("MIDIRemappingCurve"),false));
+                for(const char* attr:{"enabled","messageType","msb","lsb","channel"})newEntry->setAttribute(attr,oldEntry->getStringAttribute(attr));
+                assert(oldEntry->isEquivalentTo(newEntry,false));
+                oldTable->removeChildElement(oldEntry,true);
+            }
+            newTable->removeChildElement(newEntry,true);
+        }
+        assert(oldXml->isEquivalentTo(newXml.get(),false));
+        auto twice=after;assert(!fengyin::SwamTechniqueRouting::prepare(twice,wantVibrato,wantGrowl,false,false,false,true).changed);assert(twice==after);
+        ++audited;
+    }
+    assert(audited==21);std::cout<<"PASS "<<audited<<" complete SWAM packages, "<<repaired<<" legacy route repairs; every unrelated XML attribute and response curve retained\n";
     // Optional installed-plugin verification: no audio device, no saved settings.
     if (argc >= 2)
     {
@@ -224,16 +266,17 @@ int main(int argc, char** argv)
         juce::MemoryBlock state;
         plugin->getStateInformation(state);
         const auto before = state;
-        if(argc>=3 && juce::String(argv[2])=="--routing")
+        if(argc>=3 && (juce::String(argv[2])=="--routing" || juce::String(argv[2])=="--routing-preserve"))
         {
+            const bool preserve=juce::String(argv[2])=="--routing-preserve";
             std::vector<float> values;for(auto* p:plugin->getParameters())values.push_back(p->getValue());
             auto routed=state;
             const bool needsGrowl=fengyin::simpleGrowl(fengyin::SwamPluginClassifier::instrumentKey(plugin->getName().toStdString()));
-            const auto plan=fengyin::SwamTechniqueRouting::prepare(routed,true,needsGrowl,false,true);
+            const auto plan=fengyin::SwamTechniqueRouting::prepare(routed,true,needsGrowl,false,!preserve,false,preserve);
             if(!plan.supported)return 20;
             if(plan.changed)plugin->setStateInformation(routed.getData(),static_cast<int>(routed.getSize()));
             juce::MemoryBlock restored;plugin->getStateInformation(restored);
-            auto inspect=restored;const auto checked=fengyin::SwamTechniqueRouting::prepare(inspect,true,needsGrowl,false,true);
+            auto inspect=restored;const auto checked=fengyin::SwamTechniqueRouting::prepare(inspect,true,needsGrowl,false,!preserve,false,preserve);
             if(!checked.supported||checked.changed||checked.vibrato!=plan.vibrato||checked.growl!=plan.growl||checked.volume!=plan.volume){
                 std::cerr<<"Routing readback: changed="<<checked.changed<<" volume="<<checked.volume<<" expected="<<plan.volume<<std::endl;
                 auto outer=juce::AudioProcessor::getXmlFromBinary(restored.getData(),static_cast<int>(restored.getSize()));juce::MemoryBlock body;
@@ -285,6 +328,9 @@ int main(int argc, char** argv)
                             midi.addEvent(juce::MidiMessage::controllerEvent(vibratoChannel,plan.vibrato,v),0);if(needsGrowl)midi.addEvent(juce::MidiMessage::controllerEvent(growlChannel,plan.growl,g),0);
                         }
                     }
+                    // A new breath event must not reopen an explicitly closed
+                    // technique or turn OFF into breath-driven vibrato again.
+                    if(block%10==0)midi.addEvent(juce::MidiMessage::controllerEvent(1,routes.controller,block%20?70:80),0);
                     plugin->processBlock(audio,midi);
                     if(block>=200)samples.insert(samples.end(),audio.getReadPointer(0),audio.getReadPointer(0)+256);
                 }
@@ -295,7 +341,7 @@ int main(int argc, char** argv)
             for(int lag=80;lag<=700;++lag){double sum=0,e1=0,e2=0;for(int i=0;i<4096;++i){sum+=baseline[static_cast<size_t>(i)]*baseline[static_cast<size_t>(i+lag)];e1+=baseline[static_cast<size_t>(i)]*baseline[static_cast<size_t>(i)];e2+=baseline[static_cast<size_t>(i+lag)]*baseline[static_cast<size_t>(i+lag)];}const auto c=sum/std::sqrt(e1*e2);if(c>bestPeriod){bestPeriod=c;centreLag=lag;}}
             const auto analyse=[centreLag](const std::vector<float>& s){
                 std::vector<double> pitches;double power=0,correlation=0;int windows=0;
-                for(size_t start=0;start+4096<s.size();start+=4096){
+                for(size_t start=0;start+4096<s.size();start+=1024){
                     double best=-1;int bestLag=0;double energy=0;
                     for(int i=0;i<2048;++i)energy+=s[start+i]*s[start+i];
                     power+=energy;
@@ -310,7 +356,9 @@ int main(int argc, char** argv)
                     pitches.push_back(1200*std::log2(48000.0/fractional/261.625565));correlation+=best;++windows;
                 }
                 double low=1e9,high=-1e9;for(auto p:pitches){low=std::min(low,p);high=std::max(high,p);}
-                return std::array<double,3>{windows?high-low:0,windows?correlation/windows:0,power};
+                double strongest=-1,frequency=0,mean=0;for(auto p:pitches)mean+=p;mean/=std::max(size_t(1),pitches.size());
+                for(double hz=3;hz<=8;hz+=.02){double a=0,b=0;for(size_t n=0;n<pitches.size();++n){const auto angle=juce::MathConstants<double>::twoPi*hz*double(n)*1024/48000;a+=(pitches[n]-mean)*std::cos(angle);b+=(pitches[n]-mean)*std::sin(angle);}const auto magnitude=a*a+b*b;if(magnitude>strongest){strongest=magnitude;frequency=hz;}}
+                return std::array<double,4>{windows?high-low:0,windows?correlation/windows:0,power,frequency};
             };
             const auto off=analyse(baseline);const auto on=analyse(render(127,0));const auto growled=analyse(render(0,127));
             std::cout<<"Rendered pitch spread off="<<off[0]<<" on="<<on[0]<<" correlation off="<<off[1]<<" growl="<<growled[1]<<" power="<<off[2]<<"\n";
@@ -319,6 +367,24 @@ int main(int argc, char** argv)
             const auto gated=analyse(render(0,0,true));
             std::cout<<"Explicit OFF pitch spread="<<gated[0]<<" correlation="<<gated[1]<<" power="<<gated[2]<<"\n";
             if(gated[2]<=1e-9 || gated[0]>off[0]+5.0)return 25;
+            if(preserve) {
+                juce::AudioProcessorParameter* rate=nullptr;
+                for(auto* p:plugin->getParameters())if(p->getName(100)=="Vibrato Rate")rate=p;
+                if(!rate)return 26;
+                double previous=0;
+                for(int mode=0;mode<3;++mode){
+                    const auto expected=fengyin::MusicTempoPolicy::forMode(mode).saxRate;
+                    float best=0;double error=1e9;
+                    // Independent grid search, then assert the rendered pitch
+                    // modulation frequency, rather than just parameter text.
+                    for(int n=0;n<=2000;++n){const float value=float(n)/2000;const double difference=std::abs(rate->getText(value,100).getDoubleValue()-expected);if(difference<error){error=difference;best=value;}}
+                    if(error>.05)return 27;rate->setValueNotifyingHost(best);
+                    const auto actual=analyse(render(127,0));
+                    std::cout<<"Tempo mode="<<mode<<" expectedHz="<<expected<<" renderedHz="<<actual[3]<<"\n";
+                    if(std::abs(actual[3]-expected)>.25 || actual[3]<=previous)return 28;
+                    previous=actual[3];
+                }
+            }
             plugin->releaseResources();std::cout<<"PASS native routing readback, preserved parameters, CC drives both techniques\n";return 0;
         }
         const auto mapping = fengyin::SwamExpressionCurve::applyToState(state);

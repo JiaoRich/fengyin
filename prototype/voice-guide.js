@@ -21,11 +21,11 @@
   const emit=(name,value={})=>backend?.emitEvent(name,value);
   const busy=()=>!!state.recording || !!state.screenRecordingBusy || Number(state.breath)>0.015 || videoWantsPlaying || !video.paused;
   function stop(){emit('stopVoice');if(pending){clearTimeout(pending.timeout);pending.resolve(false);pending=null;}}
-  function say(id,{force=false,completion=false}={}){
+  function say(id,{force=false,completion=false,tone=false}={}){
     // Reuse the reviewed audio-only clip for this legacy step. The updated
     // recording step below explains the current audio/screen workflow in text.
     if(id==='GUIDE_RECORD')id='G010';
-    if(!enabled || !clips.has(id) || (busy()&&!force) || state.recording || state.screenRecordingBusy)return Promise.resolve(false);
+    if(!(tone?toneEnabled:enabled) || !clips.has(id) || (busy()&&!force) || state.recording || state.screenRecordingBusy)return Promise.resolve(false);
     stop();const request=++token;
     return new Promise(resolve=>{
       pending={request,resolve,completion,timeout:setTimeout(()=>{stop();},45000)};
@@ -42,7 +42,7 @@
   window.fengyinVoice={say,stop,speakText,
     learning(name){learnedName=controlName(name);say(/咬嘴|颤音|揉弦/.test(name)?'V047':'NEW_MAP_START');},
     cleared(){say('NEW_MAP_CLEAR');},
-    tone(name){if(!toneEnabled)return;const spoken=name.replace('次中萨','次中音萨克斯').replace('上低萨','上低音萨克斯').replace('高萨','高音萨克斯').replace('中萨','中音萨克斯').replaceAll('-', '，');const match=catalog.find(x=>x.text.replace(/[。～]/g,'')===spoken);return say(match?.id || 'NEW_TONE_GENERIC');},
+    tone(name){if(!toneEnabled)return;const media=Object.values(window.FENGYIN_TONE_MEDIA||{}).find(t=>t.name===name);const spoken=name.replace('次中萨','次中音萨克斯').replace('上低萨','上低音萨克斯').replace('高萨','高音萨克斯').replace('中萨','中音萨克斯').replaceAll('-', '，').replaceAll('*','');const match=catalog.find(x=>x.text.replace(/[。～]/g,'')===spoken);return say(clips.has(media?.voiceId)?media.voiceId:(match?.id || 'NEW_TONE_GENERIC'),{tone:true});},
     recordingPreferences(){return {announce:enabled,volume};}
   };
   const style=document.createElement('style');style.textContent=`

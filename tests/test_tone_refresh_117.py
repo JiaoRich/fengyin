@@ -47,6 +47,6 @@ class ToneRefresh117(unittest.TestCase):
         for ident,text in [('V014_01','高音萨克斯，原声'),('TONE_VIOLIN_BRIGHT','小提琴，明亮'),('TONE_VIOLIN_SOFT','小提琴，柔美')]:
             self.assertEqual(entries[ident]['text'].rstrip('。'),text)
             self.assertEqual(entries[ident]['speechText'],text)
-            self.assertEqual(entries[ident]['voice'],'x6_wuyediantai_mini')
+            self.assertEqual(entries[ident]['voice'],'x6_lingyuyan_pro')
 
 if __name__=='__main__':unittest.main()

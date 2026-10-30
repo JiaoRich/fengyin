@@ -1,0 +1,4107 @@
+[
+  {
+    "id": "V001",
+    "text": "欢迎使用风吟。接下来，我带您连接电吹管，并完成第一次演奏。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "06f2ca9df30b2c7bfdcec96e10be96df99d77623be0d8f80438e4fc412d7b0f1",
+    "sha256": "e200bd72bfd4f2e099478e4f500309cf834e0b9b210e8ad9c795cb65bbb6cf44",
+    "seconds": 6.44,
+    "speechText": "欢迎使用风吟。接下来，我带您连接电吹管，并完成第一次演奏。",
+    "status": "success"
+  },
+  {
+    "id": "V002",
+    "text": "请用数据线连接电吹管和电脑，并打开电吹管电源。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "b0677743e20c8eebc702f6ce57ec2899109e10db759775e4f1042ce72709996e",
+    "sha256": "427daebf9544fe7ed5e6ef89206ab61cc9398f394216e96720118fc6504335ae",
+    "seconds": 5.12,
+    "speechText": "请用数据线连接电吹管和电脑，并打开电吹管电源。",
+    "status": "success"
+  },
+  {
+    "id": "V003",
+    "text": "电吹管已连接。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "0172f1d1a4d58f7f17ea806b326f95cbd730202d48826919f21f92b09ffc4566",
+    "sha256": "faa0954dcc72b33c02ad2edec2c5585f2dcbacddd7da5ff20c386b022dfe61ad",
+    "seconds": 2.04,
+    "speechText": "电吹管已连接。",
+    "status": "success"
+  },
+  {
+    "id": "V005",
+    "text": "请轻轻吹奏两到三秒，让风吟检测气息信号。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "f70229ae0fa5ea41e0989bb3777a70b18f973d5dfe3b266f0dc27c9854fb73fb",
+    "sha256": "69c8dc9644885e45c98a2186c47b8fe478d272f3e4a6c1a8594692ccc9a39fab",
+    "seconds": 4.64,
+    "speechText": "请轻轻吹奏两到三秒，让风吟检测气息信号。",
+    "status": "success"
+  },
+  {
+    "id": "V007",
+    "text": "暂未检测到气息信号，请确认电吹管已连接，再试一次。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "58d2ac24fa45ad00b3eb15b43f413d770891e6efa883da8e27590e1051dd9b7a",
+    "sha256": "f022d9411b4e7e5766ab5e767572cf6e5c475b822b512c9be1717f229c712b7c",
+    "seconds": 5.48,
+    "speechText": "暂未检测到气息信号，请确认电吹管已连接，再试一次。",
+    "status": "success"
+  },
+  {
+    "id": "V011",
+    "text": "点击一个音色名称，加载完成后就可以吹奏。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "7790ebb504daf5f696b205f33bea4b50fe4be43d9bf5a57e595055cfd4e2980e",
+    "sha256": "ad657528abf70d3b0a9dbe5ad12d8c96577c5bb37ca54dba5b86df95ea8a36d5",
+    "seconds": 4.04,
+    "speechText": "点击一个音色名称，加载完成后就可以吹奏。",
+    "status": "success"
+  },
+  {
+    "id": "V012",
+    "text": "设置完成，可以开始演奏了，祝您玩得开心。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "79fc546a3b3757acf47a0be2bf41a8dbe7c7f88e73e6bd5575279f0b0f8fb36b",
+    "sha256": "83d5fe9fd34cfb62b54d9e7cee48f9c6e40747f25dcfc19d92aad8a8aba554e8",
+    "seconds": 4,
+    "speechText": "设置完成，可以开始演奏了，祝您玩得开心。",
+    "status": "success"
+  },
+  {
+    "id": "V013",
+    "text": "已跳过引导。以后可以在高级设置里重新打开。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "950005129828da38cac4756d741a784e5b398fdcacd4a2253cee791031e95c51",
+    "sha256": "90a20caae78a32958c3401e2137e84e7bd7a82e51da80115b0f0a04443b75d0e",
+    "seconds": 4.56,
+    "speechText": "已跳过引导。以后可以在高级设置里重新打开。",
+    "status": "success"
+  },
+  {
+    "id": "V014_01",
+    "text": "高音萨克斯，原声。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "1e073da0d46e7791b6788705b8b03f16bce87a61f7dc313a312919bce6127136",
+    "sha256": "8278f0112959ab1bbeb4beb391462bf12445c874ad9625fad56f014dbdce2ae7",
+    "seconds": 2.48,
+    "speechText": "高音萨克斯，原声",
+    "status": "success"
+  },
+  {
+    "id": "V014_02",
+    "text": "高音萨克斯，明亮。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "a35723719b4ad0802d966fccfb8a53243a81b0fcd8792592061ae87ed8211e73",
+    "sha256": "2a0e093ddc4cbc8cc064c357e9afcfed771e9a7f9f1a7245600f88f921b8ee1c",
+    "seconds": 2.6,
+    "speechText": "高音萨克斯，明亮",
+    "status": "success"
+  },
+  {
+    "id": "V014_03",
+    "text": "中音萨克斯，爵士。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "e31dd9de714215787add51112babf403a0fa42f9f73dd1f3e5d34c9bf726b207",
+    "sha256": "a7866f0abf17bee51529be99a7e48a63759993be7002eba8207effd53406aa14",
+    "seconds": 2.72,
+    "speechText": "中音萨克斯，爵士",
+    "status": "success"
+  },
+  {
+    "id": "V014_04",
+    "text": "中音萨克斯，深情。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "75216031a5ac2577087446df78a07c8d8da0963912b0b0bc945a924d0446dc17",
+    "sha256": "c6e3fc39ff9a900b5e96ecc33547dc4af6d23562ed61a1aab8c2f1cc659fe84a",
+    "seconds": 2.72,
+    "speechText": "中音萨克斯，深情",
+    "status": "success"
+  },
+  {
+    "id": "V014_05",
+    "text": "中音萨克斯，流行。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "4af51db2e5e960c3bb05ff4493321038bc50e3e03c0d0b2c40dfda6ca2a34c67",
+    "sha256": "43d1627c42659ac1440b7c3a95d496e68736a969496d3407ae9dd0cda0579139",
+    "seconds": 2.48,
+    "speechText": "中音萨克斯，流行",
+    "status": "success"
+  },
+  {
+    "id": "V014_06",
+    "text": "次中音萨克斯，醇厚。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "41d821e78155ae038a7ee57670f389b99dd252f40450b54861ae5c513e4d6e7c",
+    "sha256": "ca069f4a7f57d34c3aca55f24cd39ca343670326b6bee2857beeb67f41883881",
+    "seconds": 2.8,
+    "speechText": "次中音萨克斯，醇厚",
+    "status": "success"
+  },
+  {
+    "id": "V014_07",
+    "text": "次中音萨克斯，温暖。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "fb8067a85169cbda9bfc423456d65f902d059de4d97ce6db19a9ed6a82bc845e",
+    "sha256": "55958ef7e52eb9e826ca9114d6d97168a79635b821e588ce437efeca679f52d0",
+    "seconds": 2.52,
+    "speechText": "次中音萨克斯，温暖",
+    "status": "success"
+  },
+  {
+    "id": "V014_08",
+    "text": "次中音萨克斯，气包音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "cb15583b79103020cc0d75634df892a0e6fb4d396804749c1b96d02ac4faabe5",
+    "sha256": "5490e5e402ea1bcb97e3a5164c6e674ecd78fd43a788e752aff4994c25ad7f34",
+    "seconds": 3,
+    "speechText": "次中音萨克斯，气包音",
+    "status": "success"
+  },
+  {
+    "id": "V014_11",
+    "text": "小号。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "b4a5ae656ffaab7691860a3fe3e3a91abab01ce70d5d30249f94b93d9c9bf391",
+    "sha256": "9faef3e2415d3690d6de1baafa1391489b518e9856a942aa21b0ca55c77d2fdc",
+    "seconds": 1.44,
+    "speechText": "小号",
+    "status": "success"
+  },
+  {
+    "id": "V014_12",
+    "text": "高音小号。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "ea94406782e46d377b624db53f685bcaf5c17e2e777d67499fd6e032b5df0b1a",
+    "sha256": "935be398f56e4000b5f766c5f4825d6968d7fcaa1bd2592b20811ef980985e9c",
+    "seconds": 1.76,
+    "speechText": "高音小号",
+    "status": "success"
+  },
+  {
+    "id": "V014_13",
+    "text": "中音长号。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "816e317deabfb1ee3b13c9b8f9498951520658759e90fdc765703757a007dbd4",
+    "sha256": "bacd9bb8fd30ebc07ddbbc5215fecc3642fa78fbc978029f0162be7cb0e77880",
+    "seconds": 1.96,
+    "speechText": "中音长号",
+    "status": "success"
+  },
+  {
+    "id": "V014_14",
+    "text": "低音长号。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "d720dd8d951f1f513c786ce218baf5681389c329e33014e5165f790be17cb1dc",
+    "sha256": "b501f3156519d27e7ad55d9822bac29a3f5a8fb1d6169be59edc90f12c3f6894",
+    "seconds": 1.72,
+    "speechText": "低音长号",
+    "status": "success"
+  },
+  {
+    "id": "V014_15",
+    "text": "长笛。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "28276e301e529b3d7ab9a0c11939ed8d6e874bc3c1c866bd640accd9dd414bbd",
+    "sha256": "2b0c57f1251549f5d387364bc3d513aff8732f332e4cfd4acd597eb5f1e0d43a",
+    "seconds": 1.68,
+    "speechText": "长笛",
+    "status": "success"
+  },
+  {
+    "id": "V014_16",
+    "text": "短笛。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "eb540c7c6f6ee593fb90d8c87c77bb2c2063ca5a688a92131a99f2da1b87dd97",
+    "sha256": "ad801753db3e5b66cc20ad3a71480f463501655cde38ab6c1c15673aa92607cb",
+    "seconds": 1.52,
+    "speechText": "短笛",
+    "status": "success"
+  },
+  {
+    "id": "V014_17",
+    "text": "单簧管。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "d748b839a2ffa07e84a7b351ada7615c72d95b9ce469d1bb062e2c0d8d963694",
+    "sha256": "7bf2974274accae02307381adb4f729ed65cec7ad0b7cce7e31a783a855c3cd3",
+    "seconds": 1.56,
+    "speechText": "单簧管",
+    "status": "success"
+  },
+  {
+    "id": "V014_18",
+    "text": "双簧管。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "d3c76cddc2d2f64777c4c949a30b3cc7294782c672bfd31afefd758a9b74922c",
+    "sha256": "cd1666ac85eab29150576a152082c90829366aa497a1c920a07531ec64f513de",
+    "seconds": 1.6,
+    "speechText": "双簧管",
+    "status": "success"
+  },
+  {
+    "id": "V014_22",
+    "text": "大提琴。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "db494f047c60af90ce0eedc53b9da23c8df24a57c30e279270e9d86348d0ee3b",
+    "sha256": "253f6b65acc349219af814351ee8f2b4a66793f9b8fdd42d52d9bc39f024151c",
+    "seconds": 1.6,
+    "speechText": "大提琴",
+    "status": "success"
+  },
+  {
+    "id": "V014_26",
+    "text": "二胡。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "ccff5b66fa2e72948b857d049aa838238920fd9f024bb0873c9f431c93b8e939",
+    "sha256": "e3a405de01fb11bd3f995ca86d4a940c5b904931a60883f815f0e94134685551",
+    "seconds": 1.36,
+    "speechText": "二胡",
+    "status": "success"
+  },
+  {
+    "id": "V014_27",
+    "text": "古筝。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "91d16265e35b49ca003924d2e3120da228e51515192ad26583fcdb50bb2658b3",
+    "sha256": "7149e34afb198b3692a9ccc347bdad2d0fe6a9d8439c91edb763fa94519739ce",
+    "seconds": 1.2,
+    "speechText": "古筝。",
+    "status": "success"
+  },
+  {
+    "id": "V014_28",
+    "text": "葫芦丝。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "aaaa57f7f51b89adae01f032e20f293d1208503246860ae3e43d5c6166fb05b8",
+    "sha256": "bf0db8cd1e0fc3f997a8586d03b6d5b1c74d79f4e5a29c20af6d07fd72eccc0b",
+    "seconds": 1.6,
+    "speechText": "葫芦丝",
+    "status": "success"
+  },
+  {
+    "id": "V014_29",
+    "text": "柳琴。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "34a6a707f6956c2e3f5e4428df53060c079801dc0223577e0c966b36c2bbf6ec",
+    "sha256": "cdd2c1710b9fac94811b950aafce05acf62cde6c4a8c3ad4dcc2783bb3578f0c",
+    "seconds": 1.44,
+    "speechText": "柳琴",
+    "status": "success"
+  },
+  {
+    "id": "V014_30",
+    "text": "马头琴。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "f6d44f13df48d4ddca849c7c722ae2d5a7f9dda33b4ee124be84f4252331f3c9",
+    "sha256": "f869c7332d67b0e02178704c6ea799ae00f0480e771f58b1ad5fcfe95717d61d",
+    "seconds": 1.64,
+    "speechText": "马头琴",
+    "status": "success"
+  },
+  {
+    "id": "V014_31",
+    "text": "曲笛。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "dbc6a6f992f5337bc5ef52f30ba65db43351794dd0b36dded130310b3348c71d",
+    "sha256": "8d0935c4dca075b8e563dbdca2917982c060584e93970fca9520107a088541ec",
+    "seconds": 1.36,
+    "speechText": "曲笛",
+    "status": "success"
+  },
+  {
+    "id": "V014_32",
+    "text": "埙。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "6f164469cbb2f633776399eb8aabf3ca19e125aeded501a751edadaff29952e5",
+    "sha256": "8958a7e6f29ede9640d08ff9c8cef455d0db4da7bbe614b6f5cfec7b9ebb0551",
+    "seconds": 1.28,
+    "speechText": "埙",
+    "status": "success"
+  },
+  {
+    "id": "V014_33",
+    "text": "唢呐。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "cd640b8a184a0b3b7ce7274ea83fe51dd26c7ef8ffd4e204915c866a527b9ab3",
+    "sha256": "ad3452bb5c0a617fc4a8724f1a93b4d84f7e53e5b78911c24eadff6ad4a4d93a",
+    "seconds": 1.44,
+    "speechText": "唢呐",
+    "status": "success"
+  },
+  {
+    "id": "V014_34",
+    "text": "三弦。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "80afd3f005ab54563d4a2a23408dbd46799de8ef6bf1670c51037aee20b65337",
+    "sha256": "778fb458e1e90dd5c094e255c2af90f8c35cb1eb73ddd88ed8a9ba5ca2fe3dac",
+    "seconds": 1.44,
+    "speechText": "三弦",
+    "status": "success"
+  },
+  {
+    "id": "V014_35",
+    "text": "琵琶。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "8d48ebfb6c1e0b9ffacb21139230ab7e2c2231ccff9d3b1adc5f1722ad1e5138",
+    "sha256": "3719288704ba0ec1cff98abcfc88c8e29648eacaa36b31df1202511c7c9f2ecb",
+    "seconds": 1.36,
+    "speechText": "琵琶",
+    "status": "success"
+  },
+  {
+    "id": "V014_36",
+    "text": "笙。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "bcee030f51ec49e84a107cf3aa719d9da790acd44a090f0a40d5ec8f2f46fefc",
+    "sha256": "7f5fa52e688c0877f56ea8276805cac661ba00aee2d7f8316a44638417a22423",
+    "seconds": 1.2,
+    "speechText": "笙。",
+    "status": "success"
+  },
+  {
+    "id": "V014_37",
+    "text": "南箫。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "6503c9fac67d8220049a816aec5f3f1be43b039ca2d92c7500d785831d1e1885",
+    "sha256": "66923145b6dc1939ca6c90064561799ec69db41d956102a6b446ddba1d423301",
+    "seconds": 1.56,
+    "speechText": "南箫",
+    "status": "success"
+  },
+  {
+    "id": "V026_01",
+    "text": "演奏调已设为C调。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "596b8bfda4fb2867ff3ca8e2624efeff44f4ebf13e6c9d889b710401f63bfb73",
+    "sha256": "049af073122b02cf8bfcf1cc7c8661737d76e701ac2eef62a589fa11b10ca49c",
+    "seconds": 2.36,
+    "speechText": "演奏调已设为C调。",
+    "status": "success"
+  },
+  {
+    "id": "V026_02",
+    "text": "演奏调已设为降D调。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "eb99e02865e52d7c542ffd60d39ccce742d255ed35b897a5c1b7d8dafdb62752",
+    "sha256": "7f48b1d1e1b3207703ba4e010634c8f06a91ea32060a0d12fffba761e020e315",
+    "seconds": 2.6,
+    "speechText": "演奏调已设为降D调。",
+    "status": "success"
+  },
+  {
+    "id": "V026_03",
+    "text": "演奏调已设为D调。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "14dfca20d9c5a92dfd939494e612a14c9d7620733acff040fa9e98b4f239708f",
+    "sha256": "4b6447896a133b2dcb667e18409999cf776503ee987266e4fb296bed7b609eb3",
+    "seconds": 2.32,
+    "speechText": "演奏调已设为D调。",
+    "status": "success"
+  },
+  {
+    "id": "V026_04",
+    "text": "演奏调已设为降E调。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "d760c2eaf21dce047522ac38c74dacca07d74005342fd4022d91766275fa7eac",
+    "sha256": "c7e96d836f5ac62bebb75b8236044b53b0932d5e6ba0a41ac55c4a22f8addcdd",
+    "seconds": 2.68,
+    "speechText": "演奏调已设为降E调。",
+    "status": "success"
+  },
+  {
+    "id": "V026_05",
+    "text": "演奏调已设为E调。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "a9c1da89f9097e89a94ad3747fb648d6afc0310bace768801a093f1c72c176fa",
+    "sha256": "86807aa85379337e273abf258f7beffd7384182857127b03ebbee70e1f68d0b9",
+    "seconds": 2.32,
+    "speechText": "演奏调已设为E调。",
+    "status": "success"
+  },
+  {
+    "id": "V026_06",
+    "text": "演奏调已设为F调。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "c4a093a0de8de73c532e9ed30b64827c70d84c0eaab7ef1e27f4cb8fd90b20c2",
+    "sha256": "da44b015dc8910123b0152d2c18c38cd3ebfa4b03ea5ee198daae272ec08f586",
+    "seconds": 2.52,
+    "speechText": "演奏调已设为F调。",
+    "status": "success"
+  },
+  {
+    "id": "V026_07",
+    "text": "演奏调已设为升F调。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "cfcce0bf2849e05f6eba1404d5eaeceedff63a01e015fdc99879fa70f09ac055",
+    "sha256": "2fa8a52f803930b0ed24511ae448a6b86238a0f6b50badc1574ed0c39ccba286",
+    "seconds": 2.72,
+    "speechText": "演奏调已设为升F调。",
+    "status": "success"
+  },
+  {
+    "id": "V026_08",
+    "text": "演奏调已设为G调。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "ba0fa4612137d9e5c4e269cb2393c51db107c3fa22fe7268829a55a832a959ee",
+    "sha256": "ed84e9e6e81f6c230c0301567a5ba689f2dc59bca375e88e631383ace1dadba5",
+    "seconds": 2.4,
+    "speechText": "演奏调已设为G调。",
+    "status": "success"
+  },
+  {
+    "id": "V026_09",
+    "text": "演奏调已设为降A调。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "073aabe12a166c89d2106085bcfd38e7174fc2e37cbee5a3a22755b93672032f",
+    "sha256": "5008488d45814e8bedda5a7e00c983130c253b29fa3a15c551d79430085abcb0",
+    "seconds": 2.64,
+    "speechText": "演奏调已设为降A调。",
+    "status": "success"
+  },
+  {
+    "id": "V026_10",
+    "text": "演奏调已设为A调。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "0fb9ad1c48762b7a75156c75dab28eac950c610dd48a22199a457e93ec9d240f",
+    "sha256": "6fdbd5bd0a2126d27362254992edde2016079346572633c67f195d52921b278b",
+    "seconds": 2.4,
+    "speechText": "演奏调已设为A调。",
+    "status": "success"
+  },
+  {
+    "id": "V026_11",
+    "text": "演奏调已设为降B调。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "30e0c81577a82c6e062e12b24fab11c0c27fee8b6bc85f4dd06b6e7903c978b0",
+    "sha256": "19edcc93e7eafed93ad3c86ffc4316a7267fd182fd9832b6fc564c9258c4ac9c",
+    "seconds": 2.68,
+    "speechText": "演奏调已设为降B调。",
+    "status": "success"
+  },
+  {
+    "id": "V026_12",
+    "text": "演奏调已设为B调。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "62508d1188d0bb92202ec167a119692597b5a9a9923e6eecdb9bdb29908ba0bb",
+    "sha256": "40c436626d20cff35a5c815c7cb3c9c3ac9d80320d45708f8397aad2b9c6a3d8",
+    "seconds": 2.32,
+    "speechText": "演奏调已设为B调。",
+    "status": "success"
+  },
+  {
+    "id": "V027_01",
+    "text": "弯音范围已设为上下1个半音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "17f3df1e537e2ad7af49f74892de56cc0efbc9a5c1a3f542f8b959e2399a22c9",
+    "sha256": "9456bfa3e986864c36bddd29f0807ab28d742d9a88c9ff56482bf64ad908e09f",
+    "seconds": 3.24,
+    "speechText": "弯音范围已设为上下1个半音。",
+    "status": "success"
+  },
+  {
+    "id": "V027_02",
+    "text": "弯音范围已设为上下2个半音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "91fa9d5e8d5e0fc7057c4d987e7953b51027a8fcb4bb9100e1822e7c372d93f1",
+    "sha256": "ea3caa7e63f65dbc9e1a4d5aa47232f1177c7c02fc39611839fcf267ab9a4de6",
+    "seconds": 3.48,
+    "speechText": "弯音范围已设为上下2个半音。",
+    "status": "success"
+  },
+  {
+    "id": "V027_03",
+    "text": "弯音范围已设为上下3个半音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "2d1c60b29ae48ba4887ea035a853182e6420edb00a8db9abb840bee311b04d8b",
+    "sha256": "08c8e3e06b01b3e63eb59b7dd06f021d33b401ebb7a6515a46802edc4b6d0b8b",
+    "seconds": 3.32,
+    "speechText": "弯音范围已设为上下3个半音。",
+    "status": "success"
+  },
+  {
+    "id": "V027_04",
+    "text": "弯音范围已设为上下4个半音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "b11dd927521e30b855e585450ef95b4b388e6db60d5a3fe04d7dbd2964720bad",
+    "sha256": "8a32b64c46ee1a404d75f1489aca540b27961d6916988e37f57dc07d860b43d3",
+    "seconds": 3.36,
+    "speechText": "弯音范围已设为上下4个半音。",
+    "status": "success"
+  },
+  {
+    "id": "V027_05",
+    "text": "弯音范围已设为上下5个半音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "311424f767a631cfc8820c983ea167d55ff97f12d8c759f7862faaa3b9314ee8",
+    "sha256": "33e3f665dbea6275432f5929999306c6808718cf9055dfc383d109f95d50376c",
+    "seconds": 3.24,
+    "speechText": "弯音范围已设为上下5个半音。",
+    "status": "success"
+  },
+  {
+    "id": "V027_06",
+    "text": "弯音范围已设为上下6个半音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "05ef7982dc88371ab062569effb23444b38c8591e88c36b5aa41c6c5b8974cf6",
+    "sha256": "f98b338f159deb4ed9dfcfbb9a860edcdb3ec6426adf7189a6322a828be74f5e",
+    "seconds": 3.36,
+    "speechText": "弯音范围已设为上下6个半音。",
+    "status": "success"
+  },
+  {
+    "id": "V027_07",
+    "text": "弯音范围已设为上下7个半音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "c2070768636c8b4618e70889cb5c3b1bb896a56bbba6b2896eec890ee7395d1d",
+    "sha256": "fede92e846db879d6537871812231ba69a96de8a3e58d7f63b371b8d26cbac18",
+    "seconds": 3.4,
+    "speechText": "弯音范围已设为上下7个半音。",
+    "status": "success"
+  },
+  {
+    "id": "V027_08",
+    "text": "弯音范围已设为上下8个半音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "17e67f8b9dff848e87c664f6c482d467c9868874db860b493ca5069705621ad5",
+    "sha256": "ea74b2ed6b64b34bf7efbd3772d2b71099089fa3e02c1996826b408a5c7b3bf5",
+    "seconds": 3.36,
+    "speechText": "弯音范围已设为上下8个半音。",
+    "status": "success"
+  },
+  {
+    "id": "V027_09",
+    "text": "弯音范围已设为上下9个半音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "3a70a535361bd7b3be6c7a761af7dd57ea54a3eba983b37b8e48655b9f9464c3",
+    "sha256": "c2028079590928cc34d2ad182827447626f0086243ab9ba82ef0bc07bac2284b",
+    "seconds": 3.28,
+    "speechText": "弯音范围已设为上下9个半音。",
+    "status": "success"
+  },
+  {
+    "id": "V027_10",
+    "text": "弯音范围已设为上下10个半音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "fac656495af71e7c024c33c58af479d7bc283b14cd05fc9bbd772ed815843bd7",
+    "sha256": "4d6624463fe06119f72c6f21e693055ac752f19e59bfb9fcc10e0df4e6a4ffc5",
+    "seconds": 3.36,
+    "speechText": "弯音范围已设为上下10个半音。",
+    "status": "success"
+  },
+  {
+    "id": "V027_11",
+    "text": "弯音范围已设为上下11个半音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "09533eaf5d48c687791c60ed6d6044dec22db9798e58ceed3eaef8ba379bd18d",
+    "sha256": "97a215feade20c55764c08fb056d1b6f7d14290926a332e036be65cf69cf8100",
+    "seconds": 3.6,
+    "speechText": "弯音范围已设为上下11个半音。",
+    "status": "success"
+  },
+  {
+    "id": "V027_12",
+    "text": "弯音范围已设为上下12个半音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "35007aa22b428d9742edb0cfa2ef65262335c84f05eaa56fb341765665b3f7ce",
+    "sha256": "bc79f5fa3aa5d0cfb286b455d31e6682b817ae0545198af8c842662c6d3b6cc6",
+    "seconds": 3.48,
+    "speechText": "弯音范围已设为上下12个半音。",
+    "status": "success"
+  },
+  {
+    "id": "V028",
+    "text": "吹奏音量只调整乐器声音，不影响伴奏音量。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "c4edd210cebb4f4cf4c447632d847e49ebc8c1bba4c558998af107b2464151fb",
+    "sha256": "b82d678de0252a655f0e4c25db0915ba9a79b187e59f6be9e12b7f315d72189f",
+    "seconds": 4.24,
+    "speechText": "吹奏音量只调整乐器声音，不影响伴奏音量。",
+    "status": "success"
+  },
+  {
+    "id": "V029",
+    "text": "混响让声音更有空间感。您可以边听边调整。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "9be0a316a5a5309773381d43c1ddd09ffd444e516da742c15c3ccb7f4446e172",
+    "sha256": "ddc5c9c1b712aa248b3eb92dab5805ea1ad7d76b188fc6d3263c719bb9522b24",
+    "seconds": 4.36,
+    "speechText": "混响让声音更有空间感。您可以边听边调整。",
+    "status": "success"
+  },
+  {
+    "id": "V030",
+    "text": "点击精简模式，可以切换到小窗口。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "51b8d5a62ebcbc8f8b366b61a5b84c9064564f465c682b8dae1bb5de039e8bf4",
+    "sha256": "d0b2e8cdac16d318c8d16466f64162f731ec6f10d90fab9af4d6bbaee2a6a781",
+    "seconds": 3.52,
+    "speechText": "点击精简模式，可以切换到小窗口。",
+    "status": "success"
+  },
+  {
+    "id": "V031",
+    "text": "精简模式不支持视频伴奏。请使用其他软件播放伴奏。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "b904849f3e4c9dd246fcde17a10e243d2b327419279dce8e62431773038f8344",
+    "sha256": "572ef1f732086cf9bb017bb525002021ff22cb65f4942d05cfb040c21a35910a",
+    "seconds": 5.32,
+    "speechText": "精简模式不支持视频伴奏。请使用其他软件播放伴奏。",
+    "status": "success"
+  },
+  {
+    "id": "V032",
+    "text": "已返回全屏模式。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "1758d497e4920a08197cc52f657182b0a98a8969fa427c88edb54bc618d81213",
+    "sha256": "003feacf968985a1375a0306c759afa56f26b50aedcb68e43a6e31ba1fde0ab0",
+    "seconds": 2.16,
+    "speechText": "已返回全屏模式。",
+    "status": "success"
+  },
+  {
+    "id": "V034",
+    "text": "在智能适配中，可以设置颤音、嘶吼音和其他技巧。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "6b27c620cb83b63e921f30a8e7eab7706333c52b5dd642d73a1bae9ac488793b",
+    "sha256": "6ae3983780d42f489d30e91759cec0ced19074f42658e9298eb338513e2d565e",
+    "seconds": 5.36,
+    "speechText": "在智能适配中，可以设置颤音、嘶吼音和其他技巧。",
+    "status": "success"
+  },
+  {
+    "id": "V079",
+    "text": "还未加载音色，请先在音色方案里选一个音色",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "13eccc158c84e31c2e0f0b026c4e6fbc86e059a98170f0b3dfd5b8e91657ba4b",
+    "sha256": "392256d25f2666c126eb19bc65abf47cbedc142638639437a076296d4079751c",
+    "seconds": 4.56,
+    "speechText": "还未加载音色，请先在音色方案里选一个音色",
+    "status": "success"
+  },
+  {
+    "id": "V035",
+    "text": "点击选择视频，打开电脑里的伴奏视频，再点击播放。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "1c4497a951a1d5648ede5d2cac2cd27d80a9ef6562fb41db803669274e54fb54",
+    "sha256": "5b8cdf9842be7c9fc8feae3ff4ba365005ab4c15975cfb4a9552514f6255bb08",
+    "seconds": 5.32,
+    "speechText": "点击选择视频，打开电脑里的伴奏视频，再点击播放。",
+    "status": "success"
+  },
+  {
+    "id": "V036",
+    "text": "伴奏已加载，点击播放即可开始。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "d4f177e10a7e79d3caf10ac0009d96384c9cb6a79f12cb5ace22269674d4c47c",
+    "sha256": "4d0a66fe54c9c9b23b83a57c7a4c9a7ad6b0d666782e4fdcf1f2b4f41a8e1538",
+    "seconds": 3.52,
+    "speechText": "伴奏已加载，点击播放即可开始。",
+    "status": "success"
+  },
+  {
+    "id": "V037",
+    "text": "这个视频暂时无法打开，请换一个支持的MP4视频试试。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "003599e5e05be9c751ba7d7c2ec6383943c18833773b6599f52077073ffb3cb9",
+    "sha256": "e4e8c4f0649d75264f5519ca40893475e0dce57dc786b2283a80538f30075d63",
+    "seconds": 4.88,
+    "speechText": "这个视频暂时无法打开，请换一个支持的MP4视频试试。",
+    "status": "success"
+  },
+  {
+    "id": "V038",
+    "text": "请先选择伴奏视频。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "f74203e6302fbc90b0a158b5734ce029c34eee285f626c6635bffbf4318c8e09",
+    "sha256": "0fdb65055d646e7ddfa7b3fbcf31e3acd16b5af125f3a10da43c3873bfe735bf",
+    "seconds": 2.36,
+    "speechText": "请先选择伴奏视频。",
+    "status": "success"
+  },
+  {
+    "id": "V040",
+    "text": "点击开始录音，结束时点击停止录音。保存后可在我的录音中查看。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "f0f1e5560c8f9f635f7653dbccb82012fd52d2d10ceff55f45bde3097d126b63",
+    "sha256": "1d1227719d69b19691f6a7519f69cf98f5b714c3a96cfc8284e5b33397c7278a",
+    "seconds": 6.4,
+    "speechText": "点击开始录音，结束时点击停止录音。保存后可在我的录音中查看。",
+    "status": "success"
+  },
+  {
+    "id": "V041",
+    "text": "3，2，1，开始录音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "b25d269a4010c7a8bf10d52c2736ead4580921e432e7386702f141b8c3e004c4",
+    "sha256": "0ae1fff335d4bcd476e8b9886f1e41b01772f978883d183ae3542a8ace4287ee",
+    "seconds": 4.04,
+    "speechText": "3，2，1，开始录音。",
+    "status": "success"
+  },
+  {
+    "id": "V042",
+    "text": "录音已保存，可以在我的录音里查看。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "cb3f8f3545a9de148b1ea03a96b5ca261c4a0ffcfe34c1f090b5aa643e78cebb",
+    "sha256": "2b79458086b7623cf41390b87724bf06263a9dfdabd8692626bc46dd762d4815",
+    "seconds": 3.52,
+    "speechText": "录音已保存，可以在我的录音里查看。",
+    "status": "success"
+  },
+  {
+    "id": "V046",
+    "text": "正在录音。请先停止并保存录音，再退出。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "4f47280be2d2dae1e9c0a7f89215405fcf06b1037fff80059414c64ee2e12c77",
+    "sha256": "299e5506c24efc0d4682f7e208a26a018cca029ef62cfe82fd66636d32100f12",
+    "seconds": 4.6,
+    "speechText": "正在录音。请先停止并保存录音，再退出。",
+    "status": "success"
+  },
+  {
+    "id": "V047",
+    "text": "请轻咬吹嘴，让风吟识别咬嘴控制信号",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "39e10aa98642efa674b7087182521d4dcc14548e17140a120c8537d0bdb7ec62",
+    "sha256": "583fe6bd32c95bf1028cd290ababc346bd67e95e9a7907383b3a9b04f11c4ae6",
+    "seconds": 4.44,
+    "speechText": "请轻咬吹嘴，让风吟识别咬嘴控制信号",
+    "status": "success"
+  },
+  {
+    "id": "V052",
+    "text": "没有识别到控制信号，请再试一次",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "0eac4f0262337b5b49397423e00f9044512c42d98af2c9d35d9f0bac568900ec",
+    "sha256": "648a7db9ea0c26957c7cc04f95c98519277d7317cfc58bde574bb535d28420fc",
+    "seconds": 3.68,
+    "speechText": "没有识别到控制信号，请再试一次",
+    "status": "success"
+  },
+  {
+    "id": "V057_01",
+    "text": "已开启自动颤音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "b6964186b6c7f23dcedf42a898b9870cedeecce4aa57cf1c35e983fba1c5020d",
+    "sha256": "e99ce3e4d80ba476c34c0662cc1dd33fb357bbbfa4bc19741d4c5ac3d393df18",
+    "seconds": 2.16,
+    "speechText": "已开启自动颤音。",
+    "status": "success"
+  },
+  {
+    "id": "V057_02",
+    "text": "已开启自动嘶吼音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "7f29b78910eae7b04a992ff39f56aaccd7186515bdbc18dc53571e02c05f2f53",
+    "sha256": "d3036f2e036d0b2e011881e4fe2f71f66eed9d13bc29157dcb988b1eeb8fc3b8",
+    "seconds": 2.36,
+    "speechText": "已开启自动嘶吼音。",
+    "status": "success"
+  },
+  {
+    "id": "V058_01",
+    "text": "颤音控制已关闭。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "400e89c37f409ea434fba6edded13bcae7e229c52dd48f418bfa5085fdeb730d",
+    "sha256": "42cb257600b0f50f28ce5d30d518144de2164468bdf63798ce58872d66345daf",
+    "seconds": 2,
+    "speechText": "颤音控制已关闭。",
+    "status": "success"
+  },
+  {
+    "id": "V058_02",
+    "text": "嘶吼音已关闭。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "ac95c08f3172bef203bdc985ba6dcf0b80a0257e977191e950107e67300493a7",
+    "sha256": "ef4b5662e394872e4ceed6de6f6a48fa7d013bdedac6a387fc1e73a1f2409652",
+    "seconds": 2.04,
+    "speechText": "嘶吼音已关闭。",
+    "status": "success"
+  },
+  {
+    "id": "V060",
+    "text": "电吹管连接已断开，请检查数据线和电源。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "7664334f4453d59933043a2d2b52a5b1b03b3809540b6c258c6f9859f78d33eb",
+    "sha256": "f2ad8cdde12177a68c8075cd8e354b44f78568f33994cf2f707b7bccd20b71e6",
+    "seconds": 4.28,
+    "speechText": "电吹管连接已断开，请检查数据线和电源。",
+    "status": "success"
+  },
+  {
+    "id": "V072",
+    "text": "语音提示已开启。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "81b17232ff61d07b460214fd0a3a1212fce320b7304c2721cbd58e328397fb9b",
+    "sha256": "e2ca79edbd39f5eb82bd2a5def480b5ba940471812318a41ca50ee9ff6840bab",
+    "seconds": 2.36,
+    "speechText": "语音提示已开启。",
+    "status": "success"
+  },
+  {
+    "id": "V073",
+    "text": "语音提示已关闭。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "0008a0e4cbcd309d61b5b5f2f302020f97034375aa3fc2ba605564669288047d",
+    "sha256": "a517817b1e3a2a7d662501c8d5b45a69a23ae720c083047ee905aa885dcd9fc8",
+    "seconds": 2.2,
+    "speechText": "语音提示已关闭。",
+    "status": "success"
+  },
+  {
+    "id": "V076",
+    "text": "音色切换播报已开启。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "1e3822dd9285bd12390471ec9e5528a8dea5b41b27b4a66223479587c7cf6aa5",
+    "sha256": "ee5e433d4c5f222f54ace2ee07231a01bb956a745387a0c43c45a647b9a85042",
+    "seconds": 2.56,
+    "speechText": "音色切换播报已开启。",
+    "status": "success"
+  },
+  {
+    "id": "V077",
+    "text": "音色切换播报已关闭。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "789438f6acaec256cce7054b5ef14c6d769582a1cb1a625c4513a14d85565dbe",
+    "sha256": "0d54f891a98dd9ab07df33c4f775f49b8f06d0abfdf1c3ec847e0d76441dec40",
+    "seconds": 2.44,
+    "speechText": "音色切换播报已关闭。",
+    "status": "success"
+  },
+  {
+    "id": "G001",
+    "text": "请选择您喜欢的音色。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "cf2469fe76f086ff312d242f2801f376604077e992492fc1080c24e603f5201c",
+    "sha256": "56ea6c24e6ad33e9da4ea8fe71fb9dfd60de9e1f8c1e96f415c05713118857d7",
+    "seconds": 2.36,
+    "speechText": "请选择您喜欢的音色。",
+    "status": "success"
+  },
+  {
+    "id": "G002",
+    "text": "现在可以试着吹奏，准备好后点击下一步。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "562a576c8d16c04d6e09972736554ac7deec837a05295ecbb919348eb0b39a0a",
+    "sha256": "109339dea4162408e5b53eb95eee6e73b18cbaa9ce99e4f7c192a2d1e6ce2436",
+    "seconds": 4.04,
+    "speechText": "现在可以试着吹奏，准备好后点击下一步。",
+    "status": "success"
+  },
+  {
+    "id": "G003",
+    "text": "点击演奏调，选择歌曲需要的调式。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "2598587b2052d1cf8e0874b822bc7d2add6c55a4d51bc08fcb65250d58dfbbb7",
+    "sha256": "89e759960bfb6fb46ce7c71af4f07a84f734443ab949f204875700f93f0a35e6",
+    "seconds": 4,
+    "speechText": "点击演奏调，选择歌曲需要的调式。",
+    "status": "success"
+  },
+  {
+    "id": "G004",
+    "text": "点击弯音，设置弯音的变化范围。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "5777780c70471f2c7256c188b6adec6844953fa1a8f27785b7cdb5b037adc635",
+    "sha256": "3135375a33df92029c8e34811d96775512425cfa0a505b78727909f246c94ba1",
+    "seconds": 3.64,
+    "speechText": "点击弯音，设置弯音的变化范围。",
+    "status": "success"
+  },
+  {
+    "id": "G005",
+    "text": "在智能适配中，可以选择技巧的控制方式。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "6cdb7dbc07e62705c9fcb5369e988ca3b5ef2e971e4084bcd70ba55491d101dc",
+    "sha256": "6c02ecedc7d389d0b049d6c7f32cbd33cb4e9695ebd30d44ec29115bbf0f1042",
+    "seconds": 4,
+    "speechText": "在智能适配中，可以选择技巧的控制方式。",
+    "status": "success"
+  },
+  {
+    "id": "G006",
+    "text": "选择咬嘴控制或按键触发后，按提示完成映射。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "c306e0ade2e21d230765704190a998bad090779cf4b3a21f67543b6d87e4dd98",
+    "sha256": "51f8dc7f0d0e8611d8543acafa65b02a5ba46c6160457ab6060c8a41e0277ba7",
+    "seconds": 5.04,
+    "speechText": "选择咬嘴控制或按键触发后，按提示完成映射。",
+    "status": "success"
+  },
+  {
+    "id": "G007",
+    "text": "如果不想使用某个映射，可以点击取消映射。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "6167cb42c4dabb9631985df5ba8faddf8a836b87e65a2298907a7f6eb3fe8684",
+    "sha256": "e2298d1e00b78e27f6e19ba1c1845a9338976808b7668cfb866a4c26e6a28abe",
+    "seconds": 4.04,
+    "speechText": "如果不想使用某个映射，可以点击取消映射。",
+    "status": "success"
+  },
+  {
+    "id": "G008",
+    "text": "选择视频后，点击播放开始伴奏，再次点击可以暂停。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "061192ac141ec004a23b28444f62f049b579a3a35945d414b07f43d2d8d47ac1",
+    "sha256": "82bc15a0a05cb5709fa59446b72573917e276f07a0e832c6870e980b32793797",
+    "seconds": 5.4,
+    "speechText": "选择视频后，点击播放开始伴奏，再次点击可以暂停。",
+    "status": "success"
+  },
+  {
+    "id": "G009",
+    "text": "这里可以单独调整视频伴奏的音量。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "667e661f2c0fe056c02948c931bec27cbe38bd3209da65634df8f3758d32422f",
+    "sha256": "b863e4100e784afb4c8404ac0ccd3f95375b735cab59db4a79e87859f64673c1",
+    "seconds": 3.12,
+    "speechText": "这里可以单独调整视频伴奏的音量。",
+    "status": "success"
+  },
+  {
+    "id": "G010",
+    "text": "演奏结束后，点击停止录音，等待保存完成。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "f2584cf39aafe02bd3dfa038b45543120a74516a8b1b9cebb57ad4d782b60623",
+    "sha256": "155f17213add0c45c0d2aaaae7b7a0eecbec1359ef7b1bb387a38fc9cf056c54",
+    "seconds": 4.68,
+    "speechText": "演奏结束后，点击停止录音，等待保存完成。",
+    "status": "success"
+  },
+  {
+    "id": "G011",
+    "text": "点击我的录制，可以查看和播放已经保存的录音和录屏。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "f156d93f0678c4cffc63048947bdcd099ed2d02876428907dc1007bbf2b38a5c",
+    "sha256": "9b95b02c26cda8efb30ec483e3207f5dc8956c9ed3da37230efe97a619771266",
+    "seconds": 4.96,
+    "speechText": "点击我的录制，可以查看和播放已经保存的录音和录屏。",
+    "status": "success"
+  },
+  {
+    "id": "G012",
+    "text": "精简模式可以移动和调整窗口大小，点击全屏可以返回。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "0297ac3551c2efddcb19f9e23162314b70f98c94a59288ed9dd8b4825c1f60f9",
+    "sha256": "fd4c78fdbbf12c6e0bc487520d82dacf6854a7b568221bc63d2ecd172e9d595c",
+    "seconds": 5.24,
+    "speechText": "精简模式可以移动和调整窗口大小，点击全屏可以返回。",
+    "status": "success"
+  },
+  {
+    "id": "G013",
+    "text": "在这里选择您喜欢的界面主题。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "519561ae7affe3ac2c14b08aeb86f892a57dc1a6e0183fc033def72515842c29",
+    "sha256": "7cb7bc993b6fde966dae8640616d43d772d2813bb3363d7d4cc58b66847381fb",
+    "seconds": 2.88,
+    "speechText": "在这里选择您喜欢的界面主题。",
+    "status": "success"
+  },
+  {
+    "id": "G014",
+    "text": "高级设置中可以查看声音模式和输出设备。声音正常时，不需要修改。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "023529503be5cd80cbe6b51b13e709e51193a3460c53b8a8f8c143205fa85bb9",
+    "sha256": "519eb89aeb66933cec8747f4ef4312540ee04922d55f4cacfedd3b3d132b0847",
+    "seconds": 6.16,
+    "speechText": "高级设置中可以查看声音模式和输出设备。声音正常时，不需要修改。",
+    "status": "success"
+  },
+  {
+    "id": "G015",
+    "text": "高级设置中可以关闭语音提示，也可以重新开始新手指引。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "b89e011f53f39130bd60432ead37632ba4098e5eb832ef699657d28e21b068cd",
+    "sha256": "4b9015a563f3b3d535fed20ec757807dcf6a68b2ae6f643d28c1a1875bf81976",
+    "seconds": 5.04,
+    "speechText": "高级设置中可以关闭语音提示，也可以重新开始新手指引。",
+    "status": "success"
+  },
+  {
+    "id": "G016",
+    "text": "您可以点击上一步重看，也可以跳过当前步骤，或者结束引导。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "ff80e5d0fb22b293372c792997227e6f6af7abe7a275ea4f95782b45fcd9d021",
+    "sha256": "80c9dc0ab976247f8eb4b108bd5f6e2ccff9d75de76f2c0af70d4120cba6de89",
+    "seconds": 5.32,
+    "speechText": "您可以点击上一步重看，也可以跳过当前步骤，或者结束引导。",
+    "status": "success"
+  },
+  {
+    "id": "T001",
+    "text": "请先将电吹管设置为C调，再在演奏调中选择歌曲需要的调。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "a20197f0048b23d470593fd505aaa2547b93896e21d27f3c0ec77270f0d06ebe",
+    "sha256": "179162a5c85031347199c2adc25a3cc876437797e197c1d79d265b0f70947926",
+    "seconds": 5.76,
+    "speechText": "请先将电吹管设置为C调，再在演奏调中选择歌曲需要的调。",
+    "status": "success"
+  },
+  {
+    "id": "MT_SLOW",
+    "text": "慢速乐曲。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "479579bbcf2c423f6934712a0c0eb0badeee992569030222c2cc83c52b9fc6d9",
+    "sha256": "f79fc5b187a43c5a4c6f0e251b0715c38c08100ff36e1f4011600ac0b8ba3792",
+    "seconds": 1.92,
+    "speechText": "慢速乐曲。",
+    "status": "success"
+  },
+  {
+    "id": "MT_MEDIUM",
+    "text": "中速乐曲。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "7329c4c4eff318e463fbd6183351aea9e95f8148438be7d27749320955707bf4",
+    "sha256": "4ffcc33e16a0a3857c1b62d2516766045c9daa10f1e8ea5a11b825a91fcf80cf",
+    "seconds": 1.76,
+    "speechText": "中速乐曲。",
+    "status": "success"
+  },
+  {
+    "id": "MT_FAST",
+    "text": "快速乐曲。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "158240c2e9b4f9a82a722138c669461083f7bd709d160348f7b08a8eb70e700c",
+    "sha256": "d12955ed1c9739a1f7a533cbbada438266eef4acf20d8c077d3be54fc07aa488",
+    "seconds": 1.72,
+    "speechText": "快速乐曲。",
+    "status": "success"
+  },
+  {
+    "id": "MT_GUIDE",
+    "text": "选择乐曲速度，风吟会自动进行颤音和混响优化",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "9fa3174aa2115ba25b7a7dd2c614905192551a971f4498bc746f8fad9c6c944e",
+    "sha256": "a5f4ba67c3dd42831d1ead3881090da272364b22e17fd44a711a8ce7c816be59",
+    "seconds": 5.36,
+    "speechText": "选择乐曲速度，风吟会自动进行颤音和混响优化",
+    "status": "success"
+  },
+  {
+    "id": "TONE_VIOLIN_BRIGHT",
+    "text": "小提琴，明亮。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "5e32a8f8475acf2e1291f69b0722f8c554168ec2bc4cade8de114a48c109da3f",
+    "sha256": "776fba57922271f1a22af36b01d3a66396adb2c89d97910b76baebe1931f6f18",
+    "seconds": 2.36,
+    "speechText": "小提琴，明亮",
+    "status": "success"
+  },
+  {
+    "id": "TONE_VIOLIN_SOFT",
+    "text": "小提琴，柔美。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "b89fa35f21025e012b9828d37eade0b59ba0d9a2952236591b550699c78fbbb3",
+    "sha256": "23cef994fb3b9de7a3ceb35117d4de737ac681fa618813934bf073960778e2f9",
+    "seconds": 2.36,
+    "speechText": "小提琴，柔美",
+    "status": "success"
+  },
+  {
+    "id": "NEW_MAP_START",
+    "text": "请操作一次要映射的按键或控制器。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "e5f52053b0381751751e3b8fd6c3736158c10c58e5752c739b61d716bf8eff35",
+    "sha256": "ff947bad77ed9a49a59391241361633bc1b6eaebbd50bc334bca60ec1ae55eff",
+    "seconds": 3.36,
+    "speechText": "请操作一次要映射的按键或控制器。",
+    "status": "success"
+  },
+  {
+    "id": "NEW_MAP_OK",
+    "text": "映射成功，已保存这支电吹管的设置。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "29ec6fc6e9f951a24109ba7b1556b016cbcfd4eb78d4a05c714aff74ca8aa8f1",
+    "sha256": "2d90a36b9f8053c99df54d4d401d5a1522d9c95661a70d9cbe9a9338a2bf23e6",
+    "seconds": 4,
+    "speechText": "映射成功，已保存这支电吹管的设置。",
+    "status": "success"
+  },
+  {
+    "id": "NEW_MAP_CLEAR",
+    "text": "已取消此项映射。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "6ed40390a2a1f6e6fa70f6d02b3bc910073b2a2da1e4746567e0b13aa9ee3acf",
+    "sha256": "567e0af6fc3d20b42c7e8369f8de1ac548e4c057019600ce65d9323fe457a023",
+    "seconds": 2.16,
+    "speechText": "已取消此项映射。",
+    "status": "success"
+  },
+  {
+    "id": "NEW_MAP_CANCEL",
+    "text": "已取消本次设置。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "d6750a19d8e3b3f5e9028f5869fee8febe7f193df2c32189b50b6c1c9df772c1",
+    "sha256": "5e9835415785f58889f3f7e741d2cca6b3c2f7fda3e2a40a68deb38a2132283b",
+    "seconds": 2.16,
+    "speechText": "已取消本次设置。",
+    "status": "success"
+  },
+  {
+    "id": "NEW_VIB_HARDWARE",
+    "text": "已切换为咬嘴控制颤音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "bff103ea4f258c3649bc1e3c008c3dbfd6ad7f7cedaa31f8aa677b1e4e39fc30",
+    "sha256": "248f3359179523ee51fac5ad64911618c204c1f7e6d61be2823a3d5032fbdf85",
+    "seconds": 2.72,
+    "speechText": "已切换为咬嘴控制颤音。",
+    "status": "success"
+  },
+  {
+    "id": "NEW_GROWL_HARDWARE",
+    "text": "已切换为按键控制嘶吼音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "e039f26724d90f62f59b3ac645337ba902480ec0fb7a010accdd5afd61beeb91",
+    "sha256": "8ed395604cd94c662154eff38dfd251e5bc14586d7f35faf548bb82a87999991",
+    "seconds": 2.96,
+    "speechText": "已切换为按键控制嘶吼音。",
+    "status": "success"
+  },
+  {
+    "id": "NEW_OTHER_ON",
+    "text": "其他技巧已启用，请使用映射的按键控制。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "ac8eab52320064a9d9883eccb76f7d08e5f67dd0271cc74a7d2dad73222cd9f5",
+    "sha256": "3e84c4dedfe7a34352ac71dd7c8fc288a4346534d2a2f7d8a103434c651efb6a",
+    "seconds": 4,
+    "speechText": "其他技巧已启用，请使用映射的按键控制。",
+    "status": "success"
+  },
+  {
+    "id": "NEW_OTHER_OFF",
+    "text": "其他技巧已关闭。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "1056357ff520e85d59069e77dffa12ed02858c53422e7dc623640cd4668a0dbd",
+    "sha256": "cc710f0a8e847ce6757738c96de1507b4b80e3c3d646bbac00cbe3750a2f118a",
+    "seconds": 1.96,
+    "speechText": "其他技巧已关闭。",
+    "status": "success"
+  },
+  {
+    "id": "NEW_TONE_GENERIC",
+    "text": "音色加载完成。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "a1516202762d0686c6795de022d7a581ffd0e4ab1c24e90a445b0b375651902b",
+    "sha256": "33321683ffcc847214b8aa2081c58e23b8c0d5216208553159752e100a7aac08",
+    "seconds": 2.04,
+    "speechText": "音色加载完成。",
+    "status": "success"
+  },
+  {
+    "id": "TONE_DONGXIAO",
+    "text": "洞箫。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "9ccc54bb3e31af7c635c6c0ac01ef3a97745ca5173040d191760fc05d6f1f80e",
+    "sha256": "0ecf4a959628743184941938b4156a4dcd2f39eb9d6d7eee74b3608b7d0478e6",
+    "seconds": 1.48,
+    "speechText": "洞箫",
+    "status": "success"
+  },
+  {
+    "id": "TONE_BANGDI",
+    "text": "梆笛。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "57799aae232523ca972d68efe11c78691cfec97f1aeb2e2e3cd133f703302235",
+    "sha256": "bda4693388e317aeb80de21ebaa21b8ec834949c89439a941cab6e4b778e4901",
+    "seconds": 1.36,
+    "speechText": "梆笛",
+    "status": "success"
+  },
+  {
+    "id": "TONE_JINGHU",
+    "text": "京胡。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "24d9e2e2e2add3c57ba2c4596f5e1637951ede990796cecb93b931fb4ac99ab0",
+    "sha256": "10db6051b081fe98d63aa273dc33584396761514587f1118706b690b32d77dac",
+    "seconds": 1.52,
+    "speechText": "京胡",
+    "status": "success"
+  },
+  {
+    "id": "TONE_KENSA",
+    "text": "肯萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "c54d95ee3ad44e90e1c8ef8e76d5331d7d24ae8c09c423a1f4fdcd84994bf8d7",
+    "sha256": "8bbe78611a53d9a36902278b45305fcfe974b3b9e0c810a8b4a52fa766001625",
+    "seconds": 1.28,
+    "speechText": "肯萨",
+    "status": "success"
+  },
+  {
+    "id": "REC_SAVED",
+    "text": "录制已保存，可以在我的录制中查看。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "98dbbec0ac87618dedd6f409edc23149c23f98cc71c0800e481d434d46e4cbd2",
+    "sha256": "2a9e5dc755d4476ebd69f98a4c8b7b9fee531e704a080c7c000f9afce6a87351",
+    "seconds": 3.68,
+    "speechText": "录制已保存，可以在我的录制中查看。",
+    "status": "success"
+  },
+  {
+    "id": "REC_AUDIO",
+    "text": "准备开始录音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "c5f621262e1a142c9197f0001972849002736268c38c6461749298bd76212c04",
+    "sha256": "87c7272054c6daebf8a9367fac73bc7e8c2a66f551504ac9b4591093c2d8e146",
+    "seconds": 1.64,
+    "speechText": "准备开始录音。",
+    "status": "success"
+  },
+  {
+    "id": "GUIDE_OUTPUT",
+    "text": "请确认声音输出是您正在使用的扬声器或耳机。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "b8378b99085e1b059bd5acd230553da37a389218095ad19e8c1cf3cb4dc0b211",
+    "sha256": "cce21c8d2e0ba84c67cc8cb5db384c61310b1723da021e2f216db217c7f1fe78",
+    "seconds": 4.24,
+    "speechText": "请确认声音输出是您正在使用的扬声器或耳机。",
+    "status": "success"
+  },
+  {
+    "id": "GUIDE_MATCH",
+    "text": "点击开始匹配。保持管身不动，不咬嘴，吹一个气息由弱到强的长音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "5b96bc06ff9095093f5efc24a7df0251abe937fef5b47af02c3181330782a2ba",
+    "sha256": "1cfc4af5da1c30cc9406bc22d0c2d50e0dd81a5a08b2832859fe3108d858547f",
+    "seconds": 7.6,
+    "speechText": "点击开始匹配。保持管身不动，不咬嘴，吹一个气息由弱到强的长音。",
+    "status": "success"
+  },
+  {
+    "id": "GUIDE_TRY",
+    "text": "请吹几个音，试试轻吹和强吹。能听到声音后，就可以开始演奏了。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "16ea6f2f4351d4b364efc6ecdf4744c12e7f2471d2bdd3170af96dfa42c282be",
+    "sha256": "317c15bc38342630f76b490d2cda51da6382ffd7325fc005d54eeb8b985f75f2",
+    "seconds": 6.36,
+    "speechText": "请吹几个音，试试轻吹和强吹。能听到声音后，就可以开始演奏了。",
+    "status": "success"
+  },
+  {
+    "id": "GUIDE_TECH",
+    "text": "选择咬嘴控制或按键控制，再点击映射。需要移除时，点击清除映射。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "d6f6a6ef93bdae6e367dd150870e55e81b1ec75096bf091fefb935267cf22c9a",
+    "sha256": "5b5a7d594d396c516ecaa083ed40a19e86f2962761d2f8998de8bf503d80b834",
+    "seconds": 8.24,
+    "speechText": "选择咬嘴控制或按键控制，再点击映射。需要移除时，点击清除映射。",
+    "status": "success"
+  },
+  {
+    "id": "GUIDE_KEY",
+    "text": "根据歌曲需要选择演奏调。调整后，吹几个音确认调性。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "d8940140335688661534bad458e0098960f68c7612b1ba3d4f270648db6c2c69",
+    "sha256": "9d705ecb7969601010d5a112835e2133b1f95908aa8ebf99cc5fe4aa182f28a2",
+    "seconds": 5.8,
+    "speechText": "根据歌曲需要选择演奏调。调整后，吹几个音确认调性。",
+    "status": "success"
+  },
+  {
+    "id": "GUIDE_RECORD",
+    "text": "点击开始录音。结束后，在我的录制中查看文件。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "1129c623a5dc07a51756857a32cdfffd505ed02716f4c71dc5e17df71585e81d",
+    "sha256": "80f907fde8b7eb117171bbc76617c7831dc09568bfb0fd8d09747c38152807da",
+    "seconds": 4.76,
+    "speechText": "点击开始录音。结束后，在我的录制中查看文件。",
+    "status": "success"
+  },
+  {
+    "id": "REC_PREP_AUDIO",
+    "text": "准备录音，将在滴声后开始。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "99211026f5497be07e0de77291cf803772e3eb22624a0749556824038013b1dd",
+    "sha256": "b98d700896ddf32c8ef18cd85bfa31cfbaa7d88114d0b343aef575518ea60ead",
+    "seconds": 3.08,
+    "speechText": "准备录音，将在滴声后开始。",
+    "status": "success"
+  },
+  {
+    "id": "REC_PREP_SCREEN",
+    "text": "准备录屏，将在滴声后开始。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "c5fe233949d1eb7bf352ec0cc4a6f38cf647995bb57bcb50f66e6dba49d7b013",
+    "sha256": "632c4088f3ae81593dcda10e879e89d8826bea3679d038581a8977f240f23186",
+    "seconds": 3.24,
+    "speechText": "准备录屏，将在滴声后开始。",
+    "status": "success"
+  },
+  {
+    "id": "TONE_140_KONTAKT_KENSA",
+    "text": "肯萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "c54d95ee3ad44e90e1c8ef8e76d5331d7d24ae8c09c423a1f4fdcd84994bf8d7",
+    "sha256": "8bbe78611a53d9a36902278b45305fcfe974b3b9e0c810a8b4a52fa766001625",
+    "seconds": 1.28,
+    "speechText": "肯萨",
+    "status": "success",
+    "reusedFrom": "TONE_KENSA"
+  },
+  {
+    "id": "TONE_140_ALTO_SILKY",
+    "text": "中音萨克斯，丝滑。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "f7d268801a336563af3bb9e482db7ba33d02eb889f72443eeaf15eaf26366131",
+    "sha256": "aad230741ee0d04fc3d730ea142df88c830d8a0c05b11d08258de86ddc9c7c78",
+    "seconds": 2.68,
+    "speechText": "中音萨克斯，丝滑。",
+    "status": "success"
+  },
+  {
+    "id": "TONE_140_TENOR_SILKY",
+    "text": "次中音萨克斯，丝滑。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "eea34ac582244c9761e807bb4e26d848dd7c4664bef552ddc054807a95b5c430",
+    "sha256": "da4c8a3124ffb1f846ff8d7fb233d9551cf169e06b3e4a70d73e4d19bd81619d",
+    "seconds": 2.96,
+    "speechText": "次中音萨克斯，丝滑。",
+    "status": "success"
+  },
+  {
+    "id": "TONE_140_TRUMPET",
+    "text": "小号一。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "768f47c02f7fdf4c6acf6b651fa8e2ac5ba42db228e59b43d5786401d71f141e",
+    "sha256": "b781a628d8b3f3bcaa0eeb68ea1b86cf13e8cb39383c0218887e00a70b076779",
+    "seconds": 1.4,
+    "speechText": "小号一。",
+    "status": "success"
+  },
+  {
+    "id": "TONE_140_TRUMPET_2",
+    "text": "小号二。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "a89ebe1966051b256cc5748a1244d13cc640bb35e3105ac4930444307e9b35d1",
+    "sha256": "7330b3faef32af481bcf5aecdd46c41c6ad33da9c1535a5126e31b69a9fb6ae2",
+    "seconds": 1.4,
+    "speechText": "小号二。",
+    "status": "success"
+  },
+  {
+    "id": "TONE_140_CLARINET",
+    "text": "单簧管一。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "2bd30ab4bb28509118ed2e2e314076f8a2991185e5ef2f243bc51fc91cbd4e4e",
+    "sha256": "ddb7a43b8370d7d4b689bc1862f3c2e42259e0ed711c3ab5cfbf6c45e8c3c07a",
+    "seconds": 1.8,
+    "speechText": "单簧管一。",
+    "status": "success"
+  },
+  {
+    "id": "TONE_140_KONG_CLARINET_2",
+    "text": "单簧管二。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "93c606fc20c80d38c28d9e98297de16a6417021a87af20b18d361a7b8d6eb044",
+    "sha256": "470988df197cabbbec2165743a8d7b9c8d797727b1bc01ee02ea958798dac6f2",
+    "seconds": 1.68,
+    "speechText": "单簧管二。",
+    "status": "success"
+  },
+  {
+    "id": "TONE_140_OBOE",
+    "text": "双簧管一。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "e5c428c53b558c81798af27069aa2a5bd6ce3b98ef39df37aae51285844d8d0f",
+    "sha256": "9d7489377a65ea5c0cd52ba637d45f5affee6eb49072a12dcf4c6b3d39516d72",
+    "seconds": 1.88,
+    "speechText": "双簧管一。",
+    "status": "success"
+  },
+  {
+    "id": "TONE_140_KONG_OBOE_2",
+    "text": "双簧管二。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "84b5c5362e5051b42c3728419c2ef69404236c00f01dcaec69d05f1c79eaed1e",
+    "sha256": "53b1da6becd1760fdb6aa93c442216c00b764c2d2a1fa5a4dc024bced467b7de",
+    "seconds": 1.84,
+    "speechText": "双簧管二。",
+    "status": "success"
+  },
+  {
+    "id": "TONE_140_VIOLIN_SOFT",
+    "text": "小提琴一。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "691f02f23f025a41c59b47e50cce6052481d76a4ae58d0fe442532d8fc06a52d",
+    "sha256": "aea166bdd4fd1716895e16b20b98af79d87d33c20ec63fe2d5c350e772c45b58",
+    "seconds": 1.68,
+    "speechText": "小提琴一。",
+    "status": "success"
+  },
+  {
+    "id": "TONE_140_KONG_VIOLIN_2",
+    "text": "小提琴二。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "fe9cbfe46dceafb61292ea336335217682ea3c810c3e78dbb826eb10e775b170",
+    "sha256": "82839cac0ed390f0c67aa664f8a8944559339e756108aef66d901e9cb4ecadf2",
+    "seconds": 1.64,
+    "speechText": "小提琴二。",
+    "status": "success"
+  },
+  {
+    "id": "TONE_140_KONG_ERHU",
+    "text": "二胡一。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "dd33ff5e97f6e5e2edc1cd35ac1b58f76ee3ce3cd83fc5941c038e1eb39d32b6",
+    "sha256": "f396eac3b80a7014622693a48f8fc699ed0fbe58d51e1ccc341dff037c44b39e",
+    "seconds": 1.48,
+    "speechText": "二胡一。",
+    "status": "success"
+  },
+  {
+    "id": "TONE_140_KONG_ERHU_NEW_2",
+    "text": "二胡二。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "fa4b1acf310fd5359fd93d8338a4c294fff4aeeeee0b5e685b8ab0619367b4f3",
+    "sha256": "c0514e78f5b707c202e4fbb8e108bcbefb9e62f462d9a5d76b61013e6de19f73",
+    "seconds": 1.48,
+    "speechText": "二胡二。",
+    "status": "success"
+  },
+  {
+    "id": "TONE_140_KONG_HULUSI_STRAIGHT",
+    "text": "葫芦丝，直音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "2683daca1fec49fe56cc9fca5d37d4b63f7ed83d1ffc82060c441aeafad48d36",
+    "sha256": "a182f1d445715124e400b431157eaf4060473bada29be68d96fc785aff3114ed",
+    "seconds": 2.68,
+    "speechText": "葫芦丝，直音。",
+    "status": "success"
+  },
+  {
+    "id": "TONE_140_KONG_HULUSI_VIBRATO",
+    "text": "葫芦丝，颤音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "075811f7177c23f4c6073d245772d60c4f862aa1b2c998de3f8f3d6243405f23",
+    "sha256": "1063937b16c3bae753e249589e6d4a40faffbea79e7e3890666689b005e34036",
+    "seconds": 2.52,
+    "speechText": "葫芦丝，颤音。",
+    "status": "success"
+  },
+  {
+    "id": "TONE_140_KONG_QUDI_STRAIGHT",
+    "text": "曲笛一。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "aec542533afc8aed8ef9ce5ccd84d3b97a205d7f54f2ba586bbd94c02ca6072d",
+    "sha256": "6a56939de313136d14fb3aadd3fa0bc14e193c421d7115fd34d97e89fae57ea6",
+    "seconds": 1.6,
+    "speechText": "曲笛一。",
+    "status": "success"
+  },
+  {
+    "id": "TONE_140_KONG_QUDI",
+    "text": "曲笛二。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "e01628d9fa43d5007292f9caf905842350b03c0bba6618a137430812e2a92a32",
+    "sha256": "2225089b924e9c5699e069494417f9f281734d99e7de0ea58dce6b0d87807acf",
+    "seconds": 1.52,
+    "speechText": "曲笛二。",
+    "status": "success"
+  },
+  {
+    "id": "TONE_140_KONG_SUONA_VIBRATO",
+    "text": "唢呐一。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "1386f6ac43da828bd11dd62f81c63e0478010eb2d104ecc2d2ce9f3edad38200",
+    "sha256": "1d35d4d42b5a0b42e68c128568c3ca79374a360682ecd179ce7fb5c79cb28e92",
+    "seconds": 1.68,
+    "speechText": "唢呐一。",
+    "status": "success"
+  },
+  {
+    "id": "TONE_140_KONG_SUONA",
+    "text": "唢呐二。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "d62ad0b35b5e14a6217c75b52d18eec5c0aa172cc8e7805f8a0867a8d7cc4b39",
+    "sha256": "b7a39a59d2dfa3d1c3df0ac6dd8d2025512e7e2342c53ea94c4b708b906042f8",
+    "seconds": 1.6,
+    "speechText": "唢呐二。",
+    "status": "success"
+  }
+]

@@ -52,7 +52,7 @@ class PrototypeStructureTests(unittest.TestCase):
 
     def test_sound_libraries_follow_scanned_plugins(self):
         self.assertIn('id="library-tabs"', HTML)
-        self.assertIn("for (const tone of publishedTones)", JS)
+        self.assertIn("for (const tone of orderedTones)", JS)
         self.assertIn('std::array<PublishedToneDefinition, 41>', (ROOT / "native" / "Source" / "PublishedToneCatalog.h").read_text(encoding="utf-8"))
         self.assertIn("if(p.studioDraft || !p.published) return", JS)
         self.assertIn("$('#library-tabs').hidden=true", JS)
@@ -229,15 +229,15 @@ class PrototypeStructureTests(unittest.TestCase):
 
     def test_sound_plan_page_is_compact_and_exposes_rescan(self):
         sound_page = HTML.split('id="page-sounds"', 1)[1].split('id="page-chain"', 1)[0]
-        self.assertNotIn('<h2>音色方案</h2>', sound_page)
+        self.assertNotIn('id="restore-tone-order"', sound_page)
         self.assertNotIn('data-action="scan-sounds"', JS)
         self.assertIn("if(p.studioDraft || !p.published) return", JS)
         self.assertNotIn('data-action="scan-folder"', JS)
         self.assertNotIn('class="plugin-original-name"', JS)
         self.assertIn('class="delete-tone"', JS)
         self.assertIn('.preset-grid{grid-template-columns:repeat(3,minmax(280px,1fr))', HTML)
-        self.assertIn('draggable="true"', JS)
-        self.assertIn("nativeEvent('reorderInstrumentCards'", JS)
+        self.assertNotIn('draggable="true"', JS)
+        self.assertNotIn("nativeEvent('reorderInstrumentCards'", JS)
 
     def test_global_header_has_dynamic_greeting_and_no_duplicate_page_titles(self):
         self.assertIn('id="time-greeting"', HTML)

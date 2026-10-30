@@ -1,10 +1,10 @@
 [
   {
-    "id": "REC_PREP_AUDIO",
-    "text": "准备录音，将在滴声后开始。",
-    "voice": "x6_wuyediantai_mini",
+    "id": "REC_SAVED",
+    "text": "录制已保存，可以在我的录制中查看。",
+    "voice": "x6_lingyuyan_pro",
     "settings": {
-      "vcn": "x6_wuyediantai_mini",
+      "vcn": "x6_lingyuyan_pro",
       "speed": 50,
       "volume": 50,
       "pitch": 50,
@@ -20,16 +20,45 @@
         "frame_size": 0
       }
     },
-    "requestHash": "76c545a2f9f90edaeb1bf9dc2d1bca28aa94e587617e63c2f38d040e77c84a1a",
-    "sha256": "583d01990241423a56a60e98e7e1bb6ab99c0bc6e2593cc4f26fd3ce8b5610b8",
-    "seconds": 3.14
+    "requestHash": "98dbbec0ac87618dedd6f409edc23149c23f98cc71c0800e481d434d46e4cbd2",
+    "sha256": "2a9e5dc755d4476ebd69f98a4c8b7b9fee531e704a080c7c000f9afce6a87351",
+    "seconds": 3.68,
+    "speechText": "录制已保存，可以在我的录制中查看。",
+    "status": "success"
+  },
+  {
+    "id": "REC_PREP_AUDIO",
+    "text": "准备录音，将在滴声后开始。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "99211026f5497be07e0de77291cf803772e3eb22624a0749556824038013b1dd",
+    "sha256": "b98d700896ddf32c8ef18cd85bfa31cfbaa7d88114d0b343aef575518ea60ead",
+    "seconds": 3.08,
+    "speechText": "准备录音，将在滴声后开始。",
+    "status": "success"
   },
   {
     "id": "REC_PREP_SCREEN",
     "text": "准备录屏，将在滴声后开始。",
-    "voice": "x6_wuyediantai_mini",
+    "voice": "x6_lingyuyan_pro",
     "settings": {
-      "vcn": "x6_wuyediantai_mini",
+      "vcn": "x6_lingyuyan_pro",
       "speed": 50,
       "volume": 50,
       "pitch": 50,
@@ -45,33 +74,10 @@
         "frame_size": 0
       }
     },
-    "requestHash": "a022947ac2f512fea1e139c722e380d8a6d65d3a674f001eae7e3116a0459ef1",
-    "sha256": "05d8e3ef4a80aeb2b43891eb0be6082a787e0e173671dc3bb2421b6c4a6deccb",
-    "seconds": 3.26
-  },
-  {
-    "id": "REC_SAVED",
-    "text": "录制已保存，可以在我的录制中查看。",
-    "voice": "x6_wuyediantai_mini",
-    "settings": {
-      "vcn": "x6_wuyediantai_mini",
-      "speed": 50,
-      "volume": 50,
-      "pitch": 50,
-      "bgs": 0,
-      "reg": 0,
-      "rdn": 0,
-      "rhy": 0,
-      "audio": {
-        "encoding": "raw",
-        "sample_rate": 24000,
-        "channels": 1,
-        "bit_depth": 16,
-        "frame_size": 0
-      }
-    },
-    "requestHash": "384fb79fd5a25f36e7831b6636dce737cfd201bfa26de8638d21432454d4785e",
-    "sha256": "c64263442201ca96d4da9afaa28068e7ab55c6e4d43d980dbc67ff1e85c171dd",
-    "seconds": 3.98
+    "requestHash": "c5fe233949d1eb7bf352ec0cc4a6f38cf647995bb57bcb50f66e6dba49d7b013",
+    "sha256": "632c4088f3ae81593dcda10e879e89d8826bea3679d038581a8977f240f23186",
+    "seconds": 3.24,
+    "speechText": "准备录屏，将在滴声后开始。",
+    "status": "success"
   }
 ]

@@ -10,7 +10,7 @@ export const prompts = [
   ['REC_PREP_SCREEN', '准备录屏，将在滴声后开始。'],
   ['REC_SAVED', '录制已保存，可以在我的录制中查看。'],
 ];
-export const settings = { vcn: 'x6_wuyediantai_mini', speed: 50, volume: 50, pitch: 50,
+export const settings = { vcn: 'x6_lingyuyan_pro', speed: 50, volume: 50, pitch: 50,
   bgs: 0, reg: 0, rdn: 0, rhy: 0,
   audio: { encoding: 'raw', sample_rate: 24000, channels: 1, bit_depth: 16, frame_size: 0 } };
 
@@ -67,10 +67,10 @@ export async function synthesize(auth, text, WebSocketClient = globalThis.WebSoc
 }
 
 // Output is a staging directory. Review the WAVs before replacing shipped assets.
-export async function generate(auth, directory, WebSocketClient = globalThis.WebSocket) {
+export async function generate(auth, directory, WebSocketClient = globalThis.WebSocket, requestedPrompts = prompts) {
   await mkdir(directory, { recursive: true });
   const audit = [];
-  for (const [id, text] of prompts) {
+  for (const [id, text] of requestedPrompts) {
     const requestHash = createHash('sha256').update(JSON.stringify({ text, settings })).digest('hex');
     const file = join(directory, `${id}.wav`), receipt = join(directory, `${id}.json`);
     let bytes;

@@ -39,5 +39,5 @@ class Release113(unittest.TestCase):
         self.assertEqual(entry['sha256'],hashlib.sha256(tone).hexdigest())
         self.assertEqual(entry['bytes'],len(tone))
         catalog=json.loads(self.read('prototype/voice-catalog.js').split('=',1)[1].strip().rstrip(';'))
-        self.assertEqual(catalog['voice'],'x6_wuyediantai_mini')
+        self.assertEqual(catalog['voice'],'x6_lingyuyan_pro')
         self.assertEqual(next(i for i in catalog['items'] if i['id']=='V014_01')['text'],'高音萨克斯，原声。')

@@ -180,7 +180,7 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
 
     def test_release_tone_catalog_is_explicit_and_all_embedded_assets_exist(self):
         catalog = self.read("native/Source/PublishedToneCatalog.h")
-        expected_names = ['高萨-原声', '高萨-明亮', '中萨-爵士', '中萨-深情', '中萨-流行', '中萨-丝滑', '次中萨-醇厚', '次中萨-温暖', '次中萨-气包音', '次中萨-丝滑', '小号1', '小号2', '高音小号', '中音长号', '低音长号', '长笛', '短笛', '单簧管1', '单簧管2', '双簧管1', '双簧管2', '小提琴1', '小提琴2', '大提琴', '二胡1', '二胡2', '葫芦丝-直音', '葫芦丝-颤音', '柳琴', '曲笛1', '曲笛2*', '埙', '唢呐1', '唢呐2*', '三弦', '琵琶', '南箫', '洞箫', '梆笛*', '京胡', '肯萨1']
+        expected_names = ['高萨-原声', '高萨-明亮', '中萨-爵士', '中萨-深情', '中萨-流行', '中萨-丝滑', '次中萨-醇厚', '次中萨-温暖', '次中萨-气包音', '次中萨-丝滑', '小号1', '小号2', '高音小号', '中音长号', '低音长号', '长笛', '短笛', '单簧管1', '单簧管2', '双簧管1', '双簧管2', '小提琴1', '小提琴2', '大提琴', '二胡1', '二胡2', '葫芦丝-直音', '葫芦丝-颤音', '柳琴', '曲笛1', '曲笛2*', '埙', '唢呐1', '唢呐2*', '三弦', '琵琶', '南箫', '洞箫', '梆笛*', '京胡', '肯萨']
         self.assertIn("std::array<PublishedToneDefinition, 41>", catalog)
         for name in expected_names:
             self.assertEqual(catalog.count(f'"{name}"'), 1, name)

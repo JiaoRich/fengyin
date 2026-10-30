@@ -23,6 +23,7 @@
 #include "VideoAudioExtractor.h"
 #include "VideoPlaybackCache.h"
 #include "VlcVideoSurface.h"
+#include "VideoFileChooser.h"
 #include "VideoViewportGate.h"
 #include "WindowsLowLatencyOptimizer.h"
 #include "VoicePromptService.h"
@@ -252,11 +253,12 @@ private:
     bool webVideoProxyAttempted = false;
     juce::File webVideoProxyReady;
     double webVideoPrepareAfterMs = 0;
-    std::unique_ptr<juce::FileChooser> webVideoChooser;
+    VideoFileChooser webVideoChooser { *this };
     std::unique_ptr<juce::FileChooser> pluginFolderChooser;
     std::unique_ptr<juce::FileChooser> recordingFolderChooser;
     juce::File webVideoFile;
     int webVideoGeneration = 0;
+    int lastVideoTimingGeneration = -1;
     int webVideoSeekRevision = 0;
     bool webVideoAudioReady = false;
     // Explicit opt-in, bounded real-machine DSP test; never enabled by settings.

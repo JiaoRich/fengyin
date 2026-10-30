@@ -84,7 +84,7 @@ class KongHeadroom134(unittest.TestCase):
             # code-line ending conversion; package/binary hashes remain exact.
             source=(ROOT / path).read_bytes().replace(b'\r\n',b'\n')
             # 1.1.39 preserves the router, while updating only diagnostics and DSP guards.
-            latest=json.loads((ASSETS/'release-139-audit.json').read_text(encoding='utf-8'))
+            latest=json.loads((ASSETS/'release-140-audit.json').read_text(encoding='utf-8'))
             self.assertEqual(sha(source), latest.get('signalPathSha256',{}).get(path,expected), path)
         for name, expected in self.audit['unchangedPackages'].items():
             self.assertFalse(name.startswith('folk-'))

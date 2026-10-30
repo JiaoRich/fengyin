@@ -283,8 +283,10 @@ body.compact-mode #music-tempo{grid-column:1/-1;justify-content:center;flex-wrap
 @media(max-width:540px){.midi-dialog-head{padding:22px 20px 18px}.midi-dialog h2{font-size:22px}.midi-dialog-content{padding:0 20px 20px}.midi-current{padding:15px 14px;gap:11px}.midi-current .device-label>b{font-size:16px}.midi-transport-icon{width:37px;height:40px}.midi-device{gap:8px;padding:14px 12px}.midi-dialog button{padding:7px 13px}.midi-dialog-foot{padding:14px 20px}.midi-dialog-foot small{max-width:180px}.compact-brand span{display:none!important}}
 </style><style>
 /* 1.1.39: retain compact layout; fit the full performance spectrum. */
-    #preset-grid .instrument-preset-card.compact{padding-inline:24px}
-    #preset-grid .instrument-preset-card.compact h3{font-size:20px;line-height:1.2;text-align:center;overflow-wrap:anywhere}
+    #page-sounds #preset-grid .instrument-preset-card.compact{padding-inline:24px}
+    #preset-grid .instrument-preset-card.compact h3{width:100%;align-self:stretch;font-size:20px;line-height:1.2;text-align:center;overflow-wrap:anywhere}
+    .tone-library-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}.tone-library-heading h2{margin:0;font-size:24px}.tone-library-heading button{font:inherit;font-size:14px;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--accent-soft);color:var(--text);cursor:pointer}
+    #preset-grid .instrument-preset-card.compact small{width:100%;text-align:center}
     body:not(.compact-mode) #page-play.active{height:var(--play-available-height,calc(100dvh - 104px));min-height:0;overflow:visible}
     body:not(.compact-mode) #page-play .stage-grid{min-height:0;flex:1 1 0}
     body:not(.compact-mode) #page-play .instrument-art{min-height:0}
@@ -294,6 +296,16 @@ body.compact-mode #music-tempo{grid-column:1/-1;justify-content:center;flex-wrap
     body:not(.compact-mode) #page-play .visualizer-head{flex:0 0 auto}
     body:not(.compact-mode) #page-play .spectrum-body{position:relative;flex:1 1 0;min-height:0}
     body:not(.compact-mode) #spectrum{display:block;position:absolute;inset:0;width:100%;height:100%}
+</style>
+<style>
+    /* Restore the breath ring in both layouts without continuous raster work. */
+    #breath-wave,.instrument-aura{display:none!important}
+    #breath-ring{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3;opacity:0;overflow:hidden;contain:strict;transition:opacity .12s linear}
+    #breath-ring path{fill:none;stroke:var(--accent);stroke-width:1.3;stroke-linejoin:round;stroke-opacity:.68}
+    #breath-ring path:nth-child(2){stroke:var(--accent-2);stroke-opacity:.48}
+    #breath-ring path:nth-child(3){stroke-opacity:.30}
+    .instrument-art.empty #breath-ring,body.presentation-hidden #breath-ring{display:none}
+    @media(prefers-reduced-motion:reduce){#breath-ring{transition:none}}
 </style>
 </head>
 <body data-theme="neon">
@@ -355,7 +367,7 @@ body.compact-mode #music-tempo{grid-column:1/-1;justify-content:center;flex-wrap
           <aside class="performance-card glass">
             <div class="instrument-heading"><div><p>当前音色</p><h2 id="sound-name">尚未选择音色</h2><p id="source-plugin-name" hidden>请先到“音色方案”选择并加载</p></div></div>
             <div class="instrument-art empty" id="instrument-art">
-              <div class="instrument-aura"></div>
+              <div class="instrument-aura"></div><svg id="breath-ring" viewBox="0 0 340 340" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><path/><path/><path/></svg>
               <img class="instrument-picture" id="instrument-picture" alt="当前加载的乐器" hidden>
               <div class="instrument-empty" id="instrument-empty"><span>♫</span><strong>尚未加载乐器</strong><small>选择音色方案后，这里才会显示对应乐器</small><button type="button" id="choose-sound-from-empty">选择音色方案</button></div>
               <canvas class="breath-wave" id="breath-wave" aria-label="随演奏气息变化的波纹"></canvas>
@@ -401,7 +413,7 @@ body.compact-mode #music-tempo{grid-column:1/-1;justify-content:center;flex-wrap
         </div>
       </section>
 
-      <section class="page" id="page-sounds"><div class="panel glass"><div class="library-tabs" id="library-tabs" role="tablist" aria-label="音源系列" hidden><button class="library-tab active" type="button" role="tab" aria-selected="true" data-library="swam">西洋乐器 · SWAM</button><button class="library-tab" type="button" role="tab" aria-selected="false" data-library="kong">中国民乐 · 空音</button></div><div class="library-context" id="library-context" hidden><i></i><strong id="library-context-title">已识别 SWAM 音源</strong><b id="library-context-status">本地音源</b></div><div class="preset-grid" id="preset-grid"></div></div></section>
+      <section class="page" id="page-sounds"><div class="panel glass"><div class="library-tabs" id="library-tabs" role="tablist" aria-label="音源系列" hidden><button class="library-tab active" type="button" role="tab" aria-selected="true" data-library="swam">西洋乐器 · SWAM</button><button class="library-tab" type="button" role="tab" aria-selected="false" data-library="kong">中国民乐 · 空音</button></div><div class="library-context" id="library-context" hidden><i></i><strong id="library-context-title">已识别 SWAM 音源</strong><b id="library-context-status">本地音源</b></div><div class="tone-library-heading"><h2>音色方案</h2></div><div class="preset-grid" id="preset-grid"></div></div></section>
       <section class="page" id="page-chain"><div class="panel glass"><div class="custom-tone-empty" id="custom-tone-empty"><button class="primary-button" id="start-custom-tone" type="button">定制我的音色</button></div><div class="custom-tone-editor" id="custom-tone-editor" hidden><section class="custom-tone-step"><span>第一步</span><h3>选择音源</h3><div class="custom-source-row"><select id="instrument-select" aria-label="选择乐器音源"><option value="">请选择音源</option></select><button id="open-instrument" type="button" disabled>打开界面</button></div><span class="load-state" id="instrument-load-state">请选择一个乐器音源</span><span class="plugin-status" id="plugin-status"></span></section><section class="custom-tone-step" id="custom-effects-step" hidden><span>第二步</span><h3>设置效果链</h3></section><button id="scan-swam" hidden><b id="scan-title">扫描音源</b><span id="scan-label">扫描</span></button><button id="load-instrument" hidden>加载音源</button><select id="chain-style-select" hidden disabled></select><input id="tone-warmth" hidden type="range" value="20"><b id="tone-warmth-label" hidden>20%</b><button id="tone-expert" hidden></button><input id="eq-tone" hidden type="range" min="-100" max="100" value="0"><span id="eq-label" hidden>自然</span><input id="reverb-mix" hidden type="range" min="0" max="60" value="18"><span id="reverb-label" hidden>强度 18%</span><select id="effect-select" hidden></select><button id="load-effect" hidden></button><button id="open-effect" hidden></button><button id="remove-effect" hidden></button><span id="effect-load-state" hidden></span></div></div></section>
       <section class="page" id="page-wind"><div class="panel glass adapter-panel adapter-v2">
         <section class="adapter-primary-section">
@@ -423,7 +435,7 @@ body.compact-mode #music-tempo{grid-column:1/-1;justify-content:center;flex-wrap
       </div><div class="audio-summary"><div><span>预计延迟</span><strong class="green" id="audio-latency-value">正在检测…</strong></div><p id="audio-apply-status" role="status"></p></div>
       <div class="super-latency-card" hidden><div><span>板载声卡进阶优化</span><strong>超级低延迟优化</strong><p id="super-latency-status">正在检查系统声卡…</p></div><div class="super-latency-actions"><button id="restore-audio-driver" type="button" hidden>恢复原驱动</button><button id="super-latency-optimize" class="primary-button" type="button">开始优化</button></div></div></section>
       <section class="advanced-card glass"><h3>授权与激活</h3><div class="activation"><div><h3 id="license-title">可开始1小时完整试用</h3><div class="machine-code-row"><span id="machine-code">本机识别码：正在读取…</span><button id="copy-machine-code" type="button">复制</button></div></div><div class="license-actions"><button id="start-trial" type="button">开始1小时完整试用</button><label class="license-code-label" for="license-code">激活码</label><input id="license-code" placeholder="请输入此设备的激活码"><button id="activate" class="primary-button">激活</button></div></div></section></div>
-      <div class="advanced-extras"><div id="advanced-voice"></div><div id="advanced-studio"></div></div><p class="prototype-note">风吟 1.1.39</p></div></section>
+      <div class="advanced-extras"><div id="advanced-voice"></div><div id="advanced-studio"></div></div><p class="prototype-note">风吟 1.1.40</p></div></section>
     </main>
   </div>
   <div id="record-menu" class="inline-choice" role="menu" aria-label="选择录制类型" hidden><button type="button" role="menuitem" data-record-kind="audio">录音</button><button type="button" role="menuitem" data-record-kind="video">录屏</button></div>

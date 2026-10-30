@@ -19,6 +19,7 @@ public:
         int generation = 0, seekRevision = 0;
         bool ready = false, playing = false, finished = false;
         double position = 0, duration = 0;
+        double dllLoadMs = 0, initialiseMs = 0, firstReadyMs = 0;
         int decodedVideo = 0, displayedVideo = 0, lostVideo = 0, decodedAudio = 0;
         std::string error;
     };

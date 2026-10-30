@@ -214,7 +214,6 @@ let currentPluginLoaded = false;
 let pendingPresetNavigation = null;
 let publishedTones = [];
 let toneLoadInFlight=false, queuedToneLoad=null;
-let lastToneDragAt=0;
 let customToneMode = 'idle';
 let customSourceReady = false;
 let editingPresetName = '';
@@ -233,7 +232,6 @@ let currentInstrumentModelIndex = 0;
 let currentInstrumentModelKey = '';
 let activeLibraryTab = 'swam';
 const presetCardToneIndex = new Map();
-let draggedInstrumentCardKey = '';
 let kongLibraryPrompted = false;
 let adapterMatchTimer = 0;
 let adapterMode = 'hardware';
@@ -499,7 +497,227 @@ function isSupportedInstrument(item = {}) {
     || item.isSwam === true || item.brand === 'kong';
 }
 
-function showInstrumentArtwork(key, chineseName = '') {
+window.FENGYIN_TONE_MEDIA = {
+  "kontakt-kensa": {
+    "name": "肯萨",
+    "artwork": "instrument_soprano_sax.png",
+    "voiceId": "TONE_140_KONTAKT_KENSA"
+  },
+  "soprano-kenny": {
+    "name": "高萨-原声",
+    "artwork": "instrument_soprano_sax.png",
+    "voiceId": "V014_01"
+  },
+  "soprano-pop": {
+    "name": "高萨-明亮",
+    "artwork": "instrument_soprano_sax.png",
+    "voiceId": "V014_02"
+  },
+  "alto-jazz": {
+    "name": "中萨-爵士",
+    "artwork": "instrument_alto_sax.png",
+    "voiceId": "V014_03"
+  },
+  "alto-deep": {
+    "name": "中萨-深情",
+    "artwork": "instrument_alto_sax.png",
+    "voiceId": "V014_04"
+  },
+  "alto-pop": {
+    "name": "中萨-流行",
+    "artwork": "instrument_alto_sax.png",
+    "voiceId": "V014_05"
+  },
+  "alto-silky": {
+    "name": "中萨-丝滑",
+    "artwork": "instrument_alto_sax.png",
+    "voiceId": "TONE_140_ALTO_SILKY"
+  },
+  "tenor-mellow": {
+    "name": "次中萨-醇厚",
+    "artwork": "instrument_tenor_sax.png",
+    "voiceId": "V014_06"
+  },
+  "tenor-warm": {
+    "name": "次中萨-温暖",
+    "artwork": "instrument_tenor_sax.png",
+    "voiceId": "V014_07"
+  },
+  "tenor-air-pocket": {
+    "name": "次中萨-气包音",
+    "artwork": "instrument_tenor_sax.png",
+    "voiceId": "V014_08"
+  },
+  "tenor-silky": {
+    "name": "次中萨-丝滑",
+    "artwork": "instrument_tenor_sax.png",
+    "voiceId": "TONE_140_TENOR_SILKY"
+  },
+  "trumpet": {
+    "name": "小号1",
+    "artwork": "instrument_trumpet.png",
+    "voiceId": "TONE_140_TRUMPET"
+  },
+  "trumpet-2": {
+    "name": "小号2",
+    "artwork": "instrument_trumpet.png",
+    "voiceId": "TONE_140_TRUMPET_2"
+  },
+  "piccolo-trumpet": {
+    "name": "高音小号",
+    "artwork": "instrument_piccolo_trumpet.png",
+    "voiceId": "V014_12"
+  },
+  "alto-trombone": {
+    "name": "中音长号",
+    "artwork": "instrument_tenor_trombone.png",
+    "voiceId": "V014_13"
+  },
+  "bass-trombone": {
+    "name": "低音长号",
+    "artwork": "instrument_bass_trombone.png",
+    "voiceId": "V014_14"
+  },
+  "flute": {
+    "name": "长笛",
+    "artwork": "instrument_flute.png",
+    "voiceId": "V014_15"
+  },
+  "piccolo": {
+    "name": "短笛",
+    "artwork": "instrument_piccolo.png",
+    "voiceId": "V014_16"
+  },
+  "clarinet": {
+    "name": "单簧管1",
+    "artwork": "instrument_clarinet.png",
+    "voiceId": "TONE_140_CLARINET"
+  },
+  "kong-clarinet-2": {
+    "name": "单簧管2",
+    "artwork": "instrument_clarinet.png",
+    "voiceId": "TONE_140_KONG_CLARINET_2"
+  },
+  "oboe": {
+    "name": "双簧管1",
+    "artwork": "instrument_oboe.png",
+    "voiceId": "TONE_140_OBOE"
+  },
+  "kong-oboe-2": {
+    "name": "双簧管2",
+    "artwork": "instrument_oboe.png",
+    "voiceId": "TONE_140_KONG_OBOE_2"
+  },
+  "violin-soft": {
+    "name": "小提琴1",
+    "artwork": "instrument_violin.png",
+    "voiceId": "TONE_140_VIOLIN_SOFT"
+  },
+  "kong-violin-2": {
+    "name": "小提琴2",
+    "artwork": "instrument_violin.png",
+    "voiceId": "TONE_140_KONG_VIOLIN_2"
+  },
+  "cello": {
+    "name": "大提琴",
+    "artwork": "instrument_cello.png",
+    "voiceId": "V014_22"
+  },
+  "kong-erhu": {
+    "name": "二胡1",
+    "artwork": "instrument_kong_erhu.png",
+    "voiceId": "TONE_140_KONG_ERHU"
+  },
+  "kong-erhu-new-2": {
+    "name": "二胡2",
+    "artwork": "instrument_kong_erhu.png",
+    "voiceId": "TONE_140_KONG_ERHU_NEW_2"
+  },
+  "kong-jinghu": {
+    "name": "京胡",
+    "artwork": "instrument_kong_banhu.png",
+    "voiceId": "TONE_JINGHU"
+  },
+  "kong-hulusi-straight": {
+    "name": "葫芦丝-直音",
+    "artwork": "instrument_kong_hulusi.png",
+    "voiceId": "TONE_140_KONG_HULUSI_STRAIGHT"
+  },
+  "kong-hulusi-vibrato": {
+    "name": "葫芦丝-颤音",
+    "artwork": "instrument_kong_hulusi.png",
+    "voiceId": "TONE_140_KONG_HULUSI_VIBRATO"
+  },
+  "kong-qudi-straight": {
+    "name": "曲笛1",
+    "artwork": "instrument_kong_dizi.png",
+    "voiceId": "TONE_140_KONG_QUDI_STRAIGHT"
+  },
+  "kong-qudi": {
+    "name": "曲笛2*",
+    "artwork": "instrument_kong_dizi.png",
+    "voiceId": "TONE_140_KONG_QUDI"
+  },
+  "kong-bangdi": {
+    "name": "梆笛*",
+    "artwork": "instrument_kong_dizi.png",
+    "voiceId": "TONE_BANGDI"
+  },
+  "kong-nanxiao": {
+    "name": "南箫",
+    "artwork": "instrument_kong_xiao.png",
+    "voiceId": "V014_37"
+  },
+  "kong-dongxiao": {
+    "name": "洞箫",
+    "artwork": "instrument_kong_xiao.png",
+    "voiceId": "TONE_DONGXIAO"
+  },
+  "kong-xun": {
+    "name": "埙",
+    "artwork": "instrument_kong_xun.png",
+    "voiceId": "V014_32"
+  },
+  "kong-suona-vibrato": {
+    "name": "唢呐1",
+    "artwork": "instrument_kong_suona.png",
+    "voiceId": "TONE_140_KONG_SUONA_VIBRATO"
+  },
+  "kong-suona": {
+    "name": "唢呐2*",
+    "artwork": "instrument_kong_suona.png",
+    "voiceId": "TONE_140_KONG_SUONA"
+  },
+  "kong-liuqin": {
+    "name": "柳琴",
+    "artwork": "instrument_kong_liuqin.png",
+    "voiceId": "V014_29"
+  },
+  "kong-sanxian": {
+    "name": "三弦",
+    "artwork": "instrument_kong_sanxian.png",
+    "voiceId": "V014_34"
+  },
+  "kong-pipa": {
+    "name": "琵琶",
+    "artwork": "instrument_kong_pipa.png",
+    "voiceId": "V014_35"
+  }
+};
+
+function showInstrumentArtwork(key, chineseName = '', activeToneId = '') {
+  const toneMedia = window.FENGYIN_TONE_MEDIA[activeToneId.replace(/^builtin:/,'')]
+    || Object.values(window.FENGYIN_TONE_MEDIA).find(t=>t.name===chineseName);
+  if (toneMedia) {
+    const picture=$('#instrument-picture');
+    const artwork=toneMedia.artwork;
+    picture.alt=`当前乐器：${toneMedia.name}`;
+    if(currentArtworkKey!==artwork) {picture.src=`../assets/instruments/${artwork}`;currentArtworkKey=artwork;}
+    picture.hidden=false;
+    $('#instrument-art').classList.remove('empty','folk');
+    $('.breath-track').classList.remove('inactive');
+    return;
+  }
   if(key==='kontakt-kensa')key='soprano-sax';
   const picture = $('#instrument-picture');
   if (key.startsWith('kong-') || key.startsWith('container:kong-v3:')) {
@@ -945,86 +1163,14 @@ new ResizeObserver(entries => {
   entries[0].target.style.setProperty('--scan-span', Math.max(1, columns - 1));
 }).observe($('#preset-grid'));
 
-function bindInstrumentSorting() {
-  const grid = $('#preset-grid');
-  const original = [...grid.querySelectorAll('.instrument-preset-card')];
-  let source = null, committed = false, frame = 0, pointerX = 0, pointerY = 0, lastMove = 0;
-  let scrollHost = document.scrollingElement;
-  for (let parent = grid; parent; parent = parent.parentElement) {
-    if (/(auto|scroll)/.test(getComputedStyle(parent).overflowY) && parent.scrollHeight > parent.clientHeight) {
-      scrollHost = parent; break;
-    }
-  }
-  function preview(target) {
-    if (!source || !target || source === target || performance.now() - lastMove < 160) return;
-    const nodes = [...grid.querySelectorAll('.instrument-preset-card')];
-    const rects = new Map(nodes.map(node => [node, node.getBoundingClientRect()]));
-    const forward = nodes.indexOf(source) < nodes.indexOf(target);
-    grid.insertBefore(source, forward ? target.nextSibling : target);
-    lastMove = performance.now();
-    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) nodes.forEach(node => {
-      if (node === source) return;
-      const before = rects.get(node), after = node.getBoundingClientRect();
-      node.getAnimations().forEach(animation => animation.cancel());
-      node.animate([{transform:`translate(${before.left-after.left}px,${before.top-after.top}px)`},
-        {transform:'translate(0,0)'}], {duration:180,easing:'ease-out'});
-    });
-  }
-  function tick() {
-    if (!source) return;
-    const rect = scrollHost === document.scrollingElement
-      ? {top:0,bottom:innerHeight} : scrollHost.getBoundingClientRect();
-    const bounds = {top:Math.max(0,rect.top),bottom:Math.min(innerHeight,rect.bottom)};
-    const edge = 85;
-    const delta = pointerY < bounds.top + edge ? -Math.min(16,(bounds.top+edge-pointerY)/5)
-      : pointerY > bounds.bottom-edge ? Math.min(16,(pointerY-bounds.bottom+edge)/5) : 0;
-    if (delta) {
-      scrollHost.scrollTop += delta;
-      preview(document.elementFromPoint(pointerX,pointerY)?.closest('.instrument-preset-card'));
-    }
-    frame = requestAnimationFrame(tick);
-  }
-  function cleanup() {
-    lastToneDragAt=Date.now();
-    cancelAnimationFrame(frame);
-    document.removeEventListener('dragover', track);
-    if (!committed) original.forEach(node => grid.appendChild(node));
-    source?.classList.remove('dragging'); source = null; draggedInstrumentCardKey = '';
-    renderPresets();
-  }
-  function track(event) { pointerX=event.clientX; pointerY=event.clientY; }
-  original.forEach(card => {
-    card.addEventListener('dragstart', event => {
-      if (event.target.closest('button,select,input')) return event.preventDefault();
-      source=card; committed=false; draggedInstrumentCardKey=card.dataset.cardKey;
-      card.classList.add('dragging'); track(event);
-      event.dataTransfer.effectAllowed='move'; event.dataTransfer.setData('text/plain',draggedInstrumentCardKey);
-      document.addEventListener('dragover',track); frame=requestAnimationFrame(tick);
-    });
-    card.addEventListener('dragover', event => {
-      if (!source) return;
-      event.preventDefault(); event.dataTransfer.dropEffect='move'; track(event); preview(card);
-    });
-    card.addEventListener('dragend',cleanup);
-  });
-  grid.ondragover = event => { if (source) {event.preventDefault();track(event);} };
-  grid.ondrop = event => {
-    if (!source) return;
-    event.preventDefault(); committed=true;
-    const order=[...grid.querySelectorAll('.instrument-preset-card')].map(card=>card.dataset.cardKey);
-    try { localStorage.setItem(`fengyin-card-order-${activeLibraryTab}`,JSON.stringify(order));
-      nativeEvent('reorderInstrumentCards',{library:activeLibraryTab,order});
-      toast('乐器顺序已保存');
-    } catch { committed=false; toast('顺序保存失败，请重试'); }
-    cleanup();
-  };
-}
-
 function renderPresets() {
-  if (draggedInstrumentCardKey) return;
   $('#library-tabs').hidden=true; $('#library-context').hidden=true;
   const cards=[];
-  for (const tone of publishedTones) {
+  // The publisher's instrument-first order is authoritative on every render.
+  // Legacy browser drag orders never override this; studio tones follow it.
+  const ranks=new Map(Object.keys(globalThis.FENGYIN_TONE_MEDIA||{}).map((id,index)=>[id,index]));
+  const orderedTones=[...publishedTones].sort((a,b)=>(ranks.get(a.id)??1e9)-(ranks.get(b.id)??1e9));
+  for (const tone of orderedTones) {
     const pluginIndex=availableInstruments.findIndex(p=>tone.kind==='kong' ? p.brand==='kong' : tone.kind==='kontakt' ? p.brand==='kontakt' : p.instrumentKey===tone.instrumentKey);
     cards.push({id:`builtin:${tone.id}`,catalogId:tone.id,name:tone.name,
       pluginIndex,styleId:tone.styleId,instrumentKey:tone.instrumentKey,kind:tone.kind,index:-1,missing:pluginIndex<0});
@@ -1034,16 +1180,8 @@ function renderPresets() {
     cards.push({id:`custom:${p.id}`,presetId:p.id,name:p.name,index,
       missing:!availableInstruments.some(i=>i.pluginId===p.pluginId)});
   });
-  let order=[]; try { order=JSON.parse(localStorage.getItem('fengyin-card-order-swam')||'[]'); } catch {}
-  // Migrate old instrument/style keys, including both formerly-colliding violins.
-  order=order.flatMap(key=>{
-    if(key==='builtin:violin')return ['builtin:violin-bright'];
-    if(cards.some(c=>c.id===key))return [key];
-    return publishedTones.filter(t=>`builtin:${t.instrumentKey}:${t.styleId}`===key).map(t=>`builtin:${t.id}`);
-  });
-  cards.sort((a,b)=>(order.includes(a.id)?order.indexOf(a.id):1e9)-(order.includes(b.id)?order.indexOf(b.id):1e9));
   $('#preset-grid').innerHTML=cards.map(c=>`<section class="instrument-preset-card compact ${latestBackendState.activeToneVariantId===c.id?'active':''}" data-card-key="${escapeHtml(c.id)}" tabindex="0" role="button">
-    <h3>${escapeHtml(c.name)}</h3><span class="card-drag-handle" draggable="true" aria-label="拖动排序">⠿</span>
+    <h3>${escapeHtml(c.name)}</h3>
     ${c.index>=0?'<button class="delete-tone" type="button">删除</button>':''}
     ${c.missing?'<small>缺少音源</small>':toneLoadInFlight&&pendingPresetNavigation?.name===c.name?'<small>正在加载…</small>':''}</section>`).join('');
   function load(c) {
@@ -1060,11 +1198,10 @@ function renderPresets() {
     renderPresets();
   }
   $$('#preset-grid .instrument-preset-card').forEach((el,i)=>{
-    el.onclick=e=>{if(Date.now()-lastToneDragAt<300||e.target.closest('.card-drag-handle'))return;
+    el.onclick=e=>{
       if(e.target.closest('.delete-tone')){nativeEvent('deletePreset',{id:cards[i].presetId});return;} load(cards[i]);};
     el.onkeydown=e=>{if(e.target===el&&(e.key==='Enter'||e.key===' ')){e.preventDefault();load(cards[i]);}};
   });
-  bindInstrumentSorting();
   let quick=$('#quick-tones');
   if(!quick){quick=document.createElement('div');quick.id='quick-tones';document.body.appendChild(quick);}
   quick.innerHTML=cards.map((c,i)=>`<button class="${latestBackendState.activeToneVariantId===c.id?'active':''}" data-tone="${i}">${escapeHtml(c.name)}${c.missing?' · 缺少音源':''}</button>`).join('');
@@ -2352,7 +2489,7 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   if (currentPluginLoaded)
     techniquePlan = mergeBackendTechniquePlan(currentInstrument.instrumentKey, state, techniqueMappings);
   if (currentPluginLoaded && (state.instrumentKey || state.pluginName))
-    showInstrumentArtwork(state.instrumentKey || inferInstrumentKey(state.pluginName), state.instrumentChineseName || state.pluginName);
+    showInstrumentArtwork(state.instrumentKey || inferInstrumentKey(state.pluginName), state.instrumentChineseName || state.pluginName, state.activeToneVariantId || '');
   else if (!currentPluginLoaded) {
     currentInstrument = null;
     techniquePlan = mergeBackendTechniquePlan('', state, techniqueMappings);
@@ -2656,7 +2793,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.39 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.40 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},
@@ -2946,6 +3083,34 @@ function updateStaticTheme() {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000"><defs><radialGradient id="g"><stop stop-color="${base}"/><stop offset="1" stop-color="${edge}"/></radialGradient></defs><rect width="1600" height="1000" fill="url(#g)"/><path d="M0 850 Q600 500 1600 120 M0 930 Q800 620 1600 280" fill="none" stroke="${accent}" stroke-opacity=".12" stroke-width="3"/></svg>`;
   document.body.style.backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
+// Restore the familiar three breath rings. Geometry is prebuilt once; only
+// quantised breath changes update transform/opacity on the existing meter clock.
+// No independent animation, blur filter, recurring frame loop or audio work.
+const breathRing=$('#breath-ring');
+const breathRingParts=[...breathRing.querySelectorAll('path')];
+const ringRadii=[78,97,117];
+for(let ring=0;ring<3;ring++){
+  const points=[];
+  for(let n=0;n<=96;n++){
+    const angle=n/96*Math.PI*2;
+    const radius=ringRadii[ring]+2*Math.sin(angle*5+ring*1.7);
+    points.push(`${n?'L':'M'}${(170+Math.cos(angle)*radius).toFixed(2)} ${(170+Math.sin(angle)*radius*.84).toFixed(2)}`);
+  }
+  breathRingParts[ring].setAttribute('d',points.join(' ')+'Z');
+}
+let lastRingLevel=-1;
+function updateBreathRing(breath){
+  const energy=currentPluginLoaded?Math.max(0,Math.min(1,breath/100)):0;
+  const level=currentPluginLoaded?Math.round(energy*32):-1;
+  if(level===lastRingLevel)return;
+  lastRingLevel=level;
+  breathRing.style.opacity=currentPluginLoaded?String(.24+energy*.54):'0';
+  for(let ring=0;ring<3;ring++){
+    const scale=1+energy*(.10+ring*.025);
+    breathRingParts[ring].setAttribute('transform',`translate(170 170) scale(${scale.toFixed(3)}) translate(-170 -170)`);
+  }
+}
+
 function draw(timestamp = performance.now()) {
   visualTimer = null;
   if (document.hidden || !nativePresentationVisible || !$('#page-play').classList.contains('active') || !$('#technique-dialog').hidden) return;
@@ -2979,7 +3144,7 @@ function draw(timestamp = performance.now()) {
   const styles = getComputedStyle(document.body);
   const a = styles.getPropertyValue('--accent').trim();
   const b = styles.getPropertyValue('--accent-2').trim();
-  if (!realtime && $('#page-play').classList.contains('active')) drawBreathWave(ratio,safeBreath,a,b);
+  updateBreathRing(safeBreath);
   const bars = compactMode ? 0 : 66;
   for(let i=0;i<bars;i++) {
     const x = i*bounds.width/bars;

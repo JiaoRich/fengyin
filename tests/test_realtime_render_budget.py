@@ -26,7 +26,12 @@ class RealtimeRenderBudget(unittest.TestCase):
         js=(ROOT/'prototype/app.js').read_text(encoding='utf-8')
         self.assertIn('if (!backendControlsChanged(state)) return;',js)
         self.assertIn('realtime ? 1000/12 : 1000/24',js)
-        self.assertIn("if (!realtime && $('#page-play').classList.contains('active')) drawBreathWave",js)
+        self.assertIn('updateBreathRing(safeBreath);',js)
+        wind=js.split('function updateBreathRing(',1)[1].split('function draw(',1)[0]
+        self.assertNotIn('setInterval(',wind)
+        self.assertNotIn('requestAnimationFrame(',wind)
+        self.assertIn('Math.round(energy*32)',wind)
+        self.assertIn('if(level===lastRingLevel)return;',wind)
         css=(ROOT/'prototype/styles.css').read_text(encoding='utf-8')
         self.assertIn('body.realtime-rendering',css)
         self.assertIn('backdrop-filter:none!important',css)

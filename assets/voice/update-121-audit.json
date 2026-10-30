@@ -2,73 +2,190 @@
   {
     "id": "REC_AUDIO",
     "text": "准备开始录音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "c5f621262e1a142c9197f0001972849002736268c38c6461749298bd76212c04",
+    "sha256": "87c7272054c6daebf8a9367fac73bc7e8c2a66f551504ac9b4591093c2d8e146",
+    "seconds": 1.64,
     "speechText": "准备开始录音。",
-    "voice": "x6_wuyediantai_mini",
-    "status": "success",
-    "sha256": "c1dffddd7096ee2aeda8ac28fa2f8f54daa879c5cdab72203da884ee32e92ed7",
-    "seconds": 1.7
-  },
-  {
-    "id": "REC_VIDEO",
-    "text": "准备开始录视频。",
-    "speechText": "准备开始录视频。",
-    "voice": "x6_wuyediantai_mini",
-    "status": "success",
-    "sha256": "6258930aa701147f674775594ec1a442b3e6961ed50d479ba847ab53ca274fdc",
-    "seconds": 2.1
+    "status": "success"
   },
   {
     "id": "GUIDE_OUTPUT",
     "text": "请确认声音输出是您正在使用的扬声器或耳机。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "b8378b99085e1b059bd5acd230553da37a389218095ad19e8c1cf3cb4dc0b211",
+    "sha256": "cce21c8d2e0ba84c67cc8cb5db384c61310b1723da021e2f216db217c7f1fe78",
+    "seconds": 4.24,
     "speechText": "请确认声音输出是您正在使用的扬声器或耳机。",
-    "voice": "x6_wuyediantai_mini",
-    "status": "success",
-    "sha256": "f2b2d9fb173ad4531b473cbf32a2aedcd0dedf50789ba9437dc878a32ee2acc4",
-    "seconds": 4.82
+    "status": "success"
   },
   {
     "id": "GUIDE_MATCH",
     "text": "点击开始匹配。保持管身不动，不咬嘴，吹一个气息由弱到强的长音。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "5b96bc06ff9095093f5efc24a7df0251abe937fef5b47af02c3181330782a2ba",
+    "sha256": "1cfc4af5da1c30cc9406bc22d0c2d50e0dd81a5a08b2832859fe3108d858547f",
+    "seconds": 7.6,
     "speechText": "点击开始匹配。保持管身不动，不咬嘴，吹一个气息由弱到强的长音。",
-    "voice": "x6_wuyediantai_mini",
-    "status": "success",
-    "sha256": "216e1c091f013d8be4c3cfcdf503c143b79fef2c773d871f1fb3db28addddbcb",
-    "seconds": 7.38
+    "status": "success"
   },
   {
     "id": "GUIDE_TRY",
     "text": "请吹几个音，试试轻吹和强吹。能听到声音后，就可以开始演奏了。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "16ea6f2f4351d4b364efc6ecdf4744c12e7f2471d2bdd3170af96dfa42c282be",
+    "sha256": "317c15bc38342630f76b490d2cda51da6382ffd7325fc005d54eeb8b985f75f2",
+    "seconds": 6.36,
     "speechText": "请吹几个音，试试轻吹和强吹。能听到声音后，就可以开始演奏了。",
-    "voice": "x6_wuyediantai_mini",
-    "status": "success",
-    "sha256": "b2a90c3719f4ac939448990971e92db754101b404e94404e106d8cf46bcf1b92",
-    "seconds": 6.98
+    "status": "success"
   },
   {
     "id": "GUIDE_TECH",
     "text": "选择咬嘴控制或按键控制，再点击映射。需要移除时，点击清除映射。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "d6f6a6ef93bdae6e367dd150870e55e81b1ec75096bf091fefb935267cf22c9a",
+    "sha256": "5b5a7d594d396c516ecaa083ed40a19e86f2962761d2f8998de8bf503d80b834",
+    "seconds": 8.24,
     "speechText": "选择咬嘴控制或按键控制，再点击映射。需要移除时，点击清除映射。",
-    "voice": "x6_wuyediantai_mini",
-    "status": "success",
-    "sha256": "50c92af9fb7982b741d397bd454a86dac14b8d75a5ebff0159814edb1c45acb5",
-    "seconds": 7.22
+    "status": "success"
   },
   {
     "id": "GUIDE_KEY",
     "text": "根据歌曲需要选择演奏调。调整后，吹几个音确认调性。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "d8940140335688661534bad458e0098960f68c7612b1ba3d4f270648db6c2c69",
+    "sha256": "9d705ecb7969601010d5a112835e2133b1f95908aa8ebf99cc5fe4aa182f28a2",
+    "seconds": 5.8,
     "speechText": "根据歌曲需要选择演奏调。调整后，吹几个音确认调性。",
-    "voice": "x6_wuyediantai_mini",
-    "status": "success",
-    "sha256": "f402d6e114b926084161d2befd16096c13e9c08a4cbafba70d365505a38102c6",
-    "seconds": 5.98
+    "status": "success"
   },
   {
     "id": "GUIDE_RECORD",
-    "text": "点击开始录制旁的小箭头，选择录音或录视频。结束后，在我的录制中查看文件。",
-    "speechText": "点击开始录制旁的小箭头，选择录音或录视频。结束后，在我的录制中查看文件。",
-    "voice": "x6_wuyediantai_mini",
-    "status": "success",
-    "sha256": "7b98c2a5a33f549a03e20171f844fb4f7ca1482d065eec2fd463a48b5c7b0c1c",
-    "seconds": 8.22
+    "text": "点击开始录音。结束后，在我的录制中查看文件。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "1129c623a5dc07a51756857a32cdfffd505ed02716f4c71dc5e17df71585e81d",
+    "sha256": "80f907fde8b7eb117171bbc76617c7831dc09568bfb0fd8d09747c38152807da",
+    "seconds": 4.76,
+    "speechText": "点击开始录音。结束后，在我的录制中查看文件。",
+    "status": "success"
   }
 ]
