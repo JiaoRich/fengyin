@@ -33,7 +33,7 @@ ToneStyleSettings MasterOutputService::getToneStyle() const noexcept
 
 void MasterOutputService::setSampleRate(double value) noexcept
 {
-    const auto validRate = value > 0.0 ? value : 48000.0;
+    const auto validRate = std::isfinite(value) && value > 0.0 ? value : 48000.0;
     sampleRate.store(validRate, std::memory_order_relaxed);
     // Device start is not audible yet: initialise ramps at their current targets.
     // Later UI changes remain smoothed in the audio callback.
@@ -44,7 +44,41 @@ void MasterOutputService::setSampleRate(double value) noexcept
     instrumentReverb.reset();
     wetPreDelay.prepare(validRate);
     wetPreDelay.setDelay(reverbPreDelayMs.load());
+    wetStateNeedsClear = false;
+    if (!signalStateIsFinite()) resetSignalState();
+}
+
+void MasterOutputService::resetSignalState() noexcept
+{
+    instrumentEnvelope = 0.0f;
+    compressorGain = 1.0f;
+    bassLowPass = {};
+    toneLowPass = {};
+    smoothedBassGain = juce::Decibels::decibelsToGain(bassTone.load(std::memory_order_relaxed) * 12.0f);
+    smoothedOutputGain = styleOutputGain.load(std::memory_order_relaxed);
+    instrumentReverb.reset();
+    airProcessor.reset();
+    wetPreDelay.reset();
+    wetStateNeedsClear = false;
     lastInstrumentReverbMix = -1.0f;
+}
+
+uint64_t MasterOutputService::removeNonfinite(float* const* outputs, int channels, int samples) noexcept
+{
+    uint64_t invalid = 0;
+    for (int channel = 0; channel < channels; ++channel)
+        if (auto* data = outputs[channel])
+            for (int sample = 0; sample < samples; ++sample)
+                if (!std::isfinite(data[sample])) { data[sample] = 0.0f; ++invalid; }
+    return invalid;
+}
+
+bool MasterOutputService::signalStateIsFinite() const noexcept
+{
+    return std::isfinite(instrumentEnvelope) && std::isfinite(compressorGain)
+        && std::isfinite(smoothedBassGain) && std::isfinite(smoothedOutputGain)
+        && std::isfinite(bassLowPass[0]) && std::isfinite(bassLowPass[1])
+        && std::isfinite(toneLowPass[0]) && std::isfinite(toneLowPass[1]);
 }
 
 MasterOutputService::ProfileSettings MasterOutputService::currentProfileSettings() const noexcept
@@ -74,6 +108,10 @@ void MasterOutputService::updateInstrumentReverb(float mix, const ProfileSetting
 void MasterOutputService::processInstrument(float* const* outputs, int channels, int samples) noexcept
 {
     if (outputs == nullptr || channels <= 0 || samples <= 0) return;
+    // Invalid data must never enter stateful filters. Finite over-range samples
+    // are deliberately left untouched: this is not a limiter or gain policy.
+    const auto invalidInput = removeNonfinite(outputs, channels, samples);
+    if (invalidInput) invalidInputSamples.fetch_add(invalidInput, std::memory_order_relaxed);
     const auto settings = currentProfileSettings();
     const auto requestedTone = eqTone.load(std::memory_order_relaxed);
     const auto tone = juce::jlimit(-1.0f, 1.0f, requestedTone);
@@ -146,6 +184,7 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
     updateInstrumentReverb(wetMix, settings);
     if (wetMix > 0.0f)
     {
+        wetStateNeedsClear = true;
         const auto dryScale=1.0f-juce::jlimit(0.0f,.48f,wetMix*settings.reverbScale)*.32f;
         wetPreDelay.setDelay(reverbPreDelayMs.load());
         for(int pos=0;pos<samples;pos+=512) {
@@ -157,7 +196,12 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
             for(int c=0;c<(stereo?2:1);++c)if(outputs[c])for(int i=0;i<n;++i)outputs[c][pos+i]=outputs[c][pos+i]*dryScale+wetScratch[c][i];
         }
     }
-    else {instrumentReverb.reset();wetPreDelay.reset();}
+    else if (wetStateNeedsClear)
+    {
+        instrumentReverb.reset();
+        wetPreDelay.reset();
+        wetStateNeedsClear = false;
+    }
 
     // The visible performance fader owns only the instrument bus. No limiter,
     // fixed makeup gain or master gain is applied to the accompaniment.
@@ -166,13 +210,26 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
     for (int channel = 0; channel < channels; ++channel)
         if (outputs[channel] != nullptr)
             juce::FloatVectorOperations::multiply(outputs[channel], performanceVolume, samples);
+    uint64_t invalidOutput = 0;
     for (int sample = 0; sample < samples; ++sample)
     {
         float linkedPeak = 0.0f;
         for (int channel = 0; channel < channels; ++channel)
             if (outputs[channel] != nullptr)
-                linkedPeak = juce::jmax(linkedPeak, std::abs(outputs[channel][sample]));
+            {
+                auto& value = outputs[channel][sample];
+                if (!std::isfinite(value)) { value = 0.0f; ++invalidOutput; }
+                linkedPeak = juce::jmax(linkedPeak, std::abs(value));
+            }
         blockPeak = juce::jmax(blockPeak, linkedPeak);
+    }
+    if (invalidOutput) invalidOutputSamples.fetch_add(invalidOutput, std::memory_order_relaxed);
+    if (invalidOutput || !signalStateIsFinite())
+    {
+        // Bounded audio-thread-only recovery after an actual arithmetic fault.
+        // No device/plugin restart, allocation, logging or MIDI reset.
+        resetSignalState();
+        signalRecoveries.fetch_add(1, std::memory_order_relaxed);
     }
     instrumentPeak.store(blockPeak, std::memory_order_relaxed);
 }
@@ -180,6 +237,7 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
 void MasterOutputService::processMaster(float* const* outputs, int channels, int samples) noexcept
 {
     if (outputs == nullptr || channels <= 0 || samples <= 0) return;
+    uint64_t invalidOutput = 0;
     constexpr auto digitalCeiling = 1.0f;
     uint64_t overloaded = 0;
     for (int sample = 0; sample < samples; ++sample)
@@ -187,11 +245,16 @@ void MasterOutputService::processMaster(float* const* outputs, int channels, int
         float linkedPeak = 0.0f;
         for (int channel = 0; channel < channels; ++channel)
             if (outputs[channel] != nullptr)
-                linkedPeak = juce::jmax(linkedPeak, std::abs(outputs[channel][sample]));
+            {
+                auto& value = outputs[channel][sample];
+                if (!std::isfinite(value)) { value = 0.0f; ++invalidOutput; }
+                linkedPeak = juce::jmax(linkedPeak, std::abs(value));
+            }
         // Meter overloads without changing samples. Final PCM conversion may
         // clip values outside its representable range; that is not gain control.
         if (linkedPeak > digitalCeiling) ++overloaded;
     }
+    if (invalidOutput) invalidOutputSamples.fetch_add(invalidOutput, std::memory_order_relaxed);
     updateSpectrumAndPeaks(outputs, channels, samples);
     if (overloaded != 0) overloadSamples.fetch_add(overloaded, std::memory_order_relaxed);
 }

@@ -19,6 +19,9 @@ class SwamGainCurve119(unittest.TestCase):
                 if row['file']=='violin-soft.fytonepack':
                     with zipfile.ZipFile(ROOT/'assets/incoming-tones/20261018/violin-room-before-123.zip') as r:
                         packageBytes=r.read(row['file'])
+                if row['file']=='trumpet.fytonepack':
+                    with zipfile.ZipFile(ROOT/'assets/incoming-tones/20261018/swam-post-gain-pre-139.zip') as r:
+                        packageBytes=r.read(row['file'])
                 with self.subTest(row['file']),zipfile.ZipFile(io.BytesIO(packageBytes)) as z:
                     self.assertIsNone(z.testzip())
                     old=ET.fromstring(zipfile.ZipFile(__import__('io').BytesIO(baseline.read(row['file']))).read('tone.xml'))

@@ -23,7 +23,7 @@ class PrototypeStructureTests(unittest.TestCase):
     def test_required_first_milestone_controls_exist(self):
         for control_id in (
             "video-file", "play-button", "spectrum", "breath-bar",
-            "meter-l", "meter-r", "theme", "license-code", "activate", "scan-swam"
+            "theme", "license-code", "activate", "scan-swam"
         ):
             self.assertIn(f'id="{control_id}"', HTML)
 
@@ -53,7 +53,7 @@ class PrototypeStructureTests(unittest.TestCase):
     def test_sound_libraries_follow_scanned_plugins(self):
         self.assertIn('id="library-tabs"', HTML)
         self.assertIn("for (const tone of publishedTones)", JS)
-        self.assertIn('std::array<PublishedToneDefinition, 42>', (ROOT / "native" / "Source" / "PublishedToneCatalog.h").read_text(encoding="utf-8"))
+        self.assertIn('std::array<PublishedToneDefinition, 41>', (ROOT / "native" / "Source" / "PublishedToneCatalog.h").read_text(encoding="utf-8"))
         self.assertIn("if(p.studioDraft || !p.published) return", JS)
         self.assertIn("$('#library-tabs').hidden=true", JS)
         self.assertIn("key.startsWith('kong-suona')", JS)

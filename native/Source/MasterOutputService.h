@@ -49,6 +49,9 @@ public:
     [[nodiscard]] float getInstrumentPeak() const noexcept { return instrumentPeak.load(std::memory_order_relaxed); }
     [[nodiscard]] float getRightPeak() const noexcept { return rightPeak.load(); }
     [[nodiscard]] uint64_t getOverloadSamples() const noexcept { return overloadSamples.load(); }
+    [[nodiscard]] uint64_t getInvalidInputSamples() const noexcept { return invalidInputSamples.load(std::memory_order_relaxed); }
+    [[nodiscard]] uint64_t getInvalidOutputSamples() const noexcept { return invalidOutputSamples.load(std::memory_order_relaxed); }
+    [[nodiscard]] uint64_t getSignalRecoveries() const noexcept { return signalRecoveries.load(std::memory_order_relaxed); }
 
     void setSampleRate(double value) noexcept;
     void processInstrument(float* const* outputs, int channels, int samples) noexcept;
@@ -71,6 +74,9 @@ private:
     [[nodiscard]] ProfileSettings currentProfileSettings() const noexcept;
     void updateInstrumentReverb(float mix, const ProfileSettings& settings) noexcept;
     void updateSpectrumAndPeaks(float* const* outputs, int channels, int samples) noexcept;
+    void resetSignalState() noexcept;
+    static uint64_t removeNonfinite(float* const* outputs, int channels, int samples) noexcept;
+    bool signalStateIsFinite() const noexcept;
 
     static constexpr std::size_t fifoSize = 8192;
     static constexpr int fftOrder = 11;
@@ -87,6 +93,7 @@ private:
     std::atomic<float> airAmount { 0.0f };
     AirProcessor airProcessor;
     std::atomic<uint64_t> overloadSamples { 0 };
+    std::atomic<uint64_t> invalidInputSamples { 0 }, invalidOutputSamples { 0 }, signalRecoveries { 0 };
     float smoothedBassGain = 1.0f;
     float smoothedOutputGain = 1.0f;
     std::array<float, 2> bassLowPass {};
@@ -99,6 +106,7 @@ private:
     std::array<std::array<float,512>,2> wetScratch {};
     std::atomic<bool> reverbParametersDirty { true };
     float lastInstrumentReverbMix = -1.0f;
+    bool wetStateNeedsClear = false; // Audio-thread owned; prepare runs with audio stopped.
     int lastInstrumentProfile = -1;
     float instrumentEnvelope = 0.0f;
     float compressorGain = 1.0f;

@@ -321,8 +321,8 @@ int main()
     }
     const auto bundled=juce::File(juce::String::fromUTF8(__FILE__)).getParentDirectory().getParentDirectory().getChildFile("assets/tone-packages");
     const auto files=bundled.findChildFiles(juce::File::findFiles,false,"*.fytonepack");
-    // 42 published packages plus seven retained historical package fixtures.
-    assert(files.size()==49);
+    // 41 published packages plus seven retained historical package fixtures.
+    assert(files.size()==48);
     const auto gainAudit=juce::JSON::parse(bundled.getChildFile("kong-headroom-134-audit.json"));
     assert(gainAudit["targets"].isArray() && gainAudit["targets"].size()==13);
     int routedFolkPackages=0, boostedPackages=0;

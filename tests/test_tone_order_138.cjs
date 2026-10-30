@@ -1,6 +1,6 @@
 const {chromium}=require('playwright');
 const fs=require('fs'),assert=require('node:assert/strict'),{pathToFileURL}=require('node:url'),path=require('node:path');
-const expected=["kontakt-kensa", "kontakt-kensa-2", "soprano-kenny", "soprano-pop", "alto-jazz", "alto-deep", "alto-pop", "alto-silky", "tenor-mellow", "tenor-warm", "tenor-air-pocket", "tenor-silky", "trumpet", "trumpet-2", "piccolo-trumpet", "alto-trombone", "bass-trombone", "flute", "piccolo", "clarinet", "kong-clarinet-2", "oboe", "kong-oboe-2", "violin-soft", "kong-violin-2", "cello", "kong-erhu", "kong-erhu-new-2", "kong-jinghu", "kong-hulusi-straight", "kong-hulusi-vibrato", "kong-qudi-straight", "kong-qudi", "kong-bangdi", "kong-nanxiao", "kong-dongxiao", "kong-xun", "kong-suona-vibrato", "kong-suona", "kong-liuqin", "kong-sanxian", "kong-pipa"];
+const expected=["kontakt-kensa", "soprano-kenny", "soprano-pop", "alto-jazz", "alto-deep", "alto-pop", "alto-silky", "tenor-mellow", "tenor-warm", "tenor-air-pocket", "tenor-silky", "trumpet", "trumpet-2", "piccolo-trumpet", "alto-trombone", "bass-trombone", "flute", "piccolo", "clarinet", "kong-clarinet-2", "oboe", "kong-oboe-2", "violin-soft", "kong-violin-2", "cello", "kong-erhu", "kong-erhu-new-2", "kong-jinghu", "kong-hulusi-straight", "kong-hulusi-vibrato", "kong-qudi-straight", "kong-qudi", "kong-bangdi", "kong-nanxiao", "kong-dongxiao", "kong-xun", "kong-suona-vibrato", "kong-suona", "kong-liuqin", "kong-sanxian", "kong-pipa"];
 const text=fs.readFileSync('native/Source/PublishedToneCatalog.h','utf8');
 const tones=[...text.matchAll(/\{ "([^"]+)", "([^"]+)", "([^"]+)", "([^"]+)", PublishedToneKind::(\w+),/g)].map(m=>({id:m[1],name:m[2],instrumentKey:m[3],styleId:m[4],kind:m[5].startsWith('kong')?'kong':m[5].startsWith('kontakt')?'kontakt':'swam'}));
 assert.deepEqual(tones.map(t=>t.id),expected);
@@ -26,6 +26,6 @@ try{
  await page.reload();await show();const result=await ids();assert.deepEqual(result.slice(0,3),custom);
  assert.deepEqual(result.slice(3),expected.map(id=>'builtin:'+id).filter(id=>!custom.includes(id)));
  assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('fengyin-card-order-swam'))),custom,'upgrade must not overwrite saved order');
- console.log('PASS: exact 42-tone default; real drag/drop; reload persistence; existing partial user order preserved.');
+ console.log('PASS: exact 41-tone default; real drag/drop; reload persistence; existing partial user order preserved.');
 }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1)});

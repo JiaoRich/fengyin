@@ -17,3 +17,7 @@ add_executable(BleMidiDecoderCheck "${ROOT}/tests/test_ble_midi_decoder.cpp")
 target_include_directories(BleMidiDecoderCheck PRIVATE "${ROOT}/native/Source")
 target_compile_options(BleMidiDecoderCheck PRIVATE /utf-8 /UNDEBUG)
 add_test(NAME ble_midi_decoder COMMAND BleMidiDecoderCheck)
+
+add_executable(BleDiscoveryQueueCheck "${ROOT}/tests/test_ble_discovery_queue.cpp")
+target_compile_options(BleDiscoveryQueueCheck PRIVATE /utf-8 /UNDEBUG)
+add_test(NAME ble_discovery_queue COMMAND BleDiscoveryQueueCheck)

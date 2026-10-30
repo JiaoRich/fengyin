@@ -8,11 +8,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class ToneRelease137(unittest.TestCase):
     def test_catalogue_matches_approved_package_inventory(self):
-        audit = json.loads((ROOT/'assets/tone-packages/release-137-audit.json').read_text(encoding='utf-8'))
+        audit = json.loads((ROOT/'assets/tone-packages/release-139-audit.json').read_text(encoding='utf-8'))
         self.assertEqual(audit['calibration'], 'deferred')
         rows = audit['tones']
-        self.assertEqual(len(rows), 42)
-        self.assertEqual(len({r['name'] for r in rows}), 42)
+        self.assertEqual(len(rows), 41)
+        self.assertEqual(len({r['name'] for r in rows}), 41)
         source = (ROOT/'native/Source/PublishedToneCatalog.h').read_text(encoding='utf-8')
         actual = re.findall(r'\{ "([^"]+)",\s*"([^"]+)",\s*"([^"]+)",\s*"[^"]+",\s*PublishedToneKind::\w+,\s*"([^"]+)"', source)
         self.assertEqual(sorted(actual), sorted((r['id'],r['name'],r['instrumentKey'],r['asset']) for r in rows))  # Later releases may reorder defaults without changing tone state.
@@ -31,6 +31,6 @@ class ToneRelease137(unittest.TestCase):
             self.assertTrue(row['asset'].startswith('tone137-'))
         self.assertEqual(sum(r['brand']=='swam' for r in rows),21)
         self.assertEqual(sum(r['brand']=='kong' for r in rows),19)
-        self.assertEqual(sum(r['brand']=='kontakt' for r in rows),2)
+        self.assertEqual(sum(r['brand']=='kontakt' for r in rows),1)
 
 if __name__=='__main__': unittest.main()

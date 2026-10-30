@@ -10,6 +10,7 @@
 #if JUCE_WINDOWS
 #include <windows.h>
 #include <shellapi.h>
+#include <psapi.h>
 #endif
 
 namespace
@@ -1556,11 +1557,28 @@ void MainComponent::logAudioDiagnostic(const fengyin::AudioDeviceStatus& status)
     folder.createDirectory();
     const auto log=folder.getChildFile(detailed?"audio-timing-diagnostic.log":"audio-source-diagnostic.log");
     if(log.getSize()>(detailed?16*1024*1024:256*1024))log.replaceWithText("");
+    // UI-thread, once per five seconds. Never query process resources from audio.
+    juce::String resources;
+#if JUCE_WINDOWS
+    PROCESS_MEMORY_COUNTERS_EX memory{};
+    memory.cb = sizeof(memory);
+    DWORD handles = 0;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&memory), sizeof(memory)))
+        resources += " rssBytes=" + juce::String(static_cast<juce::int64>(memory.WorkingSetSize))
+            + " privateBytes=" + juce::String(static_cast<juce::int64>(memory.PrivateUsage));
+    if (GetProcessHandleCount(GetCurrentProcess(), &handles)) resources += " handles=" + juce::String(handles);
+#endif
     log.appendText(juce::Time::getCurrentTime().toISO8601(true)
         +" sourcePeak="+juce::String(pluginHost.takeDiagnosticSourcePeak(),6)
         +" callbacks="+juce::String(pluginHost.getCallbackCount())
         +" signalBlocks="+juce::String(pluginHost.getSignalBlocks())
         +" device="+status.deviceName+pluginHost.takeStageTimingReport()
+        +(detailed ? juce::String() : pluginHost.takeCallbackCadenceReport())
+        +" audioCpu="+juce::String(status.cpuUsage,5)+resources
+        +" droppedMidi="+juce::String(pluginHost.getDroppedMidiEventCount())
+        +" invalidInput="+juce::String(masterOutput.getInvalidInputSamples())
+        +" invalidOutput="+juce::String(masterOutput.getInvalidOutputSamples())
+        +" signalRecoveries="+juce::String(masterOutput.getSignalRecoveries())
         +" type="+status.deviceType+" rate="+juce::String(status.sampleRate)
         +" buffer="+juce::String(status.bufferSize)+" xruns="+juce::String(status.xRunCount)
         +" callbackOverruns="+juce::String(pluginHost.getCallbackOverruns())

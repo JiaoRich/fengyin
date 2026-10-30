@@ -1511,6 +1511,13 @@ function formatTime(seconds) {
   return `${minutes}:${rest}`;
 }
 
+function fitPerformanceHeight() {
+  if(compactMode || !$('#page-play').classList.contains('active'))return;
+  const page=$('#page-play'),main=page.closest('main');
+  const bottom=Number.parseFloat(getComputedStyle(main).paddingBottom)||0;
+  page.style.setProperty('--play-available-height',Math.max(0,innerHeight-page.getBoundingClientRect().top-bottom)+'px');
+  requestVisualFrame();
+}
 $('#theme').addEventListener('change', event => { document.body.dataset.theme = event.target.value; updateStaticTheme(); requestVisualFrame(); });
 // Keep the native select as the source of options; use a non-modal upward menu.
 const themeButton=document.createElement('button'); themeButton.id='theme-button'; themeButton.type='button';
@@ -2649,7 +2656,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.38 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.39 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},
@@ -2977,18 +2984,18 @@ function draw(timestamp = performance.now()) {
   for(let i=0;i<bars;i++) {
     const x = i*bounds.width/bars;
     const wave = Math.abs(Math.sin(i*.24+tick*3)+Math.sin(i*.08-tick)*.45);
-    const h = 7 + wave*safeBreath*.75*(.45+Math.sin(i/bars*Math.PI)*.55);
+    const availableHeight = Math.max(0,bounds.height-4);
+    const fraction = Math.min(1,(wave/1.45)*(safeBreath/100)*(.45+Math.sin(i/bars*Math.PI)*.55));
+    const h = Math.min(availableHeight,Math.max(Math.min(3,availableHeight),fraction*availableHeight));
     const gradient = ctx.createLinearGradient(0,bounds.height-h,0,bounds.height);
     gradient.addColorStop(0,a); gradient.addColorStop(1,b);
     ctx.fillStyle = gradient;
     ctx.globalAlpha = .35 + wave*.55;
-    ctx.fillRect(x,bounds.height-h,Math.max(3,bounds.width/bars-5),h);
+    ctx.fillRect(x,bounds.height-2-h,Math.max(1,bounds.width/bars-5),h);
   }
   ctx.globalAlpha = 1;
   setTextIfChanged($('#breath-value'),currentPluginLoaded ? `${Math.round(safeBreath)}%` : '—');
   $('#breath-bar').style.width = currentPluginLoaded ? `${safeBreath}%` : '0%';
-  $('#meter-l').style.width = `${Math.min(100,Number(latestBackendState.outputLeftPeak||0)*100)}%`;
-  $('#meter-r').style.width = `${Math.min(100,Number(latestBackendState.outputRightPeak||0)*100)}%`;
   if (!window.__JUCE__?.backend?.emitEvent) $('#cpu').textContent = `${Math.round(14+Math.abs(Math.sin(tick*.3))*9)}%`;
   // No recurring frame loop: new MIDI/meter state, resize or transition wakes us.
   if (!realtime && Math.abs(rimTarget-compactRimBreath)>.001) requestVisualFrame(); // Finish only the active fade.
@@ -3185,3 +3192,10 @@ window.__JUCE__?.backend?.addEventListener('midiConnectionState',renderMidiConne
 
 $('#midi-confirm').addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();$('#midi-confirm-cancel').click();}if(e.key==='Tab'){const a=$('#midi-confirm-cancel'),b=$('#midi-confirm-ok');if(e.shiftKey&&document.activeElement===a){e.preventDefault();b.focus();}else if(!e.shiftKey&&document.activeElement===b){e.preventDefault();a.focus();}}});
 document.addEventListener('pointerdown',e=>{if(midiMenu&&!e.target.closest('.midi-more,.midi-device-menu')){midiMenu='';renderMidiConnection(midiConnectionState);}});
+
+// Register after canvas and presentation state have been initialised.
+new ResizeObserver(()=>{fitPerformanceHeight();requestVisualFrame();}).observe(canvas.parentElement);
+window.addEventListener('resize',fitPerformanceHeight);
+new MutationObserver(fitPerformanceHeight).observe($('#page-play'),{attributes:true,attributeFilter:['class']});
+new MutationObserver(fitPerformanceHeight).observe(document.body,{attributes:true,attributeFilter:['class']});
+fitPerformanceHeight();

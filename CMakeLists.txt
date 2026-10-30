@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.38 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.39 LANGUAGES C CXX)
 option(FENGYIN_ARCHIVED_VIDEO_RECORDING "Build archived video-recording diagnostics, never for release" OFF)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
@@ -92,7 +92,6 @@ juce_add_binary_data(FengYinWebAssets SOURCES
     assets/tone-packages/folk-bangdi.fytonepack
     assets/tone-packages/folk-jinghu.fytonepack
     assets/tone-packages/kontakt-kensa.fytonepack
-    assets/tone-packages/tone137-kontakt-kensa-2.fytonepack
     assets/tone-packages/kong/erhu.kam
     assets/tone-packages/kong/guzheng.kam
     assets/tone-packages/kong/hulusi.kam
@@ -304,7 +303,7 @@ if(WIN32)
     target_link_libraries(FengYinScreenCapture PRIVATE windowsapp d3d11 dxgi dxguid mfplat mfreadwrite mfuuid evr ole32 uuid avrt)
     install(TARGETS FengYinScreenCapture RUNTIME DESTINATION .)
     target_sources(FengYin PRIVATE native/Source/WindowsCompatibility.manifest)
-    target_link_libraries(FengYin PRIVATE setupapi advapi32 shell32 avrt dwmapi windowsapp)
+    target_link_libraries(FengYin PRIVATE setupapi advapi32 shell32 avrt dwmapi windowsapp psapi)
     if(FENGYIN_ARCHIVED_VIDEO_RECORDING)
     add_executable(FengYinScreenRecorder WIN32 native/ScreenRecorder/main.cpp)
     target_compile_definitions(FengYinScreenRecorder PRIVATE WINVER=0x0A00 _WIN32_WINNT=0x0A00)
@@ -514,6 +513,8 @@ if(BUILD_TESTING)
     target_include_directories(FengYinRecordingTests PRIVATE native/Source)
     target_link_libraries(FengYinRecordingTests PRIVATE juce::juce_audio_formats juce::juce_audio_utils juce::juce_cryptography juce::juce_events juce::juce_dsp juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
     add_test(NAME wav_recording COMMAND FengYinRecordingTests)
+    add_executable(FengYinBleDiscoveryQueueTests tests/test_ble_discovery_queue.cpp)
+    add_test(NAME ble_discovery_queue COMMAND FengYinBleDiscoveryQueueTests)
     add_executable(FengYinAudioStageTimingTests tests/test_audio_stage_timing.cpp)
     add_test(NAME audio_stage_timing COMMAND FengYinAudioStageTimingTests)
     add_executable(FengYinCaptureFrameComposerTests tests/test_capture_frame_composer.cpp)
@@ -570,6 +571,10 @@ if(BUILD_TESTING)
     add_test(NAME recording_begin_beep COMMAND FengYinVoicePromptTests "${CMAKE_SOURCE_DIR}/assets/voice/REC_BEGIN_BEEP.wav")
     add_test(NAME recording_saved_prompt COMMAND FengYinVoicePromptTests "${CMAKE_SOURCE_DIR}/assets/voice/REC_SAVED.wav")
 
+    add_executable(FengYinMasterOutputGuardTests tests/test_master_output_guard.cpp native/Source/MasterOutputService.cpp)
+    target_include_directories(FengYinMasterOutputGuardTests PRIVATE native/Source)
+    target_link_libraries(FengYinMasterOutputGuardTests PRIVATE juce::juce_dsp juce::juce_recommended_config_flags)
+    add_test(NAME master_output_guard COMMAND FengYinMasterOutputGuardTests)
     add_executable(FengYinToneStyleTests tests/test_tone_style_catalog.cpp native/Source/MasterOutputService.cpp)
     target_include_directories(FengYinToneStyleTests PRIVATE native/Source)
     target_link_libraries(FengYinToneStyleTests PRIVATE juce::juce_dsp juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)

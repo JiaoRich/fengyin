@@ -187,7 +187,8 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
     // Scoped to this callback; does not change plugin parameters or buffering.
     const juce::ScopedNoDenormals noDenormals;
     const auto nowSeconds = juce::Time::getMillisecondCounterHiRes() * 0.001;
-    if(timingEnabled)callbackCadence.record(audioTrace::now(),numSamples);
+    // Reuse the existing monotonic callback clock; no extra trace clock on the normal path.
+    callbackCadence.record(static_cast<uint64_t>(nowSeconds * 1.0e9), numSamples);
     auto traceSink=detailedTiming.sink();
     const audioTrace::Session traceSession(timingEnabled?&traceSink:nullptr);
     audioTrace::Scope midiTime(audioTrace::Event::midiDrain);
@@ -278,12 +279,7 @@ juce::String PluginHostEngine::takeStageTimingReport()
             +",maxUs="+juce::String(m.maxUs)+",over="+juce::String(m.overBudget)+"]";
     }
     const auto details=player.detailedTiming.take();
-    const auto cadence=player.callbackCadence.take();
-    result+=" callbackCadence[epoch="+juce::String(player.callbackCadence.epoch.load())
-        +",calls="+juce::String(cadence.calls)+",minFrames="+juce::String(cadence.minFrames)
-        +",maxFrames="+juce::String(cadence.maxFrames)+",maxGapUs="
-        +juce::String(static_cast<double>(cadence.maxGapNs)/1000.0,2)
-        +",changeSkipped="+juce::String(player.changeSkippedBlocks.load())+"]";
+    result += takeCallbackCadenceReport();
     const char* events[]{"playerLockWait","graphLockWait","nodeLockWait","nodeBodyInclusive",
         "vstLockWait","vstAdapterInclusive","pluginCallWall","techniqueDispatch","midiDrain"};
     const char* roles[]{"host","instrument","serialFx"};
@@ -294,6 +290,17 @@ juce::String PluginHostEngine::takeStageTimingReport()
             +",maxUs="+juce::String(static_cast<double>(value.maxNs)/1000.0,2)+"]";
     }
     return result;
+}
+
+juce::String PluginHostEngine::takeCallbackCadenceReport()
+{
+    const auto cadence=player.callbackCadence.take();
+    return " callbackCadence[epoch="+juce::String(player.callbackCadence.epoch.load())
+        +",calls="+juce::String(cadence.calls)+",minFrames="+juce::String(cadence.minFrames)
+        +",maxFrames="+juce::String(cadence.maxFrames)+",maxGapUs="
+        +juce::String(static_cast<double>(cadence.maxGapNs)/1000.0,2)
+        +",changeSkipped="+juce::String(player.changeSkippedBlocks.load())+"]";
+
 }
 
 void RecordingAudioProcessorPlayer::audioDeviceAboutToStart(juce::AudioIODevice* device)

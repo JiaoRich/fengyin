@@ -41,7 +41,9 @@
     .library-tabs{position:sticky;top:0;z-index:6;display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:20px 0 14px;padding:7px;border:1px solid var(--line);border-radius:15px;background:rgba(6,17,30,.93);backdrop-filter:blur(16px)}.library-tab{min-height:48px;border:1px solid transparent!important;background:transparent!important;color:var(--muted)!important;font-weight:700}.library-tab.active{border-color:var(--accent)!important;background:linear-gradient(120deg,var(--accent-soft),var(--accent-2-soft))!important;color:var(--text)!important;box-shadow:inset 3px 0 var(--accent),0 0 18px var(--glow)}.library-context{display:flex;align-items:center;gap:11px;padding:11px 15px;border:1px solid var(--line);border-radius:13px;background:rgba(255,255,255,.025)}.library-context>i{width:9px;height:9px;flex:0 0 9px;border-radius:50%;background:var(--good);box-shadow:0 0 12px var(--good)}.library-context strong,.library-context span{display:block}.library-context strong{font-size:12px}.library-context span{color:var(--muted);font-size:11px}.library-context b{margin-left:auto;padding:5px 9px;border-radius:12px;background:var(--accent-soft);color:var(--accent);font-size:10px}.preset-source{display:block;margin-bottom:5px;color:var(--accent)!important;font-size:10px!important}.preset-folk{position:relative;text-align:left}.preset-folk:before{content:attr(data-mark);display:grid;width:34px;height:34px;margin-bottom:9px;place-items:center;border-radius:11px;background:linear-gradient(135deg,var(--accent-soft),var(--accent-2-soft));color:var(--accent);font-size:18px}.instrument-art.folk .instrument-empty{display:grid}.instrument-art.folk .instrument-empty button{display:none}.instrument-art.folk .instrument-empty>span{font-size:30px}.instrument-art.folk .instrument-aura,.instrument-art.folk .breath-wave{display:block}.instrument-art.folk .instrument-empty{background:transparent;border:0}.instrument-art.folk .instrument-empty strong{font-size:20px}
     .expert-dialog{width:min(720px,calc(100vw - 48px));max-height:calc(100vh - 48px);overflow:auto}.expert-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.expert-control{padding:13px 14px;border:1px solid var(--line);border-radius:13px;background:rgba(255,255,255,.035)}.expert-control label{display:flex;justify-content:space-between;margin-bottom:9px;font-size:12px}.expert-control b{color:var(--accent)}.expert-control input{width:100%;accent-color:var(--accent)}.expert-warning{margin:12px 0 0;color:var(--muted);font-size:13px}.expert-dialog .dialog-actions{flex-wrap:wrap}.expert-dialog .primary-button{border-color:var(--accent);background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff}.name-dialog{width:min(460px,calc(100vw - 48px))}.name-dialog input{width:100%;margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#0d1d30;color:var(--text);font:inherit}.preset-shell.custom-kong{display:block}
     @media(max-width:1250px){.adapter-cards-four{grid-template-columns:1fr 1fr}.technique-list{grid-template-columns:1fr}.plugin-manager .tone-engine-row{grid-area:5/1;grid-template-columns:1fr}.tone-engine-row>div{grid-column:1}.plugin-manager>.plugin-status{grid-area:6/1}.plugin-manager>.save-custom{grid-area:7/1}.variant-switchers{grid-template-columns:1fr}.variant-stepper{grid-template-columns:30px minmax(0,1fr) 30px}}
-  .custom-scan-button{margin:8px 0 22px;padding:12px 20px;border:1px solid var(--accent);border-radius:13px;background:rgba(57,211,255,.09);color:var(--text);font:inherit;font-weight:700;cursor:pointer}.custom-scan-button:hover{background:rgba(57,211,255,.16)}.expert-inline{margin-top:24px}.expert-inline .dialog-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}.expert-inline .primary-button{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:white;border:0}.chain[hidden],.tone-engine-row[hidden],.variant-stepper[hidden]{display:none!important}</style>
+  .custom-scan-button{margin:8px 0 22px;padding:12px 20px;border:1px solid var(--accent);border-radius:13px;background:rgba(57,211,255,.09);color:var(--text);font:inherit;font-weight:700;cursor:pointer}.custom-scan-button:hover{background:rgba(57,211,255,.16)}.expert-inline{margin-top:24px}.expert-inline .dialog-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}.expert-inline .primary-button{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:white;border:0}.chain[hidden],.tone-engine-row[hidden],.variant-stepper[hidden]{display:none!important}
+    /* 1.1.39: full-mode height follows the actual viewport; compact layout is unchanged. */
+</style>
   <style>
     .technique-dialog-head{position:sticky!important;z-index:3;top:-24px;margin:-24px -24px 16px!important;padding:20px 24px 14px;background:linear-gradient(145deg,#142a44,#091522);border-bottom:1px solid var(--line)}
     .technique-head-actions{display:flex;align-items:center;gap:9px}.technique-head-actions button{display:grid;width:44px;height:44px;place-items:center;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.06);color:var(--text);font-size:24px;cursor:pointer}
@@ -279,7 +281,21 @@ body.compact-mode #music-tempo{grid-column:1/-1;justify-content:center;flex-wrap
 #midi-connection-success{position:fixed;transform:translate(-50%,-50%);z-index:10060;display:flex;align-items:center;gap:12px;width:max-content;max-width:calc(100vw - 36px);padding:14px 22px;border:1px solid #398071;border-radius:14px;background:#153a38;box-shadow:0 14px 40px #0006;pointer-events:none;color:#eafff7}#midi-connection-success>span{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#286859;color:#85f3cc;font-size:20px}#midi-connection-success strong{display:block;font-size:16px;font-weight:600}#midi-connection-success small{display:block;color:#abd6c9;font-size:12px;max-width:260px;overflow-wrap:anywhere}
 #compact-midi-connect{font-size:12px;flex-shrink:0;touch-action:manipulation}
 @media(max-width:540px){.midi-dialog-head{padding:22px 20px 18px}.midi-dialog h2{font-size:22px}.midi-dialog-content{padding:0 20px 20px}.midi-current{padding:15px 14px;gap:11px}.midi-current .device-label>b{font-size:16px}.midi-transport-icon{width:37px;height:40px}.midi-device{gap:8px;padding:14px 12px}.midi-dialog button{padding:7px 13px}.midi-dialog-foot{padding:14px 20px}.midi-dialog-foot small{max-width:180px}.compact-brand span{display:none!important}}
-</style></head>
+</style><style>
+/* 1.1.39: retain compact layout; fit the full performance spectrum. */
+    #preset-grid .instrument-preset-card.compact{padding-inline:24px}
+    #preset-grid .instrument-preset-card.compact h3{font-size:20px;line-height:1.2;text-align:center;overflow-wrap:anywhere}
+    body:not(.compact-mode) #page-play.active{height:var(--play-available-height,calc(100dvh - 104px));min-height:0;overflow:visible}
+    body:not(.compact-mode) #page-play .stage-grid{min-height:0;flex:1 1 0}
+    body:not(.compact-mode) #page-play .instrument-art{min-height:0}
+    body:not(.compact-mode) #page-play .video-card{min-height:0}
+    body:not(.compact-mode) #page-play .lower-stage{flex:0 0 auto;min-height:0;overflow:visible}
+    body:not(.compact-mode) #page-play .visualizer{min-height:0;height:clamp(92px,13vh,150px);display:flex;flex-direction:column;gap:5px;overflow:visible}
+    body:not(.compact-mode) #page-play .visualizer-head{flex:0 0 auto}
+    body:not(.compact-mode) #page-play .spectrum-body{position:relative;flex:1 1 0;min-height:0}
+    body:not(.compact-mode) #spectrum{display:block;position:absolute;inset:0;width:100%;height:100%}
+</style>
+</head>
 <body data-theme="neon">
   <div class="ambient ambient-a"></div>
   <div class="ambient ambient-b"></div>
@@ -363,9 +379,8 @@ body.compact-mode #music-tempo{grid-column:1/-1;justify-content:center;flex-wrap
 
         <div class="lower-stage" id="lower-stage">
         <article class="visualizer glass">
-          <div class="visualizer-head"><div><p>实时演奏动态</p><h3>气息与声音</h3></div><div class="legend"><span>左声道</span><span>右声道</span></div></div>
-          <canvas id="spectrum"></canvas>
-          <div class="meters"><div><span>L</span><div class="meter"><i id="meter-l"></i></div></div><div><span>R</span><div class="meter"><i id="meter-r"></i></div></div></div>
+          <div class="visualizer-head"><div><p>实时演奏动态</p><h3>气息与声音</h3></div></div>
+          <div class="spectrum-body"><canvas id="spectrum" role="img" aria-label="演奏声音动态"></canvas></div>
           <div class="marquee" id="marquee"></div>
         </article>
 
@@ -408,7 +423,7 @@ body.compact-mode #music-tempo{grid-column:1/-1;justify-content:center;flex-wrap
       </div><div class="audio-summary"><div><span>预计延迟</span><strong class="green" id="audio-latency-value">正在检测…</strong></div><p id="audio-apply-status" role="status"></p></div>
       <div class="super-latency-card" hidden><div><span>板载声卡进阶优化</span><strong>超级低延迟优化</strong><p id="super-latency-status">正在检查系统声卡…</p></div><div class="super-latency-actions"><button id="restore-audio-driver" type="button" hidden>恢复原驱动</button><button id="super-latency-optimize" class="primary-button" type="button">开始优化</button></div></div></section>
       <section class="advanced-card glass"><h3>授权与激活</h3><div class="activation"><div><h3 id="license-title">可开始1小时完整试用</h3><div class="machine-code-row"><span id="machine-code">本机识别码：正在读取…</span><button id="copy-machine-code" type="button">复制</button></div></div><div class="license-actions"><button id="start-trial" type="button">开始1小时完整试用</button><label class="license-code-label" for="license-code">激活码</label><input id="license-code" placeholder="请输入此设备的激活码"><button id="activate" class="primary-button">激活</button></div></div></section></div>
-      <div class="advanced-extras"><div id="advanced-voice"></div><div id="advanced-studio"></div></div><p class="prototype-note">风吟 1.1.38</p></div></section>
+      <div class="advanced-extras"><div id="advanced-voice"></div><div id="advanced-studio"></div></div><p class="prototype-note">风吟 1.1.39</p></div></section>
     </main>
   </div>
   <div id="record-menu" class="inline-choice" role="menu" aria-label="选择录制类型" hidden><button type="button" role="menuitem" data-record-kind="audio">录音</button><button type="button" role="menuitem" data-record-kind="video">录屏</button></div>

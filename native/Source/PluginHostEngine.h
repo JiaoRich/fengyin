@@ -124,6 +124,7 @@ public:
     void unloadEffect();
     void setRecordingService(RecordingService* service) noexcept { player.setRecordingService(service); }
     juce::String takeStageTimingReport();
+    juce::String takeCallbackCadenceReport();
     bool isStageTimingEnabled() const noexcept {return player.timingEnabled;}
     void setAccompanimentService(AccompanimentAudioService* service) noexcept { player.setAccompanimentService(service); }
     void setMasterOutputService(MasterOutputService* service) noexcept { player.setMasterOutputService(service); }

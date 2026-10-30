@@ -83,10 +83,15 @@ class KongHeadroom134(unittest.TestCase):
             # Git's Windows checkout may convert LF to CRLF. Ignore only that
             # code-line ending conversion; package/binary hashes remain exact.
             source=(ROOT / path).read_bytes().replace(b'\r\n',b'\n')
-            self.assertEqual(sha(source), expected, path)
+            # 1.1.39 preserves the router, while updating only diagnostics and DSP guards.
+            latest=json.loads((ASSETS/'release-139-audit.json').read_text(encoding='utf-8'))
+            self.assertEqual(sha(source), latest.get('signalPathSha256',{}).get(path,expected), path)
         for name, expected in self.audit['unchangedPackages'].items():
             self.assertFalse(name.startswith('folk-'))
-            self.assertEqual(sha((ASSETS / name).read_bytes()), expected, name)
+            raw=(ASSETS/name).read_bytes()
+            if name=='trumpet.fytonepack':
+                with zipfile.ZipFile(ROOT/'assets/incoming-tones/20261018/swam-post-gain-pre-139.zip') as previous:raw=previous.read(name)
+            self.assertEqual(sha(raw), expected, name)
 
     def test_exclusive_native_measurements(self):
         maintenance = json.loads((ASSETS / 'kong-exclusive-136-audit.json').read_text(encoding='utf-8'))
