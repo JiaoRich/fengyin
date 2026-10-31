@@ -8,6 +8,7 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
     juce::File fixture;
     VideoFileChooser chooser { *this };
     bool chooserRequested=false,chooserHandled=false;
+    uint64_t chooserSeenAt=0;
     int chooserCompletions=0;
     std::atomic<uint64_t> ui{now()},javascript{now()};
     bool failed=false,webOnly=false,ready=false,clickPending=false,expanded=false;
@@ -52,10 +53,11 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
             })
             .withEventListener("testInput",[](juce::var p){std::cout<<"web input "<<juce::JSON::toString(p,true)<<std::endl;})
             .withEventListener("chooseVideo",[this](juce::var){
-                chooserRequested=true;chooserHandled=false;
+                chooserRequested=true;chooserHandled=false;chooserSeenAt=0;
                 chooser.open([this](juce::File file){
                     ++chooserCompletions;
                     if(!file.existsAsFile()){failed=true;return;}
+                    std::cout<<"PASS physical selector confirmation="<<chooserCompletions<<std::endl;
                     ++generation;
                     if(!webOnly){
                         if(!surface.initialise()){failed=true;return;}
@@ -101,15 +103,43 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
         for(auto* child:component->getChildren())if(auto* browser=findFileBrowser(child))return browser;
         return nullptr;
     }
+    static juce::TextButton* findDialogButton(juce::Component* component,const juce::String& name) {
+        if(auto* button=dynamic_cast<juce::TextButton*>(component))if(button->getButtonText()==name)return button;
+        for(auto* child:component->getChildren())if(auto* button=findDialogButton(child,name))return button;
+        return nullptr;
+    }
     void completeFileDialog() {
         if(!chooserRequested||chooserHandled)return;
         auto* dialog=dynamic_cast<juce::FileChooserDialogBox*>(juce::Component::getCurrentlyModalComponent());
         if(!dialog)return;
+        // The release regression was an invisible JUCE modal behind WebView2.
+        // Never "test" it by directly invoking exitModalState again.
+        if(!dialog->isOnDesktop()||dialog->getParentComponent()!=nullptr||!dialog->getPeer()
+           ||dialog->getPeer()==getPeer()) {
+            failed=true;std::cerr<<"FAIL chooser is a painted child behind native WebView2"<<std::endl;return;
+        }
         if(auto* browser=findFileBrowser(dialog)){
-            browser->setFileName(fixture.getFullPathName());
-            // Exercise the actual chooser's asynchronous completion, including
-            // destruction and its queued callback, rather than bypassing it.
-            dialog->exitModalState(1);chooserHandled=true;
+            if(!chooserSeenAt){chooserSeenAt=now();browser->setFileName(fixture.getFullPathName());return;}
+            if(now()-chooserSeenAt<150||touchPhase||mousePhase||now()<inputSettledAt)return;
+            auto* button=findDialogButton(dialog,browser->getActionVerb());
+            if(!button||!button->isEnabled())return;
+            const auto hwnd=static_cast<HWND>(dialog->getPeer()->getNativeHandle());
+            const auto local=dialog->getLocalPoint(button,button->getLocalBounds().getCentre());
+            const auto scale=dialog->getPeer()->getPlatformScaleFactor();
+            POINT point{juce::roundToInt(local.x*scale),juce::roundToInt(local.y*scale)};ClientToScreen(hwnd,&point);
+            if(!IsWindowVisible(hwnd)||!IsWindowEnabled(hwnd)||(GetWindowLongPtrW(hwnd,GWL_STYLE)&WS_CHILD)!=0
+               ||GetWindow(hwnd,GW_OWNER)!=static_cast<HWND>(getPeer()->getNativeHandle())
+               ||GetAncestor(WindowFromPoint(point),GA_ROOT)!=hwnd||GetForegroundWindow()!=hwnd) {
+                failed=true;std::cerr<<"FAIL chooser not visible/owned/foreground, or native WebView/VLC covers Open"<<std::endl;return;
+            }
+            // Use the same physical input modality as the page controls, now
+            // targeted at the chooser's own HWND. Do not bypass its buttons.
+            if(touchInput()) {
+                touchPoint=point;touchPhase=1;
+                if(!injectTouch(POINTER_FLAG_DOWN|POINTER_FLAG_INRANGE|POINTER_FLAG_INCONTACT)){failed=true;return;}
+            } else {mousePoint=point;mousePhase=3;}
+            chooserHandled=true;
+            std::cout<<"PASS selector above real WebView2/VLC; physical Open queued, generation="<<generation<<std::endl;
         }
     }
     void click(const juce::String& selector,double fraction=.5) {
