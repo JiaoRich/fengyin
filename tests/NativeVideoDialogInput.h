@@ -36,27 +36,49 @@ inline void dumpNativeVideoDialog(DWORD pid)
     DeleteDC(memory);ReleaseDC(nullptr,screen);
 }
 
-// Test-only input preparation. Confirmation still goes through the real OS
-// mouse/touch Open button; never invoke OnFileOk or synthesize a result file.
+// Test-only input preparation: focus the actual File name Edit and send OS
+// keyboard input. Confirm using real mouse/touch Open, never OnFileOk/IPC fakes.
 inline HWND prepareNativeVideoDialog(HWND dialog, const juce::File& file, bool cancel = false)
 {
     if (cancel) return GetDlgItem(dialog, IDCANCEL);
+    if(GetForegroundWindow()!=dialog)return nullptr;
     Microsoft::WRL::ComPtr<IUIAutomation> automation;
     Microsoft::WRL::ComPtr<IUIAutomationElement> root, edit;
-    Microsoft::WRL::ComPtr<IUIAutomationCondition> id;
+    Microsoft::WRL::ComPtr<IUIAutomationCondition> id, type, both;
     if (FAILED(CoCreateInstance(CLSID_CUIAutomation, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&automation)))
         || FAILED(automation->ElementFromHandle(dialog, &root))) return nullptr;
     VARIANT name; VariantInit(&name); name.vt = VT_BSTR; name.bstrVal = SysAllocString(L"1148");
     const auto conditionResult = automation->CreatePropertyCondition(UIA_AutomationIdPropertyId, name, &id);
     VariantClear(&name);
-    if (FAILED(conditionResult) || FAILED(root->FindFirst(TreeScope_Descendants, id.Get(), &edit)) || !edit) return nullptr;
+    VARIANT kind;VariantInit(&kind);kind.vt=VT_I4;kind.lVal=UIA_EditControlTypeId;
+    if (FAILED(conditionResult)||FAILED(automation->CreatePropertyCondition(UIA_ControlTypePropertyId,kind,&type))
+        ||FAILED(automation->CreateAndCondition(id.Get(),type.Get(),&both))
+        ||FAILED(root->FindFirst(TreeScope_Descendants,both.Get(),&edit))||!edit)return nullptr;
     Microsoft::WRL::ComPtr<IUIAutomationValuePattern> value;
     if (FAILED(edit->GetCurrentPatternAs(UIA_ValuePatternId, IID_PPV_ARGS(&value)))) return nullptr;
-    const auto path = SysAllocString(file.getFullPathName().toWideCharPointer());
-    if (!path) return nullptr;
-    const auto setResult = value->SetValue(path);
-    SysFreeString(path);
-    if (FAILED(setResult)) return nullptr;
+    BSTR current=nullptr;
+    if(FAILED(value->get_CurrentValue(&current)))return nullptr;
+    const auto actual=juce::String(current);SysFreeString(current);
+    const auto wanted=file.getFullPathName();
+    if(actual!=wanted) {
+        static HWND typedWindow=nullptr;
+        static double typedAt=0;
+        const auto now=juce::Time::getMillisecondCounterHiRes();
+        if(typedWindow!=dialog||now-typedAt>1000) {
+            if(FAILED(edit->SetFocus()))return nullptr;
+            std::vector<INPUT> input;
+            const auto key=[&](WORD vk,DWORD flags,WORD scan=0){INPUT item{};item.type=INPUT_KEYBOARD;item.ki.wVk=vk;item.ki.wScan=scan;item.ki.dwFlags=flags;input.push_back(item);};
+            key(VK_CONTROL,0);key('A',0);key('A',KEYEVENTF_KEYUP);key(VK_CONTROL,KEYEVENTF_KEYUP);
+            const std::wstring text(wanted.toWideCharPointer());
+            for(const auto character:text){key(0,KEYEVENTF_UNICODE,WORD(character));key(0,KEYEVENTF_UNICODE|KEYEVENTF_KEYUP,WORD(character));}
+            if(SendInput(UINT(input.size()),input.data(),sizeof(INPUT))!=input.size())return nullptr;
+            typedWindow=dialog;typedAt=now;
+        }
+        // Wait for the real Edit to receive the OS keyboard events. A parent
+        // ComboBox shares ID 1148; its ValuePattern can report success without
+        // filling the Edit. Never click Open until the actual text matches.
+        return nullptr;
+    }
     return GetDlgItem(dialog, IDOK);
 }
 
