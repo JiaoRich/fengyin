@@ -64,8 +64,9 @@ class VlcWebViewDiagnostic(unittest.TestCase):
         self.assertEqual(cases[0],(1,'web-only'))
         self.assertEqual(cases[5],(2,'web-only'))
         self.assertEqual([m for _,m in cases[1:5]],list(reversed([m for _,m in cases[6:]])))
-        clicks='PASS physical click cycle=\n'*20
+        clicks='PASS verified WebView2 runtime version=155.0.4283.62\n'+'PASS physical click cycle=\n'*20
         self.assertTrue(runner.check_result('web-only',0,False,clicks)['passed'])
+        self.assertFalse(runner.check_result('web-only',0,False,clicks.replace('PASS verified WebView2 runtime version=155.0.4283.62\n',''))['passed'])
         selectors='PASS selector above real WebView2/VLC;\n'*4+'PASS physical selector confirmation=\n'*4+'PASS physical native selector cancellation retains existing video\n'
         self.assertFalse(runner.check_result('production-ui-control',0,False,clicks)['passed'])
         self.assertTrue(runner.check_result('production-ui-control',0,False,clicks+selectors)['passed'])

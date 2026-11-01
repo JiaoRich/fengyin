@@ -37,9 +37,12 @@ try {
     }
     $runtime = $candidates | Sort-Object Version -Descending | Select-Object -First 1
     if (-not $runtime -or $runtime.Version.Major -lt 155) { throw 'CI must test a current runtime comparable to the captured target (155+), not the runner image 131.' }
-    # Make the exact selected runtime explicit for child diagnostic processes.
-    $env:WEBVIEW2_BROWSER_EXECUTABLE_FOLDER = $runtime.Path
-    [pscustomobject]@{version=$runtime.Version.ToString();path=$runtime.Path;installerSha256=$installerSha;signature='Microsoft Corporation';exitCode=$install.ExitCode} |
+    # This is an installed Evergreen runtime, not a Fixed Version deployment.
+    # Use the same registered-runtime discovery as the shipping application.
+    # Pinning a versioned installation directory becomes stale if Edge Update
+    # replaces it during the long native build. Never change machine settings.
+    Remove-Item Env:WEBVIEW2_BROWSER_EXECUTABLE_FOLDER -ErrorAction SilentlyContinue
+    [pscustomobject]@{version=$runtime.Version.ToString();path=$runtime.Path;selection='registered-evergreen';installerSha256=$installerSha;signature='Microsoft Corporation';exitCode=$install.ExitCode} |
         ConvertTo-Json | Set-Content -Encoding UTF8 'ci-webview-runtime.json'
     Write-Host ('Verified CI WebView2 runtime: ' + $runtime.Version)
 } catch { throw }

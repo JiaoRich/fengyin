@@ -4,6 +4,7 @@
 #include <juce_gui_extra/juce_gui_extra.h>
 #include <windows.h>
 #include <dbghelp.h>
+#include <WebView2.h>
 #include "VlcVideoSurface.h"
 #include "VideoHostRendering.h"
 #include "VlcWebViewClipping.h"
@@ -13,6 +14,34 @@
 #include <thread>
 
 static uint64_t now() { return GetTickCount64(); }
+// Diagnostic only. A backend fallback must fail immediately with the real
+// discovery HRESULT, rather than running a 30-second IE page with no bridge.
+static bool verifyWebViewRuntime() {
+    static_assert(JUCE_USE_WIN_WEBVIEW2 && JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING);
+    const auto overrideFolder=juce::SystemStats::getEnvironmentVariable("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER",{});
+    LPWSTR version=nullptr;
+    const auto result=GetAvailableCoreWebView2BrowserVersionString(nullptr,&version);
+    const auto versionText=version?juce::String(version):juce::String{};
+    CoTaskMemFree(version);
+    std::cout<<"WebView2 runtime discovery hr=0x"<<std::hex<<static_cast<unsigned long>(result)<<std::dec
+        <<" version="<<versionText<<" override="<<overrideFolder<<std::endl;
+    if(FAILED(result)||versionText.isEmpty()
+        ||(juce::SystemStats::getEnvironmentVariable("GITHUB_ACTIONS",{})=="true"&&versionText.getIntValue()<155)) {
+        std::cerr<<"FAIL WebView2 runtime discovery; IE fallback is not valid acceptance"<<std::endl;
+        return false;
+    }
+    const auto options=juce::WebBrowserComponent::Options{}
+        .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
+        .withWinWebView2Options(juce::WebBrowserComponent::Options::WinWebView2{}
+            .withUserDataFolder(juce::File::getSpecialLocation(juce::File::tempDirectory)
+                .getChildFile("fy-webview-probe-"+juce::Uuid().toString())));
+    if(!juce::WebBrowserComponent::areOptionsSupported(options)) {
+        std::cerr<<"FAIL WebView2 environment unavailable despite registered runtime; no IE fallback"<<std::endl;
+        return false;
+    }
+    std::cout<<"PASS verified WebView2 runtime version="<<versionText<<std::endl;
+    return true;
+}
 static void dumpProcess(const wchar_t* filename) {
     auto file=CreateFileW(filename,GENERIC_WRITE,0,nullptr,CREATE_NEW,0,nullptr);
     if(file!=INVALID_HANDLE_VALUE){
@@ -229,6 +258,7 @@ int main(int argc,char** argv) {
     std::cout<<"diagnostic WebView args="<<juce::SystemStats::getEnvironmentVariable("FENGYIN_DIAGNOSTIC_WEBVIEW_ARGS",{})<<std::endl;
     if(argc!=3){std::cerr<<"red-fixture.mp4 web-only|immediate|deferred|attached-immediate|attached-deferred|production-ui\n";return 2;}
     juce::ScopedJuceInitialiser_GUI init;
+    if(!verifyWebViewRuntime())return 4;
     const auto fixture=juce::File(juce::String::fromUTF8(argv[1]));
     if(!fixture.existsAsFile())return 2;
     if(juce::String(argv[2]).startsWith("production-ui")) {
