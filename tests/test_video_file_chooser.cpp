@@ -30,8 +30,12 @@ struct Test final : juce::Component, juce::Timer
     {
         clicked=false;seenAt=0;
         picker->open([this](juce::File file) {
-            std::cout<<"Native completion phase="<<phase<<" path="<<file.getFullPathName()<<std::endl;
-            if(picker->isPending() || (phase==0 ? file.existsAsFile() : file!=fixture)) {fail("wrong native selection/cancellation");return;}
+            const auto expectedId=fixture.getFileIdentifier(),actualId=file.getFileIdentifier();
+            std::cout<<"Native completion phase="<<phase<<" path="<<file.getFullPathName()<<" expected="<<fixture.getFullPathName()
+                <<" ids="<<actualId<<"/"<<expectedId<<" pending="<<picker->isPending()<<std::endl;
+            // Shell expands RUNNER~1/other 8.3 aliases. Compare the actual NTFS
+            // file identity, not two spellings of the same absolute pathname.
+            if(picker->isPending() || (phase==0 ? file.existsAsFile() : !file.existsAsFile()||actualId==0||actualId!=expectedId)) {fail("wrong native selection/cancellation");return;}
             ++completed;++phase;
             if(phase==2) {
                 const auto area=juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->userBounds.toNearestInt();
