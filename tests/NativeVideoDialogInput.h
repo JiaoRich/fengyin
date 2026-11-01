@@ -19,7 +19,11 @@ inline HWND prepareNativeVideoDialog(HWND dialog, const juce::File& file, bool c
     if (FAILED(conditionResult) || FAILED(root->FindFirst(TreeScope_Descendants, id.Get(), &edit)) || !edit) return nullptr;
     Microsoft::WRL::ComPtr<IUIAutomationValuePattern> value;
     if (FAILED(edit->GetCurrentPatternAs(UIA_ValuePatternId, IID_PPV_ARGS(&value)))) return nullptr;
-    if (FAILED(value->SetValue(file.getFullPathName().toWideCharPointer()))) return nullptr;
+    const auto path = SysAllocString(file.getFullPathName().toWideCharPointer());
+    if (!path) return nullptr;
+    const auto setResult = value->SetValue(path);
+    SysFreeString(path);
+    if (FAILED(setResult)) return nullptr;
     return GetDlgItem(dialog, IDOK);
 }
 
