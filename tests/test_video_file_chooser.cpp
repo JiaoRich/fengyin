@@ -46,6 +46,7 @@ struct Test final : juce::Component, juce::Timer
             else if(phase==4) { // queue destruction: no callback, no helper leak
                 auto temporary=std::make_unique<VideoFileChooser>(*this,helperExecutable);
                 temporary->open([this](juce::File){fail("destroyed queued chooser callback");});temporary.reset();
+                clicked=false;seenAt=0;
                 picker->open([this](juce::File){fail("destroyed active chooser callback");});phase=5;
             }
         },[this](juce::String){++errors;if(phase==7){phase=8;open();}else fail("native helper failed");});
