@@ -190,6 +190,16 @@ public:
         return hwnd;
     }
     DWORD processId() const { return pid; }
+    juce::var diagnostics()
+    {
+        auto state = videoDialog::packet(running() ? "running" : "exited");
+        auto* object = state.getDynamicObject();
+        object->setProperty("pid", static_cast<juce::int64>(pid));
+        object->setProperty("window", static_cast<juce::int64>(reinterpret_cast<INT_PTR>(window())));
+        object->setProperty("ready", juce::JSON::parse(directory.getChildFile("ready.json")));
+        object->setProperty("result", result());
+        return state;
+    }
     bool startupExpired() const { return juce::Time::getMillisecondCounterHiRes() - started > 60000 && !hwnd; }
     void bringToFront()
     {

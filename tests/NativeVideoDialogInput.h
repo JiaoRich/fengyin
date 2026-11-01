@@ -2,6 +2,39 @@
 #if JUCE_WINDOWS
 #include <UIAutomation.h>
 #include <wrl/client.h>
+#include <iostream>
+
+inline void dumpNativeVideoDialog(DWORD pid)
+{
+    const auto foreground=GetForegroundWindow();DWORD foregroundPid=0;GetWindowThreadProcessId(foreground,&foregroundPid);
+    std::cerr<<"foreground="<<foreground<<" pid="<<foregroundPid<<std::endl;
+    const auto describe=[](HWND window,LPARAM)->BOOL {
+        wchar_t name[128]{},text[512]{};GetClassNameW(window,name,128);DWORD_PTR ignored=0;
+        SendMessageTimeoutW(window,WM_GETTEXT,512,reinterpret_cast<LPARAM>(text),SMTO_ABORTIFHUNG,100,&ignored);
+        std::cerr<<"hwnd="<<window<<" id="<<GetDlgCtrlID(window)<<" class="<<juce::String(name)
+            <<" text="<<juce::String(text)<<" visible="<<IsWindowVisible(window)<<" enabled="<<IsWindowEnabled(window)<<std::endl;return TRUE;
+    };
+    struct Context {DWORD pid;WNDENUMPROC describe;} context{pid,describe};
+    EnumWindows([](HWND window,LPARAM p)->BOOL {
+        const auto& context=*reinterpret_cast<Context*>(p);DWORD windowPid=0;GetWindowThreadProcessId(window,&windowPid);
+        if(windowPid==context.pid){context.describe(window,0);EnumChildWindows(window,context.describe,0);}return TRUE;
+    },reinterpret_cast<LPARAM>(&context));
+    const auto screen=GetDC(nullptr),memory=CreateCompatibleDC(screen);
+    const int width=GetSystemMetrics(SM_CXSCREEN),height=GetSystemMetrics(SM_CYSCREEN);
+    BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);info.bmiHeader.biWidth=width;info.bmiHeader.biHeight=-height;
+    info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;
+    void* pixels=nullptr;const auto bitmap=CreateDIBSection(screen,&info,DIB_RGB_COLORS,&pixels,nullptr,0);
+    if(bitmap&&pixels){
+        const auto previous=SelectObject(memory,bitmap);
+        if(BitBlt(memory,0,0,width,height,screen,0,0,SRCCOPY|CAPTUREBLT)) {
+            BITMAPFILEHEADER header{};header.bfType=0x4d42;header.bfOffBits=sizeof(header)+sizeof(info.bmiHeader);header.bfSize=header.bfOffBits+width*height*4;
+            juce::FileOutputStream output(juce::File::getCurrentWorkingDirectory().getChildFile("native-selector-failure.bmp"));
+            output.write(&header,sizeof(header));output.write(&info.bmiHeader,sizeof(info.bmiHeader));output.write(pixels,size_t(width)*size_t(height)*4);
+        }
+        SelectObject(memory,previous);DeleteObject(bitmap);
+    }
+    DeleteDC(memory);ReleaseDC(nullptr,screen);
+}
 
 // Test-only input preparation. Confirmation still goes through the real OS
 // mouse/touch Open button; never invoke OnFileOk or synthesize a result file.

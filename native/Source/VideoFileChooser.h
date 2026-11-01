@@ -80,6 +80,7 @@ public:
    #if JUCE_WINDOWS
     HWND nativeWindow() { return native.window(); }
     DWORD nativeProcessId() const { return native.processId(); }
+    juce::var nativeDiagnostics() { return native.diagnostics(); }
    #endif
 private:
     void timerCallback() override

@@ -21,11 +21,16 @@ struct Test final : juce::Component, juce::Timer
         picker = std::make_unique<VideoFileChooser>(*this,helperExecutable); open(); startTimer(20);
     }
     ~Test() override { stopTimer(); picker.reset(); if(destroyedProcess)CloseHandle(destroyedProcess); folder.deleteRecursively(); }
-    void fail(const char* message) { failed=true;std::cerr<<"FAIL "<<message<<std::endl;juce::MessageManager::getInstance()->stopDispatchLoop(); }
+    void fail(const char* message) {
+        failed=true;std::cerr<<"FAIL "<<message<<" phase="<<phase<<" completed="<<completed<<" clicked="<<clicked<<" heartbeat="<<heartbeats<<std::endl;
+        if(picker){std::cerr<<juce::JSON::toString(picker->nativeDiagnostics())<<std::endl;dumpNativeVideoDialog(picker->nativeProcessId());}
+        juce::MessageManager::getInstance()->stopDispatchLoop();
+    }
     void open()
     {
         clicked=false;seenAt=0;
         picker->open([this](juce::File file) {
+            std::cout<<"Native completion phase="<<phase<<" path="<<file.getFullPathName()<<std::endl;
             if(picker->isPending() || (phase==0 ? file.existsAsFile() : file!=fixture)) {fail("wrong native selection/cancellation");return;}
             ++completed;++phase;
             if(phase==2) {
