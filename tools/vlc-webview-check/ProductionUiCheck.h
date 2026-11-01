@@ -1,5 +1,6 @@
 #pragma once
 #include "VideoFileChooser.h"
+#include "../../tests/NativeVideoDialogInput.h"
 // Diagnostic only. Real release HTML/CSS/JS, file:// origin, physical input,
 // production VLC/host renderer. Fake meter data is NOT an instrument DSP test.
 struct ProductionUiScene final:juce::Component,juce::Timer {
@@ -10,6 +11,8 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
     bool chooserRequested=false,chooserHandled=false;
     uint64_t chooserSeenAt=0;
     int chooserCompletions=0;
+    int chooserCancellations=0;
+    bool cancelThisChooser=false,reopenAfterCancel=false;
     std::atomic<uint64_t> ui{now()},javascript{now()};
     bool failed=false,webOnly=false,ready=false,clickPending=false,expanded=false;
     int touchPhase=0,mousePhase=0;
@@ -54,7 +57,13 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
             .withEventListener("testInput",[](juce::var p){std::cout<<"web input "<<juce::JSON::toString(p,true)<<std::endl;})
             .withEventListener("chooseVideo",[this](juce::var){
                 chooserRequested=true;chooserHandled=false;chooserSeenAt=0;
+                cancelThisChooser=generation==1&&cycle==5&&chooserCancellations==0;
                 chooser.open([this](juce::File file){
+                    if(cancelThisChooser) {
+                        if(file.existsAsFile()||generation!=1||(!webOnly&&surface.getState().generation!=1)){failed=true;return;}
+                        ++chooserCancellations;chooserRequested=false;reopenAfterCancel=true;
+                        std::cout<<"PASS physical native selector cancellation retains existing video"<<std::endl;return;
+                    }
                     ++chooserCompletions;
                     if(!file.existsAsFile()){failed=true;return;}
                     std::cout<<"PASS physical selector confirmation="<<chooserCompletions<<std::endl;
@@ -63,7 +72,7 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
                         if(!surface.initialise()){failed=true;return;}
                         surface.player()->load(file.getFullPathName().toStdString(),generation);
                     }
-                });
+                },[this](juce::String message){failed=true;std::cerr<<"FAIL native selector "<<message<<std::endl;});
                 // Duplicate browser events while a selector is open must not
                 // create another dialog or load twice.
                 chooser.open([this](juce::File){failed=true;});
@@ -98,49 +107,29 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
     ~ProductionUiScene()override{stopTimer();surface.shutdown();web.reset();}
     void paint(juce::Graphics& g)override{g.fillAll(juce::Colour(0xff07101d));}
     void finish(){stopTimer();juce::MessageManager::getInstance()->stopDispatchLoop();}
-    static juce::FileBrowserComponent* findFileBrowser(juce::Component* component) {
-        if(auto* browser=dynamic_cast<juce::FileBrowserComponent*>(component))return browser;
-        for(auto* child:component->getChildren())if(auto* browser=findFileBrowser(child))return browser;
-        return nullptr;
-    }
-    static juce::TextButton* findDialogButton(juce::Component* component,const juce::String& name) {
-        if(auto* button=dynamic_cast<juce::TextButton*>(component))if(button->getButtonText()==name)return button;
-        for(auto* child:component->getChildren())if(auto* button=findDialogButton(child,name))return button;
-        return nullptr;
-    }
     void completeFileDialog() {
         if(!chooserRequested||chooserHandled)return;
-        auto* dialog=dynamic_cast<juce::FileChooserDialogBox*>(juce::Component::getCurrentlyModalComponent());
-        if(!dialog)return;
-        // The release regression was an invisible JUCE modal behind WebView2.
-        // Never "test" it by directly invoking exitModalState again.
-        if(!dialog->isOnDesktop()||dialog->getParentComponent()!=nullptr||!dialog->getPeer()
-           ||dialog->getPeer()==getPeer()) {
-            failed=true;std::cerr<<"FAIL chooser is a painted child behind native WebView2"<<std::endl;return;
+        const auto hwnd=chooser.nativeWindow();
+        if(!hwnd)return;
+        DWORD pid=0;GetWindowThreadProcessId(hwnd,&pid);
+        wchar_t className[64]{};GetClassNameW(hwnd,className,64);
+        if(pid==GetCurrentProcessId()||pid!=chooser.nativeProcessId()||juce::String(className)!="#32770"
+            ||!IsWindowEnabled(static_cast<HWND>(getPeer()->getNativeHandle()))) {
+            failed=true;std::cerr<<"FAIL selector is not isolated native Windows Shell"<<std::endl;return;
         }
-        if(auto* browser=findFileBrowser(dialog)){
-            if(!chooserSeenAt){chooserSeenAt=now();browser->setFileName(fixture.getFullPathName());return;}
-            if(now()-chooserSeenAt<150||touchPhase||mousePhase||now()<inputSettledAt)return;
-            auto* button=findDialogButton(dialog,browser->getActionVerb());
-            if(!button||!button->isEnabled())return;
-            const auto hwnd=static_cast<HWND>(dialog->getPeer()->getNativeHandle());
-            const auto local=dialog->getLocalPoint(button,button->getLocalBounds().getCentre());
-            const auto scale=dialog->getPeer()->getPlatformScaleFactor();
-            POINT point{juce::roundToInt(local.x*scale),juce::roundToInt(local.y*scale)};ClientToScreen(hwnd,&point);
-            if(!IsWindowVisible(hwnd)||!IsWindowEnabled(hwnd)||(GetWindowLongPtrW(hwnd,GWL_STYLE)&WS_CHILD)!=0
-               ||GetWindow(hwnd,GW_OWNER)!=static_cast<HWND>(getPeer()->getNativeHandle())
-               ||GetAncestor(WindowFromPoint(point),GA_ROOT)!=hwnd||GetForegroundWindow()!=hwnd) {
-                failed=true;std::cerr<<"FAIL chooser not visible/owned/foreground, or native WebView/VLC covers Open"<<std::endl;return;
-            }
-            // Use the same physical input modality as the page controls, now
-            // targeted at the chooser's own HWND. Do not bypass its buttons.
-            if(touchInput()) {
-                touchPoint=point;touchPhase=1;
-                if(!injectTouch(POINTER_FLAG_DOWN|POINTER_FLAG_INRANGE|POINTER_FLAG_INCONTACT)){failed=true;return;}
-            } else {mousePoint=point;mousePhase=3;}
-            chooserHandled=true;
-            std::cout<<"PASS selector above real WebView2/VLC; physical Open queued, generation="<<generation<<std::endl;
-        }
+        if(!chooserSeenAt){chooserSeenAt=now();return;}
+        if(now()-chooserSeenAt<250||touchPhase||mousePhase||now()<inputSettledAt)return;
+        const auto button=prepareNativeVideoDialog(hwnd,fixture,cancelThisChooser);
+        POINT point{};
+        if(!nativeDialogButtonPoint(hwnd,button,point))return;
+        // Real Windows Open button above WebView2 and VLC. The ValuePattern
+        // only fills File name; acceptance is actual OS mouse/touch input.
+        if(touchInput()) {
+            touchPoint=point;touchPhase=1;
+            if(!injectTouch(POINTER_FLAG_DOWN|POINTER_FLAG_INRANGE|POINTER_FLAG_INCONTACT)){failed=true;return;}
+        } else {mousePoint=point;mousePhase=3;}
+        chooserHandled=true;
+        std::cout<<(cancelThisChooser?"Native Shell physical Cancel queued, generation=":"PASS selector above real WebView2/VLC; native Shell physical Open queued, generation=")<<generation<<std::endl;
     }
     void click(const juce::String& selector,double fraction=.5) {
         if(selector=="#change-video")requestedGeneration=generation+1;
@@ -273,6 +262,9 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
                 mousePoint=p;mousePhase=3;
             }
         }
+        if(reopenAfterCancel&&!touchPhase&&!mousePhase&&now()>=inputSettledAt) {
+            reopenAfterCancel=false;click("#change-video");deadline=now()+30000;
+        }
         completeFileDialog();
         if(ready&&now()-lastState>=100){lastState=now();sendState();}
         if(phase==0&&ready) {
@@ -288,7 +280,7 @@ struct ProductionUiScene final:juce::Component,juce::Timer {
             previousVolume=volumeCommands;phase=4;click("#video-volume",cycle%2?.25:.75);
         } else if(phase==4&&volumeCommands>previousVolume) {
             std::cout<<"PASS physical click cycle="<<cycle<<" production fullscreen/play/volume, input="<<(touchInput()?"touch":"mouse")<<" PCM="<<(webOnly?0:surface.player()->testPcmNonzero.load())<<std::endl;
-            if(++cycle==20){if(chooserCompletions!=4){failed=true;std::cerr<<"FAIL picker completion count="<<chooserCompletions<<std::endl;}finish();return;}
+            if(++cycle==20){if(chooserCompletions!=4||chooserCancellations!=1){failed=true;std::cerr<<"FAIL picker completion/cancel count="<<chooserCompletions<<"/"<<chooserCancellations<<std::endl;}finish();return;}
             if(cycle%5==0){phase=1;click("#change-video");deadline=now()+30000;}
             else {phase=2;click("#fullscreen");}
         }

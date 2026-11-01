@@ -29,7 +29,7 @@ target_compile_definitions(FengYinVlcWebViewCheck PRIVATE JUCE_WEB_BROWSER=1 JUC
     JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1 JUCE_MODAL_LOOPS_PERMITTED=1 FENGYIN_VLC_TEST_PCM=1
     FENGYIN_DIAGNOSTIC_FRONTEND="${ROOT}/prototype/index.html")
 target_compile_options(FengYinVlcWebViewCheck PRIVATE /utf-8 /EHsc)
-target_link_libraries(FengYinVlcWebViewCheck PRIVATE juce::juce_gui_extra juce::juce_recommended_config_flags user32 gdi32 dbghelp)
+target_link_libraries(FengYinVlcWebViewCheck PRIVATE juce::juce_gui_extra juce::juce_recommended_config_flags user32 gdi32 dbghelp ole32 oleaut32 shell32 uuid uiautomationcore)
 # The production surface resolves VLC beside its own executable. The standalone
 # workflow staged this runtime, but the full installer preflight did not. Keep
 # the executable self-contained in both entry points, before any GUI case runs.

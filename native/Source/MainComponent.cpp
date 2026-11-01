@@ -978,6 +978,9 @@ void MainComponent::chooseVideoForWebInterface()
         {
             if (safeThis == nullptr) return;
             if (file.existsAsFile()) safeThis->loadVideoForWebInterface(file);
+        }, [safeThis](juce::String message)
+        {
+            if (safeThis && safeThis->webInterface) safeThis->webInterface->emitEventIfBrowserIsVisible("editorResult", message);
         });
 }
 

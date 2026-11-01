@@ -19,13 +19,25 @@ public:
     const juce::String getApplicationVersion() override { return JUCE_APPLICATION_VERSION_STRING; }
     bool moreThanOneInstanceAllowed() override
     {
-        return juce::JUCEApplication::getCommandLineParameters().startsWith("--scan-plugin ");
+        const auto command = juce::JUCEApplication::getCommandLineParameters();
+        return command.startsWith("--scan-plugin ")
+           #if JUCE_WINDOWS
+            || command.startsWith("--select-video ")
+           #endif
+            ;
     }
 
     void initialise(const juce::String& commandLine) override
     {
         auto arguments = juce::StringArray::fromTokens(commandLine, true);
         arguments.removeEmptyStrings();
+       #if JUCE_WINDOWS
+        if (arguments.size() == 2 && arguments[0] == "--select-video")
+        {
+            setApplicationReturnValue(fengyin::runNativeVideoFileDialog(juce::File(arguments[1].unquoted())));
+            quit(); return; // no logger, plugins, audio device, WebView2 or VLC
+        }
+       #endif
         if (arguments.size() == 3 && arguments[0] == "--scan-plugin")
         {
             scanWorker = std::make_unique<PluginScanWorker>(arguments[1].unquoted(), juce::File(arguments[2].unquoted()));

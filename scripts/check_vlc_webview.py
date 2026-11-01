@@ -21,12 +21,14 @@ def check_result(mode,code,timeout,text):
     previews=text.count('PASS real paused first picture generation=')
     chooser_windows=text.count('PASS selector above real WebView2/VLC;')
     chooser_confirmations=text.count('PASS physical selector confirmation=')
+    chooser_cancellations=text.count('PASS physical native selector cancellation retains existing video')
     passed=(code==0 and acknowledgements==20 and not timeout
-            and (not mode.startswith('production-ui') or (chooser_windows==4 and chooser_confirmations==4))
+            and (not mode.startswith('production-ui') or (chooser_windows==4 and chooser_confirmations==4 and chooser_cancellations==1))
             and (mode in ('web-only','production-ui-control') or (previews>=4 if mode.startswith('production-ui') else previews==4)))
     return dict(mode=mode,exitCode=code,timedOut=timeout,
                 clickAcknowledgements=acknowledgements,pausedFirstPictures=previews,
-                visibleChooserWindows=chooser_windows,physicalChooserConfirmations=chooser_confirmations,passed=passed)
+                visibleChooserWindows=chooser_windows,physicalChooserConfirmations=chooser_confirmations,
+                physicalChooserCancellations=chooser_cancellations,passed=passed)
 
 
 def main():

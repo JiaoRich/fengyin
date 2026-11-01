@@ -224,6 +224,8 @@ template<class CheckedScene>int runCheckedScene(CheckedScene& scene) {
 }
 
 int main(int argc,char** argv) {
+    const auto pickerArgs=juce::StringArray::fromTokens(juce::String(GetCommandLineW()),true);
+    if(pickerArgs.size()==3&&pickerArgs[1]=="--select-video")return fengyin::runNativeVideoFileDialog(juce::File(pickerArgs[2].unquoted()));
     std::cout<<"diagnostic WebView args="<<juce::SystemStats::getEnvironmentVariable("FENGYIN_DIAGNOSTIC_WEBVIEW_ARGS",{})<<std::endl;
     if(argc!=3){std::cerr<<"red-fixture.mp4 web-only|immediate|deferred|attached-immediate|attached-deferred|production-ui\n";return 2;}
     juce::ScopedJuceInitialiser_GUI init;
