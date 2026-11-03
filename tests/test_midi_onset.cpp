@@ -80,9 +80,10 @@ int main() {
         fengyin::MidiInputService input(false);input.attachExternal("concurrent-sensitivity","Test controller");input.setPerformanceSink(&sink);
         std::thread incoming([&]{input.acceptExternalMessage(juce::MidiMessage::controllerEvent(1,2,64));});
         while(!sink.entered.load())std::this_thread::yield();
-        std::thread ui([&]{input.setBreathSensitivity(100,false);});
+        std::atomic<bool> uiFinished{false};
+        std::thread ui([&]{input.setBreathSensitivity(100,false);uiFinished.store(true);});
         const auto deadline=juce::Time::getMillisecondCounterHiRes()+100;
-        while(input.getBreathSensitivity()!=100&&juce::Time::getMillisecondCounterHiRes()<deadline)std::this_thread::yield();
+        while(!uiFinished.load()&&juce::Time::getMillisecondCounterHiRes()<deadline)std::this_thread::yield();
         sink.release.store(true);incoming.join();ui.join();
         assert(sink.last.load()==input.getSnapshot().breath&&input.getBreathSensitivity()==100);
         input.setPerformanceSink(nullptr);
