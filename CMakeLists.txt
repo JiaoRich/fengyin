@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.42 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.43 LANGUAGES C CXX)
 option(FENGYIN_ARCHIVED_VIDEO_RECORDING "Build archived video-recording diagnostics, never for release" OFF)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
@@ -7,7 +7,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Windows 安装包使用静态 MSVC 运行库，避免用户额外安装 VC++ 运行环境。
+# Main binaries use static MSVC. Third-party plug-ins still need the bundled
+# official shared VC++ prerequisite; static linking here does not supply it.
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
     add_compile_options(/utf-8)
@@ -576,6 +577,9 @@ if(BUILD_TESTING)
     target_include_directories(FengYinMidiOnsetTests PRIVATE native/Source)
     target_link_libraries(FengYinMidiOnsetTests PRIVATE juce::juce_audio_devices juce::juce_data_structures juce::juce_recommended_config_flags)
     add_test(NAME midi_phrase_onset COMMAND FengYinMidiOnsetTests)
+    add_executable(FengYinBreathSensitivityTests tests/test_breath_sensitivity.cpp)
+    target_include_directories(FengYinBreathSensitivityTests PRIVATE native/Source)
+    add_test(NAME breath_sensitivity_curve COMMAND FengYinBreathSensitivityTests)
     add_executable(FengYinVoicePromptTests tests/test_voice_prompt.cpp)
     target_include_directories(FengYinVoicePromptTests PRIVATE native/Source)
     target_link_libraries(FengYinVoicePromptTests PRIVATE juce::juce_audio_utils juce::juce_recommended_config_flags)

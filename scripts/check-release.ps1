@@ -25,6 +25,10 @@ $RequiredFiles = @(
     "components\VLC\sdk\COPYING.LIB",
     "components\VLC\source\vlc-3.0.24.tar.xz",
     "MicrosoftEdgeWebView2RuntimeInstallerX64.exe",
+    "components\VC-Runtime\VC_redist.x64.exe",
+    "components\VC-Runtime\vc-runtime.json",
+    "components\VC-Runtime\Install-VCRuntime.ps1",
+    "components\VC-Runtime\VCRuntimePolicy.ps1",
     "components\ASIO4ALL\ASIO4ALL_2_22.exe",
     "components\VB-CABLE\VBCABLE_Setup_x64.exe",
     "components\Fresh Air\Setup Fresh Air v1.0.8.exe"
@@ -33,6 +37,8 @@ foreach ($Name in $RequiredFiles) {
     $Path = Join-Path $PackageDir $Name
     if (-not (Test-Path $Path)) { throw "发布检查失败，缺少：$Name" }
 }
+& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PackageDir 'components\VC-Runtime\Install-VCRuntime.ps1') -PackageDirectory (Join-Path $PackageDir 'components\VC-Runtime') -VerifyOnly
+if($LASTEXITCODE -ne 0){throw 'Release VC++ prerequisite signature/hash/version failed'}
 
 $RetiredCapture = Get-ChildItem $PackageDir -Recurse -File | Where-Object {
     $_.Name -match '^FengYinScreenRecorder\.exe$|^Use-.*-recording\.cmd$|^ScreenRecorderLib'

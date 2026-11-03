@@ -5,7 +5,7 @@
   #define OutputDir "."
 #endif
 #ifndef AppVersion
-  #define AppVersion "1.1.28"
+  #define AppVersion "1.1.43"
 #endif
 #ifndef ChineseMessages
   #define ChineseMessages "compiler:Languages\ChineseSimplified.isl"
@@ -78,6 +78,27 @@ Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 var
   VBCableInstalledThisRun: Boolean;
   AudioDriverRestartRequired: Boolean;
+
+procedure PrepareVCRuntime();
+var
+  Code, Choice: Integer;
+  Args: String;
+begin
+  WizardForm.StatusLabel.Caption := '正在检查并准备音源所需的微软运行组件…';
+  Args := ExpandConstant('-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{app}\components\VC-Runtime\Install-VCRuntime.ps1" -PackageDirectory "{app}\components\VC-Runtime"');
+  repeat
+    Code := -1;
+    if Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Args, '', SW_HIDE, ewWaitUntilTerminated, Code) then
+    begin
+      Log('Microsoft VC++ prerequisite exit=' + IntToStr(Code));
+      if (Code = 0) or (Code = 3010) then Exit;
+      if Code = 3011 then
+        RaiseException('微软运行组件需要重启后完成更新。请保存工作、重启电脑，再运行风吟安装包完成其余组件安装。');
+    end;
+    Choice := MsgBox(ExpandConstant('微软运行组件未准备完成，音源可能无法加载。请检查 {commonappdata}\FengYin\InstallLogs 中的错误记录；已有更新版本但损坏时，请在 Windows“已安装的应用”中修复该版本。处理后点击“重试”，或取消本次安装。'), mbError, MB_RETRYCANCEL);
+    if Choice = IDCANCEL then RaiseException('微软运行组件尚未准备完成，安装已停止。');
+  until False;
+end;
 
 procedure MarkAudioDriverRestart();
 begin
@@ -216,6 +237,7 @@ var
   ResultCode: Integer;
 begin
   if CurStep <> ssPostInstall then Exit;
+  PrepareVCRuntime();
   { Capture the interactive user's defaults, not the elevated administrator's. }
   if not ExecAsOriginalUser(ExpandConstant('{app}\FengYinAudioWatchdog.exe'), '--snapshot-install', '',
       SW_HIDE, ewWaitUntilTerminated, ResultCode) then

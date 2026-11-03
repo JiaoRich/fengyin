@@ -115,12 +115,16 @@ class HostRegressionTests(unittest.TestCase):
     def test_breath_is_raw_passthrough_and_precedes_note_on(self):
         self.assertIn("sink->resetPerformance()", MIDI)
         note_block = MIDI.split("if (message.isNoteOn())", 1)[1].split("else if (message.isNoteOff())", 1)[0]
-        self.assertLess(note_block.index("sink->breathChanged(currentBreath"), note_block.index("sink->noteOn"))
+        self.assertLess(note_block.index("sink->breathChanged(BreathSensitivity::apply(currentBreath"), note_block.index("sink->noteOn"))
         self.assertIn("const auto rawBreath = static_cast<float>(message.getControllerValue()) / 127.0f", MIDI)
         self.assertNotIn("processMidiValue", MIDI)
         self.assertNotIn("0.28f + currentBreath * 0.52f", MIDI)
-        self.assertIn('activeProfile.id == "yamaha-yds"', MIDI)
-        self.assertIn("savedController = 11", MIDI)
+        self.assertIn('updateBreathDrivenTechniques(rawBreath, sink', MIDI)
+        self.assertIn('breath.store(rawBreath', MIDI)
+        restore = MIDI.split('void MidiInputService::restoreBreathController()', 1)[1].split('DeviceProfile MidiInputService::getActiveProfile()', 1)[0]
+        self.assertIn('getIntValue(controllerSettingKey(), savedController)', restore)
+        self.assertNotIn('savedController = 11', restore)
+        self.assertNotIn('profileRevision', restore)
         reset = (ROOT / "native" / "Source" / "PerformanceReset.h").read_text(encoding="utf-8")
         self.assertIn("juce::MidiMessage::allNotesOff", reset)
         self.assertIn("controllerEvent(1, 11, kong ? 127 : 0)", reset)

@@ -67,9 +67,12 @@ void MidiInputService::prepareDevice(const juce::String& name, const juce::Strin
     connectedIdentifier = identifier;
     activeProfile = DeviceProfileMatcher::match(name.toStdString());
     restoreBreathController();
+    breathSensitivity.store(0, std::memory_order_relaxed);
     updateEffectiveTranspose();
     if (auto* settingsFile = properties.getUserSettings())
     {
+        breathSensitivity.store(BreathSensitivity::valid(settingsFile->getIntValue(
+            controllerSettingKey() + ".sensitivityV1", 0)), std::memory_order_relaxed);
         pitchSensitivity.store(static_cast<float>(settingsFile->getDoubleValue(controllerSettingKey() + ".pitch", 1.0)));
         const auto savedSensitivity = juce::jlimit(0, 2,
         settingsFile->getIntValue(controllerSettingKey() + ".growlSensitivity", 1));
@@ -121,6 +124,7 @@ void MidiInputService::disconnect()
     lastNote.store(-1, std::memory_order_relaxed);
     velocity.store(0.0f, std::memory_order_relaxed);
     breath.store(0.0f, std::memory_order_relaxed);
+    breathSensitivity.store(0, std::memory_order_relaxed);
     pitchBend.store(0.0f, std::memory_order_relaxed);
     intelligentTechniques.reset();
     activeNoteCount = 0;
@@ -175,13 +179,15 @@ void MidiInputService::pollConnection()
 
 MidiSnapshot MidiInputService::getSnapshot() const noexcept
 {
+    const auto raw = breath.load(std::memory_order_relaxed);
     return {
         input != nullptr || externalConnected,
         lastNote.load(std::memory_order_relaxed),
         velocity.load(std::memory_order_relaxed),
-        breath.load(std::memory_order_relaxed),
+        BreathSensitivity::apply(raw, getBreathSensitivity()),
         pitchBend.load(std::memory_order_relaxed),
-        messageCount.load(std::memory_order_relaxed)
+        messageCount.load(std::memory_order_relaxed),
+        raw
     };
 }
 
@@ -207,14 +213,11 @@ void MidiInputService::restoreBreathController()
     auto savedController = activeProfile.breathController;
     if (auto* settingsFile = properties.getUserSettings())
     {
+        // A brand default is only a fallback, not evidence of the device's
+        // current output. Preserve explicit/observed per-device input, including
+        // YDS controllers configured for CC2. The plug-in's expression CC11 is
+        // a separate output route and must not overwrite this input selection.
         savedController = settingsFile->getIntValue(controllerSettingKey(), savedController);
-        // Preserve the existing one-time migration for pre-0.5 Yamaha profiles.
-        const auto profileRevisionKey = controllerSettingKey() + ".profileRevision";
-        if (activeProfile.id == "yamaha-yds" && settingsFile->getIntValue(profileRevisionKey, 0) < 1)
-        {
-            savedController = 11;
-            settingsFile->setValue(profileRevisionKey, 1);
-        }
     }
     breathController.store(juce::jlimit(0, 127, savedController));
     activeProfile.breathController = breathController.load();
@@ -243,6 +246,30 @@ juce::String MidiInputService::controllerSettingKey() const
     return "breathCC." + juce::String::toHexString(connectedIdentifier.hashCode64());
 }
 
+void MidiInputService::setBreathSensitivity(int strength, bool persist)
+{
+    // UI messages must be tied to the currently connected device. No global
+    // fallback is saved for an unplugged controller or for a different pipe.
+    if (connectedIdentifier.isEmpty()) return;
+    strength = BreathSensitivity::valid(strength);
+    {
+        // Without serialization an in-flight CC computed with the old curve can
+        // arrive after this update and leave a held note at the wrong expression.
+        // Only bounded arithmetic/event delivery is protected, never settings IO.
+        const juce::SpinLock::ScopedLockType lock(breathEventLock);
+        breathSensitivity.store(strength, std::memory_order_relaxed);
+        if (auto* sink = performanceSink.load(std::memory_order_acquire))
+            sink->breathChanged(BreathSensitivity::apply(breath.load(std::memory_order_relaxed), strength),
+                                juce::Time::getMillisecondCounterHiRes() * .001);
+    }
+    if (persist)
+    {
+        savePreferences();
+        juce::Logger::writeToLog("Breath sensitivity saved: strength=" + juce::String(strength)
+            + " inputCC=" + juce::String(getBreathController()));
+    }
+}
+
 juce::String MidiInputService::techniqueSettingKey() const
 {
     return "technique.roles.v2." + juce::String::toHexString(connectedIdentifier.hashCode64());
@@ -255,6 +282,7 @@ void MidiInputService::savePreferences()
     {
         settingsFile->setValue("preferredDevice", connectedIdentifier);
         settingsFile->setValue(controllerSettingKey(), breathController.load());
+        settingsFile->setValue(controllerSettingKey() + ".sensitivityV1", getBreathSensitivity());
         settingsFile->setValue(controllerSettingKey() + ".pitch", pitchSensitivity.load(std::memory_order_relaxed));
         settingsFile->setValue(controllerSettingKey() + ".growlSensitivity", growlSensitivity.load(std::memory_order_relaxed));
         settingsFile->setValue("performanceKeyV3", targetKey.load(std::memory_order_relaxed));
@@ -696,7 +724,11 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
         lastNote.store(outputNote, std::memory_order_relaxed);
         const auto currentBreath = breath.load(std::memory_order_relaxed);
         auto safeVelocity = message.getFloatVelocity();
-        if (sink != nullptr) sink->breathChanged(currentBreath, timestampSeconds);
+        if (sink != nullptr)
+        {
+            const juce::SpinLock::ScopedLockType lock(breathEventLock);
+            sink->breathChanged(BreathSensitivity::apply(currentBreath, getBreathSensitivity()), timestampSeconds);
+        }
         velocity.store(safeVelocity, std::memory_order_relaxed);
         ++activeNoteCount;
         latestNoteStartedMs.store(juce::Time::getMillisecondCounterHiRes(), std::memory_order_relaxed);
@@ -726,12 +758,14 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
     else if (message.isController() && message.getControllerNumber() == breathController.load())
     {
         const auto rawBreath = static_cast<float>(message.getControllerValue()) / 127.0f;
-        breath.store(rawBreath, std::memory_order_relaxed);
-        if (sink != nullptr)
         {
-            sink->breathChanged(rawBreath, timestampSeconds);
-            updateBreathDrivenTechniques(rawBreath, sink, juce::Time::getMillisecondCounterHiRes());
+            const juce::SpinLock::ScopedLockType lock(breathEventLock);
+            breath.store(rawBreath, std::memory_order_relaxed);
+            if (sink != nullptr)
+                sink->breathChanged(BreathSensitivity::apply(rawBreath, getBreathSensitivity()), timestampSeconds);
         }
+        if (sink != nullptr)
+            updateBreathDrivenTechniques(rawBreath, sink, juce::Time::getMillisecondCounterHiRes());
     }
     else if (message.isPitchWheel())
     {

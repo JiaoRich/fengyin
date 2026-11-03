@@ -93,6 +93,7 @@
     ['混响',null,'#performance-reverb','play',null,null,'调节乐器的混响量，伴奏保持原有声音。'],
     ['吹奏音量',null,'#master-volume','play',null,null,'调节吹奏音量，与伴奏取得合适的平衡。'],
     ['声音设置',null,'#page-audio','settings',null,null,'在高级设置中选择声音模式、输出设备、采样率和缓冲区，并查看预计延迟。修改会保存；如出现声音异常，查看页面的错误提示。'],
+    ['气息灵敏度',null,'.breath-sensitivity-card','settings',null,null,'连接电吹管后，拖动滑块调整吹奏手感。适中保持原样，向轻松方向调整更省力，向困难方向调整需要更大气息。设置按当前设备记忆，气息百分比显示调整后的有效气息。'],
     ['授权与激活',null,'.activation','settings',null,null,'这里查看激活状态、复制本机识别码。未激活时，可输入激活码并点击激活。'],
     ['语音与音色播报',null,'#advanced-voice','settings',null,null,'语音提示和音色播报可以分别开关。录制开始的“滴”声用于确认开始时间。'],
     ['调音师工作台',null,'#studio-entry','settings',null,null,'调音师入口需要密码。进入后可创建或编辑音色方案、选择音源、调整效果链并保存或导出方案；导入方案后也可继续编辑。'],

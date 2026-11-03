@@ -45,3 +45,13 @@ SWAM 和其他 VST3 音源、效果器不随风吟提供。用户必须自行获
 ## BLE MIDI packet codec
 
 Microsoft Windows MIDI Services BLE MIDI 1.0 codec, copyright Microsoft Corporation, MIT License. Only the standalone source codec is used; no preview transport, driver or service binaries are distributed. Full license: components/BluetoothMIDI/LICENSE.txt. Source: https://github.com/microsoft/MIDI/blob/main/src/in-box/Transport/BluetoothMidiTransport/midi_ble_midi1_codec.h
+## Microsoft Visual C++ runtime prerequisite
+
+The Windows installer includes the official Microsoft Visual C++ v14 x64
+Redistributable, version 14.51.36247.0, unchanged. Microsoft license terms apply.
+The original package is preserved in `components/VC-Runtime`; provenance and
+SHA256 are recorded in `vc-runtime.json`. Windows installation uses Microsoft's
+supported install/repair mechanism and preserves newer installed versions.
+Uninstalling FengYin does not remove the shared Microsoft runtime.
+
+https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files

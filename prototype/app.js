@@ -2379,12 +2379,66 @@ function renderSmartAdapter(state) {
   renderAdapterTechniqueGrid();
 }
 
+// Device-scoped input response. The backend owns the curve and the effective
+// breath meter; never apply a second mapping in the browser.
+const sensitivityInput=$('#breath-sensitivity'),sensitivityValue=$('#breath-sensitivity-value');
+let sensitivityGesture='',sensitivityPending=null,sensitivityFrame=0,sensitivityPointer=false;
+const sensitivityDevice=state=>`${state.deviceIdentifier||''}/${state.connectionGeneration??-1}`;
+function drawBreathSensitivity(strength){
+  strength=Math.max(-100,Math.min(100,Math.round(Number(strength)||0)));
+  sensitivityInput.value=100-strength;
+  sensitivityValue.textContent=strength>0?`+${strength}`:String(strength);
+  const ratio=(100-strength)/200;
+  sensitivityValue.style.left=`clamp(24px,calc(${ratio*100}% + ${10-ratio*20}px),calc(100% - 24px))`;
+  sensitivityInput.setAttribute('aria-valuetext',`${strength>0?'轻松':strength<0?'困难':'适中'}，${strength}`);
+}
+function renderBreathSensitivity(state){
+  const device=sensitivityDevice(state),connected=!!state.deviceConnected&&!!state.deviceIdentifier;
+  if(sensitivityGesture&&sensitivityGesture!==device){sensitivityGesture='';sensitivityPointer=false;sensitivityPending=null;cancelAnimationFrame(sensitivityFrame);sensitivityFrame=0;}
+  sensitivityInput.disabled=!connected;
+  $('#breath-sensitivity-device').textContent=connected?(state.deviceName||'当前电吹管'):'连接电吹管后可调节';
+  if(sensitivityPending&&(sensitivityPending.device!==device||Number(state.breathSensitivity)===sensitivityPending.strength||performance.now()>sensitivityPending.until))sensitivityPending=null;
+  if(!sensitivityGesture&&!sensitivityPending)drawBreathSensitivity(connected?state.breathSensitivity:0);
+}
+function sendBreathSensitivity(commit){
+  const state=latestBackendState,device=sensitivityDevice(state);
+  if(!state.deviceConnected||!sensitivityGesture||sensitivityGesture!==device)return;
+  const strength=100-Number(sensitivityInput.value);
+  nativeEvent('setBreathSensitivity',{strength,commit,deviceIdentifier:state.deviceIdentifier,connectionGeneration:state.connectionGeneration});
+  if(commit)sensitivityPending={device,strength,until:performance.now()+1800};
+}
+sensitivityInput.addEventListener('pointerdown',event=>{
+  if(sensitivityInput.disabled)return;
+  const rect=sensitivityInput.getBoundingClientRect(),thumb=rect.left+10+(rect.width-20)*Number(sensitivityInput.value)/200;
+  if(Math.abs(event.clientX-thumb)>24){event.preventDefault();return;}
+  sensitivityPointer=true;
+  sensitivityGesture=sensitivityDevice(latestBackendState);
+});
+sensitivityInput.addEventListener('keydown',()=>{sensitivityPointer=false;});
+sensitivityInput.addEventListener('input',()=>{
+  if(sensitivityInput.disabled)return;
+  if(!sensitivityGesture)sensitivityGesture=sensitivityDevice(latestBackendState);
+  let position=Number(sensitivityInput.value);
+  if(sensitivityPointer)for(const anchor of [0,100,200])if(Math.abs(position-anchor)<=2){position=anchor;break;}
+  drawBreathSensitivity(100-position);
+  if(!sensitivityFrame)sensitivityFrame=requestAnimationFrame(()=>{sensitivityFrame=0;sendBreathSensitivity(false);});
+});
+function commitBreathSensitivity(){
+  cancelAnimationFrame(sensitivityFrame);sensitivityFrame=0;
+  if(sensitivityGesture)sendBreathSensitivity(true);sensitivityGesture='';sensitivityPointer=false;
+}
+sensitivityInput.addEventListener('change',commitBreathSensitivity);
+sensitivityInput.addEventListener('pointerup',commitBreathSensitivity);
+sensitivityInput.addEventListener('pointercancel',commitBreathSensitivity);
+sensitivityInput.addEventListener('blur',commitBreathSensitivity);
+drawBreathSensitivity(0);
+
 let backendControlSignature = '';
 function backendControlsChanged(state) {
   const controls = {...state};
   // These counters/meters have a fast path below. They must not rebuild every
   // hidden settings panel, artwork and style selector at the audio-meter rate.
-  for (const key of ['breath','instrumentPeak','outputLeftPeak','outputRightPeak',
+  for (const key of ['breath','rawBreath','instrumentPeak','outputLeftPeak','outputRightPeak',
     'audioCpu','audioXruns','callbackOverruns','overloadSamples','droppedMidiEvents','note','noteReceived','videoClock']) delete controls[key];
   const signature = JSON.stringify(controls);
   if (signature === backendControlSignature) return false;
@@ -2413,6 +2467,7 @@ window.__JUCE__?.backend?.addEventListener('backendMeterState',packet=>renderBac
 window.__JUCE__?.backend?.addEventListener('backendState', state => {
   if(state.videoClock)applyVideoPlaybackClock(state.videoClock);
   renderBackendMeters(state,true);
+  renderBreathSensitivity(state);
   if (!backendControlsChanged(state)) return;
   renderBendRange(state);
   $$('#music-tempo [data-tempo]').forEach(button=>{const active=Number(button.dataset.tempo)===Number(state.musicTempoMode??1);button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));});
@@ -2792,7 +2847,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.42 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.43 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

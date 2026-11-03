@@ -555,6 +555,15 @@ void MainComponent::setupWebInterface()
             if (isActivated)
                 midi.setTargetKey(static_cast<int>(payload.getProperty("targetKey", 0)));
         })
+        .withEventListener("setBreathSensitivity", [this](juce::var payload)
+        {
+            if (payload.getProperty("deviceIdentifier", "").toString() != midi.getConnectedDeviceIdentifier()
+                || static_cast<juce::int64>(payload.getProperty("connectionGeneration", -1))
+                    != static_cast<juce::int64>(midi.getConnectionGeneration())) return;
+            midi.setBreathSensitivity(static_cast<int>(payload.getProperty("strength", 0)),
+                                     static_cast<bool>(payload.getProperty("commit", true)));
+            lastWebStateAtMs = 0;
+        })
         .withEventListener("setGrowlSensitivity", [this](juce::var payload)
         {
             const auto value = payload.getProperty("sensitivity", "standard").toString();
@@ -1580,6 +1589,9 @@ void MainComponent::logAudioDiagnostic(const fengyin::AudioDeviceStatus& status)
         +" device="+status.deviceName+pluginHost.takeStageTimingReport()
         +(detailed ? juce::String() : pluginHost.takeCallbackCadenceReport())
         +" audioCpu="+juce::String(status.cpuUsage,5)+resources
+        +" rawBreath="+juce::String(snapshot.rawBreath,4)
+        +" effectiveBreath="+juce::String(snapshot.breath,4)
+        +" breathSensitivity="+juce::String(midi.getBreathSensitivity())
         +" droppedMidi="+juce::String(pluginHost.getDroppedMidiEventCount())
         +" invalidInput="+juce::String(masterOutput.getInvalidInputSamples())
         +" invalidOutput="+juce::String(masterOutput.getInvalidOutputSamples())
@@ -1603,7 +1615,8 @@ void MainComponent::logAudioDiagnostic(const fengyin::AudioDeviceStatus& status)
           +",proxyAttempted="+juce::String(webVideoProxyAttempted?1:0)
           +",recording="+juce::String(recorder.isRecording()?1:0)
           +",windowRecorderBusy="+juce::String(windowRecorder.busy()?1:0)
-          +",breath="+juce::String(snapshot.breath,4)+",note="+juce::String(snapshot.lastNote)
+          +",breath="+juce::String(snapshot.breath,4)
+          +",note="+juce::String(snapshot.lastNote)
           +",pluginLoading="+juce::String(pluginLoading?1:0)
           +",effectLoading="+juce::String(effectLoading?1:0)+"]" : juce::String())+"\n");
 }
@@ -1820,6 +1833,7 @@ void MainComponent::timerCallback()
         lastWebMeterAtMs=webNow;
         auto meters=std::make_unique<juce::DynamicObject>();
         meters->setProperty("breath",snapshot.breath);
+        meters->setProperty("rawBreath",snapshot.rawBreath);
         meters->setProperty("note",snapshot.lastNote);
         meters->setProperty("noteReceived",snapshot.lastNote>=0);
         meters->setProperty("audioCpu",currentAudio.cpuUsage);
@@ -1855,6 +1869,8 @@ void MainComponent::timerCallback()
         state->setProperty("deviceConnected", snapshot.deviceConnected);
         state->setProperty("deviceName", midi.getConnectedDeviceName());
         state->setProperty("deviceIdentifier", midi.getConnectedDeviceIdentifier());
+        state->setProperty("connectionGeneration", static_cast<juce::int64>(midi.getConnectionGeneration()));
+        state->setProperty("breathSensitivity", midi.getBreathSensitivity());
         state->setProperty("deviceMatched", snapshot.deviceConnected && midi.hasCompletedBreathMatch());
         state->setProperty("breathMatching", breathDetectionActive && webBreathDetectionActive);
         const auto deviceProfile = midi.getActiveProfile();
@@ -1868,6 +1884,7 @@ void MainComponent::timerCallback()
         state->setProperty("hasAssignableButtons", deviceProfile.hasAssignableButtons);
         state->setProperty("hasMotionController", deviceProfile.hasMotionController);
         state->setProperty("breath", snapshot.breath);
+        state->setProperty("rawBreath", snapshot.rawBreath);
         state->setProperty("note", snapshot.lastNote);
         state->setProperty("noteReceived", snapshot.lastNote >= 0);
         state->setProperty("audioDevice", currentAudio.deviceName);

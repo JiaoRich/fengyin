@@ -1,9 +1,13 @@
 name: Windows 编译与安装包
-run-name: ${{ inputs.native_video_picker_test && 'Windows native video picker check' || inputs.screen_capture_probe && 'Windows isolated GPU recording candidate' || inputs.diagnostic_only && 'Windows diagnostic collectors only' || inputs.media_runtime_test && 'Windows media performance runtime (no installer)' || inputs.vlc_webview_test && 'Windows VLC WebView interaction diagnostic' || inputs.media_integration_test && 'Windows media integration diagnostic' || inputs.native_window_test && 'Windows native input diagnostic' || 'Windows build and installer' }}
+run-name: ${{ inputs.vc_runtime_test && 'Windows VC runtime prerequisite check' || inputs.native_video_picker_test && 'Windows native video picker check' || inputs.screen_capture_probe && 'Windows isolated GPU recording candidate' || inputs.diagnostic_only && 'Windows diagnostic collectors only' || inputs.media_runtime_test && 'Windows media performance runtime (no installer)' || inputs.vlc_webview_test && 'Windows VLC WebView interaction diagnostic' || inputs.media_integration_test && 'Windows media integration diagnostic' || inputs.native_window_test && 'Windows native input diagnostic' || 'Windows build and installer' }}
 
 on:
   workflow_dispatch:
     inputs:
+      vc_runtime_test:
+        description: Test only official VC runtime preparation and actual Inno wrapper
+        type: boolean
+        default: false
       native_video_picker_test:
         description: Validate native Windows video picker only (no audio engine or installer)
         type: boolean
@@ -57,6 +61,27 @@ permissions:
   contents: read
 
 jobs:
+  vc-runtime-check:
+    if: ${{ inputs.vc_runtime_test }}
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Prepare Inno test runtime
+        shell: powershell
+        run: choco install innosetup --yes --no-progress
+      - name: Execute official runtime and production installer flow checks
+        shell: powershell
+        run: |
+          ./scripts/test-vc-runtime.ps1
+          ./scripts/test-vc-installer-flow.ps1
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: VC-runtime-prerequisite-evidence
+          path: vc-runtime-test/
+          if-no-files-found: warn
+
   native-video-picker:
     if: ${{ inputs.native_video_picker_test }}
     runs-on: windows-2022
@@ -513,7 +538,7 @@ jobs:
           name: FengYin-Crash-Capture
           path: diagnostic/FengYin-Crash-Capture.zip
   windows-release:
-    if: ${{ !inputs.native_video_picker_test && !inputs.bluetooth_midi_test && !inputs.screen_capture_probe && !inputs.media_runtime_test && !inputs.vlc_webview_test && !inputs.media_integration_test && !inputs.diagnostic_only && !inputs.startup_comparison && !inputs.kong_test && !inputs.native_window_test }}
+    if: ${{ !inputs.vc_runtime_test && !inputs.native_video_picker_test && !inputs.bluetooth_midi_test && !inputs.screen_capture_probe && !inputs.media_runtime_test && !inputs.vlc_webview_test && !inputs.media_integration_test && !inputs.diagnostic_only && !inputs.startup_comparison && !inputs.kong_test && !inputs.native_window_test }}
     name: Windows x64 Release
     runs-on: windows-2022
     timeout-minutes: 60
@@ -534,6 +559,20 @@ jobs:
         with:
           path: third_party/ci-webview/WebView2RuntimeInstallerX64.exe
           key: win2022-webview155-0625fb5c1e75be58
+
+      - name: 验证官方VC++运行组件及安装决策
+        shell: powershell
+        run: |
+          ./scripts/test-vc-runtime.ps1
+          ./scripts/test-vc-installer-flow.ps1
+
+      - name: 保存VC++运行组件验证记录
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: VC-runtime-prerequisite-evidence
+          path: vc-runtime-test/
+          if-no-files-found: warn
 
       - name: 验证 Fresh Air 全新安装
         shell: powershell

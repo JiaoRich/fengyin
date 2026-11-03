@@ -15,6 +15,7 @@
 #include "PitchKey.h"
 #include "MidiOnsetTrace.h"
 #include "MusicTempoPolicy.h"
+#include "BreathSensitivity.h"
 
 namespace fengyin
 {
@@ -26,6 +27,7 @@ struct MidiSnapshot
     float breath = 0.0f;
     float pitchBend = 0.0f;
     uint64_t messageCount = 0;
+    float rawBreath = 0.0f;
 };
 
 struct ExpressionSettings
@@ -68,6 +70,8 @@ public:
     [[nodiscard]] ExpressionSettings getExpressionSettings() const;
     void setExpressionSettings(ExpressionSettings settings);
     void setBreathController(int controllerNumber);
+    void setBreathSensitivity(int strength, bool persist = true);
+    [[nodiscard]] int getBreathSensitivity() const noexcept { return breathSensitivity.load(std::memory_order_relaxed); }
     void setPerformanceSink(MidiPerformanceSink* sink) noexcept;
     void beginBreathDetection() noexcept;
     void cancelBreathDetection() noexcept;
@@ -123,6 +127,8 @@ private:
     std::atomic<int> lastNote { -1 };
     std::atomic<float> velocity { 0.0f };
     std::atomic<float> breath { 0.0f };
+    std::atomic<int> breathSensitivity { 0 };
+    juce::SpinLock breathEventLock; // Serialize live UI response changes with CC/first-note expression delivery.
     std::atomic<float> pitchBend { 0.0f };
     std::atomic<float> pitchSensitivity { 1.0f };
     std::atomic<uint64_t> messageCount { 0 };

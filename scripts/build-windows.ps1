@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.1.42",
+    [string]$Version = "1.1.43",
     [switch]$SkipInstaller
 )
 
@@ -39,6 +39,8 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
 }
 # Fail inexpensive source regressions before the native build, not after it.
 Invoke-Checked "发布源码预检" { python -m unittest discover -s (Join-Path $ProjectRoot "tests") -p "test_*.py" }
+& (Join-Path $PSScriptRoot 'prepare-vc-runtime.ps1') -DestinationDirectory (Join-Path $ProjectRoot 'third_party\vc-runtime')
+if ($LASTEXITCODE -ne 0) { throw 'VC++ runtime preflight failed' }
 Invoke-Checked "LibVLC official runtime and source verification" { python (Join-Path $PSScriptRoot "prepare_vlc.py") $VlcRoot }
 Invoke-Checked "Audio-only recording dependencies verification" { python (Join-Path $PSScriptRoot "prepare_audio_recording.py") $RecordingRoot }
 # Download before compilation. Never package a partial or unsigned dependency.
@@ -211,6 +213,9 @@ if ((Get-FileHash (Join-Path $ProjectRoot "assets\components\magic.CURVE-1.0.2-W
 New-Item -ItemType Directory -Path $MagicDestination -Force | Out-Null
 Copy-Item (Join-Path $ProjectRoot "assets\components\magic.CURVE-1.0.2-Windows-Setup.exe") (Join-Path $MagicDestination "magic.CURVE-1.0.2-Windows-Setup.exe") -Force
 Copy-Item (Join-Path $ProjectRoot "installer\AudioComponents.txt") $PackageDir -Force
+$VCRuntimePackage=Join-Path $PackageDir 'components\VC-Runtime'
+New-Item -ItemType Directory -Force -Path $VCRuntimePackage | Out-Null
+Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'third_party\vc-runtime') -File | Copy-Item -Destination $VCRuntimePackage -Force
 if (-not $UsePreparedFfmpeg) {
     Copy-Item $FfmpegPath (Join-Path $PackageDir "ffmpeg.exe") -Force
     Copy-Item (Join-Path (Split-Path $FfmpegPath) "ffprobe.exe") (Join-Path $PackageDir "ffprobe.exe") -Force
