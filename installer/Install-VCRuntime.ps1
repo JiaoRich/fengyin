@@ -5,9 +5,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'VCRuntimePolicy.ps1')
-$manifest = Get-Content -LiteralPath (Join-Path $PackageDirectory 'vc-runtime.json') -Raw | ConvertFrom-Json
-$required = [version]$manifest.version
-$exe = Join-Path $PackageDirectory $manifest.file
+$run = $null
 
 function Read-InstalledVCRuntime {
     $versions = @()
@@ -42,6 +40,13 @@ function Test-VCRuntimeFiles {
 }
 
 try {
+    if (-not $VerifyOnly) {
+        New-Item -ItemType Directory -Force -Path $LogDirectory | Out-Null
+        $run = Join-Path $LogDirectory ('vc-runtime-'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,6))
+    }
+    $manifest = Get-Content -LiteralPath (Join-Path $PackageDirectory 'vc-runtime.json') -Raw | ConvertFrom-Json
+    $required = [version]$manifest.version
+    $exe = Join-Path $PackageDirectory $manifest.file
     if (-not [Environment]::Is64BitProcess) { throw 'Required: 64-bit Windows PowerShell.' }
     if ((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash -ne $manifest.sha256) { throw 'VC++ installer SHA256 mismatch.' }
     $signature = Get-AuthenticodeSignature -LiteralPath $exe
@@ -50,8 +55,6 @@ try {
     $binaryVersion = [version]::new($info.FileMajorPart,$info.FileMinorPart,$info.FileBuildPart,$info.FilePrivatePart)
     if ($binaryVersion -ne $required) { throw 'VC++ installer version mismatch.' }
     if ($VerifyOnly) { Write-Output ('Verified Microsoft VC++ '+$required); exit 0 }
-    New-Item -ItemType Directory -Force -Path $LogDirectory | Out-Null
-    $run = Join-Path $LogDirectory ('vc-runtime-'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,6))
     Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
@@ -73,7 +76,11 @@ namespace FengYin {
     $code = 0
     if ($action -ne 'skip') {
         $arguments = '/'+$action+' /quiet /norestart /log "'+$run+'.log"'
-        $process = Start-Process -FilePath $exe -ArgumentList $arguments -Wait -PassThru
+        $process = Start-Process -FilePath $exe -ArgumentList $arguments -PassThru
+        if (-not $process.WaitForExit(600000)) {
+            throw 'VC++ preparation exceeded 10 minutes. The Microsoft installer was not forcibly terminated; wait for it to finish before retrying. See its install log.'
+        }
+        $process.Refresh()
         $code = $process.ExitCode
     }
     $after = Read-InstalledVCRuntime

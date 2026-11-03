@@ -560,9 +560,11 @@ void MainComponent::setupWebInterface()
             if (payload.getProperty("deviceIdentifier", "").toString() != midi.getConnectedDeviceIdentifier()
                 || static_cast<juce::int64>(payload.getProperty("connectionGeneration", -1))
                     != static_cast<juce::int64>(midi.getConnectionGeneration())) return;
-            midi.setBreathSensitivity(static_cast<int>(payload.getProperty("strength", 0)),
-                                     static_cast<bool>(payload.getProperty("commit", true)));
-            lastWebStateAtMs = 0;
+            const bool commit = static_cast<bool>(payload.getProperty("commit", true));
+            midi.setBreathSensitivity(static_cast<int>(payload.getProperty("strength", 0)), commit);
+            // Preview is already local and meters have their own lightweight
+            // clock. Do not resend the complete library/settings on each drag.
+            if (commit) lastWebStateAtMs = 0;
         })
         .withEventListener("setGrowlSensitivity", [this](juce::var payload)
         {

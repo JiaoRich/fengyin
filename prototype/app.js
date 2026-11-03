@@ -2382,7 +2382,7 @@ function renderSmartAdapter(state) {
 // Device-scoped input response. The backend owns the curve and the effective
 // breath meter; never apply a second mapping in the browser.
 const sensitivityInput=$('#breath-sensitivity'),sensitivityValue=$('#breath-sensitivity-value');
-let sensitivityGesture='',sensitivityPending=null,sensitivityFrame=0,sensitivityPointer=false;
+let sensitivityGesture='',sensitivityPending=null,sensitivityFrame=0,sensitivityPointer=false,sensitivityLastPreview=0;
 const sensitivityDevice=state=>`${state.deviceIdentifier||''}/${state.connectionGeneration??-1}`;
 function drawBreathSensitivity(strength){
   strength=Math.max(-100,Math.min(100,Math.round(Number(strength)||0)));
@@ -2421,7 +2421,10 @@ sensitivityInput.addEventListener('input',()=>{
   let position=Number(sensitivityInput.value);
   if(sensitivityPointer)for(const anchor of [0,100,200])if(Math.abs(position-anchor)<=2){position=anchor;break;}
   drawBreathSensitivity(100-position);
-  if(!sensitivityFrame)sensitivityFrame=requestAnimationFrame(()=>{sensitivityFrame=0;sendBreathSensitivity(false);});
+  if(!sensitivityFrame)sensitivityFrame=requestAnimationFrame(()=>{
+    sensitivityFrame=0;const now=performance.now();
+    if(now-sensitivityLastPreview>=32){sensitivityLastPreview=now;sendBreathSensitivity(false);}
+  });
 });
 function commitBreathSensitivity(){
   cancelAnimationFrame(sensitivityFrame);sensitivityFrame=0;

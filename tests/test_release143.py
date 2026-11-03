@@ -27,6 +27,7 @@ class Release143(unittest.TestCase):
         bridge=main.split('.withEventListener("setBreathSensitivity"',1)[1].split('.withEventListener(',1)[0]
         self.assertIn('deviceIdentifier',bridge);self.assertIn('connectionGeneration',bridge)
         self.assertNotIn('masterOutput',bridge);self.assertNotIn('pluginHost',bridge)
+        self.assertIn('if (commit) lastWebStateAtMs = 0;',bridge)
 
     def test_runtime_is_pinned_and_verified(self):
         manifest=json.loads((ROOT/'installer/vc-runtime.json').read_text(encoding='utf-8'))
