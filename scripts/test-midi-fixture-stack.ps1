@@ -3,12 +3,19 @@ $ErrorActionPreference = 'Stop'
 $Evidence = Join-Path $BuildDirectory 'evidence'
 New-Item -ItemType Directory $Evidence -Force | Out-Null
 $Baseline = Join-Path (Resolve-Path $BuildDirectory) 'previous-test.cpp'
+$Baseline = $Baseline.Replace('\','/')
 # The preceding release candidate failed before its first test output. Keep
 # that exact source as the counterexample, with the same production runtime.
-$Previous = git show 'HEAD^:tests/test_midi_onset.cpp'
+$BaselineRevision = 'a282729d371dae1d999c9cd527d17884c0b3e313'
+if(!(git rev-list --all | Where-Object { $_ -eq $BaselineRevision })) {
+    git fetch --depth 1 origin $BaselineRevision
+    if($LASTEXITCODE){throw 'Cannot retrieve the pinned previous fixture revision'}
+}
+$Previous = git show "${BaselineRevision}:tests/test_midi_onset.cpp"
 if($LASTEXITCODE -ne 0){throw 'Cannot read the exact preceding test fixture'}
 [IO.File]::WriteAllLines($Baseline, $Previous, (New-Object Text.UTF8Encoding($false)))
-cmake -S tools/midi-input-check -B $BuildDirectory -G 'Visual Studio 17 2022' -A x64 "-DBASELINE_SOURCE=$Baseline"
+$BaselineRevision | Set-Content (Join-Path $Evidence 'previous-revision.txt') -Encoding utf8
+cmake -S tools/midi-input-check -B $BuildDirectory -G 'Visual Studio 17 2022' -A x64 "-DBASELINE_SOURCE:FILEPATH=$Baseline"
 if($LASTEXITCODE){throw 'MIDI regression configure failed'}
 cmake --build $BuildDirectory --config Release --parallel 4
 if($LASTEXITCODE){throw 'MIDI regression compile failed'}
