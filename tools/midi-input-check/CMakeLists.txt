@@ -1,0 +1,31 @@
+cmake_minimum_required(VERSION 3.22)
+project(FengYinMidiInputCheck LANGUAGES C CXX)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    add_compile_options(/utf-8 /UNDEBUG)
+else()
+    add_compile_options(-UNDEBUG)
+endif()
+set(ROOT "${CMAKE_CURRENT_LIST_DIR}/../..")
+include(FetchContent)
+FetchContent_Declare(JUCE GIT_REPOSITORY https://github.com/juce-framework/JUCE.git GIT_TAG 9.0.2 GIT_SHALLOW TRUE
+    PATCH_COMMAND ${CMAKE_COMMAND} -DJUCE_SOURCE_DIR=<SOURCE_DIR> -P "${ROOT}/scripts/patch-juce-wasapi-raw.cmake")
+FetchContent_MakeAvailable(JUCE)
+
+# Share the exact production implementation between the previous and current
+# test fixture. Neither target raises Windows' default stack size.
+add_library(MidiCheckRuntime STATIC "${ROOT}/native/Source/MidiInputService.cpp")
+target_include_directories(MidiCheckRuntime PUBLIC "${ROOT}/native/Source")
+target_link_libraries(MidiCheckRuntime PUBLIC juce::juce_audio_devices juce::juce_data_structures
+    juce::juce_recommended_config_flags)
+add_executable(OnsetFixed "${ROOT}/tests/test_midi_onset.cpp")
+target_link_libraries(OnsetFixed PRIVATE MidiCheckRuntime)
+if(DEFINED BASELINE_SOURCE)
+    add_executable(OnsetBaseline "${BASELINE_SOURCE}")
+    target_link_libraries(OnsetBaseline PRIVATE MidiCheckRuntime)
+endif()
+enable_testing()
+add_test(NAME production_midi_receive COMMAND OnsetFixed)
+set_tests_properties(production_midi_receive PROPERTIES TIMEOUT 60)

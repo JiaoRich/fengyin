@@ -9,6 +9,7 @@
 #include "MidiOnsetTrace.h"
 #include "SimpleTechniquePolicy.h"
 #include <thread>
+#include <memory>
 
 namespace fengyin {
 struct MidiInputServiceTestAccess {
@@ -62,6 +63,10 @@ struct Sink : fengyin::MidiPerformanceSink {
     void pitchBendChanged(float v, double t) noexcept override { events.push_back({'P',v,t}); }
     void techniqueChanged(fengyin::PerformanceTechnique, float v) noexcept override { events.push_back({'T',v,0}); }
 };
+// Each fixture owns a bounded trace queue. Keep test fixture storage on the
+// heap: MSVC can reserve all main() locals at entry even for disjoint scopes,
+// exceeding its default 1 MiB stack before the first test can run. The actual
+// service, callbacks, scoped lifetime and all assertions remain unchanged.
 int main() {
     juce::ScopedJuceInitialiser_GUI juceInitialiser;
     const auto reconnectSettings=juce::File::getSpecialLocation(juce::File::tempDirectory)
@@ -77,7 +82,7 @@ int main() {
                 last.store(v);
             }
         } sink;
-        fengyin::MidiInputService input(false);input.attachExternal("concurrent-sensitivity","Test controller");input.setPerformanceSink(&sink);
+        auto inputOwner = std::make_unique<fengyin::MidiInputService>(false); auto& input = *inputOwner;input.attachExternal("concurrent-sensitivity","Test controller");input.setPerformanceSink(&sink);
         std::thread incoming([&]{input.acceptExternalMessage(juce::MidiMessage::controllerEvent(1,2,64));});
         while(!sink.entered.load())std::this_thread::yield();
         std::atomic<bool> uiFinished{false};
@@ -89,7 +94,7 @@ int main() {
         input.setPerformanceSink(nullptr);
     }
     {
-        fengyin::MidiInputService input(false);Sink sink;input.setPerformanceSink(&sink);
+        auto inputOwner = std::make_unique<fengyin::MidiInputService>(false); auto& input = *inputOwner;Sink sink;input.setPerformanceSink(&sink);
         fengyin::MidiInputServiceTestAccess::useTestSettings(input,reconnectSettings);
         input.attachExternal("sensitivity-a","Yamaha YDS-150");input.setBreathController(2);
         assert(input.getBreathSensitivity()==0);
@@ -126,13 +131,13 @@ int main() {
         input.setPerformanceSink(nullptr);
     }
     {
-        fengyin::MidiInputService input(false);
+        auto inputOwner = std::make_unique<fengyin::MidiInputService>(false); auto& input = *inputOwner;
         fengyin::MidiInputServiceTestAccess::useTestSettings(input,reconnectSettings);
         input.attachExternal("sensitivity-a","Yamaha YDS-150");assert(input.getBreathSensitivity()==-100);
         input.attachExternal("sensitivity-b","Other controller");assert(input.getBreathSensitivity()==55);
     }
     {
-        fengyin::MidiInputService input(false);Sink sink;input.setPerformanceSink(&sink);
+        auto inputOwner = std::make_unique<fengyin::MidiInputService>(false); auto& input = *inputOwner;Sink sink;input.setPerformanceSink(&sink);
         fengyin::MidiInputServiceTestAccess::useTestSettings(input,reconnectSettings);
         input.attachExternal("ble:pressure-test","Pressure controller");input.setBreathController(11);
         fengyin::TechniqueMapping mapping;mapping.technique=fengyin::PerformanceTechnique::portamento;
@@ -150,7 +155,7 @@ int main() {
     }
 
     {
-        fengyin::MidiInputService input(false); Sink sink;
+        auto inputOwner = std::make_unique<fengyin::MidiInputService>(false); auto& input = *inputOwner; Sink sink;
         fengyin::MidiInputServiceTestAccess::useTestSettings(input,reconnectSettings);
         input.setPerformanceSink(&sink); input.suspendAutomaticConnection(true);
         input.attachExternal("ble:stable-id", "Bluetooth controller");
@@ -178,7 +183,7 @@ int main() {
     // Real persisted preferences, isolated from the user's settings. Reconnection
     // restores breath/mouthpiece independently; motion must never replace breath.
     {
-        fengyin::MidiInputService input(false);
+        auto inputOwner = std::make_unique<fengyin::MidiInputService>(false); auto& input = *inputOwner;
         fengyin::MidiInputServiceTestAccess::useTestSettings(input,reconnectSettings);
         fengyin::MidiInputServiceTestAccess::restoreDevice(input,"device-a");
         input.setBreathController(11);
@@ -224,7 +229,7 @@ int main() {
         assert(input.hasCompletedBreathMatch() && input.getBreathController()==11);
     }
     {
-        fengyin::MidiInputService restarted(false);
+        auto restartedOwner = std::make_unique<fengyin::MidiInputService>(false); auto& restarted = *restartedOwner;
         fengyin::MidiInputServiceTestAccess::useTestSettings(restarted,reconnectSettings);
         fengyin::MidiInputServiceTestAccess::restoreDevice(restarted,"device-a");
         assert(restarted.getBreathController()==11 && restarted.hasCompletedBreathMatch());
@@ -236,7 +241,7 @@ int main() {
     for(int revision : {-1,0,1}) for(int cc : {2,11,7}) for(bool matched : {false,true}) {
         const auto identifier="yamaha-saved-"+juce::String(revision)+"-"+juce::String(cc)+"-"+juce::String(int(matched));
         {
-            fengyin::MidiInputService input(false);Sink sink;
+            auto inputOwner = std::make_unique<fengyin::MidiInputService>(false); auto& input = *inputOwner;Sink sink;
             fengyin::MidiInputServiceTestAccess::useTestSettings(input,reconnectSettings);
             fengyin::MidiInputServiceTestAccess::seedBreathPreference(input,identifier,cc,matched,revision);
             input.setPerformanceSink(&sink);
@@ -254,7 +259,7 @@ int main() {
             input.setPerformanceSink(nullptr);
         }
         {
-            fengyin::MidiInputService restarted(false);
+            auto restartedOwner = std::make_unique<fengyin::MidiInputService>(false); auto& restarted = *restartedOwner;
             fengyin::MidiInputServiceTestAccess::useTestSettings(restarted,reconnectSettings);
             fengyin::MidiInputServiceTestAccess::restoreDevice(restarted,identifier,"Yamaha YDS-150");
             assert(restarted.getBreathController()==cc);
@@ -262,7 +267,7 @@ int main() {
         }
     }
     {
-        fengyin::MidiInputService fresh(false);
+        auto freshOwner = std::make_unique<fengyin::MidiInputService>(false); auto& fresh = *freshOwner;
         fengyin::MidiInputServiceTestAccess::useTestSettings(fresh,reconnectSettings);
         fengyin::MidiInputServiceTestAccess::restoreDevice(fresh,"yamaha-no-history","Yamaha YDS-150");
         assert(!fresh.hasCompletedBreathMatch());
@@ -336,7 +341,7 @@ int main() {
     Sink sink;
     // Kensa mouthpiece CC/pressure drives the technique, never pitch bend.
     for(const auto source:{fengyin::TechniqueSourceType::controller,fengyin::TechniqueSourceType::channelPressure}) {
-        Sink routed;fengyin::MidiInputService input(false);input.setPerformanceSink(&routed);
+        Sink routed;auto inputOwner = std::make_unique<fengyin::MidiInputService>(false); auto& input = *inputOwner;input.setPerformanceSink(&routed);
         input.setTechniqueContext("kontakt-kensa");fengyin::TechniqueMapping mapping;
         mapping.technique=fengyin::PerformanceTechnique::vibrato;mapping.mode=fengyin::TechniqueControlMode::hardware;
         mapping.sourceType=source;mapping.sourceNumber=74;input.setTechniqueMappings({mapping});routed.events.clear();
@@ -356,7 +361,7 @@ int main() {
                            fengyin::TechniqueControlMode::automatic})
     {
         Sink routed;
-        fengyin::MidiInputService input(false);
+        auto inputOwner = std::make_unique<fengyin::MidiInputService>(false); auto& input = *inputOwner;
         input.setPerformanceSink(&routed);
         input.setTechniqueContext(key);
         fengyin::TechniqueMapping mapping;
@@ -384,14 +389,14 @@ int main() {
         assert(routed.offNotes.back()==65);
     }
     {
-        fengyin::MidiInputService defaults(false);
+        auto defaultsOwner = std::make_unique<fengyin::MidiInputService>(false); auto& defaults = *defaultsOwner;
         const auto mappings=defaults.getTechniqueMappings();
         assert(mappings.size()==1 && mappings[0].technique==fengyin::PerformanceTechnique::vibrato);
         assert(mappings[0].mode==fengyin::TechniqueControlMode::breath);
     }
     {
         Sink pitchSink;
-        fengyin::MidiInputService pitch(false);
+        auto pitchOwner = std::make_unique<fengyin::MidiInputService>(false); auto& pitch = *pitchOwner;
         fengyin::MidiInputServiceTestAccess::useTestSettings(pitch,reconnectSettings);
         pitch.setPerformanceSink(&pitchSink);
         const auto sendPitch = [&](juce::MidiMessage m) { fengyin::MidiInputServiceTestAccess::send(pitch, m, 1); };
@@ -408,7 +413,7 @@ int main() {
         sendPitch(juce::MidiMessage::noteOn(1, 65, (juce::uint8)80));
         assert(pitchSink.onNotes.back() == 63);
     }
-    fengyin::MidiInputService service(false); // No user preferences read/written.
+    auto serviceOwner = std::make_unique<fengyin::MidiInputService>(false); auto& service = *serviceOwner; // No user preferences read/written.
     fengyin::MidiInputServiceTestAccess::useTestSettings(service,reconnectSettings);
     service.setPerformanceSink(&sink);
     service.setTechniqueContext("kong-erhu");
