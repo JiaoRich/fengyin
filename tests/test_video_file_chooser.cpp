@@ -12,7 +12,7 @@ struct Test final : juce::Component, juce::Timer
     bool failed = false, clicked = false;
     double seenAt = 0;
     HWND obscuredSelector = nullptr;
-    bool foregroundRequested = false;
+    bool hostClickSent = false, foregroundRequested = false;
     const double deadline = juce::Time::getMillisecondCounterHiRes() + 60000;
     HANDLE destroyedProcess = nullptr;
     explicit Test(juce::File executable = {}) : helperExecutable(std::move(executable))
@@ -96,28 +96,44 @@ struct Test final : juce::Component, juce::Timer
             if (!obscuredSelector)
             {
                 if (GetForegroundWindow() != hwnd) return;
-                // Reproduce the obscured picker and activate the host with
-                // real input. The original selector and callback must survive.
-                if (!SetWindowPos(host, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE))
-                { fail("cannot cover selector with host"); return; }
-                RECT bounds {};
+                // Arrange the test-only cover independently of Windows'
+                // foreground restrictions. Drop TOPMOST before reopening.
+                if (!SetWindowPos(host, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE))
+                { fail("cannot arrange selector cover"); return; }
+                obscuredSelector = hwnd;
+                return;
+            }
+            if (hwnd != obscuredSelector) { fail("replaced instead of restoring selector"); return; }
+            if (!hostClickSent)
+            {
+                RECT bounds {}, pickerBounds {}, overlap {};
                 GetWindowRect(host, &bounds);
-                POINT point {(bounds.left + bounds.right) / 2, (bounds.top + bounds.bottom) / 2};
-                if (GetAncestor(WindowFromPoint(point), GA_ROOT) != host || !SetCursorPos(point.x, point.y))
-                { fail("cannot activate exposed host during selector test"); return; }
+                GetWindowRect(hwnd, &pickerBounds);
+                if (!IntersectRect(&overlap, &bounds, &pickerBounds))
+                { fail("test host does not overlap selector"); return; }
+                POINT point {(overlap.left + overlap.right) / 2, (overlap.top + overlap.bottom) / 2};
+                const auto hit = GetAncestor(WindowFromPoint(point), GA_ROOT);
+                if (hit != host || !SetCursorPos(point.x, point.y))
+                {
+                    std::cerr << "cover host=" << host << " hit=" << hit << " picker=" << hwnd << std::endl;
+                    fail("selector cover cannot receive real input"); return;
+                }
                 INPUT mouse[2] {};
                 mouse[0].type = mouse[1].type = INPUT_MOUSE;
                 mouse[0].mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
                 mouse[1].mi.dwFlags = MOUSEEVENTF_LEFTUP;
                 if (SendInput(2, mouse, sizeof(INPUT)) != 2)
                 { fail("could not put host in front of selector"); return; }
-                obscuredSelector = hwnd;
+                hostClickSent = true;
                 return;
             }
-            if (hwnd != obscuredSelector) { fail("replaced instead of restoring selector"); return; }
             if (!foregroundRequested)
             {
                 if (GetForegroundWindow() != host) return;
+                if (!SetWindowPos(host, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
+                    || GetForegroundWindow() != host || (GetWindowLongPtrW(host, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0)
+                { fail("could not restore ordinary host z-order before reopening"); return; }
+                std::cout << "PASS actual host foreground with same pending native selector" << std::endl;
                 picker->open([this](juce::File) { fail("foreground request replaced callback"); });
                 foregroundRequested = true;
                 return;
@@ -132,7 +148,8 @@ struct Test final : juce::Component, juce::Timer
         input[0].mi.dwFlags=MOUSEEVENTF_LEFTDOWN;input[1].mi.dwFlags=MOUSEEVENTF_LEFTUP;
         if(SendInput(2,input,sizeof(INPUT))!=2){fail("cannot click actual Shell button");return;}
         clicked=true;
-        std::cout<<"PASS physical native Shell selector phase="<<phase<<std::endl;
+        std::cout<<"PASS physical native Shell selector phase="<<phase
+            <<(phase==1?" after foreground recovery":"")<<std::endl;
     }
 };
 #else
