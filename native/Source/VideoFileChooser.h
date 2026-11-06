@@ -98,7 +98,7 @@ private:
             finish(file, (status != "selected" && status != "cancelled") || (status == "selected" && !file.existsAsFile()));
             return;
         }
-        native.window();
+        native.serviceForegroundRequest();
         if (!native.running() || native.startupExpired()) finish({}, true);
        #endif
     }

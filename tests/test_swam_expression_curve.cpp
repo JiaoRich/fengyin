@@ -174,23 +174,37 @@ int main(int argc, char** argv)
         assert(!fengyin::SwamTechniqueRouting::prepare(state,true,false,false,true,true).changed);
         assert(once==state);
     }
-    // Every shipped SWAM state: global vibrato/growl must not share breath.
+    // Every shipped SWAM state: only the two explicitly breath-driven
+    // Growl presets may share expression.
     // Restoring these two control destinations must leave all other routes,
     // curves, scalar parameters, effects, volume and native portamento intact.
-    int audited=0,repaired=0;
+    int audited=0,repaired=0,breathGrowls=0;
     for(const auto& tone:fengyin::publishedToneCatalog) {
         if(tone.kind!=fengyin::PublishedToneKind::swamPackage)continue;
         juce::ZipFile zip(root.getChildFile("assets/tone-packages").getChildFile(juce::String(tone.assetName.data())));
         std::unique_ptr<juce::InputStream> input(zip.createStreamForEntry(zip.getIndexOfFileName("tone.xml")));
         assert(input);auto doc=juce::parseXML(input->readEntireStreamAsString());assert(doc);
-        juce::MemoryBlock before;assert(before.fromBase64Encoding(doc->getChildByName("PRESET")->getChildByName("INSTRUMENT_STATE")->getAllSubText()));
+        const auto* preset = doc->getChildByName("PRESET"); assert(preset);
+        const bool breathGrowl = preset->getBoolAttribute("swamBreathGrowl");
+        assert(breathGrowl == (tone.id == "alto-breath-growl" || tone.id == "tenor-breath-growl"));
+        juce::MemoryBlock before;assert(before.fromBase64Encoding(preset->getChildByName("INSTRUMENT_STATE")->getAllSubText()));
         auto after=before;
         const bool wantVibrato=fengyin::simpleVibrato(tone.instrumentKey),wantGrowl=fengyin::simpleGrowl(tone.instrumentKey);
-        auto result=fengyin::SwamTechniqueRouting::prepare(after,wantVibrato,wantGrowl,false,false,false,true);
-        assert(result.supported);repaired+=result.changed;
+        auto result=fengyin::SwamTechniqueRouting::prepare(after,wantVibrato,wantGrowl,false,false,false,true,breathGrowl);
+        assert(result.supported && result.breathGrowl == breathGrowl);repaired+=result.changed;
         const auto routes=fengyin::SwamExpressionCurve::applyToState(after);
         if(wantVibrato)assert(result.vibrato>=0&&result.vibrato!=routes.controller);
-        if(wantGrowl)assert(result.growl>=0&&result.growl!=result.vibrato&&result.growl!=routes.controller);
+        if (breathGrowl)
+        {
+            ++breathGrowls;
+            assert(after == before && result.growl == -1 && routes.controller == 11);
+            assert(std::count_if(routes.routes.begin(), routes.routes.end(), [](const auto& route)
+                { return route.parameter.equalsIgnoreCase("growl") && route.controller == 11 && route.channel == 1; }) == 1);
+            auto legacy = before;
+            const auto managed = fengyin::SwamTechniqueRouting::prepare(legacy, wantVibrato, wantGrowl, false, false, false, true);
+            assert(managed.changed && !managed.breathGrowl && managed.growl != 11);
+        }
+        else if(wantGrowl)assert(result.growl>=0&&result.growl!=result.vibrato&&result.growl!=routes.controller);
         auto oldXml=fengyin::SwamStateCompatibility::read(before),newXml=fengyin::SwamStateCompatibility::read(after);assert(oldXml&&newXml);
         auto* oldTable=fengyin::SwamTechniqueRouting::findTable(*oldXml);
         auto* newTable=fengyin::SwamTechniqueRouting::findTable(*newXml);assert(oldTable&&newTable);
@@ -210,10 +224,10 @@ int main(int argc, char** argv)
             newTable->removeChildElement(newEntry,true);
         }
         assert(oldXml->isEquivalentTo(newXml.get(),false));
-        auto twice=after;assert(!fengyin::SwamTechniqueRouting::prepare(twice,wantVibrato,wantGrowl,false,false,false,true).changed);assert(twice==after);
+        auto twice=after;assert(!fengyin::SwamTechniqueRouting::prepare(twice,wantVibrato,wantGrowl,false,false,false,true,breathGrowl).changed);assert(twice==after);
         ++audited;
     }
-    assert(audited==21);std::cout<<"PASS "<<audited<<" complete SWAM packages, "<<repaired<<" legacy route repairs; every unrelated XML attribute and response curve retained\n";
+    assert(audited==24 && breathGrowls==2);std::cout<<"PASS "<<audited<<" complete SWAM packages, "<<repaired<<" legacy route repairs; every unrelated XML attribute and response curve retained\n";
     // Optional installed-plugin verification: no audio device, no saved settings.
     if (argc >= 2)
     {

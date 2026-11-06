@@ -111,6 +111,7 @@ std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<Soun
         child->setAttribute("pluginProgramName", preset.pluginProgramName);
         child->setAttribute("containerInstrument", preset.containerInstrument);
         child->setAttribute("containerAdapter", preset.containerAdapter);
+        if (preset.swamBreathGrowl) child->setAttribute("swamBreathGrowl", true);
         child->setAttribute("kongTechniqueProfile",preset.kongTechniques.enabled);
         child->setAttribute("kongVibratoCC",preset.kongTechniques.vibratoCC);
         child->setAttribute("kongOtherChannel",preset.kongTechniques.otherChannel);
@@ -178,6 +179,7 @@ juce::Array<SoundPreset> SoundPresetStore::fromXml(const juce::XmlElement& root)
         preset.pluginProgramName = child->getStringAttribute("pluginProgramName");
         preset.containerInstrument = child->getBoolAttribute("containerInstrument", false);
         preset.containerAdapter = child->getStringAttribute("containerAdapter");
+        preset.swamBreathGrowl = preset.pluginBrand == "swam" && child->getBoolAttribute("swamBreathGrowl");
         preset.kongTechniques.enabled=child->getBoolAttribute("kongTechniqueProfile",false);
         preset.kongTechniques.vibratoCC=child->getIntAttribute("kongVibratoCC",-1);
         preset.kongTechniques.otherChannel=child->getIntAttribute("kongOtherChannel",0);

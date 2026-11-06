@@ -93,6 +93,7 @@ public:
     {
         if(technique==PerformanceTechnique::tremolo && stringTremolo.available())return true;
         if (kontaktStandardControls.load()) return technique==PerformanceTechnique::vibrato;
+        if (technique == PerformanceTechnique::growl && usesSwamBreathGrowl()) return false;
         const auto index=static_cast<size_t>(technique);
         if(index>=nativeTechniqueRoutes.size())return false;
         if(kongExpressionMode.load()) {
@@ -171,7 +172,8 @@ public:
     bool selectInstrumentModel(int index);
     int applySwamToneProfile(const SwamToneProfile& profile, bool restoreModel = true);
     [[nodiscard]] juce::var getSwamToneAudit() const { return swamToneAudit; }
-    bool applyStandardSwamExpressionCurve(bool initialiseNewInstrument = false);
+    bool applyStandardSwamExpressionCurve(bool initialiseNewInstrument = false, bool preferBreathGrowl = false);
+    [[nodiscard]] bool usesSwamBreathGrowl() const noexcept { return swamBreathGrowl.load(); }
     bool applyExpressionAttackControl();
     bool setBendRange(int semitones);
     int getBendRange() const;
@@ -255,6 +257,7 @@ private:
     juce::StringArray instrumentModelNames;
     std::vector<float> instrumentModelValues;
     std::atomic<bool> kongExpressionMode { false };
+    std::atomic<bool> swamBreathGrowl { false };
     std::atomic<int> swamExpressionController { 11 };
     std::atomic<int> swamExpressionChannel { 1 };
     std::array<std::atomic<int>, static_cast<size_t>(PerformanceTechnique::count)> nativeTechniqueRoutes {};

@@ -11,6 +11,8 @@ struct Test final : juce::Component, juce::Timer
     int phase = 0, completed = 0, errors = 0, heartbeats = 0;
     bool failed = false, clicked = false;
     double seenAt = 0;
+    HWND obscuredSelector = nullptr;
+    bool foregroundRequested = false;
     const double deadline = juce::Time::getMillisecondCounterHiRes() + 60000;
     HANDLE destroyedProcess = nullptr;
     explicit Test(juce::File executable = {}) : helperExecutable(std::move(executable))
@@ -64,7 +66,7 @@ struct Test final : juce::Component, juce::Timer
         }
         if(phase==9) {
             if(completed!=5||errors!=1||heartbeats<20){fail("lifecycle counts or host heartbeat wrong");return;}
-            std::cout<<"PASS native Shell cancel/open/Chinese+surrogate+space path/compact/fullscreen/duplicate/crash/reopen/destruction; UI heartbeats="<<heartbeats<<std::endl;
+            std::cout<<"PASS native Shell cancel/open/Chinese+surrogate+space path/compact/fullscreen/foreground recovery/duplicate/crash/reopen/destruction; UI heartbeats="<<heartbeats<<std::endl;
             juce::MessageManager::getInstance()->stopDispatchLoop();return;
         }
         const auto hwnd=picker->nativeWindow();
@@ -88,6 +90,40 @@ struct Test final : juce::Component, juce::Timer
         }
         if(!seenAt){seenAt=juce::Time::getMillisecondCounterHiRes();return;}
         if(juce::Time::getMillisecondCounterHiRes()-seenAt<250)return;
+        if (phase == 1)
+        {
+            const auto host = static_cast<HWND>(getPeer()->getNativeHandle());
+            if (!obscuredSelector)
+            {
+                if (GetForegroundWindow() != hwnd) return;
+                // Reproduce the obscured picker and activate the host with
+                // real input. The original selector and callback must survive.
+                if (!SetWindowPos(host, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE))
+                { fail("cannot cover selector with host"); return; }
+                RECT bounds {};
+                GetWindowRect(host, &bounds);
+                POINT point {(bounds.left + bounds.right) / 2, (bounds.top + bounds.bottom) / 2};
+                if (GetAncestor(WindowFromPoint(point), GA_ROOT) != host || !SetCursorPos(point.x, point.y))
+                { fail("cannot activate exposed host during selector test"); return; }
+                INPUT mouse[2] {};
+                mouse[0].type = mouse[1].type = INPUT_MOUSE;
+                mouse[0].mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+                mouse[1].mi.dwFlags = MOUSEEVENTF_LEFTUP;
+                if (SendInput(2, mouse, sizeof(INPUT)) != 2)
+                { fail("could not put host in front of selector"); return; }
+                obscuredSelector = hwnd;
+                return;
+            }
+            if (hwnd != obscuredSelector) { fail("replaced instead of restoring selector"); return; }
+            if (!foregroundRequested)
+            {
+                if (GetForegroundWindow() != host) return;
+                picker->open([this](juce::File) { fail("foreground request replaced callback"); });
+                foregroundRequested = true;
+                return;
+            }
+            if (GetForegroundWindow() != hwnd) return;
+        }
         const auto button=prepareNativeVideoDialog(hwnd,fixture,phase==0);
         POINT point{};
         if(!nativeDialogButtonPoint(hwnd,button,point))return;

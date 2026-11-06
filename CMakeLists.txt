@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.43 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.44 LANGUAGES C CXX)
 option(FENGYIN_ARCHIVED_VIDEO_RECORDING "Build archived video-recording diagnostics, never for release" OFF)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
@@ -58,10 +58,13 @@ juce_add_binary_data(FengYinWebAssets SOURCES
     assets/tone-packages/alto-deep.fytonepack
     assets/tone-packages/alto-pop.fytonepack
     assets/tone-packages/tone137-alto-silky.fytonepack
+    assets/tone-packages/alto-breath-growl.fytonepack
+    assets/tone-packages/alto-breathy.fytonepack
     assets/tone-packages/tenor-mellow.fytonepack
     assets/tone-packages/tenor-warm.fytonepack
     assets/tone-packages/tenor-air-pocket.fytonepack
     assets/tone-packages/tone137-tenor-silky.fytonepack
+    assets/tone-packages/tenor-breath-growl.fytonepack
     assets/tone-packages/trumpet.fytonepack
     assets/tone-packages/tone137-trumpet-2.fytonepack
     assets/tone-packages/piccolo-trumpet.fytonepack

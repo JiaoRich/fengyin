@@ -604,6 +604,7 @@ void PluginHostEngine::unload()
     instrumentModelParameter = nullptr;
     instrumentModelNames.clear();
     instrumentModelValues.clear();
+    swamBreathGrowl.store(false);
     swamExpressionController.store(11, std::memory_order_relaxed);
     swamExpressionChannel.store(1, std::memory_order_relaxed);
     for (auto& route : nativeTechniqueRoutes) route.store(0, std::memory_order_relaxed);
@@ -746,13 +747,14 @@ bool PluginHostEngine::applyExpressionAttackControl()
     return false;
 }
 
-bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstrument)
+bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstrument, bool preferBreathGrowl)
 {
     // The player may still be attached after replacing an instrument. Never
     // restore opaque plugin state concurrently with its audio callback.
     const ScopedGraphPause pause(graph.get());
     juce::Logger::writeToLog("SWAM expression state update begin");
     for (auto& value : lastNativeTechniqueMessages) value.store(0, std::memory_order_relaxed);
+    swamBreathGrowl.store(false);
     swamExpressionController.store(11, std::memory_order_relaxed);
     swamExpressionChannel.store(1, std::memory_order_relaxed);
     for (auto& route : nativeTechniqueRoutes) route.store(0, std::memory_order_relaxed);
@@ -771,7 +773,7 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstru
     // controllers for those roles; preserve every existing response curve and
     // all unrelated MIDI routes (especially native portamento/Aftertouch).
     const auto configured=SwamTechniqueRouting::prepare(state,simpleVibrato(key),simpleGrowl(key),
-        initialiseNewInstrument&&wantFlutter,initialiseNewInstrument,initialiseNewInstrument&&ownTremolo,!initialiseNewInstrument);
+        initialiseNewInstrument&&wantFlutter,initialiseNewInstrument,initialiseNewInstrument&&ownTremolo,!initialiseNewInstrument,preferBreathGrowl);
     if(configured.supported && configured.changed)
     {
         // Once per activation, while the graph is paused, never on each CC or mode switch.
@@ -779,14 +781,21 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstru
         juce::MemoryBlock verified;plugin->getStateInformation(verified);
         auto check=verified;
         const auto routing=SwamTechniqueRouting::prepare(check,simpleVibrato(key),simpleGrowl(key),
-            initialiseNewInstrument&&wantFlutter,initialiseNewInstrument,initialiseNewInstrument&&ownTremolo,!initialiseNewInstrument);
-        if(!routing.supported || routing.changed || routing.vibrato!=configured.vibrato || routing.growl!=configured.growl || routing.flutter!=configured.flutter || routing.volume!=configured.volume)
+            initialiseNewInstrument&&wantFlutter,initialiseNewInstrument,initialiseNewInstrument&&ownTremolo,!initialiseNewInstrument,preferBreathGrowl);
+        if(!routing.supported || routing.changed || routing.breathGrowl!=configured.breathGrowl || routing.vibrato!=configured.vibrato || routing.growl!=configured.growl || routing.flutter!=configured.flutter || routing.volume!=configured.volume)
         {
             plugin->setStateInformation(original.getData(),static_cast<int>(original.getSize()));
             state=original;
             juce::Logger::writeToLog("SWAM automatic technique routing failed verification; original state restored");
         }
         else {state=verified;juce::Logger::writeToLog("SWAM automatic technique routes verified; curves preserved");}
+    }
+    if (configured.breathGrowl)
+    {
+        const auto growl = static_cast<size_t>(PerformanceTechnique::growl);
+        techniqueValues[growl].store(0.0f, std::memory_order_relaxed);
+        techniqueDirty[growl].store(false, std::memory_order_relaxed);
+        swamBreathGrowl.store(true);
     }
     const auto mappingState = SwamStateCompatibility::read(state);
     nativePortamentoInput.store(mappingState && SwamTechniqueParameterPolicy::hasNativePortamentoInput(*mappingState));
@@ -805,7 +814,7 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstru
             {"alternatefingering", PerformanceTechnique::alternateFingering}, {"legato", PerformanceTechnique::legato}
         };
         for (const auto& name : names)
-            if (parameter == name.first)
+            if (parameter == name.first && !(name.second == PerformanceTechnique::growl && usesSwamBreathGrowl()))
                 nativeTechniqueRoutes[static_cast<size_t>(name.second)].store((route.channel << 8) | (route.controller + 1));
     }
     if (! result.found)
@@ -1240,6 +1249,7 @@ void PluginHostEngine::routeTechnique(PerformanceTechnique technique, float valu
     const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
     const auto index = static_cast<size_t>(technique);
     if (index >= techniqueValues.size()) return;
+    if (technique == PerformanceTechnique::growl && usesSwamBreathGrowl()) return;
     const auto safeValue = juce::jlimit(0.0f, 1.0f, value);
     if(technique==PerformanceTechnique::tremolo && !kongExpressionMode.load()) {
         // Never fall back to a similarly named "Tremolo Mode" parameter if
@@ -1647,7 +1657,8 @@ void PluginHostEngine::flushTechniqueValues()
         }
     }
     for (size_t index = 0; index < techniqueParameters.size(); ++index)
-        if (techniqueDirty[index].exchange(false, std::memory_order_acq_rel))
+        if (techniqueDirty[index].exchange(false, std::memory_order_acq_rel)
+            && !(index == static_cast<size_t>(PerformanceTechnique::growl) && usesSwamBreathGrowl()))
             if (nativeTechniqueRoutes[index].load() == 0
                 || (techniqueValues[index].load() == 0.0f && (index == static_cast<size_t>(PerformanceTechnique::vibrato)
                     || index == static_cast<size_t>(PerformanceTechnique::growl)

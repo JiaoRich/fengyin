@@ -462,7 +462,8 @@ function mergeBackendTechniquePlan(key, state, mappings) {
       sourceNumber:Number(backend.sourceNumber ?? -1),
       toggle:!!backend.toggle,
       pluginSupported:item.pluginSupported && backend.pluginSupported !== false,
-      routeMissing:item.pluginSupported && backend.pluginSupported === false
+      routeMissing:item.pluginSupported && backend.pluginSupported === false,
+      presetBreathControl:backend.presetBreathControl === true
     };
   });
 }
@@ -504,54 +505,69 @@ window.FENGYIN_TONE_MEDIA = {
     "voiceId": "TONE_140_KONTAKT_KENSA"
   },
   "soprano-kenny": {
-    "name": "高萨-原声",
+    "name": "原声高萨",
     "artwork": "instrument_soprano_sax.png",
     "voiceId": "V014_01"
   },
   "soprano-pop": {
-    "name": "高萨-明亮",
+    "name": "明亮高萨",
     "artwork": "instrument_soprano_sax.png",
     "voiceId": "V014_02"
   },
   "alto-jazz": {
-    "name": "中萨-爵士",
+    "name": "爵士中萨",
     "artwork": "instrument_alto_sax.png",
     "voiceId": "V014_03"
   },
   "alto-deep": {
-    "name": "中萨-深情",
+    "name": "深情中萨",
     "artwork": "instrument_alto_sax.png",
     "voiceId": "V014_04"
   },
   "alto-pop": {
-    "name": "中萨-流行",
+    "name": "流行中萨",
     "artwork": "instrument_alto_sax.png",
     "voiceId": "V014_05"
   },
   "alto-silky": {
-    "name": "中萨-丝滑",
+    "name": "浪漫中萨",
     "artwork": "instrument_alto_sax.png",
-    "voiceId": "TONE_140_ALTO_SILKY"
+    "voiceId": "NEW_TONE_GENERIC"
+  },
+  "alto-breath-growl": {
+    "name": "嘶吼中萨",
+    "artwork": "instrument_alto_sax.png",
+    "voiceId": "NEW_TONE_GENERIC"
+  },
+  "alto-breathy": {
+    "name": "气声中萨",
+    "artwork": "instrument_alto_sax.png",
+    "voiceId": "NEW_TONE_GENERIC"
   },
   "tenor-mellow": {
-    "name": "次中萨-醇厚",
+    "name": "醇厚次中萨",
     "artwork": "instrument_tenor_sax.png",
     "voiceId": "V014_06"
   },
   "tenor-warm": {
-    "name": "次中萨-温暖",
+    "name": "温暖次中萨",
     "artwork": "instrument_tenor_sax.png",
     "voiceId": "V014_07"
   },
   "tenor-air-pocket": {
-    "name": "次中萨-气包音",
+    "name": "气包音次中萨",
     "artwork": "instrument_tenor_sax.png",
     "voiceId": "V014_08"
   },
   "tenor-silky": {
-    "name": "次中萨-丝滑",
+    "name": "浪漫次中萨",
     "artwork": "instrument_tenor_sax.png",
-    "voiceId": "TONE_140_TENOR_SILKY"
+    "voiceId": "NEW_TONE_GENERIC"
+  },
+  "tenor-breath-growl": {
+    "name": "嘶吼次中萨",
+    "artwork": "instrument_tenor_sax.png",
+    "voiceId": "NEW_TONE_GENERIC"
   },
   "trumpet": {
     "name": "小号1",
@@ -1820,6 +1836,9 @@ function renderTechniqueMappings(force = false) {
     const mapped = sourceDescription(item) !== '未设置';
     const modeLabels = item.id === 'mute' ? {off:'关闭',hardware:'按键控制'} : item.id === 'vibrato' ? {off:'关闭',breath:'自动',hardware:'咬嘴控制'} : {off:'关闭',breath:'自动',hardware:'按键控制'};
     const heading = item.id === 'vibrato' ? '颤音' : item.id === 'growl' ? '嘶吼音' : item.name === '技巧音色' ? item.name : '其他技巧';
+    if (item.presetBreathControl) return `<article class="technique-card" data-technique-id="${item.id}">
+      <div class="technique-card-head"><div class="technique-card-title"><h3>${heading}</h3></div><span class="technique-card-state">随气息控制</span></div>
+    </article>`;
     return `<article class="technique-card ${item.featured ? '' : 'secondary'}" data-technique-id="${item.id}">
       <div class="technique-card-head"><div class="technique-card-title"><h3>${heading}</h3></div><span class="technique-card-state">${item.mode === 'off' ? '已关闭' : hardware ? (mapped ? '已映射' : '待映射') : '自动控制'}</span></div>
       <div class="technique-control"><div class="technique-mode-buttons" role="group" aria-label="${heading}控制方式">${Object.entries(modeLabels).map(([value,label]) => `<button type="button" data-technique-mode="${value}" aria-pressed="${item.mode === value}" ${!item.routeMissing ? '' : 'disabled'}>${label}</button>`).join('')}</div><div class="technique-map-actions" aria-label="${item.id === 'vibrato' ? '咬嘴控制' : '按键控制'}的映射设置" ${hardware ? '' : 'hidden'}><button type="button" class="learn-source" ${item.routeMissing ? 'disabled' : ''}>${Number(window.fengyinTechniqueLearning) === item.index ? '等待操作…' : mapped ? '重新映射' : '点击映射'}</button><button type="button" class="clear-source" ${mapped?'':'hidden'}>清除映射</button></div></div>
@@ -2850,7 +2869,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.43 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.44 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

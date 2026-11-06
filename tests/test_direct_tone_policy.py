@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class DirectTonePolicy(unittest.TestCase):
     def test_activation_is_read_only_and_editor_close_does_not_capture_state(self):
         host = (ROOT / 'native/Source/PluginHostEngine.cpp').read_text(encoding='utf-8')
-        body = host.split('bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstrument)', 1)[1].split('\nvoid ', 1)[0]
+        body = host.split('bool PluginHostEngine::applyStandardSwamExpressionCurve(', 1)[1].split('\nvoid ', 1)[0]
         self.assertIn('initialiseNewInstrument&&wantFlutter,initialiseNewInstrument,initialiseNewInstrument&&ownTremolo,!initialiseNewInstrument', body)
         self.assertIn('SwamTechniqueRouting::prepare', body)
         self.assertIn('if(configured.supported && configured.changed)', body)
@@ -64,7 +64,7 @@ class DirectTonePolicy(unittest.TestCase):
 
     def test_native_routes_do_not_leak_between_instruments(self):
         host = (ROOT / 'native/Source/PluginHostEngine.cpp').read_text(encoding='utf-8')
-        for method in ('void PluginHostEngine::unload()', 'bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstrument)'):
+        for method in ('void PluginHostEngine::unload()', 'bool PluginHostEngine::applyStandardSwamExpressionCurve('):
             body = host.split(method, 1)[1].split('\n}', 1)[0]
             self.assertIn('swamExpressionChannel.store(1', body)
             self.assertIn('nativeTechniqueRoutes) route.store(0', body)

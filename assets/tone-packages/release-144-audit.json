@@ -1,0 +1,357 @@
+{
+  "calibration": "deferred",
+  "tones": [
+    {
+      "id": "kontakt-kensa",
+      "name": "肯萨",
+      "instrumentKey": "kontakt-kensa",
+      "asset": "kontakt-kensa.fytonepack",
+      "brand": "kontakt",
+      "sha256": "cb108266f67fca8498643e19df681ff258b9094cab7f60621bbb3655b5b15be8"
+    },
+    {
+      "id": "soprano-kenny",
+      "name": "原声高萨",
+      "instrumentKey": "soprano-sax",
+      "asset": "soprano-kenny.fytonepack",
+      "brand": "swam",
+      "sha256": "7f073c5d15622868ff6c475d554e8a440d0219f906db55e01de15666e898df09"
+    },
+    {
+      "id": "soprano-pop",
+      "name": "明亮高萨",
+      "instrumentKey": "soprano-sax",
+      "asset": "soprano-pop.fytonepack",
+      "brand": "swam",
+      "sha256": "8bb25daabcb3cfecd9e308262b3cc44adf4b8b2ed52eb798fe075c92d9585591"
+    },
+    {
+      "id": "alto-jazz",
+      "name": "爵士中萨",
+      "instrumentKey": "alto-sax",
+      "asset": "alto-jazz.fytonepack",
+      "brand": "swam",
+      "sha256": "d3563940915ee4293c874b0f2232d5124d2f537c2ce5d0ef9ccf094640a85ae1"
+    },
+    {
+      "id": "alto-deep",
+      "name": "深情中萨",
+      "instrumentKey": "alto-sax",
+      "asset": "alto-deep.fytonepack",
+      "brand": "swam",
+      "sha256": "bb4a9f176e61cfa75534bc996dae7020e5914a1e1ea755221085d1d7dfc3332d"
+    },
+    {
+      "id": "alto-pop",
+      "name": "流行中萨",
+      "instrumentKey": "alto-sax",
+      "asset": "alto-pop.fytonepack",
+      "brand": "swam",
+      "sha256": "42ba6f069f7a306eecd96310224f5499273a3ca08f4c556a3514915a549d3ad9"
+    },
+    {
+      "id": "alto-silky",
+      "name": "浪漫中萨",
+      "instrumentKey": "alto-sax",
+      "asset": "tone137-alto-silky.fytonepack",
+      "brand": "swam",
+      "sha256": "3931b448683752fb7de480a280614618c39fcc0dabcd486e9090cbfea4f335e0"
+    },
+    {
+      "id": "alto-breath-growl",
+      "name": "嘶吼中萨",
+      "instrumentKey": "alto-sax",
+      "asset": "alto-breath-growl.fytonepack",
+      "brand": "swam",
+      "sha256": "9350cac15168b6903882b264079b5d5a52016ba77e5c0b7e3f69a83a60232328"
+    },
+    {
+      "id": "alto-breathy",
+      "name": "气声中萨",
+      "instrumentKey": "alto-sax",
+      "asset": "alto-breathy.fytonepack",
+      "brand": "swam",
+      "sha256": "d7de2ba139eb43e4a18eaffdcbb50521a97451e3bf53c20c4e6694fc84e726e8"
+    },
+    {
+      "id": "tenor-mellow",
+      "name": "醇厚次中萨",
+      "instrumentKey": "tenor-sax",
+      "asset": "tenor-mellow.fytonepack",
+      "brand": "swam",
+      "sha256": "0a436ecb782dfd9cac04abaf85920b508fa0807b1ac76de05dc6437c634e82fb"
+    },
+    {
+      "id": "tenor-warm",
+      "name": "温暖次中萨",
+      "instrumentKey": "tenor-sax",
+      "asset": "tenor-warm.fytonepack",
+      "brand": "swam",
+      "sha256": "6dc753abdcda1b4dc607e5dccfc0ed826bc958f2ff8dbe1e0214e742e3ea0a8f"
+    },
+    {
+      "id": "tenor-air-pocket",
+      "name": "气包音次中萨",
+      "instrumentKey": "tenor-sax",
+      "asset": "tenor-air-pocket.fytonepack",
+      "brand": "swam",
+      "sha256": "eb92e752fbb72c22e7f5b88c70604b9e927a3768703a861846835201a61e02c5"
+    },
+    {
+      "id": "tenor-silky",
+      "name": "浪漫次中萨",
+      "instrumentKey": "tenor-sax",
+      "asset": "tone137-tenor-silky.fytonepack",
+      "brand": "swam",
+      "sha256": "9ef401de4ea792acc7d4ce4417edd5dfde2fba99cf82350f6088c855ec8fb20c"
+    },
+    {
+      "id": "tenor-breath-growl",
+      "name": "嘶吼次中萨",
+      "instrumentKey": "tenor-sax",
+      "asset": "tenor-breath-growl.fytonepack",
+      "brand": "swam",
+      "sha256": "5936f9483f01f20314f612a54930bce2cd133daf115e9143480b88354ae6467e"
+    },
+    {
+      "id": "trumpet",
+      "name": "小号1",
+      "instrumentKey": "trumpet",
+      "asset": "trumpet.fytonepack",
+      "brand": "swam",
+      "sha256": "67c355bfe9263fe1be740b5674bae75a0c45c373750932cb91b2a9527ebb45b8"
+    },
+    {
+      "id": "trumpet-2",
+      "name": "小号2",
+      "instrumentKey": "trumpet",
+      "asset": "tone137-trumpet-2.fytonepack",
+      "brand": "swam",
+      "sha256": "88fe2e827fa0929911cdb92da4f7a4e63c38c306360583d352d4425beecec3a1"
+    },
+    {
+      "id": "piccolo-trumpet",
+      "name": "高音小号",
+      "instrumentKey": "piccolo-trumpet",
+      "asset": "piccolo-trumpet.fytonepack",
+      "brand": "swam",
+      "sha256": "b726842aa256529503db1d2fc1d398612ae75f68406df253e579c6a8f6680c38"
+    },
+    {
+      "id": "alto-trombone",
+      "name": "中音长号",
+      "instrumentKey": "alto-trombone",
+      "asset": "alto-trombone.fytonepack",
+      "brand": "swam",
+      "sha256": "a71e41dacd47fd510c117641b7552b76bc96521c57e4183c2a45e68830a25f87"
+    },
+    {
+      "id": "bass-trombone",
+      "name": "低音长号",
+      "instrumentKey": "bass-trombone",
+      "asset": "bass-trombone.fytonepack",
+      "brand": "swam",
+      "sha256": "9290b3461dc15b21df98dcd8495887df0c12204fb3bf2c83fbea2879e2bff6de"
+    },
+    {
+      "id": "flute",
+      "name": "长笛",
+      "instrumentKey": "flute",
+      "asset": "flute.fytonepack",
+      "brand": "swam",
+      "sha256": "4e1d9d409cb6f18a61b4def6e80b8e7cdae5c17d6133fb5eb64e851fb23dc681"
+    },
+    {
+      "id": "piccolo",
+      "name": "短笛",
+      "instrumentKey": "piccolo",
+      "asset": "piccolo.fytonepack",
+      "brand": "swam",
+      "sha256": "56c3743600a040c9769f1269c0b2234dc782076dc3fb2d09d439ba50447a259e"
+    },
+    {
+      "id": "clarinet",
+      "name": "单簧管1",
+      "instrumentKey": "clarinet",
+      "asset": "clarinet.fytonepack",
+      "brand": "swam",
+      "sha256": "312df5b83c5374aad35703b24c261a397d59bfab7ee52cf9166f41d8eba1f08a"
+    },
+    {
+      "id": "kong-clarinet-2",
+      "name": "单簧管2",
+      "instrumentKey": "container:kong-v3:khka_woodwinds",
+      "asset": "tone137-kong-clarinet-2.fytonepack",
+      "brand": "kong",
+      "sha256": "10c1486ae7d2c314802092f149f40da728441876eea438a816da48105285a466"
+    },
+    {
+      "id": "oboe",
+      "name": "双簧管1",
+      "instrumentKey": "oboe",
+      "asset": "oboe.fytonepack",
+      "brand": "swam",
+      "sha256": "474fa7935d139e2a26071ab74c203c842b6b3b85a33060cad552633fbf56ae9a"
+    },
+    {
+      "id": "kong-oboe-2",
+      "name": "双簧管2",
+      "instrumentKey": "container:kong-v3:khka_woodwinds",
+      "asset": "tone137-kong-oboe-2.fytonepack",
+      "brand": "kong",
+      "sha256": "9031b2175e2792930a812b7fbc9661e7fcecbec37ec8ec1ddbba888a438098f9"
+    },
+    {
+      "id": "violin-soft",
+      "name": "小提琴1",
+      "instrumentKey": "violin",
+      "asset": "violin-soft.fytonepack",
+      "brand": "swam",
+      "sha256": "d55f742005dbe4a5825531e4dbc629ac9f60fe649d38d236bd5db774a7bda719"
+    },
+    {
+      "id": "kong-violin-2",
+      "name": "小提琴2",
+      "instrumentKey": "container:kong-v3:khka_strings",
+      "asset": "tone137-kong-violin-2.fytonepack",
+      "brand": "kong",
+      "sha256": "756117d11f473d052d13f80fa781d00db9fbe9d48ede288237335bb0cd270a08"
+    },
+    {
+      "id": "cello",
+      "name": "大提琴",
+      "instrumentKey": "cello",
+      "asset": "cello.fytonepack",
+      "brand": "swam",
+      "sha256": "8a6c7030841c53c58ddcc8438994e5f4d8e67ad52893e0dd5fdfa326998ef293"
+    },
+    {
+      "id": "kong-erhu",
+      "name": "二胡1",
+      "instrumentKey": "kong-erhu-2",
+      "asset": "folk-erhu.fytonepack",
+      "brand": "kong",
+      "sha256": "83d0580a474301e5848b34d036bc1d70181822864a256eb4756f628465f8d275"
+    },
+    {
+      "id": "kong-erhu-new-2",
+      "name": "二胡2",
+      "instrumentKey": "kong-erhu",
+      "asset": "tone137-kong-erhu-new-2.fytonepack",
+      "brand": "kong",
+      "sha256": "bd80dfda446178d11400be400162fd1c7c9ff22a25e59b38ef09f57209b94e33"
+    },
+    {
+      "id": "kong-jinghu",
+      "name": "京胡",
+      "instrumentKey": "kong-jinghu",
+      "asset": "folk-jinghu.fytonepack",
+      "brand": "kong",
+      "sha256": "6d5cb5e687e56df467da4943ed33fcfc1be7837002eae25bcf082b7bb6724692"
+    },
+    {
+      "id": "kong-hulusi-straight",
+      "name": "葫芦丝-直音",
+      "instrumentKey": "kong-hulusi",
+      "asset": "tone137-kong-hulusi-straight.fytonepack",
+      "brand": "kong",
+      "sha256": "9fb8b02c589750104320b71272f247bd7bd319c6bbdd01c01210b487a60ec59c"
+    },
+    {
+      "id": "kong-hulusi-vibrato",
+      "name": "葫芦丝-颤音",
+      "instrumentKey": "kong-hulusi",
+      "asset": "tone137-kong-hulusi-vibrato.fytonepack",
+      "brand": "kong",
+      "sha256": "c71c074dcac6292c6b006b002a7cc1f91bd2ff6b79c9e20146b0785b990676b3"
+    },
+    {
+      "id": "kong-qudi-straight",
+      "name": "曲笛1",
+      "instrumentKey": "container:kong-v3:winds",
+      "asset": "tone137-kong-qudi-straight.fytonepack",
+      "brand": "kong",
+      "sha256": "b34c821bbe5cad4ad771481f0aebbc1eaf27042222c2afa42e700c9e61290591"
+    },
+    {
+      "id": "kong-qudi",
+      "name": "曲笛2*",
+      "instrumentKey": "kong-dizi",
+      "asset": "folk-qudi.fytonepack",
+      "brand": "kong",
+      "sha256": "7bee01d06ab1cd3e02b956d0396837a4b1714152f6cb4fe7ec0d00aa69be81f3"
+    },
+    {
+      "id": "kong-bangdi",
+      "name": "梆笛*",
+      "instrumentKey": "kong-dizi-2",
+      "asset": "folk-bangdi.fytonepack",
+      "brand": "kong",
+      "sha256": "c1893cf49d74c048f3593930d9aea569eaff4fd3068e46fdf12767222e20544b"
+    },
+    {
+      "id": "kong-nanxiao",
+      "name": "南箫",
+      "instrumentKey": "kong-nanxiao",
+      "asset": "tone137-kong-nanxiao.fytonepack",
+      "brand": "kong",
+      "sha256": "67894d2583681c6c835821bbebbdbb87b9ee1dae390e580efd1186f1fbb35954"
+    },
+    {
+      "id": "kong-dongxiao",
+      "name": "洞箫",
+      "instrumentKey": "container:kong-v3:winds",
+      "asset": "tone137-kong-dongxiao.fytonepack",
+      "brand": "kong",
+      "sha256": "29badbc09bd1f7d0ff3d34eb410cef420ee0ffd29034a9c0361e8fb1473eb942"
+    },
+    {
+      "id": "kong-xun",
+      "name": "埙",
+      "instrumentKey": "kong-xun",
+      "asset": "tone137-kong-xun.fytonepack",
+      "brand": "kong",
+      "sha256": "ae36b227040732f20e714164661c20ae016e858292e5f32b56ec2791f2fd37a4"
+    },
+    {
+      "id": "kong-suona-vibrato",
+      "name": "唢呐1",
+      "instrumentKey": "kong-suona",
+      "asset": "tone137-kong-suona-vibrato.fytonepack",
+      "brand": "kong",
+      "sha256": "aa2a570ac1378d79192efec9e14acfab32f27fa7f300209cedde83e453e3227b"
+    },
+    {
+      "id": "kong-suona",
+      "name": "唢呐2*",
+      "instrumentKey": "kong-suona-2",
+      "asset": "folk-suona.fytonepack",
+      "brand": "kong",
+      "sha256": "06d6865cd971bf4c508e440d985081ceaa70804c8fdc6ed4f001b17f16b92574"
+    },
+    {
+      "id": "kong-liuqin",
+      "name": "柳琴",
+      "instrumentKey": "kong-liuqin",
+      "asset": "folk-liuqin.fytonepack",
+      "brand": "kong",
+      "sha256": "135b4e5132a1d06aad38211947362467140419b113b475baca95c2f5e8848fa8"
+    },
+    {
+      "id": "kong-sanxian",
+      "name": "三弦",
+      "instrumentKey": "kong-sanxian",
+      "asset": "folk-sanxian.fytonepack",
+      "brand": "kong",
+      "sha256": "2f5bb4fa33a108820e65921ac44d976a38897362be98567c841219d04944fed1"
+    },
+    {
+      "id": "kong-pipa",
+      "name": "琵琶",
+      "instrumentKey": "kong-pipa",
+      "asset": "folk-pipa.fytonepack",
+      "brand": "kong",
+      "sha256": "bfb85c7569002955df28615d6c40817faf308bc5eb2b5c1a785655b8f30d51bf"
+    }
+  ]
+}

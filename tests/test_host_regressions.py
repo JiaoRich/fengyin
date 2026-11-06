@@ -43,7 +43,7 @@ class HostRegressionTests(unittest.TestCase):
     def test_bulk_tone_changes_pause_live_processing(self):
         for signature in (
             'int PluginHostEngine::restoreToneParameters(',
-            'bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstrument)',
+            'bool PluginHostEngine::applyStandardSwamExpressionCurve(',
             'bool PluginHostEngine::selectInstrumentModel(',
             'int PluginHostEngine::applySwamToneProfile(',
         ):

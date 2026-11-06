@@ -22,9 +22,6 @@ class AttackControlPolicyTests(unittest.TestCase):
                     self.assertEqual(len(controls), 1)
                     # Verified Windows enums differ between saxophones and strings.
                     expected=0.666666686534882 if preset.get('instrumentKey') in ('violin','cello') else 1.0
-                    # Incoming SWAM Trumpet 3.8 state was read back as Expression in the real plugin.
-                    if path.name == 'tone137-trumpet-2.fytonepack':
-                        expected=0.75
                     self.assertAlmostEqual(float(controls[0].get('value')),expected,places=6)
                 else:
                     self.assertIn(preset.get('pluginBrand'),['kong','kontakt'])
@@ -38,7 +35,7 @@ class AttackControlPolicyTests(unittest.TestCase):
     def test_runtime_resolves_label_not_index(self):
         source = (ROOT / 'native/Source/PluginHostEngine.cpp').read_text(encoding='utf-8')
         body = source.split('bool PluginHostEngine::applyExpressionAttackControl()')[1].split(
-            'bool PluginHostEngine::applyStandardSwamExpressionCurve()')[0]
+            'bool PluginHostEngine::applyStandardSwamExpressionCurve(')[0]
         self.assertIn('ScopedGraphPause', body)
         self.assertIn('normalisedParameterName(*parameter) != "attackcontrol"', body)
         self.assertIn('getText(parameter->getValue(), 128)', body)

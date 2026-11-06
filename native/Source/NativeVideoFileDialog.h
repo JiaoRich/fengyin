@@ -5,6 +5,8 @@
   #define NOMINMAX
  #endif
  #include <windows.h>
+ #include <commctrl.h>
+ #pragma comment(lib, "comctl32.lib")
  #include <shobjidl.h>
  #include <shlobj.h>
  #include <wrl/client.h>
@@ -32,10 +34,42 @@ inline juce::var packet(const char* status, const juce::String& value = {})
     return juce::var(object.release());
 }
 
+inline UINT foregroundRequestMessage()
+{
+    static const UINT message = RegisterWindowMessageW(L"FengYin.VideoPicker.RequestForeground");
+    return message;
+}
+
+inline DWORD foregroundProcess()
+{
+    DWORD process = 0;
+    GetWindowThreadProcessId(GetForegroundWindow(), &process);
+    return process;
+}
+
+inline LRESULT CALLBACK dialogSubclass(HWND window, UINT message, WPARAM wParam, LPARAM lParam,
+                                        UINT_PTR subclassId, DWORD_PTR hostPid)
+{
+    if (message == WM_NCDESTROY)
+        RemoveWindowSubclass(window, dialogSubclass, subclassId);
+    else if (message == foregroundRequestMessage())
+    {
+        // This runs on the selector's STA. Recheck the foreground after the
+        // asynchronous handoff so a user switching apps keeps their focus.
+        if (foregroundProcess() == hostPid && IsWindowVisible(window))
+        {
+            if (IsIconic(window)) ShowWindow(window, SW_RESTORE);
+            SetForegroundWindow(window);
+        }
+        return 0;
+    }
+    return DefSubclassProc(window, message, wParam, lParam);
+}
+
 class Events final : public IFileDialogEvents
 {
 public:
-    Events(juce::File directory, RECT bounds) : folder(std::move(directory)), ownerBounds(bounds) {}
+    Events(juce::File directory, RECT bounds, DWORD host) : folder(std::move(directory)), ownerBounds(bounds), hostPid(host) {}
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID id, void** result) override
     {
         if (result == nullptr) return E_POINTER;
@@ -73,6 +107,7 @@ private:
     std::atomic<ULONG> references {1};
     juce::File folder;
     RECT ownerBounds {};
+    DWORD hostPid = 0;
     bool published = false;
     HRESULT publishWindow(IFileDialog* dialog)
     {
@@ -91,7 +126,10 @@ private:
             const auto y = juce::jlimit(area.top, area.bottom - height, (ownerBounds.top + ownerBounds.bottom - height) / 2);
             SetWindowPos(handle, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
         }
+        const bool canActivate = foregroundRequestMessage() != 0
+            && SetWindowSubclass(handle, dialogSubclass, 1, hostPid) != FALSE;
         auto ready = packet("ready");
+        ready.getDynamicObject()->setProperty("canActivate", canActivate);
         ready.getDynamicObject()->setProperty("window", static_cast<juce::int64>(reinterpret_cast<INT_PTR>(handle)));
         published = writePacket(folder.getChildFile("ready.json"), ready);
         return S_OK;
@@ -124,7 +162,7 @@ inline int runNativeVideoFileDialog(const juce::File& folder)
         if (SUCCEEDED(SHCreateItemInKnownFolder(FOLDERID_Videos, 0, nullptr, IID_PPV_ARGS(&movies)))) dialog->SetDefaultFolder(movies.Get());
         RECT bounds {int(request["left"]), int(request["top"]), int(request["right"]), int(request["bottom"])};
         Microsoft::WRL::ComPtr<videoDialog::Events> events;
-        events.Attach(new videoDialog::Events(folder, bounds));
+        events.Attach(new videoDialog::Events(folder, bounds, static_cast<DWORD>(static_cast<juce::int64>(request["hostPid"]))));
         DWORD cookie = 0;
         if (FAILED(hr = dialog->Advise(events.Get(), &cookie))) return hr;
         // NULL is intentional, not GetActiveWindow or the host HWND. There is
@@ -153,6 +191,7 @@ public:
         auto request = std::make_unique<juce::DynamicObject>();
         request->setProperty("left", int(bounds.left)); request->setProperty("top", int(bounds.top));
         request->setProperty("right", int(bounds.right)); request->setProperty("bottom", int(bounds.bottom));
+        request->setProperty("hostPid", static_cast<juce::int64>(GetCurrentProcessId()));
         if (!videoDialog::writePacket(directory.getChildFile("request.json"), juce::var(request.release()))) { close(); return false; }
         job = CreateJobObjectW(nullptr, nullptr);
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits {};
@@ -169,23 +208,28 @@ public:
         process = processInfo.hProcess; pid = processInfo.dwProcessId;
         if (!AssignProcessToJobObject(job, process))
         { TerminateProcess(process, 1); CloseHandle(processInfo.hThread); close(); return false; }
-        AllowSetForegroundWindow(pid);
+        if (videoDialog::foregroundProcess() == GetCurrentProcessId()) AllowSetForegroundWindow(pid);
         const auto resumed = ResumeThread(processInfo.hThread) != static_cast<DWORD>(-1);
         CloseHandle(processInfo.hThread);
         if (!resumed) { close(); return false; }
         started = juce::Time::getMillisecondCounterHiRes();
+        bringToFront();
         return true;
     }
     juce::var result() const { return juce::JSON::parse(directory.getChildFile("result.json")); }
     bool running() const { return process && WaitForSingleObject(process, 0) == WAIT_TIMEOUT; }
     HWND window()
     {
-        if (!hwnd)
+        if (!hwnd && running())
         {
             const auto ready = juce::JSON::parse(directory.getChildFile("ready.json"));
             const auto candidate = reinterpret_cast<HWND>(static_cast<INT_PTR>(static_cast<juce::int64>(ready["window"])));
             DWORD candidatePid = 0;
-            if (candidate && GetWindowThreadProcessId(candidate, &candidatePid) && candidatePid == pid) hwnd = candidate;
+            if (candidate && GetWindowThreadProcessId(candidate, &candidatePid) && candidatePid == pid)
+            {
+                hwnd = candidate;
+                canActivate = static_cast<bool>(ready["canActivate"]);
+            }
         }
         return hwnd;
     }
@@ -203,7 +247,34 @@ public:
     bool startupExpired() const { return juce::Time::getMillisecondCounterHiRes() - started > 60000 && !hwnd; }
     void bringToFront()
     {
-        if (const auto handle = window()) { AllowSetForegroundWindow(pid); ShowWindowAsync(handle, SW_RESTORE); }
+        foregroundAttempts = 3;
+        nextForegroundAttempt = 0;
+    }
+    void serviceForegroundRequest()
+    {
+        const auto handle = window();
+        if (foregroundAttempts == 0 || !handle || !running() || !IsWindowVisible(handle)) return;
+        const auto foregroundPid = videoDialog::foregroundProcess();
+        if (foregroundPid != GetCurrentProcessId())
+        {
+            // The helper or another application already has focus.
+            if (foregroundPid != 0) foregroundAttempts = 0;
+            return;
+        }
+        DWORD handlePid = 0;
+        if (!canActivate || !GetWindowThreadProcessId(handle, &handlePid) || handlePid != pid)
+        {
+            foregroundAttempts = 0;
+            juce::Logger::writeToLog("Native video selector foreground handoff unavailable");
+            return;
+        }
+        const auto now = juce::Time::getMillisecondCounterHiRes();
+        if (now < nextForegroundAttempt) return;
+        AllowSetForegroundWindow(pid);
+        PostMessageW(handle, videoDialog::foregroundRequestMessage(), 0, 0);
+        nextForegroundAttempt = now + 150;
+        if (--foregroundAttempts == 0)
+            juce::Logger::writeToLog("Native video selector foreground handoff retried");
     }
     void close()
     {
@@ -212,6 +283,9 @@ public:
         if (job) CloseHandle(job);
         if (process) CloseHandle(process);
         job = nullptr; process = nullptr; hwnd = nullptr; pid = 0;
+        canActivate = false;
+        foregroundAttempts = 0;
+        nextForegroundAttempt = 0;
         if (directory != juce::File()) directory.deleteRecursively();
         directory = {};
     }
@@ -222,6 +296,9 @@ private:
     juce::File directory;
     juce::File helperExecutable;
     double started = 0;
+    bool canActivate = false;
+    int foregroundAttempts = 0;
+    double nextForegroundAttempt = 0;
 };
 } // namespace fengyin
 #endif

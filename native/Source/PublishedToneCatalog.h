@@ -19,18 +19,21 @@ struct PublishedToneDefinition
 
 // The release catalogue is deliberately explicit. Installing another plug-in
 // must never make an unreviewed tone appear in the customer-facing library.
-inline constexpr std::array<PublishedToneDefinition, 41> publishedToneCatalog {{
+inline constexpr std::array<PublishedToneDefinition, 44> publishedToneCatalog {{
     { "kontakt-kensa", "肯萨", "kontakt-kensa", "release", PublishedToneKind::kontaktPackage, "kontakt-kensa.fytonepack" },
-    { "soprano-kenny", "高萨-原声", "soprano-sax", "kenny", PublishedToneKind::swamPackage, "soprano-kenny.fytonepack" },
-    { "soprano-pop", "高萨-明亮", "soprano-sax", "pop-high", PublishedToneKind::swamPackage, "soprano-pop.fytonepack" },
-    { "alto-jazz", "中萨-爵士", "alto-sax", "jazz", PublishedToneKind::swamPackage, "alto-jazz.fytonepack" },
-    { "alto-deep", "中萨-深情", "alto-sax", "deep", PublishedToneKind::swamPackage, "alto-deep.fytonepack" },
-    { "alto-pop", "中萨-流行", "alto-sax", "pop", PublishedToneKind::swamPackage, "alto-pop.fytonepack" },
-    { "alto-silky", "中萨-丝滑", "alto-sax", "release", PublishedToneKind::swamPackage, "tone137-alto-silky.fytonepack" },
-    { "tenor-mellow", "次中萨-醇厚", "tenor-sax", "mellow", PublishedToneKind::swamPackage, "tenor-mellow.fytonepack" },
-    { "tenor-warm", "次中萨-温暖", "tenor-sax", "warm", PublishedToneKind::swamPackage, "tenor-warm.fytonepack" },
-    { "tenor-air-pocket", "次中萨-气包音", "tenor-sax", "air-pocket", PublishedToneKind::swamPackage, "tenor-air-pocket.fytonepack" },
-    { "tenor-silky", "次中萨-丝滑", "tenor-sax", "release", PublishedToneKind::swamPackage, "tone137-tenor-silky.fytonepack" },
+    { "soprano-kenny", "原声高萨", "soprano-sax", "kenny", PublishedToneKind::swamPackage, "soprano-kenny.fytonepack" },
+    { "soprano-pop", "明亮高萨", "soprano-sax", "pop-high", PublishedToneKind::swamPackage, "soprano-pop.fytonepack" },
+    { "alto-jazz", "爵士中萨", "alto-sax", "jazz", PublishedToneKind::swamPackage, "alto-jazz.fytonepack" },
+    { "alto-deep", "深情中萨", "alto-sax", "deep", PublishedToneKind::swamPackage, "alto-deep.fytonepack" },
+    { "alto-pop", "流行中萨", "alto-sax", "pop", PublishedToneKind::swamPackage, "alto-pop.fytonepack" },
+    { "alto-silky", "浪漫中萨", "alto-sax", "release", PublishedToneKind::swamPackage, "tone137-alto-silky.fytonepack" },
+    { "alto-breath-growl", "嘶吼中萨", "alto-sax", "release", PublishedToneKind::swamPackage, "alto-breath-growl.fytonepack" },
+    { "alto-breathy", "气声中萨", "alto-sax", "release", PublishedToneKind::swamPackage, "alto-breathy.fytonepack" },
+    { "tenor-mellow", "醇厚次中萨", "tenor-sax", "mellow", PublishedToneKind::swamPackage, "tenor-mellow.fytonepack" },
+    { "tenor-warm", "温暖次中萨", "tenor-sax", "warm", PublishedToneKind::swamPackage, "tenor-warm.fytonepack" },
+    { "tenor-air-pocket", "气包音次中萨", "tenor-sax", "air-pocket", PublishedToneKind::swamPackage, "tenor-air-pocket.fytonepack" },
+    { "tenor-silky", "浪漫次中萨", "tenor-sax", "release", PublishedToneKind::swamPackage, "tone137-tenor-silky.fytonepack" },
+    { "tenor-breath-growl", "嘶吼次中萨", "tenor-sax", "release", PublishedToneKind::swamPackage, "tenor-breath-growl.fytonepack" },
     { "trumpet", "小号1", "trumpet", "natural", PublishedToneKind::swamPackage, "trumpet.fytonepack" },
     { "trumpet-2", "小号2", "trumpet", "release", PublishedToneKind::swamPackage, "tone137-trumpet-2.fytonepack" },
     { "piccolo-trumpet", "高音小号", "piccolo-trumpet", "natural", PublishedToneKind::swamPackage, "piccolo-trumpet.fytonepack" },

@@ -1,4 +1,5 @@
 #include "TonePackage.h"
+#include "PublishedToneCatalog.h"
 #include "KongProjectFile.h"
 #include "SerialEffectRouting.h"
 #include "ScopedGraphPause.h"
@@ -119,7 +120,9 @@ int main()
         assert(before && after);
         const auto original = fengyin::KongProjectFile::readPluginComponentState(before->samplerState);
         const auto migrated = fengyin::KongProjectFile::readPluginComponentState(after->samplerState);
-        const auto originalMain = original.getChildWithName("PresetList").getChild(0);
+        auto originalMain = original.getChildWithName("PresetList").getChild(0).createCopy();
+        if (juce::String(migration.file) == "folk-jinghu.fytonepack")
+            originalMain.setProperty("IndexSelectedKeyswitch", 1, nullptr); // 1106 tuner selected Sus_Main_Leg2.
         const auto list = migrated.getChildWithName("PresetList");
         assert(list.getNumChildren() == 2 && list.getChild(0).isEquivalentTo(originalMain));
         assert(migrated.getChildWithName("RackParam").isEquivalentTo(original.getChildWithName("RackParam")));
@@ -321,21 +324,29 @@ int main()
     }
     const auto bundled=juce::File(juce::String::fromUTF8(__FILE__)).getParentDirectory().getParentDirectory().getChildFile("assets/tone-packages");
     const auto files=bundled.findChildFiles(juce::File::findFiles,false,"*.fytonepack");
-    // 41 published packages plus seven retained historical package fixtures.
-    assert(files.size()==48);
+    // 44 published packages plus seven retained historical package fixtures.
+    assert(files.size()==51);
     const auto gainAudit=juce::JSON::parse(bundled.getChildFile("kong-headroom-134-audit.json"));
     assert(gainAudit["targets"].isArray() && gainAudit["targets"].size()==13);
-    int routedFolkPackages=0, boostedPackages=0;
+    int routedFolkPackages=0, breathGrowlPackages=0, freshAirPackages=0;
     for(const auto& file:files){
         juce::String error;const auto imported=fengyin::TonePackage::read(file,error);
         if(!imported){std::cerr<<file.getFileName()<<": "<<error<<std::endl;return 1;}
         assert(error.isEmpty());
-        if (imported->outputGain > 1.5f && !file.getFileName().startsWith("tone137-"))
+        if (imported->swamBreathGrowl)
         {
-            ++boostedPackages;
-            const float expectedDb=imported->pluginBrand=="swam"?5.f:6.f;
-            assert(std::abs(imported->outputGain - std::pow(10.f,expectedDb/20.f)) < 1e-6f);
+            ++breathGrowlPackages;
+            assert(file.getFileName().endsWith("-breath-growl.fytonepack"));
         }
+        for (const auto& tone : fengyin::publishedToneCatalog)
+            if (file.getFileName() == juce::String(tone.assetName.data()))
+                for (const auto& effect : imported->effects)
+                    if (const auto description = juce::parseXML(effect.descriptionXml);
+                        description && description->getStringAttribute("name") == "Fresh Air")
+                    {
+                        ++freshAirPackages;
+                        assert(tone.id == "tenor-air-pocket");
+                    }
         // Every package must preserve all tuning fields and full state on export/import.
         {
             const auto copy=directory.getChildFile("gain-roundtrip-"+file.getFileName());
@@ -367,6 +378,6 @@ int main()
         }
     }
     assert(routedFolkPackages==13);
-    assert(boostedPackages==32);
+    assert(breathGrowlPackages==2 && freshAirPackages==1);
     assert(directory.deleteRecursively());
 }

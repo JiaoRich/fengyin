@@ -2048,6 +2048,8 @@ void MainComponent::timerCallback()
                 ? fengyin::simpleOther(currentInstrumentKey.toStdString()) : role.role;
             item->setProperty("pluginSupported", fengyin::simpleRoleSupported(currentInstrumentKey.toStdString(),role.role)
                 && pluginHost.hasIndependentTechniqueRoute(actualRole));
+            if (role.role == fengyin::PerformanceTechnique::growl && pluginHost.usesSwamBreathGrowl())
+                item->setProperty("presetBreathControl", true);
             item->setProperty("hardwareAvailable", true);
             item->setProperty("supported", true);
             item->setProperty("recommendedSource", utf8("只学习硬件信号，具体技巧随音色自动切换"));
@@ -3027,6 +3029,7 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
     preset.toneParameters = pluginHost.captureToneParameters();
     preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureContainerState()
         : currentPluginBrand=="kontakt" ? preset.instrumentState : juce::MemoryBlock();
+    preset.swamBreathGrowl = currentPluginBrand == "swam" && pluginHost.usesSwamBreathGrowl();
     preset.kongTechniques=currentPluginBrand=="kong" ? pluginHost.getKongTechniqueProfile() : fengyin::KongTechniqueProfile{};
     if (currentPluginBrand == "kong")
     {
@@ -3135,6 +3138,7 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
     preset.toneParameters = pluginHost.captureToneParameters();
     preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureContainerState()
         : currentPluginBrand=="kontakt" ? preset.instrumentState : juce::MemoryBlock();
+    preset.swamBreathGrowl = currentPluginBrand == "swam" && pluginHost.usesSwamBreathGrowl();
     preset.kongTechniques=currentPluginBrand=="kong" ? pluginHost.getKongTechniqueProfile() : fengyin::KongTechniqueProfile{};
     if (currentPluginBrand == "kong")
     {
@@ -3466,6 +3470,7 @@ void MainComponent::captureToneBeforePresetEdit()
     editingReturnEffects = pluginHost.captureEffectChain();
     editingReturnSamplerState = currentPluginBrand == "kong" ? pluginHost.captureKongState() : juce::MemoryBlock();
     editingReturnKongTechniques=pluginHost.getKongTechniqueProfile();
+    editingReturnSwamBreathGrowl=pluginHost.usesSwamBreathGrowl();
     editingReturnContainerProjectState.reset();
     if (currentPluginBrand == "kong")
         for (const auto& preset : cachedPresets)
@@ -3527,6 +3532,7 @@ void MainComponent::restoreToneBeforePresetEdit()
     const auto parameters = editingReturnToneParameters;
     const auto samplerState = editingReturnSamplerState;
     const auto kongTechniques=editingReturnKongTechniques;
+    const auto swamBreathGrowl=editingReturnSwamBreathGrowl;
     const auto toneSettings = editingReturnToneSettings;
     const auto effectStates = editingReturnEffects;
     const auto initialState = brand == "kong"
@@ -3544,7 +3550,7 @@ void MainComponent::restoreToneBeforePresetEdit()
                          status.bufferSize > 0 ? status.bufferSize : 128,
                          initialState,
                          [this, presetId, presetName, styleId, brand, instrumentKey, instrumentName,
-                          wasCustom, modelIndex, parameters, toneSettings, effectStates, kongTechniques, hasFullState]
+                          wasCustom, modelIndex, parameters, toneSettings, effectStates, kongTechniques, swamBreathGrowl, hasFullState]
                          (bool success, const juce::String& message)
                          {
                              if (! success) { pluginLoading = false; return; }
@@ -3575,7 +3581,7 @@ void MainComponent::restoreToneBeforePresetEdit()
                                  safe->pluginLoading = false;
                                  safe->pluginStatus.setText(utf8("已取消修改，恢复原音色"), juce::dontSendNotification);
                              };
-                             activatePluginOutput(message, false, true, kongTechniques);
+                             activatePluginOutput(message, false, true, kongTechniques, swamBreathGrowl);
                              const auto audioStatus = audio.getStatus();
                              pluginHost.restoreEffectChain(effectStates, audioStatus.sampleRate > 0 ? audioStatus.sampleRate : 48000,
                                  audioStatus.bufferSize > 0 ? audioStatus.bufferSize : 128,
@@ -3817,7 +3823,7 @@ void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
         pluginHost.configureKongTechniqueProfile(currentInstrumentKey,preset.kongTechniques);
         midi.setTechniqueContext(currentInstrumentKey);
     }
-    if(currentPluginBrand=="swam") pluginHost.applyStandardSwamExpressionCurve();
+    if(currentPluginBrand=="swam") pluginHost.applyStandardSwamExpressionCurve(false, preset.swamBreathGrowl);
     pluginStatus.setText(utf8("已恢复音色：") + preset.name, juce::dontSendNotification);
     juce::Logger::writeToLog("Preset parameters restored; restoring effect chain");
     pluginLoading = true;
@@ -3835,7 +3841,7 @@ void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
 }
 
 void MainComponent::activatePluginOutput(const juce::String& pluginName, bool applyDefaults, bool configureRoutes,
-                                         const fengyin::KongTechniqueProfile& kongProfile)
+                                         const fengyin::KongTechniqueProfile& kongProfile, bool swamBreathGrowl)
 {
     juce::Logger::writeToLog("Plugin output activation begin; defaults=" + juce::String(applyDefaults ? 1 : 0));
     audio.getDeviceManager().removeAudioCallback(&testSynth);
@@ -3865,7 +3871,7 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName, bool ap
     pluginHost.setMusicTempoMode(midi.getMusicTempoMode());masterOutput.setReverbPreDelay(fengyin::MusicTempoPolicy::forMode(midi.getMusicTempoMode()).predelayMs);
     pluginHost.configureKongTechniqueProfile(currentPluginBrand == "kong" ? currentInstrumentKey : juce::String(),kongProfile);
     if (currentPluginBrand == "swam" && configureRoutes)
-        pluginHost.applyStandardSwamExpressionCurve(applyDefaults);
+        pluginHost.applyStandardSwamExpressionCurve(applyDefaults, swamBreathGrowl);
     // Complete all plugin-state changes before the real-time callback begins.
     pluginHost.attachTo(audio.getDeviceManager());
     juce::Logger::writeToLog("Plugin output attached");

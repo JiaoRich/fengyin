@@ -6,13 +6,13 @@ namespace fengyin {
 // Standard Steinberg VstW/CcnK/FBCh envelope (VST3 SDK vst2persistence.cpp),
 // containing a verified JUCE XML chunk. No guessed vendor checksum fields.
 struct SwamTechniqueRouting {
-    struct Result { bool supported=false, changed=false; int vibrato=-1, growl=-1, flutter=-1, volume=-1; int stage=0; };
+    struct Result { bool supported=false, changed=false; int vibrato=-1, growl=-1, flutter=-1, volume=-1; int stage=0; bool breathGrowl=false; };
     static juce::XmlElement* findTable(juce::XmlElement& root) {
         if(root.hasTagName("MIDIRemappingTable"))return &root;
         for(auto* child:root.getChildIterator())if(auto* found=findTable(*child))return found;
         return nullptr;
     }
-    static Result prepare(juce::MemoryBlock& state,bool wantVibrato,bool wantGrowl,bool wantFlutter=false,bool shareVolume=false,bool ownTremolo=false,bool preserveUnrequested=false) {
+    static Result prepare(juce::MemoryBlock& state,bool wantVibrato,bool wantGrowl,bool wantFlutter=false,bool shareVolume=false,bool ownTremolo=false,bool preserveUnrequested=false,bool preferBreathGrowl=false) {
         Result result;
         auto outer=juce::AudioProcessor::getXmlFromBinary(state.getData(),static_cast<int>(state.getSize()));
         if(!outer||!outer->hasTagName("VST3PluginState"))return result;
@@ -28,6 +28,35 @@ struct SwamTechniqueRouting {
         auto xml=juce::AudioProcessor::getXmlFromBinary(bytes+176,static_cast<int>(chunkSize));
         if(!xml||!xml->hasTagName("swam"))return result;
         auto* table=findTable(*xml);if(!table)return result;
+        // Only an explicit full preset with verified shared CC11 may own Growl.
+        if (preferBreathGrowl && wantGrowl && preserveUnrequested)
+        {
+            const auto isBreathRoute = [](const juce::XmlElement& entry)
+            {
+                const auto channel = entry.getIntAttribute("channel");
+                return entry.getIntAttribute("enabled") == 1 && entry.getIntAttribute("messageType") == 1
+                    && entry.getIntAttribute("msb") == 11 && entry.getIntAttribute("lsb", -1) <= 0
+                    && (channel == 1 || channel == 17);
+            };
+            int expressionCount = 0, growlCount = 0;
+            bool expressionOnBreath = false, growlOnBreath = false;
+            for (auto* entry : table->getChildIterator())
+            {
+                const auto id = entry->getStringAttribute("parameterId");
+                if (id.equalsIgnoreCase("expression"))
+                {
+                    ++expressionCount;
+                    expressionOnBreath = isBreathRoute(*entry);
+                }
+                if (id.equalsIgnoreCase("growl"))
+                {
+                    ++growlCount;
+                    growlOnBreath = isBreathRoute(*entry);
+                }
+            }
+            result.breathGrowl = expressionCount == 1 && growlCount == 1 && expressionOnBreath && growlOnBreath;
+            if (result.breathGrowl) wantGrowl = false;
+        }
         // String bow tremolo belongs exclusively to the hardware technique key.
         // A saved breath mapping would otherwise overwrite OFF (and the held
         // key's selection) on the next CC11. Keep the curve and all other routes.
