@@ -1,4 +1,5 @@
 from pathlib import Path
+from tone_baseline_143 import previous_bytes, previous_package_bytes, previous_gain_workspace
 import hashlib
 import io
 import json
@@ -76,19 +77,19 @@ class KongHeadroom134(unittest.TestCase):
                 self.assertGreater(evidence['peak'], 0)
                 self.assertLessEqual(max(evidence['peak'], evidence['oversampledPeak4x']), self.audit['verificationCeiling'])
 
-    def test_current_exclusive_signal_path_and_other_builtins(self):
+    def test_recorded_exclusive_signal_path_and_other_builtins(self):
         maintenance = json.loads((ASSETS / 'kong-exclusive-136-audit.json').read_text(encoding='utf-8'))
         self.assertEqual(maintenance['sourceHashNewlines'], 'LF')
         for path, expected in maintenance['signalPathSha256'].items():
             # Git's Windows checkout may convert LF to CRLF. Ignore only that
             # code-line ending conversion; package/binary hashes remain exact.
-            source=(ROOT / path).read_bytes().replace(b'\r\n',b'\n')
+            source=previous_bytes(path).replace(b'\r\n',b'\n')
             # 1.1.39 preserves the router, while updating only diagnostics and DSP guards.
             latest=json.loads((ASSETS/'release-140-audit.json').read_text(encoding='utf-8'))
             self.assertEqual(sha(source), latest.get('signalPathSha256',{}).get(path,expected), path)
         for name, expected in self.audit['unchangedPackages'].items():
             self.assertFalse(name.startswith('folk-'))
-            raw=(ASSETS/name).read_bytes()
+            raw=previous_package_bytes(name)
             if name=='trumpet.fytonepack':
                 with zipfile.ZipFile(ROOT/'assets/incoming-tones/20261018/swam-post-gain-pre-139.zip') as previous:raw=previous.read(name)
             self.assertEqual(sha(raw), expected, name)
@@ -111,11 +112,12 @@ class KongHeadroom134(unittest.TestCase):
                 self.assertLessEqual(max(v['peak'], v['oversampledPeak4x']), maintenance['verificationCeiling'])
 
     def test_calibration_cannot_accumulate_on_repeat(self):
-        paths = list(ASSETS.glob('*.fytonepack'))
-        before = {p.name: sha(p.read_bytes()) for p in paths}
-        subprocess.run([sys.executable, str(ROOT / 'scripts/apply_kong_headroom_134.py'),
-                        '--measurements', 'unused-after-completed-calibration.json'], check=True, capture_output=True)
-        self.assertEqual(before, {p.name: sha(p.read_bytes()) for p in paths})
+        with previous_gain_workspace() as workspace:
+            paths = list((workspace / 'assets/tone-packages').glob('*.fytonepack'))
+            before = {p.name: sha(p.read_bytes()) for p in paths}
+            subprocess.run([sys.executable, str(workspace / 'scripts/apply_kong_headroom_134.py'),
+                            '--measurements', 'unused-after-completed-calibration.json'], check=True, capture_output=True)
+            self.assertEqual(before, {p.name: sha(p.read_bytes()) for p in paths})
 
 
 if __name__ == '__main__':

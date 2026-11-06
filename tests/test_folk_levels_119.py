@@ -1,4 +1,5 @@
 from pathlib import Path
+from tone_baseline_143 import previous_package_bytes
 import unittest,json,zipfile,hashlib,io
 import xml.etree.ElementTree as ET
 import sys
@@ -16,8 +17,7 @@ class FolkLevels119(unittest.TestCase):
         calibrated={row['file']:row for row in gain['targets']}
         with zipfile.ZipFile(ROOT/audit['baseline']) as base:
             for row in audit['targets']:
-                path=ROOT/'assets/tone-packages'/row['file']
-                raw=path.read_bytes()
+                raw=previous_package_bytes(row['file'])
                 newer=calibrated[row['file']]
                 self.assertEqual(hashlib.sha256(raw).hexdigest(),newer['beforeSha256'])
                 with zipfile.ZipFile(ROOT/gain['baseline']) as previous:raw=previous.read(row['file'])

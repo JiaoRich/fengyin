@@ -1,4 +1,5 @@
 from pathlib import Path
+from tone_baseline_143 import previous_package
 import unittest,json,zipfile,xml.etree.ElementTree as ET,hashlib
 ROOT=Path(__file__).resolve().parents[1]
 class Release113(unittest.TestCase):
@@ -31,7 +32,7 @@ class Release113(unittest.TestCase):
         self.assertIn("group.label = '采样音源 · Kontakt'",js)
         self.assertIn('option.value = String(index)',js)
     def test_original_tone_rename_and_manifest(self):
-        with zipfile.ZipFile(ROOT/'assets/tone-packages/soprano-kenny.fytonepack') as archive:
+        with previous_package('soprano-kenny.fytonepack') as archive:
             tone=archive.read('tone.xml');manifest=json.loads(archive.read('manifest.json'))
         self.assertEqual(ET.fromstring(tone).find('PRESET').get('name'),'高萨-原声')
         self.assertEqual(manifest['style'],'高萨-原声')

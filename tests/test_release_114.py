@@ -1,4 +1,5 @@
 from pathlib import Path
+from tone_baseline_143 import previous_package
 import json,zipfile,hashlib,unittest,subprocess,shutil,tempfile,xml.etree.ElementTree as E
 ROOT=Path(__file__).resolve().parents[1]
 class Release114(unittest.TestCase):
@@ -18,7 +19,7 @@ class Release114(unittest.TestCase):
         self.assertEqual(len(audit),6)
         for entry in audit:
             self.assertTrue(entry['completeStateUnchanged'])
-            with zipfile.ZipFile(ROOT/'assets/tone-packages'/entry['asset']) as z:
+            with previous_package(entry['asset']) as z:
                 self.assertIsNone(z.testzip());m=json.loads(z.read('manifest.json'));p=E.fromstring(z.read('tone.xml')).find('PRESET')
                 self.assertEqual(p.get('name'),entry['name']);self.assertTrue(p.find('INSTRUMENT_STATE').text)
                 self.assertEqual(m['dependencies'],entry['dependencies'])

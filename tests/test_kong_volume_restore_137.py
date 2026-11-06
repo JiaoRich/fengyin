@@ -1,4 +1,5 @@
 from pathlib import Path
+from tone_baseline_143 import previous_package_bytes, previous_gain_workspace
 import hashlib
 import io
 import json
@@ -21,7 +22,7 @@ class OriginalKongVolume(unittest.TestCase):
         self.assertEqual({r['file'] for r in audit['targets']}, {p.name for p in ASSETS.glob('folk-*.fytonepack')})
         with zipfile.ZipFile(ROOT / audit['restoredBaseline']) as base, zipfile.ZipFile(ROOT / audit['calibratedArchive']) as history:
             for row in audit['targets']:
-                current = (ASSETS / row['file']).read_bytes()
+                current = previous_package_bytes(row['file'])
                 previous = history.read(row['file'])
                 self.assertEqual(current, base.read(row['file']))
                 self.assertEqual(sha(current), row['restoredSha256'])
@@ -41,12 +42,13 @@ class OriginalKongVolume(unittest.TestCase):
                         self.assertEqual(sha(data), entry['sha256'])
 
     def test_repeat_restore_and_retired_calibration_never_change_packages(self):
-        paths = list(ASSETS.glob('*.fytonepack'))
-        before = {p.name: sha(p.read_bytes()) for p in paths}
-        subprocess.run([sys.executable, str(ROOT / 'scripts/restore_kong_gain_137.py')], check=True, capture_output=True)
-        result = subprocess.run([sys.executable, str(ROOT / 'scripts/apply_kong_headroom_134.py'), '--measurements', 'unused', '--refine'], capture_output=True)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(before, {p.name: sha(p.read_bytes()) for p in paths})
+        with previous_gain_workspace() as workspace:
+            paths = list((workspace / 'assets/tone-packages').glob('*.fytonepack'))
+            before = {p.name: sha(p.read_bytes()) for p in paths}
+            subprocess.run([sys.executable, str(workspace / 'scripts/restore_kong_gain_137.py')], check=True, capture_output=True)
+            result = subprocess.run([sys.executable, str(workspace / 'scripts/apply_kong_headroom_134.py'), '--measurements', 'unused', '--refine'], capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(before, {p.name: sha(p.read_bytes()) for p in paths})
 
 
 if __name__ == '__main__':

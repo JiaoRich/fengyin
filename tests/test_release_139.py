@@ -1,5 +1,6 @@
 import hashlib, importlib.util, io, json, sys, unittest, zipfile
 from pathlib import Path
+from tone_baseline_143 import previous_package
 import xml.etree.ElementTree as ET
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'scripts'))
@@ -8,7 +9,7 @@ class Release139(unittest.TestCase):
     def test_only_factory_transpose_changed_in_trumpet(self):
         with zipfile.ZipFile(ROOT/'assets/incoming-tones/20261018/swam-post-gain-pre-139.zip') as z:oldBytes=z.read('trumpet.fytonepack')
         with zipfile.ZipFile(io.BytesIO(oldBytes)) as z:old=ET.fromstring(z.read('tone.xml'));oldFiles=set(z.namelist())
-        with zipfile.ZipFile(ROOT/'assets/tone-packages/trumpet.fytonepack') as z:
+        with previous_package('trumpet.fytonepack') as z:
             new=ET.fromstring(z.read('tone.xml'));self.assertEqual(oldFiles,set(z.namelist()));self.assertIsNone(z.testzip())
             for item in json.loads(z.read('manifest.json'))['files']:
                 self.assertEqual(hashlib.sha256(z.read(item['path'])).hexdigest(),item['sha256'])

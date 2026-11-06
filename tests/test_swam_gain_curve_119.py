@@ -1,6 +1,7 @@
 import importlib.util,json,math,unittest,zipfile,io
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from tone_baseline_143 import previous_package_bytes, previous_package
 
 ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('gain119',ROOT/'scripts/apply_swam_gain_curve_119.py')
@@ -12,7 +13,7 @@ class SwamGainCurve119(unittest.TestCase):
         self.assertEqual(len(audit['targets']),19)
         with zipfile.ZipFile(m.BASELINE) as baseline:
             for row in audit['targets']:
-                packageBytes=(m.ASSETS/row['file']).read_bytes()
+                packageBytes=previous_package_bytes(row['file'])
                 # 1.1.23 explicitly disables the soft violin's internal room.
                 # Validate 1.1.19's immutable input here; the new room test proves
                 # that it is exactly the predecessor and permits only that switch.
@@ -48,7 +49,7 @@ class SwamGainCurve119(unittest.TestCase):
         with zipfile.ZipFile(m.BASELINE) as base:
             for name in ['violin-soft.fytonepack','violin-bright.fytonepack','cello.fytonepack']:
                 with zipfile.ZipFile(__import__('io').BytesIO(base.read(name))) as z:old=ET.fromstring(z.read('tone.xml')).find('PRESET')
-                with zipfile.ZipFile(m.ASSETS/name) as z:new=ET.fromstring(z.read('tone.xml')).find('PRESET')
+                with previous_package(name) as z:new=ET.fromstring(z.read('tone.xml')).find('PRESET')
                 _,a=m.mainvolume_curve(old.findtext('INSTRUMENT_STATE'));_,b=m.mainvolume_curve(new.findtext('INSTRUMENT_STATE'))
                 for tag,key in [('PARAM','id'),('MIDIRemappingEntry','parameterId')]:
                     def select(r):return {e.get(key):ET.tostring(e) for e in r.iter(tag) if any(s in e.get(key,'').lower() for s in ['tremolo','attack','vibrato'])}

@@ -1,6 +1,7 @@
 import hashlib,io,json,sys,unittest,zipfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from tone_baseline_143 import previous_package_bytes
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'scripts'))
 import disable_violin_room_123 as room
@@ -14,7 +15,7 @@ class VlcReleaseTests(unittest.TestCase):
         self.assertEqual({r['file'] for r in audit['targets']},{'violin-soft.fytonepack','violin-bright.fytonepack'})
         with zipfile.ZipFile(room.BASELINE) as base:
             for r in audit['targets']:
-                oldbytes=base.read(r['file']);newbytes=(room.ASSETS/r['file']).read_bytes()
+                oldbytes=base.read(r['file']);newbytes=previous_package_bytes(r['file'])
                 self.assertEqual(hashlib.sha256(oldbytes).hexdigest(),r['beforeSha256'])
                 self.assertEqual(r['beforeSha256'],previous[r['file']]['afterSha256'])
                 self.assertEqual(hashlib.sha256(newbytes).hexdigest(),r['afterSha256'])

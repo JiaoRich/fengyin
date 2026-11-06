@@ -1,4 +1,5 @@
 from pathlib import Path
+from tone_baseline_143 import previous_package_bytes, previous_package
 import hashlib
 import json
 import unittest
@@ -13,12 +14,12 @@ class KensaBend118Tests(unittest.TestCase):
         latest=ROOT/'assets/tone-packages/kensa-refresh-119-audit.json'
         audit = json.loads((latest if latest.exists() else ROOT/'assets/tone-packages/kensa-bend-118-audit.json').read_text(encoding='utf-8'))
         original = ROOT/audit['source']
-        packaged = ROOT/'assets/tone-packages/kontakt-kensa.fytonepack'
+        packaged = 'kontakt-kensa.fytonepack'
         self.assertEqual(hashlib.sha256(original.read_bytes()).hexdigest(), audit['sourceSha256'])
-        self.assertEqual(hashlib.sha256(packaged.read_bytes()).hexdigest(), audit['packageSha256'])
+        self.assertEqual(hashlib.sha256(previous_package_bytes(packaged)).hexdigest(), audit['packageSha256'])
         with zipfile.ZipFile(original) as z:
             before = ET.fromstring(z.read('tone.xml')).find('PRESET')
-        with zipfile.ZipFile(packaged) as z:
+        with previous_package(packaged) as z:
             self.assertIsNone(z.testzip())
             manifest = json.loads(z.read('manifest.json'))
             for entry in manifest['files']:

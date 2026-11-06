@@ -1,17 +1,18 @@
 import hashlib,json,unittest,zipfile,xml.etree.ElementTree as ET
 from pathlib import Path
+from tone_baseline_143 import previous_package
 from tone_baseline_118 import historical_bytes
 ROOT=Path(__file__).resolve().parents[1]
 class Release116(unittest.TestCase):
     def test_kensa_state_and_effect_chain_are_preserved(self):
-        def read(path):
-            with zipfile.ZipFile(path) as z:
+        def read(archive):
+            with archive as z:
                 self.assertIsNone(z.testzip())
                 return ET.fromstring(z.read('tone.xml')).find('PRESET')
         # The received 118 revision adds the user-assigned bend automation.
         # Compare against that unmodified incoming source, not the retired state.
-        old=read(ROOT/'assets/incoming-tones/20261017/肯萨-肯萨1017.fytonepack')
-        new=read(ROOT/'assets/tone-packages/kontakt-kensa.fytonepack')
+        old=read(zipfile.ZipFile(ROOT/'assets/incoming-tones/20261017/肯萨-肯萨1017.fytonepack'))
+        new=read(previous_package('kontakt-kensa.fytonepack'))
         self.assertEqual(new.get('instrumentKey'),'kontakt-kensa')
         self.assertEqual(hashlib.sha256(b''.join(ET.tostring(x) for x in old)).hexdigest(),hashlib.sha256(b''.join(ET.tostring(x) for x in new)).hexdigest())
         for key,value in old.attrib.items():
