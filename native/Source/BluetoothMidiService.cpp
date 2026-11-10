@@ -87,7 +87,7 @@ struct BluetoothMidiService::Impl : juce::Thread
             else {try{checkRequest(ticket,requestDeadline);pending->operation=factory();}catch(...){pending->error=std::current_exception();}}
             pending->ready=true;
         }))throw winrt::hresult_canceled();
-        const auto deadline=std::min(requestDeadline,juce::Time::getMillisecondCounterHiRes()+8000);
+        const auto deadline=juce::jmin(requestDeadline,juce::Time::getMillisecondCounterHiRes()+8000);
         for(;;) {
             {std::lock_guard lock(pending->mutex);if(pending->ready){if(pending->error)std::rethrow_exception(pending->error);return *pending->operation;}}
             try {checkRequest(ticket,deadline);}
@@ -97,7 +97,7 @@ struct BluetoothMidiService::Impl : juce::Thread
     }
     template<class T> auto await(T operation, unsigned ticket, int ms=8000, double requestDeadline=noDeadline)
     {
-        const auto end=std::min(requestDeadline,juce::Time::getMillisecondCounterHiRes()+ms);
+        const auto end=juce::jmin(requestDeadline,juce::Time::getMillisecondCounterHiRes()+ms);
         try
         {
             while (operation.Status()==winrt::Windows::Foundation::AsyncStatus::Started)
@@ -339,6 +339,7 @@ struct BluetoothMidiService::Impl : juce::Thread
     }
     void openGatt(const Command& command)
     {
+        using namespace winrt::Windows::Devices;
         using namespace winrt::Windows::Devices::Bluetooth::GenericAttributeProfile;
         const auto ticket=command.generation;
         const auto deadline=command.deadline;
