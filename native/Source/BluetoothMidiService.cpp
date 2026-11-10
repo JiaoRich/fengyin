@@ -1,4 +1,5 @@
 #include "BluetoothMidiService.h"
+#include "BleMidiConnectionPolicy.h"
 #include "BleMidiInputDecoder.h"
 #include "BleDiscoveryQueue.h"
 #include <deque>
@@ -7,6 +8,7 @@
 #include <atomic>
 #include <optional>
 #include <exception>
+#include <limits>
 #if JUCE_WINDOWS
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Foundation.Metadata.h>
@@ -24,7 +26,7 @@ namespace fengyin
 struct BluetoothMidiService::Impl : juce::Thread
 {
     struct Device { juce::String id, name; bool seen=false, paired=false; };
-    struct Command { juce::String action, id; unsigned generation; };
+    struct Command { juce::String action, id; unsigned generation; double deadline; };
     BluetoothMidiService& owner;
     struct CallbackLifetime { std::mutex mutex; bool alive=true; };
     std::shared_ptr<CallbackLifetime> lifetime=std::make_shared<CallbackLifetime>();
@@ -61,40 +63,56 @@ struct BluetoothMidiService::Impl : juce::Thread
     uint64_t probes=0,probeFailures=0,midiFound=0;
     std::atomic<bool> linkLost { false };
     std::atomic<uint64_t> transportEpoch { 0 }, scanEpoch { 0 };
+    juce::String connectionStage;
     const winrt::guid midiUuid { 0x03b80e5a, 0xede8, 0x4b33, { 0xa7,0x51,0x6c,0xe3,0x4e,0xc4,0xc7,0x00 } };
+    static constexpr double noDeadline = std::numeric_limits<double>::infinity();
+
+    void checkRequest(unsigned ticket, double deadline)
+    {
+        if(threadShouldExit() || generation.load()!=ticket)throw winrt::hresult_canceled();
+        if(juce::Time::getMillisecondCounterHiRes()>=deadline)
+            throw winrt::hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT),L"Bluetooth operation timed out");
+    }
     // Only the asynchronous API *start* runs on the UI thread (Windows consent
     // requirement). No .get(), pairing wait, discovery or port I/O blocks that thread.
-    template<class Factory> auto beginOnUi(Factory factory, unsigned ticket)
+    template<class Factory> auto beginOnUi(Factory factory, unsigned ticket, double requestDeadline=noDeadline)
     {
         using Operation=decltype(factory());
         struct Pending { std::mutex mutex; std::optional<Operation> operation; std::exception_ptr error; bool ready=false; std::atomic<bool> canceled{false}; };
         auto pending=std::make_shared<Pending>();
-        if(!juce::MessageManager::callAsync([this,guard=lifetime,pending,ticket,factory=std::move(factory)]() mutable {
+        if(!juce::MessageManager::callAsync([this,guard=lifetime,pending,ticket,requestDeadline,factory=std::move(factory)]() mutable {
             std::lock_guard callbackLock(guard->mutex);
             std::lock_guard resultLock(pending->mutex);
             if(!guard->alive || pending->canceled || generation.load()!=ticket) pending->error=std::make_exception_ptr(winrt::hresult_canceled());
-            else {try{pending->operation=factory();}catch(...){pending->error=std::current_exception();}}
+            else {try{checkRequest(ticket,requestDeadline);pending->operation=factory();}catch(...){pending->error=std::current_exception();}}
             pending->ready=true;
         }))throw winrt::hresult_canceled();
-        const auto deadline=juce::Time::getMillisecondCounterHiRes()+8000;
+        const auto deadline=std::min(requestDeadline,juce::Time::getMillisecondCounterHiRes()+8000);
         for(;;) {
             {std::lock_guard lock(pending->mutex);if(pending->ready){if(pending->error)std::rethrow_exception(pending->error);return *pending->operation;}}
-            if(threadShouldExit() || generation.load()!=ticket || juce::Time::getMillisecondCounterHiRes()>deadline) {
-                pending->canceled=true;throw winrt::hresult_canceled();
-            }
+            try {checkRequest(ticket,deadline);}
+            catch(...) {pending->canceled=true;throw;}
             wait(20);
         }
     }
-    template<class T> auto await(T operation, unsigned ticket, int ms=8000)
+    template<class T> auto await(T operation, unsigned ticket, int ms=8000, double requestDeadline=noDeadline)
     {
-        const auto end=juce::Time::getMillisecondCounterHiRes()+ms;
-        while (operation.Status()==winrt::Windows::Foundation::AsyncStatus::Started)
+        const auto end=std::min(requestDeadline,juce::Time::getMillisecondCounterHiRes()+ms);
+        try
         {
-            if (threadShouldExit() || generation.load()!=ticket || juce::Time::getMillisecondCounterHiRes()>end)
-            { operation.Cancel(); throw winrt::hresult_canceled(); }
-            wait(20);
+            while (operation.Status()==winrt::Windows::Foundation::AsyncStatus::Started)
+            {
+                checkRequest(ticket,end);
+                wait(20);
+            }
+            checkRequest(ticket,end);
+            return operation.GetResults();
         }
-        return operation.GetResults();
+        catch(...)
+        {
+            try {if(operation.Status()==winrt::Windows::Foundation::AsyncStatus::Started)operation.Cancel();}catch(...){}
+            throw;
+        }
     }
     Info deviceInfo(const winrt::hstring& id, const winrt::Windows::Foundation::Collections::IVector<winrt::hstring>& props, unsigned ticket)
     {
@@ -147,15 +165,25 @@ struct BluetoothMidiService::Impl : juce::Thread
         const bool cancels=action=="connect" || action=="cancel" || action=="disconnect" || action=="forget" || action=="scan" || action=="stopScan";
         std::lock_guard lock(mutex);
         if((action=="connect" || action=="forget") && !devices.count(id)) return;
+        // A dialog close can arrive before the worker even takes the connect command.
+        // Reserve the request at enqueue time so stopping discovery cannot cancel it.
+        if(connecting.isNotEmpty() && (action=="scan" || action=="stopScan" || action=="forget"))return;
         if(cancels) ++generation;
         if(action=="connect" || action=="scan" || action=="cancel" || action=="disconnect" || action=="forget") {operationFailed=false;failedId.clear();}
+        if(action=="connect")
+        {
+            connecting=id;
+            message=juce::String::fromUTF8("正在打开蓝牙设备…");
+        }
         // Coalesce repeated intent, but never discard an already requested USB
         // disconnect just because the user starts another scan before it runs.
         if(action=="cancel" || action=="disconnect") commands.clear();
         else commands.erase(std::remove_if(commands.begin(),commands.end(),[&](const auto& c){
             return c.action==action || ((action=="scan"||action=="stopScan")&&(c.action=="scan"||c.action=="stopScan"));
         }),commands.end());
-        commands.push_back({action,id,generation.load()}); notify();
+        const auto deadline=action=="connect" ? juce::Time::getMillisecondCounterHiRes()+bleMidiConnectionTimeoutMs
+                                               : std::numeric_limits<double>::infinity();
+        commands.push_back({action,id,generation.load(),deadline}); notify();
     }
     void clearReceiver() { std::lock_guard lock(receiverMutex); receiver={}; }
 #if JUCE_WINDOWS
@@ -167,6 +195,8 @@ struct BluetoothMidiService::Impl : juce::Thread
         if(gattSession) {try{gattSession.MaintainConnection(false);gattSession.Close();}catch(...){}gattSession=nullptr;}
         if(midiService) {try{midiService.Close();}catch(...){}midiService=nullptr;}
         if(ble) {try{ble.ConnectionStatusChanged(connectionToken);ble.Close();}catch(...){}ble=nullptr;}
+        notificationToken={};
+        connectionToken={};
         linkLost=false;
         std::lock_guard lock(mutex);connected.clear();
     }
@@ -286,48 +316,56 @@ struct BluetoothMidiService::Impl : juce::Thread
             {std::lock_guard lock(mutex);devices[d.id]=d;}changed();
         }
     }
-    void open(const Command& command)
+    void setConnectionStage(const Command& command, const juce::String& stage, const juce::String& progress = {})
     {
-        using namespace winrt::Windows::Devices;
-        stopScan();
-        closePort(); // Release the previous BLE input before reopening.
-        {std::lock_guard lock(mutex);connecting=command.id;message=juce::String::fromUTF8("正在连接，首次使用时请确认系统配对提示");}changed();
-        auto candidate=await(beginOnUi([id=wide(command.id)]{return Ble::FromIdAsync(id);},command.generation),command.generation);
+        std::lock_guard lock(mutex);
+        checkRequest(command.generation,command.deadline);
+        connectionStage=stage;
+        message=progress.isEmpty()?juce::String::fromUTF8("正在")+stage+juce::String::fromUTF8("…"):progress;
+        changed();
+    }
+    template<class Result> static void requireGattSuccess(const Result& result)
+    {
+        using winrt::Windows::Devices::Bluetooth::GenericAttributeProfile::GattCommunicationStatus;
+        const auto status=result.Status();
+        if(status==GattCommunicationStatus::Success)return;
+        const auto error=result.ProtocolError();
+        const auto att=error?error.Value():std::uint8_t{0};
+        const auto details="GATT status="+juce::String(static_cast<int>(status))
+            +(error?" ATT=0x"+juce::String::toHexString(static_cast<int>(att)):juce::String());
+        if(status==GattCommunicationStatus::ProtocolError && isBleMidiAuthenticationError(att))
+            throw BleMidiAuthenticationRequired(details.toStdString());
+        throw winrt::hresult_error(status==GattCommunicationStatus::AccessDenied?E_ACCESSDENIED:E_FAIL,wide(details));
+    }
+    void openGatt(const Command& command)
+    {
+        using namespace winrt::Windows::Devices::Bluetooth::GenericAttributeProfile;
+        const auto ticket=command.generation;
+        const auto deadline=command.deadline;
+        setConnectionStage(command,juce::String::fromUTF8("打开蓝牙设备"));
+        auto candidate=await(beginOnUi([id=wide(command.id)]{return Ble::FromIdAsync(id);},ticket,deadline),ticket,8000,deadline);
         if(!candidate)throw winrt::hresult_error(E_ACCESSDENIED);
         ble=candidate; // Own partial opens too, so cancel/failure closes every resource.
-        auto info=candidate.DeviceInformation();
-        if(!info.Pairing().IsPaired() && info.Pairing().CanPair()) {
-            auto custom=info.Pairing().Custom();
-            auto token=custom.PairingRequested([](const auto&,const Enumeration::DevicePairingRequestedEventArgs& args) {
-                if(args.PairingKind()==Enumeration::DevicePairingKinds::ConfirmOnly)args.Accept();
-            });
-            Enumeration::DevicePairingResult result { nullptr };
-            try {result=await(beginOnUi([custom]{return custom.PairAsync(Enumeration::DevicePairingKinds::ConfirmOnly,
-                       Enumeration::DevicePairingProtectionLevel::None);},command.generation),command.generation,45000);}
-            catch(...) {custom.PairingRequested(token);throw;}
-            custom.PairingRequested(token);
-            if(result.Status()!=Enumeration::DevicePairingResultStatus::Paired && result.Status()!=Enumeration::DevicePairingResultStatus::AlreadyPaired)
-                throw winrt::hresult_error(E_FAIL,L"Pairing did not complete");
-        }
-        // A paired BLE MIDI peripheral need not publish a Windows MidiInPort.
-        // Subscribe to the standard MIDI GATT characteristic directly instead.
-        auto services=await(candidate.GetGattServicesForUuidAsync(midiUuid,Bluetooth::BluetoothCacheMode::Uncached),command.generation,15000);
-        using namespace Bluetooth::GenericAttributeProfile;
-        if(services.Status()!=GattCommunicationStatus::Success || services.Services().Size()==0)
+        setConnectionStage(command,juce::String::fromUTF8("读取 MIDI 服务"));
+        auto services=await(candidate.GetGattServicesForUuidAsync(midiUuid,Bluetooth::BluetoothCacheMode::Uncached),ticket,15000,deadline);
+        requireGattSuccess(services);
+        if(services.Services().Size()==0)
             throw winrt::hresult_error(E_FAIL,L"BLE MIDI GATT service unavailable");
         midiService=services.Services().GetAt(0);
         for(uint32_t n=1;n<services.Services().Size();++n)services.Services().GetAt(n).Close();
+        setConnectionStage(command,juce::String::fromUTF8("查找 MIDI 数据通道"));
         const winrt::guid characteristicUuid {0x7772e5db,0x3868,0x4112,{0xa1,0xa9,0xf2,0x66,0x9d,0x10,0x6b,0xf3}};
-        auto characteristics=await(midiService.GetCharacteristicsForUuidAsync(characteristicUuid,Bluetooth::BluetoothCacheMode::Uncached),command.generation,15000);
-        if(characteristics.Status()!=GattCommunicationStatus::Success || characteristics.Characteristics().Size()==0)
+        auto characteristics=await(midiService.GetCharacteristicsForUuidAsync(characteristicUuid,Bluetooth::BluetoothCacheMode::Uncached),ticket,15000,deadline);
+        requireGattSuccess(characteristics);
+        if(characteristics.Characteristics().Size()==0)
             throw winrt::hresult_error(E_FAIL,L"BLE MIDI notification characteristic unavailable");
         midiCharacteristic=characteristics.Characteristics().GetAt(0);
         if((midiCharacteristic.CharacteristicProperties() & GattCharacteristicProperties::Notify)==GattCharacteristicProperties::None)
             throw winrt::hresult_error(E_FAIL,L"BLE MIDI characteristic does not support notifications");
-        gattSession=await(GattSession::FromDeviceIdAsync(candidate.BluetoothDeviceId()),command.generation);
+        setConnectionStage(command,juce::String::fromUTF8("开启 MIDI 接收"));
+        gattSession=await(GattSession::FromDeviceIdAsync(candidate.BluetoothDeviceId()),ticket,8000,deadline);
         if(gattSession && gattSession.CanMaintainConnection())gattSession.MaintainConnection(true);
         const auto epoch=transportEpoch.load();
-        try {
         {std::lock_guard lock(receiverMutex);packetDecoder.reset();}
         notificationToken=midiCharacteristic.ValueChanged([this,guard=lifetime,epoch](const auto&,const GattValueChangedEventArgs& args) {
             std::lock_guard callbackLock(guard->mutex);if(!guard->alive || transportEpoch.load()!=epoch)return;
@@ -342,19 +380,60 @@ struct BluetoothMidiService::Impl : juce::Thread
                 });
             }catch(...) {linkLost=true;notify();}
         });
-        auto subscribed=await(midiCharacteristic.WriteClientCharacteristicConfigurationDescriptorAsync(
-            GattClientCharacteristicConfigurationDescriptorValue::Notify),command.generation,15000);
-        if(subscribed!=GattCommunicationStatus::Success)
-            throw winrt::hresult_error(E_FAIL,L"BLE MIDI notification subscription failed");
-        if(generation.load()!=command.generation)throw winrt::hresult_canceled();
+        const auto subscribed=await(midiCharacteristic.WriteClientCharacteristicConfigurationDescriptorWithResultAsync(
+            GattClientCharacteristicConfigurationDescriptorValue::Notify),ticket,15000,deadline);
+        requireGattSuccess(subscribed);
+        checkRequest(ticket,deadline);
         connectionToken=ble.ConnectionStatusChanged([this, guard=lifetime,epoch](const auto& device,const auto&) {
             std::lock_guard callbackLock(guard->mutex);if(!guard->alive)return;
             if(transportEpoch.load()!=epoch)return;
             try {if(device.ConnectionStatus()==Bluetooth::BluetoothConnectionStatus::Disconnected){linkLost=true;notify();}}catch(...) {linkLost=true;notify();}
         });
-        {std::lock_guard lock(mutex);connected=command.id;++portEpoch;connecting.clear();history[command.id]=true;
-            devices[command.id].paired=info.Pairing().IsPaired();devices[command.id].seen=true;save();message=juce::String::fromUTF8("蓝牙 MIDI 已连接");}changed();
-        } catch(...) {closePort();throw;}
+    }
+    void pairForGatt(const Command& command, const BleMidiAuthenticationRequired& cause)
+    {
+        using namespace winrt::Windows::Devices::Enumeration;
+        checkRequest(command.generation,command.deadline);
+        auto pairing=ble.DeviceInformation().Pairing();
+        if(pairing.IsPaired() || !pairing.CanPair())throw BleMidiAuthenticationRequired(cause.what());
+        juce::Logger::writeToLog("Bluetooth MIDI: pairing requested at "+connectionStage+" ("+juce::String(cause.what())+")");
+        closePort();
+        setConnectionStage(command,juce::String::fromUTF8("Windows 配对"),
+            juce::String::fromUTF8("等待 Windows 配对，请留意系统提示…"));
+        auto result=await(beginOnUi([pairing]{return pairing.PairAsync();},command.generation,command.deadline),
+            command.generation,bleMidiConnectionTimeoutMs,command.deadline);
+        const auto status=result.Status();
+        if(status!=DevicePairingResultStatus::Paired && status!=DevicePairingResultStatus::AlreadyPaired)
+            throw winrt::hresult_error(E_FAIL,wide("Pairing did not complete; status="+juce::String(static_cast<int>(status))));
+    }
+    void open(const Command& command)
+    {
+        connectionStage=juce::String::fromUTF8("打开蓝牙设备");
+        stopScan();
+        closePort(); // Release the previous BLE input before reopening.
+        try
+        {
+            openBleMidiWithPairing([&]{openGatt(command);},
+                [&](const auto& error){pairForGatt(command,error);});
+        }
+        catch(const BleMidiAuthenticationRequired& error)
+        {
+            throw winrt::hresult_error(E_ACCESSDENIED,wide(juce::String(error.what())));
+        }
+        const bool paired=ble.DeviceInformation().Pairing().IsPaired();
+        {
+            std::lock_guard lock(mutex);
+            checkRequest(command.generation,command.deadline);
+            connected=command.id;
+            ++portEpoch;
+            connecting.clear();
+            history[command.id]=true;
+            devices[command.id].paired=paired;
+            devices[command.id].seen=true;
+            save();
+            message=juce::String::fromUTF8("蓝牙 MIDI 已连接");
+        }
+        changed();
     }
 #endif
     void run() override
@@ -374,7 +453,12 @@ struct BluetoothMidiService::Impl : juce::Thread
                     else if(command.action=="stopScan")stopScan();
                     else if(command.action=="connect" && command.generation==generation.load())open(command);
                     else if(command.action=="disconnect" || command.action=="cancel") {
-                        stopScan();closePort();std::lock_guard lock(mutex);connecting.clear();message=juce::String::fromUTF8("已断开，可选择设备重新连接");
+                        stopScan();closePort();
+                        std::lock_guard lock(mutex);
+                        if(command.generation==generation.load()) {
+                            connecting.clear();
+                            message=juce::String::fromUTF8("已断开，可选择设备重新连接");
+                        }
                     }
                     else if(command.action=="forget") {
                         bool active;{std::lock_guard lock(mutex);active=connected==command.id;}if(active)closePort();
@@ -401,14 +485,27 @@ struct BluetoothMidiService::Impl : juce::Thread
                     scanUntil=0;stopScan();std::lock_guard lock(mutex);message=juce::String::fromUTF8("搜索完成。未发现设备时，请确认电吹管已开启蓝牙且未被其他应用占用");changed();
                 }
             } catch(const winrt::hresult_error& error) {
-                if(hasCommand && command.action=="connect")closePort();
+                const bool wasConnecting=hasCommand && command.action=="connect";
+                if(wasConnecting)closePort();
+                std::lock_guard lock(mutex);
                 if(hasCommand && command.generation!=generation.load())continue;
-                std::lock_guard lock(mutex);connecting.clear();operationFailed=true;failedId=hasCommand?command.id:juce::String();
-                message=error.code()==E_ACCESSDENIED?juce::String::fromUTF8("蓝牙访问被拒绝，请检查权限后重试")
-                    :error.code()==HRESULT_FROM_WIN32(ERROR_CANCELLED)?juce::String::fromUTF8("连接已取消或超时，请重试")
-                    :juce::String::fromUTF8("连接未完成，请检查电吹管蓝牙与配对状态后重试");
-                juce::Logger::writeToLog("Bluetooth MIDI: "+juce::String::toHexString(static_cast<int>(error.code()))+" "+str(error.message()));changed();
-            } catch(...) {if(hasCommand && command.action=="connect")closePort();std::lock_guard lock(mutex);connecting.clear();operationFailed=true;failedId=hasCommand?command.id:juce::String();message=juce::String::fromUTF8("蓝牙操作未完成，请重试或使用 USB 连接");changed();}
+                connecting.clear();operationFailed=true;failedId=hasCommand?command.id:juce::String();
+                const auto stage=wasConnecting?connectionStage:juce::String::fromUTF8("蓝牙操作");
+                if(error.code()==HRESULT_FROM_WIN32(ERROR_TIMEOUT))message=stage+juce::String::fromUTF8("超时，请重试");
+                else if(error.code()==E_ACCESSDENIED)message=stage+juce::String::fromUTF8("时访问被拒绝，请检查设备配对状态");
+                else if(error.code()==HRESULT_FROM_WIN32(ERROR_CANCELLED))message=stage+juce::String::fromUTF8("已取消");
+                else message=stage+juce::String::fromUTF8("失败，请重试");
+                juce::Logger::writeToLog("Bluetooth MIDI: "+stage+" "+juce::String::toHexString(static_cast<int>(error.code()))+" "+str(error.message()));
+                changed();
+            } catch(...) {
+                const bool wasConnecting=hasCommand && command.action=="connect";
+                if(wasConnecting)closePort();
+                std::lock_guard lock(mutex);
+                if(hasCommand && command.generation!=generation.load())continue;
+                connecting.clear();operationFailed=true;failedId=hasCommand?command.id:juce::String();
+                message=(wasConnecting?connectionStage:juce::String::fromUTF8("蓝牙操作"))+juce::String::fromUTF8("失败，请重试或使用 USB 连接");
+                changed();
+            }
             // Drain queued discovery promptly. Idle waits are notification-driven.
             bool more=false;{std::lock_guard lock(mutex);more=scanning&&!adverts.empty();}
             if(!more)wait(100);

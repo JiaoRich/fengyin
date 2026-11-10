@@ -2869,7 +2869,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.44 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.45 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},
@@ -3411,15 +3411,40 @@ function renderMidiConnection(state){
  const key=state.inputConnected?`${state.inputId||state.connectedId||state.inputName}:${state.inputGeneration??state.portEpoch??0}`:'';
  if(midiReceivedInitialState&&key&&key!==lastMidiSuccess)showMidiSuccess(state);else if(!key)hideMidiSuccess();lastMidiSuccess=key;midiReceivedInitialState=true;
  $('#midi-search').disabled=!state.supported||busy;$('#midi-search').textContent=state.scanning?'停止搜索':'搜索设备';
- const message=midiNotice||state.notice||(state.operationFailed&&!state.failedId?state.message:state.scanning?'正在查找附近的电吹管…':'');setTextIfChanged($('#midi-connection-message'),message||'');
- const signature=JSON.stringify([state.devices,state.connectedId,state.connectingId,state.inputConnected,state.inputName,state.inputTransport,state.inputId,state.operationFailed,state.failedId,state.message,midiMenu]);
+ const message=midiNotice||state.notice||(busy?state.message||'正在连接蓝牙 MIDI…':state.operationFailed&&!state.failedId?state.message:state.scanning?'正在查找附近的电吹管…':'');
+ setTextIfChanged($('#midi-connection-message'),message||'');
+ const signature=JSON.stringify([state.devices,state.connectedId,state.connectingId,state.inputConnected,state.inputName,state.inputTransport,state.inputId,state.operationFailed,state.failedId,state.operationFailed?state.message:'',midiMenu]);
  if($('#midi-device-list').dataset.signature!==signature){
   $('#midi-device-list').dataset.signature=signature;const card=document.createElement('div');card.className='midi-current'+(!state.inputConnected?' offline':'');const icon=document.createElement('span');icon.className='midi-transport-icon';icon.textContent=state.inputConnected?(usb?'USB':'蓝牙'):'○';const label=document.createElement('div');label.className='device-label';const eye=document.createElement('small');eye.textContent='当前连接';const name=document.createElement('b');name.textContent=state.inputConnected?(state.inputName||'电吹管'):'尚未连接电吹管';const detail=document.createElement('small');detail.className='midi-current-status';detail.textContent=state.inputConnected?(usb?'● USB · 已连接':'● 蓝牙 · 已连接'):'插入 USB 数据线，或连接下方蓝牙设备';label.append(eye,name,detail);card.append(icon,label);
   const more=(parent,row,connected)=>{const b=midiButton('⋯',()=>{midiMenu=midiMenu===row.id?'':row.id;renderMidiConnection(midiConnectionState);},'midi-more');b.setAttribute('aria-label',`管理 ${row.name}`);b.disabled=busy;parent.append(b);if(midiMenu===row.id){const menu=document.createElement('div');menu.className='midi-device-menu';menu.append(midiButton('忘记设备',()=>confirmMidiForget(row,connected)));parent.append(menu);}};
   if(state.inputConnected&&!usb){card.append(midiButton('断开',()=>{hideMidiSuccess();midiCommand('disconnect');}));const row=(state.devices||[]).find(d=>d.id===state.connectedId);if(row)more(card,row,true);}
   $('#midi-current').replaceChildren(card);
   const available=(state.devices||[]).filter(d=>d.available&&d.id!==state.connectedId),history=(state.devices||[]).filter(d=>!d.available&&(d.remembered||d.paired)&&d.id!==state.connectedId);
-  const buildRow=(row,offline)=>{const e=document.createElement('div');e.className='midi-device'+(offline?' unavailable':'');const d=document.createElement('div');d.className='device-label';const n=document.createElement('b');n.textContent=(row.name||'蓝牙电吹管')+((state.devices||[]).filter(v=>v.name===row.name).length>1?` · ${midiDeviceDisambiguator(row.id)}`:'');const status=document.createElement('small');status.textContent=row.id===state.connectingId?'正在连接…':offline?'当前未发现':'可连接';d.append(n,status);if(state.operationFailed&&state.failedId===row.id){const error=document.createElement('small');error.className='midi-row-error';error.textContent='暂时无法连接，请重试或重新搜索。';d.append(error);}e.append(d);const pending=row.id===state.connectingId;const button=midiButton(pending?'取消':state.failedId===row.id?'重试':'连接',()=>{if(pending){midiCommand('cancel');return;}if(usb){midiNotice=usbMidiNotice;setTextIfChanged($('#midi-connection-message'),midiNotice);return;}midiNotice='';midiCommand('connect',row.id);},pending?'':'primary-button');button.disabled=offline||(busy&&!pending);e.append(button);if(row.remembered||row.paired)more(e,row,false);return e;};
+  const buildRow=(row,offline)=>{
+   const e=document.createElement('div');e.className='midi-device'+(offline?' unavailable':'');
+   const d=document.createElement('div');d.className='device-label';
+   const n=document.createElement('b');
+   n.textContent=(row.name||'蓝牙电吹管')+((state.devices||[]).filter(v=>v.name===row.name).length>1?` · ${midiDeviceDisambiguator(row.id)}`:'');
+   const pending=row.id===state.connectingId,failed=state.operationFailed&&state.failedId===row.id;
+   const status=document.createElement('small');
+   status.textContent=pending?'正在连接…':offline?'当前未发现':'可连接';
+   d.append(n,status);
+   if(failed){
+    const error=document.createElement('small');error.className='midi-row-error';
+    error.textContent=state.message||'暂时无法连接，请重试或重新搜索。';
+    d.append(error);
+   }
+   e.append(d);
+   const button=midiButton(pending?'取消':failed?'重试':'连接',()=>{
+    if(pending){midiCommand('cancel');return;}
+    if(usb){midiNotice=usbMidiNotice;setTextIfChanged($('#midi-connection-message'),midiNotice);return;}
+    midiNotice='';midiCommand('connect',row.id);
+   },pending?'':'primary-button');
+   button.disabled=offline||(busy&&!pending);
+   e.append(button);
+   if(row.remembered||row.paired)more(e,row,false);
+   return e;
+  };
   const live=$('#midi-device-list');live.replaceChildren();available.forEach(row=>live.append(buildRow(row,false)));if(!available.length){const empty=document.createElement('p');empty.className='midi-empty';empty.textContent=!state.supported?'当前蓝牙不可用，可使用 USB 连接':state.scanning?'正在搜索蓝牙电吹管…':'尚未发现其他蓝牙电吹管';live.append(empty);}
   const h=$('#midi-history-list');h.replaceChildren();history.forEach(row=>h.append(buildRow(row,true)));$('#midi-history').hidden=!history.length;$('#midi-history-title').textContent=`历史设备（${history.length}）`;
  }

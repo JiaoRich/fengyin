@@ -18,8 +18,15 @@ await render({...state,inputConnected:true,inputId:'usb-a',inputGeneration:1,inp
 assert((await page.locator('#midi-current').textContent()).includes('USB · 已连接'));assert.equal(await page.locator('#midi-current button').count(),0);
 const before=await page.evaluate(()=>events.filter(e=>e.name==='midiConnection').length);await page.locator('#midi-device-list .midi-device').first().getByRole('button',{name:'连接',exact:true}).click();assert.equal(await page.evaluate(()=>events.filter(e=>e.name==='midiConnection').length),before);assert.equal(await page.locator('#midi-connection-message').textContent(),'当前已通过USB连接电吹管，请拔掉USB数据线再使用蓝牙连接');
 await render({...state,inputConnected:false});await page.locator('#midi-device-list .midi-device').first().getByRole('button',{name:'连接',exact:true}).click();assert.equal((await last()).action,'connect');assert.equal((await last()).id,'b');
-await render({...state,connectingId:'b'});assert(await page.locator('#midi-search').isDisabled());await page.locator('#midi-device-list .midi-device').first().getByRole('button',{name:'取消',exact:true}).click();assert.equal((await last()).action,'cancel');
-await render({...state,operationFailed:true,failedId:'b'});assert(await page.locator('.midi-row-error').isVisible());assert(await page.locator('#midi-connection-success').isHidden());
+const pending={...state,connectingId:'b',message:'正在读取 MIDI 服务…'};
+await render(pending);assert(await page.locator('#midi-search').isDisabled());assert.equal(await page.locator('#midi-connection-message').textContent(),pending.message);
+const cancel=page.locator('#midi-device-list .midi-device').first().getByRole('button',{name:'取消',exact:true});
+await cancel.focus();await render({...pending,message:'等待 Windows 配对，请留意系统提示…'});assert.equal(await page.locator('#midi-connection-message').textContent(),'等待 Windows 配对，请留意系统提示…');assert(await cancel.evaluate(el=>document.activeElement===el));
+await page.locator('#midi-connection-close').click();assert.equal((await last()).action,'stopScan');
+await page.locator('.sidebar-status').click();assert(await cancel.isVisible());await cancel.click();assert.equal((await last()).action,'cancel');
+await render({...state,operationFailed:true,failedId:'b',message:'读取 MIDI 服务超时，请重试'});
+assert.equal(await page.locator('.midi-row-error').textContent(),'读取 MIDI 服务超时，请重试');assert(await page.locator('#midi-connection-success').isHidden());
+await page.locator('#midi-device-list').getByRole('button',{name:'重试',exact:true}).click();assert.equal((await last()).action,'connect');assert.equal((await last()).id,'b');
 const connected={...state,connectedId:'b',inputConnected:true,inputId:'ble:b',inputGeneration:2,inputName:'同名电吹管',inputTransport:'bluetooth'};
 await render(connected);assert(await page.locator('#midi-connection-success').isVisible());
 let toast=await page.locator('#midi-connection-success').boundingBox(),dialog=await page.locator('.midi-dialog').boundingBox();assert(Math.abs(toast.x+toast.width/2-dialog.x-dialog.width/2)<2);assert(Math.abs(toast.y+toast.height/2-dialog.y-dialog.height/2)<15);
