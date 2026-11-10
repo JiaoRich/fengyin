@@ -25,10 +25,13 @@ class FfmpegReleaseTests(unittest.TestCase):
                 os.environ["GITHUB_TOKEN"] = previous
 
     def test_requires_exact_lgpl_asset_and_digest(self):
-        asset = {"name": ffmpeg.ASSET, "digest": "sha256:" + "a" * 64,
-                 "browser_download_url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/test.zip"}
-        self.assertEqual(ffmpeg.select_asset({"assets": [asset]})[1], "a" * 64)
-        asset["digest"] = ""
+        url = f"https://github.com/{ffmpeg.REPOSITORY}/releases/download/{ffmpeg.RELEASE_TAG}/{ffmpeg.ASSET}"
+        asset = {"name": ffmpeg.ASSET, "digest": "sha256:" + ffmpeg.ARCHIVE_SHA256,
+                 "browser_download_url": url}
+        self.assertEqual(ffmpeg.select_asset({"assets": [asset]}), (url, ffmpeg.ARCHIVE_SHA256))
+        with self.assertRaises(ValueError):
+            ffmpeg.select_asset({"assets": [dict(asset, browser_download_url=url + ".other")]})
+        asset["digest"] = "sha256:" + "a" * 64
         with self.assertRaises(ValueError):
             ffmpeg.select_asset({"assets": [asset]})
 

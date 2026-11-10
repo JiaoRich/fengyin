@@ -9,8 +9,13 @@ import urllib.request
 import zipfile
 
 
-API = "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/tags/latest"
-ASSET = "ffmpeg-n8.1-latest-win64-lgpl-shared-8.1.zip"
+# The 1.1.44 installer used the November 6 build. Upstream's "latest"
+# ZIP repacks these same files with a different root folder name.
+REPOSITORY = "FFmpeg-Builds/FFmpeg-Builds"
+RELEASE_TAG = "autobuild-2026-11-06-12-50"
+API = f"https://api.github.com/repos/{REPOSITORY}/releases/tags/{RELEASE_TAG}"
+ASSET = "ffmpeg-n8.1.3-34-ga35157abb9-win64-lgpl-shared-8.1.zip"
+ARCHIVE_SHA256 = "08897c3d53909d8fde6bd5eb9324e7ca41324890d2b03e22c2f9f31025789ee2"
 
 
 def github_api_headers():
@@ -27,13 +32,12 @@ def github_api_headers():
 
 def select_asset(release):
     asset = next(a for a in release["assets"] if a["name"] == ASSET)
-    digest = asset.get("digest", "")
-    if not digest.startswith("sha256:") or len(digest) != 71:
-        raise ValueError("FFmpeg release has no valid SHA256 digest")
+    if asset.get("digest", "").lower() != "sha256:" + ARCHIVE_SHA256:
+        raise ValueError("FFmpeg release does not match the pinned SHA256 digest")
     url = asset["browser_download_url"]
-    if not url.startswith("https://github.com/BtbN/FFmpeg-Builds/releases/download/"):
+    if url != f"https://github.com/{REPOSITORY}/releases/download/{RELEASE_TAG}/{ASSET}":
         raise ValueError("Unexpected FFmpeg download origin")
-    return url, digest[7:].lower()
+    return url, ARCHIVE_SHA256
 
 
 def verify_archive(path, expected):
@@ -47,8 +51,7 @@ def verify_archive(path, expected):
 
 
 def prepare(destination):
-    # Resolve URL and hash in one API response. A rolling-release update can cause
-    # a mismatch, never an unchecked build: fail early and retry with fresh metadata.
+    # Verify the retained release metadata and archive before extracting files.
     for attempt in range(3):
         try:
             request = urllib.request.Request(API, headers=github_api_headers())
