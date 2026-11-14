@@ -16,6 +16,7 @@
 #include "MidiOnsetTrace.h"
 #include "MusicTempoPolicy.h"
 #include "BreathSensitivity.h"
+#include "EwiSoloGlide.h"
 
 namespace fengyin
 {
@@ -66,6 +67,7 @@ public:
     [[nodiscard]] uint64_t getConnectionGeneration() const noexcept { return connectionGeneration; }
     [[nodiscard]] bool hasCompletedBreathMatch();
     [[nodiscard]] DeviceProfile getActiveProfile() const;
+    [[nodiscard]] bool isEwiSolo() const noexcept { return ewiSolo.load(std::memory_order_relaxed); }
     [[nodiscard]] int getBreathController() const noexcept { return breathController.load(std::memory_order_relaxed); }
     [[nodiscard]] ExpressionSettings getExpressionSettings() const;
     void setExpressionSettings(ExpressionSettings settings);
@@ -105,6 +107,9 @@ private:
     void prepareDevice(const juce::String& name, const juce::String& identifier);
     void saveTechniqueMappings();
     void loadTechniqueMappings();
+    void refreshEwiSoloGlideGate() noexcept;
+    void dispatchEwiSoloGlideState() noexcept;
+    void updateBreathController(int controllerNumber) noexcept;
     bool handleTechniqueMessage(const juce::MidiMessage& message, MidiPerformanceSink* sink);
     void updateBreathDrivenTechniques(float mappedBreath, MidiPerformanceSink* sink, double nowMs);
     [[nodiscard]] PerformanceTechnique targetForRole(PerformanceTechnique role) const noexcept;
@@ -141,6 +146,10 @@ private:
     juce::Array<TechniqueMapping> techniqueMappings;
     std::array<std::atomic<uint64_t>, 2> techniqueNoteMasks {};
     void refreshTechniqueNoteMasks() noexcept;
+    std::atomic<bool> ewiSolo { false };
+    EwiSoloGlideGate ewiSoloGlideGate;
+    juce::SpinLock ewiSoloLearnLock;
+    EwiSoloGlideLearning ewiSoloGlideLearning;
     juce::String techniqueContext { "other" }; // Current family only; mappings remain global per device.
     std::array<float, static_cast<size_t>(PerformanceTechnique::count)> techniquePreviousInput {};
     std::array<bool, static_cast<size_t>(PerformanceTechnique::count)> techniqueToggleState {};

@@ -49,6 +49,8 @@ struct TechniqueMapping
     bool toggle = false;
     TechniqueControlMode mode = TechniqueControlMode::automatic;
     float strength = 0.5f;
+    int ewiSoloGlidePressed = -1;
+    int ewiSoloGlideReleased = -1;
 };
 
 [[nodiscard]] inline const char* techniqueId(PerformanceTechnique technique) noexcept

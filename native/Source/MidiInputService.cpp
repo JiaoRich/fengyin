@@ -1,6 +1,7 @@
 #include "MidiInputService.h"
 #include "TechniqueSignal.h"
 #include "SimpleTechniquePolicy.h"
+#include <optional>
 
 namespace fengyin
 {
@@ -66,6 +67,8 @@ void MidiInputService::prepareDevice(const juce::String& name, const juce::Strin
     connectedName = name;
     connectedIdentifier = identifier;
     activeProfile = DeviceProfileMatcher::match(name.toStdString());
+    const auto model = name.toLowerCase().retainCharacters("abcdefghijklmnopqrstuvwxyz0123456789");
+    ewiSolo.store(model.contains("ewisolo") || model.contains("akaisolo"), std::memory_order_relaxed);
     restoreBreathController();
     breathSensitivity.store(0, std::memory_order_relaxed);
     updateEffectiveTranspose();
@@ -106,6 +109,12 @@ void MidiInputService::disconnect()
         input->stop();
     input.reset();
     externalConnected = false;
+    if (ewiSolo.exchange(false))
+    {
+        cancelTechniqueLearn();
+        const juce::SpinLock::ScopedLockType lock(techniqueLock);
+        ewiSoloGlideGate.reset();
+    }
     cancelBreathDetection();
     ++connectionGeneration;
     {
@@ -231,13 +240,27 @@ DeviceProfile MidiInputService::getActiveProfile() const
 void MidiInputService::setBreathController(int controllerNumber)
 {
     const auto value = juce::jlimit(0, 127, controllerNumber);
-    breathController.store(value);
-    activeProfile.breathController = value;
+    updateBreathController(value);
     savePreferences();
     if (connectedIdentifier.isNotEmpty() && properties.getUserSettings() != nullptr)
     {
         properties.getUserSettings()->setValue(controllerSettingKey() + ".matched", true);
         properties.getUserSettings()->saveIfNeeded();
+    }
+}
+
+void MidiInputService::updateBreathController(int controllerNumber) noexcept
+{
+    const auto previous = breathController.exchange(controllerNumber);
+    activeProfile.breathController = controllerNumber;
+    if (isEwiSolo() && previous != controllerNumber)
+    {
+        const juce::SpinLock::ScopedLockType lock(techniqueLock);
+        const bool conflictsWithGlide = ewiSoloGlideGate.usesController(controllerNumber);
+        if (conflictsWithGlide)
+            if (auto* sink = performanceSink.load(std::memory_order_acquire))
+                sink->techniqueChanged(targetForRole(PerformanceTechnique::mute), 0.0f);
+        if (conflictsWithGlide || !ewiSoloGlideGate.isConfigured()) refreshEwiSoloGlideGate();
     }
 }
 
@@ -303,6 +326,14 @@ void MidiInputService::setExpressionSettings(ExpressionSettings settings)
 
 void MidiInputService::setPerformanceSink(MidiPerformanceSink* sink) noexcept
 {
+    if (isEwiSolo())
+    {
+        const juce::SpinLock::ScopedLockType lock(techniqueLock);
+        refreshEwiSoloGlideGate();
+        performanceSink.store(sink, std::memory_order_release);
+        if (sink != nullptr) sink->resetPerformance();
+        return;
+    }
     performanceSink.store(sink, std::memory_order_release);
     if (sink != nullptr)
         sink->resetPerformance();
@@ -336,8 +367,7 @@ int MidiInputService::finishBreathDetection(bool markCompleted) noexcept
     const auto detected = controllerDetector.bestContinuousController();
     if (detected >= 0)
     {
-        breathController.store(juce::jlimit(0, 127, detected), std::memory_order_relaxed);
-        activeProfile.breathController = breathController.load(std::memory_order_relaxed);
+        updateBreathController(juce::jlimit(0, 127, detected));
         savePreferences();
         if (markCompleted && connectedIdentifier.isNotEmpty() && properties.getUserSettings() != nullptr)
         {
@@ -390,8 +420,14 @@ void MidiInputService::setGrowlSensitivity(int level)
 void MidiInputService::setTechniqueMappings(const juce::Array<TechniqueMapping>& mappings)
 {
     const auto previous = getTechniqueMappings();
+    const bool ewiSoloConnected = isEwiSolo();
     {
         const juce::SpinLock::ScopedLockType lock(techniqueLock);
+        if (ewiSoloConnected)
+            if (auto* sink = performanceSink.load(std::memory_order_acquire))
+                for (const auto& mapping : previous)
+                    if (mapping.technique == PerformanceTechnique::mute)
+                        sink->techniqueChanged(targetForRole(mapping.technique), 0.0f);
         techniqueMappings.clear();
         for (auto mapping : mappings)
         {
@@ -405,6 +441,7 @@ void MidiInputService::setTechniqueMappings(const juce::Array<TechniqueMapping>&
             techniqueMappings.add(mapping);
         }
         refreshTechniqueNoteMasks();
+        if (ewiSoloConnected) refreshEwiSoloGlideGate();
         techniquePreviousInput.fill(0.0f);
         techniqueToggleState.fill(false);
         techniqueHardwareInput.fill(0.0f);
@@ -412,8 +449,32 @@ void MidiInputService::setTechniqueMappings(const juce::Array<TechniqueMapping>&
     }
     if (auto* sink = performanceSink.load(std::memory_order_acquire))
         for (const auto& mapping : previous)
-            sink->techniqueChanged(targetForRole(mapping.technique), 0.0f);
+            if (!ewiSoloConnected || mapping.technique != PerformanceTechnique::mute)
+                sink->techniqueChanged(targetForRole(mapping.technique), 0.0f);
     saveTechniqueMappings();
+}
+
+void MidiInputService::refreshEwiSoloGlideGate() noexcept
+{
+    EwiSoloGlideCalibration calibration;
+    if (simpleRoleSupported(techniqueContext.toRawUTF8(), PerformanceTechnique::mute))
+        for (const auto& mapping : techniqueMappings)
+            if (mapping.technique == PerformanceTechnique::mute && mapping.mode == TechniqueControlMode::hardware
+                && mapping.sourceType == TechniqueSourceType::controller && !mapping.toggle
+                && mapping.sourceNumber != getBreathController())
+            {
+                calibration = {mapping.sourceNumber, mapping.ewiSoloGlidePressed, mapping.ewiSoloGlideReleased};
+                break;
+            }
+    ewiSoloGlideGate.reset(calibration);
+}
+
+void MidiInputService::dispatchEwiSoloGlideState() noexcept
+{
+    const auto state = ewiSoloGlideGate.consume();
+    if (state >= 0)
+        if (auto* sink = performanceSink.load(std::memory_order_acquire))
+            sink->techniqueChanged(targetForRole(PerformanceTechnique::mute), static_cast<float>(state) / 127.0f);
 }
 
 void MidiInputService::refreshTechniqueNoteMasks() noexcept
@@ -441,6 +502,7 @@ void MidiInputService::setTechniqueContext(const juce::String& instrumentFamily)
                 if (simpleRoleSupported(techniqueContext.toRawUTF8(),mapping.technique))
                     sink->techniqueChanged(targetForRole(mapping.technique),0.0f);
         techniqueContext = next;
+        if (isEwiSolo()) refreshEwiSoloGlideGate();
     }
     if (next.startsWith("kong-")) onsetTrace.begin();
 }
@@ -487,6 +549,10 @@ void MidiInputService::saveTechniqueMappings()
                    + juce::String(mapping.toggle ? 1 : 0) + ","
                    + juce::String(static_cast<int>(mapping.mode)) + ","
                    + juce::String(mapping.strength, 4);
+        if (isEwiSolo() && mapping.technique == PerformanceTechnique::mute
+            && mapping.sourceType == TechniqueSourceType::controller
+            && mapping.ewiSoloGlidePressed >= 0 && mapping.ewiSoloGlideReleased >= 0)
+            serialised += "," + juce::String(mapping.ewiSoloGlidePressed) + "," + juce::String(mapping.ewiSoloGlideReleased);
     }
     properties.getUserSettings()->setValue(techniqueSettingKey(), serialised);
     if (activeProfile.id != "generic-wind-controller" && connectedName.isNotEmpty())
@@ -509,7 +575,7 @@ void MidiInputService::loadTechniqueMappings()
         {
             juce::StringArray fields;
             fields.addTokens(entry, ",", "");
-            if (fields.size() != 4 && fields.size() != 6) continue;
+            if (fields.size() != 4 && fields.size() != 6 && !(isEwiSolo() && fields.size() == 8)) continue;
             TechniqueMapping mapping;
             mapping.technique = static_cast<PerformanceTechnique>(juce::jlimit(0, static_cast<int>(PerformanceTechnique::count) - 1, fields[0].getIntValue()));
             mapping.sourceType = static_cast<TechniqueSourceType>(juce::jlimit(0, static_cast<int>(TechniqueSourceType::note), fields[1].getIntValue()));
@@ -522,6 +588,16 @@ void MidiInputService::loadTechniqueMappings()
             }
             else
                 mapping.mode = TechniqueControlMode::hardware;
+            if (fields.size() == 8 && mapping.technique == PerformanceTechnique::mute
+                && mapping.sourceType == TechniqueSourceType::controller)
+            {
+                const EwiSoloGlideCalibration calibration {mapping.sourceNumber, fields[6].getIntValue(), fields[7].getIntValue()};
+                if (calibration.valid())
+                {
+                    mapping.ewiSoloGlidePressed = calibration.pressed;
+                    mapping.ewiSoloGlideReleased = calibration.released;
+                }
+            }
             if (mapping.sourceType == TechniqueSourceType::pitchWheel)
             {
                 pitchMappingRemap.store(true);
@@ -544,6 +620,7 @@ void MidiInputService::loadTechniqueMappings()
         const juce::SpinLock::ScopedLockType lock(techniqueLock);
         techniqueMappings = loaded;
         refreshTechniqueNoteMasks();
+        if (isEwiSolo()) refreshEwiSoloGlideGate();
         techniquePreviousInput.fill(0.0f);
         techniqueToggleState.fill(false);
         techniqueHardwareInput.fill(0.0f);
@@ -559,6 +636,20 @@ void MidiInputService::loadTechniqueMappings()
 
 void MidiInputService::beginTechniqueLearn(PerformanceTechnique technique) noexcept
 {
+    std::optional<juce::SpinLock::ScopedLockType> lock;
+    if (isEwiSolo())
+    {
+        lock.emplace(ewiSoloLearnLock);
+        ewiSoloGlideLearning = {};
+        if (technique == PerformanceTechnique::mute)
+        {
+            const juce::SpinLock::ScopedLockType mappingLock(techniqueLock);
+            if (simpleRoleSupported(techniqueContext.toRawUTF8(), technique))
+                if (auto* sink = performanceSink.load(std::memory_order_acquire))
+                    sink->techniqueChanged(targetForRole(technique), 0.0f);
+            refreshEwiSoloGlideGate();
+        }
+    }
     learnedSourceReady.store(false, std::memory_order_relaxed);
     learnedSourceNumber.store(-1, std::memory_order_relaxed);
     learningTechniqueId.store(static_cast<int>(technique), std::memory_order_relaxed);
@@ -567,12 +658,34 @@ void MidiInputService::beginTechniqueLearn(PerformanceTechnique technique) noexc
 
 void MidiInputService::cancelTechniqueLearn() noexcept
 {
+    std::optional<juce::SpinLock::ScopedLockType> lock;
+    if (isEwiSolo()) lock.emplace(ewiSoloLearnLock);
     learningTechnique.store(false, std::memory_order_release);
     learnedSourceReady.store(false, std::memory_order_relaxed);
 }
 
 TechniqueLearnResult MidiInputService::consumeTechniqueLearnResult() noexcept
 {
+    if (isEwiSolo() && learningTechniqueId.load(std::memory_order_relaxed) == static_cast<int>(PerformanceTechnique::mute))
+    {
+        const juce::SpinLock::ScopedLockType lock(ewiSoloLearnLock);
+        if (learningTechnique.load(std::memory_order_acquire))
+        {
+            const auto calibration = ewiSoloGlideLearning.result(juce::Time::getMillisecondCounterHiRes());
+            if (calibration.valid())
+            {
+                learningTechnique.store(false, std::memory_order_release);
+                TechniqueLearnResult result;
+                result.ready = true;
+                result.mapping.technique = PerformanceTechnique::mute;
+                result.mapping.sourceType = TechniqueSourceType::controller;
+                result.mapping.sourceNumber = calibration.controller;
+                result.mapping.ewiSoloGlidePressed = calibration.pressed;
+                result.mapping.ewiSoloGlideReleased = calibration.released;
+                return result;
+            }
+        }
+    }
     if (! learnedSourceReady.exchange(false, std::memory_order_acq_rel))
         return {};
     TechniqueLearnResult result;
@@ -627,8 +740,24 @@ bool MidiInputService::handleTechniqueMessage(const juce::MidiMessage& message, 
         ? inputValue > 0.36f : inputValue > 0.55f;
     const auto validLearningSignal = sourceType == TechniqueSourceType::note
         ? message.isNoteOn() && ! ordinaryPlayedNote : meaningfulContinuousSignal;
-    if (learningTechnique.load(std::memory_order_acquire) && validLearningSignal
-        && ! (sourceType == TechniqueSourceType::controller && sourceNumber == breathController.load()))
+    const bool nonBreathController = sourceType == TechniqueSourceType::controller && sourceNumber != getBreathController();
+    const bool ewiSoloConnected = isEwiSolo();
+    bool learningGlideMessage = false;
+    bool waitingForGlideRelease = false;
+    if (ewiSoloConnected && learningTechnique.load(std::memory_order_acquire)
+        && learningTechniqueId.load(std::memory_order_relaxed) == static_cast<int>(PerformanceTechnique::mute))
+    {
+        const juce::SpinLock::ScopedLockType lock(ewiSoloLearnLock);
+        if (learningTechnique.load(std::memory_order_relaxed)
+            && learningTechniqueId.load(std::memory_order_relaxed) == static_cast<int>(PerformanceTechnique::mute))
+        {
+            learningGlideMessage = nonBreathController && ewiSoloGlideLearning.observe(message.getChannel(),
+                sourceNumber, message.getControllerValue(), juce::Time::getMillisecondCounterHiRes());
+            waitingForGlideRelease = learningGlideMessage || ewiSoloGlideLearning.started();
+        }
+    }
+    if (learningTechnique.load(std::memory_order_acquire) && !waitingForGlideRelease && validLearningSignal
+        && (sourceType != TechniqueSourceType::controller || nonBreathController))
     {
         learnedSourceType.store(static_cast<int>(sourceType), std::memory_order_relaxed);
         learnedSourceNumber.store(sourceNumber, std::memory_order_relaxed);
@@ -637,20 +766,27 @@ bool MidiInputService::handleTechniqueMessage(const juce::MidiMessage& message, 
         capturedByLearn = true;
     }
 
-    bool consumedMessage = false;
+    const bool glideMessage = ewiSoloConnected && nonBreathController && !learningGlideMessage
+        && ewiSoloGlideGate.observe(sourceNumber, message.getControllerValue());
+    bool consumedMessage = glideMessage || learningGlideMessage;
     const juce::SpinLock::ScopedTryLockType lock(techniqueLock);
     if (! lock.isLocked())
     {
         // Never let a potentially mapped wheel escape as an audible pitch bend
         // merely because the UI is updating its mapping. Notes still pass.
-        return capturedByLearn || reservedNote;
+        return consumedMessage || capturedByLearn || reservedNote;
     }
+    if (ewiSoloConnected) dispatchEwiSoloGlideState();
     for (const auto& mapping : techniqueMappings)
     {
         if (!simpleRoleSupported(techniqueContext.toRawUTF8(), mapping.technique)
             || mapping.mode != TechniqueControlMode::hardware) continue;
         if (mapping.sourceType != sourceType || (sourceType == TechniqueSourceType::controller && mapping.sourceNumber != sourceNumber)
             || (sourceType == TechniqueSourceType::note && mapping.sourceNumber != sourceNumber))
+            continue;
+        if (ewiSoloConnected && sourceType == TechniqueSourceType::controller
+            && mapping.technique == PerformanceTechnique::mute
+            && (!nonBreathController || learningGlideMessage || ewiSoloGlideGate.usesController(sourceNumber)))
             continue;
         const auto index = static_cast<size_t>(mapping.technique);
         auto outputValue = inputValue;
@@ -787,6 +923,7 @@ void MidiInputService::tickTechniqueAutomation()
     if (!sink) return;
     const juce::SpinLock::ScopedTryLockType lock(techniqueLock);
     if (!lock.isLocked()) return;
+    if (isEwiSolo()) dispatchEwiSoloGlideState();
     const auto key = techniqueContext.toRawUTF8();
     for (const auto& mapping : techniqueMappings)
     {

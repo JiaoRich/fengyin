@@ -838,6 +838,7 @@ function showPage(page) {
   if(page!=='play')$('#record-success').hidden=true;
   if (compactMode) page = 'play';
   if (page === 'chain' && !studioUnlocked) return openStudioLogin();
+  if (page !== 'sounds') cancelToneCardDrag();
   // Hide synchronously in the same bridge turn, not in a later animation
   // frame. This also works before a lost selection event has been recovered.
   if(page!=='play') {setNativeVideoExpanded(false);hideNativeVideoViewport();}
@@ -1171,6 +1172,100 @@ $('#confirm-preset-name')?.addEventListener('click', () => {
 });
 renderToneStyleSwitcher();
 
+const toneCardOrderKey = 'fengyin-card-order-swam';
+let toneCardDrag = null;
+
+function readToneCardOrder() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(toneCardOrderKey));
+    if (Array.isArray(saved)) return saved.filter(id => typeof id === 'string');
+  } catch {}
+  return [];
+}
+
+function cancelToneCardDrag() {
+  if (!toneCardDrag) return;
+  const {source, target, frame} = toneCardDrag;
+  toneCardDrag = null;
+  cancelAnimationFrame(frame);
+  source.classList.remove('dragging');
+  target?.classList.remove('drag-target');
+  renderPresets();
+}
+
+const toneCardGrid = $('#preset-grid');
+
+function markToneCardTarget(card) {
+  const target = card && card !== toneCardDrag.source ? card : null;
+  if (target === toneCardDrag.target) return;
+  toneCardDrag.target?.classList.remove('drag-target');
+  target?.classList.add('drag-target');
+  toneCardDrag.target = target;
+}
+
+function scrollToneCardsDuringDrag() {
+  const drag = toneCardDrag;
+  if (!drag) return;
+  const bounds = toneCardGrid.getBoundingClientRect();
+  const edge = Math.min(64, bounds.height / 3);
+  if (drag.x >= bounds.left && drag.x < bounds.right && drag.y >= bounds.top && drag.y < bounds.bottom) {
+    const delta = drag.y < bounds.top + edge ? drag.y - bounds.top - edge
+      : Math.max(0, drag.y - bounds.bottom + edge);
+    if (delta) {
+      toneCardGrid.scrollTop += delta / 4;
+      markToneCardTarget(document.elementFromPoint(drag.x, drag.y)?.closest('[data-card-key]'));
+    }
+  }
+  drag.frame = requestAnimationFrame(scrollToneCardsDuringDrag);
+}
+
+toneCardGrid.addEventListener('dragstart', event => {
+  if (!event.target.closest('.card-drag-handle') || !event.dataTransfer) return;
+  const source = event.target.closest('[data-card-key]');
+  if (toneCardDrag || !source) return;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', source.dataset.cardKey);
+  source.classList.add('dragging');
+  toneCardDrag = {source,target:null,x:event.clientX,y:event.clientY,frame:requestAnimationFrame(scrollToneCardsDuringDrag)};
+});
+toneCardGrid.addEventListener('dragover', event => {
+  if (!toneCardDrag) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  toneCardDrag.x = event.clientX;
+  toneCardDrag.y = event.clientY;
+  markToneCardTarget(event.target.closest('[data-card-key]'));
+});
+toneCardGrid.addEventListener('dragleave', event => {
+  if (!toneCardDrag || toneCardGrid.contains(event.relatedTarget)) return;
+  toneCardDrag.x = -1;
+  markToneCardTarget(null);
+});
+toneCardGrid.addEventListener('drop', event => {
+  if (!toneCardDrag) return;
+  event.preventDefault();
+  const {source} = toneCardDrag;
+  const target = event.target.closest('[data-card-key]');
+  if (target && target !== source) {
+    const order = [...toneCardGrid.children].map(card => card.dataset.cardKey);
+    const targetIndex = order.indexOf(target.dataset.cardKey);
+    order.splice(order.indexOf(source.dataset.cardKey), 1);
+    order.splice(targetIndex, 0, source.dataset.cardKey);
+    try {
+      localStorage.setItem(toneCardOrderKey, JSON.stringify(order));
+      toast('音色顺序已保存');
+    } catch {
+      toast('顺序保存失败，请重试');
+    }
+  }
+  cancelToneCardDrag();
+});
+toneCardGrid.addEventListener('dragend', cancelToneCardDrag);
+window.addEventListener('blur', cancelToneCardDrag);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) cancelToneCardDrag();
+});
+
 // Use the actual available content width, including Windows display scaling.
 new ResizeObserver(entries => {
   const width = entries[0].contentRect.width;
@@ -1180,10 +1275,10 @@ new ResizeObserver(entries => {
 }).observe($('#preset-grid'));
 
 function renderPresets() {
+  if (toneCardDrag) return;
   $('#library-tabs').hidden=true; $('#library-context').hidden=true;
   const cards=[];
-  // The publisher's instrument-first order is authoritative on every render.
-  // Legacy browser drag orders never override this; studio tones follow it.
+  // Publisher order is the default. After a user reorder, new cards append in default order.
   const ranks=new Map(Object.keys(globalThis.FENGYIN_TONE_MEDIA||{}).map((id,index)=>[id,index]));
   const orderedTones=[...publishedTones].sort((a,b)=>(ranks.get(a.id)??1e9)-(ranks.get(b.id)??1e9));
   for (const tone of orderedTones) {
@@ -1196,8 +1291,18 @@ function renderPresets() {
     cards.push({id:`custom:${p.id}`,presetId:p.id,name:p.name,index,
       missing:!availableInstruments.some(i=>i.pluginId===p.pluginId)});
   });
+  const ids = new Set(cards.map(card => card.id));
+  const savedRanks = new Map();
+  for (const key of readToneCardOrder()) {
+    // Older versions saved instrument/style pairs before catalogue IDs were introduced.
+    const matches = ids.has(key) ? [key] : orderedTones
+      .filter(tone => `builtin:${tone.instrumentKey}:${tone.styleId}` === key)
+      .map(tone => `builtin:${tone.id}`);
+    for (const id of matches) if (!savedRanks.has(id)) savedRanks.set(id, savedRanks.size);
+  }
+  if (savedRanks.size) cards.sort((a,b)=>(savedRanks.get(a.id)??cards.length)-(savedRanks.get(b.id)??cards.length));
   $('#preset-grid').innerHTML=cards.map(c=>`<section class="instrument-preset-card compact ${latestBackendState.activeToneVariantId===c.id?'active':''}" data-card-key="${escapeHtml(c.id)}" tabindex="0" role="button">
-    <h3>${escapeHtml(c.name)}</h3>
+    <h3>${escapeHtml(c.name)}</h3><span class="card-drag-handle" draggable="true" title="拖动排序" aria-label="拖动排序">⠿</span>
     ${c.index>=0?'<button class="delete-tone" type="button">删除</button>':''}
     ${c.missing?'<small>缺少音源</small>':toneLoadInFlight&&pendingPresetNavigation?.name===c.name?'<small>正在加载…</small>':''}</section>`).join('');
   function load(c) {
@@ -1215,6 +1320,7 @@ function renderPresets() {
   }
   $$('#preset-grid .instrument-preset-card').forEach((el,i)=>{
     el.onclick=e=>{
+      if(e.target.closest('.card-drag-handle')) return;
       if(e.target.closest('.delete-tone')){nativeEvent('deletePreset',{id:cards[i].presetId});return;} load(cards[i]);};
     el.onkeydown=e=>{if(e.target===el&&(e.key==='Enter'||e.key===' ')){e.preventDefault();load(cards[i]);}};
   });
@@ -1866,8 +1972,11 @@ function startTechniqueLearning(item,inline = false) {
   window.fengyinVoice?.learning(item.name);
   window.fengyinTechniqueLearning = item.index;
   nativeEvent('beginTechniqueLearn', {techniqueId:item.id,toggle:false});
+  const ewiSoloGlide = item.id === 'mute' && latestBackendState.ewiSoloGlideLearning;
+  const glideInstruction = '先松开滑音条，再触碰一次并松手，等待映射完成。';
   if (inline) {
-    $('#adapter-inline-hint').textContent = `正在识别“${item.name}”：请操作一次对应按键、摇杆或吹嘴……`;
+    $('#adapter-inline-hint').textContent = ewiSoloGlide
+      ? glideInstruction : `正在识别“${item.name}”：请操作一次对应按键、摇杆或吹嘴……`;
     renderAdapterTechniqueGrid();
     if (!window.__JUCE__?.backend?.emitEvent) window.setTimeout(() => {
       const target=techniquePlan.find(entry=>entry.id===item.id); if(target){target.sourceType=1;target.sourceNumber=74;}
@@ -1877,8 +1986,9 @@ function startTechniqueLearning(item,inline = false) {
   }
   techniqueHint.textContent = `正在识别“${item.name}”：请在 10 秒内操作一次吹嘴、摇杆或按键……`;
   $('#learning-dialog-title').textContent = `正在识别“${item.name}”`;
-  $('#learning-dialog-message').textContent = '请操作一次希望用于这项技巧的按键、摇杆或吹嘴。普通音符和气息波动会自动忽略。';
-  $('#learning-dialog-message').textContent += '弯音信号不参与映射；咬嘴若输出弯音，请在电吹管上改为连续CC。同一控制器映射两项技巧会同时触发。';
+  $('#learning-dialog-message').textContent = ewiSoloGlide
+    ? glideInstruction
+    : '请操作一次希望用于这项技巧的按键、摇杆或吹嘴。普通音符和气息波动会自动忽略。弯音信号不参与映射；咬嘴若输出弯音，请在电吹管上改为连续CC。同一控制器映射两项技巧会同时触发。';
   $('#technique-learning-dialog').hidden = false;
   renderTechniqueMappings();
 }
@@ -2869,7 +2979,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.45 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.46 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

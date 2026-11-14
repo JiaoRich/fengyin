@@ -8,6 +8,7 @@
 #include "OrderedMidiQueue.h"
 #include "MidiOnsetTrace.h"
 #include "SimpleTechniquePolicy.h"
+#include "KongDualSlotRouter.h"
 #include <thread>
 #include <memory>
 
@@ -387,6 +388,164 @@ int main() {
         mapping.sourceNumber=65;input.setTechniqueMappings({mapping});
         sendKey(juce::MidiMessage::noteOff(1,65));
         assert(routed.offNotes.back()==65);
+    }
+    // Exercise a full Solo mapping and the real Qin slot switch with a held
+    // note. A single MIDI release must still apply after a contended callback.
+    {
+        using Technique = fengyin::PerformanceTechnique;
+        struct QinSink : Sink
+        {
+            fengyin::KongDualSlotRouter router;
+            int activeChannel = 0;
+            QinSink() { router.configure(true); }
+            void receive(const juce::MidiMessage& message) noexcept
+            {
+                if (message.isNoteOn()) activeChannel = message.getChannel();
+                if (message.isNoteOff() && activeChannel == message.getChannel()) activeChannel = 0;
+            }
+            void noteOn(int note, float velocity, double) noexcept override
+            {
+                router.route(juce::MidiMessage::noteOn(1, note, velocity), [this](const auto& message) { receive(message); });
+            }
+            void noteOff(int note, double) noexcept override
+            {
+                router.route(juce::MidiMessage::noteOff(1, note), [this](const auto& message) { receive(message); });
+            }
+            void techniqueChanged(Technique technique, float value) noexcept override
+            {
+                if (technique == Technique::flutter)
+                    router.setTechnique(value > 0.5f, [this](const auto& message) { receive(message); });
+            }
+            void resetPerformance() noexcept override
+            {
+                router.reset([this](const auto& message) { receive(message); });
+            }
+        } qin;
+        auto input = std::make_unique<fengyin::MidiInputService>(false);
+        fengyin::MidiInputServiceTestAccess::useTestSettings(*input, reconnectSettings);
+        input->attachExternal("solo-test", "Akai EWI Solo");
+        input->setTechniqueContext("kong-pipa");
+        input->setPerformanceSink(&qin);
+        const auto cc = [&](int number, int value, int channel = 1) {
+            input->acceptExternalMessage(juce::MidiMessage::controllerEvent(channel, number, value));
+        };
+        const auto installLearned = [&] {
+            auto learned = input->consumeTechniqueLearnResult();
+            assert(learned.ready);
+            learned.mapping.mode = fengyin::TechniqueControlMode::hardware;
+            input->setTechniqueMappings({learned.mapping});
+            return learned.mapping;
+        };
+        input->beginTechniqueLearn(Technique::mute);
+        cc(65, 0);
+        cc(5, 127);
+        cc(65, 127);
+        cc(5, 100);
+        juce::Thread::sleep(55);
+        assert(!input->consumeTechniqueLearnResult().ready);
+        cc(65, 0);
+        assert(installLearned().sourceNumber == 65);
+        input->acceptExternalMessage(juce::MidiMessage::noteOn(1, 65, juce::uint8(90)));
+        assert(qin.activeChannel == 1);
+        for (int i = 0; i < 20; ++i)
+        {
+            cc(5, 127);
+            assert(qin.activeChannel == 1);
+            cc(65, 64);
+            assert(qin.activeChannel == 2);
+            cc(5, 100);
+            fengyin::MidiInputServiceTestAccess::sendWhileMappingBusy(*input, juce::MidiMessage::controllerEvent(1, 65, 63));
+            input->tickTechniqueAutomation();
+            assert(qin.activeChannel == 1);
+        }
+        cc(65, 127);
+        fengyin::MidiInputServiceTestAccess::sendWhileMappingBusy(*input, juce::MidiMessage::controllerEvent(1, 65, 0));
+        cc(65, 127);
+        input->tickTechniqueAutomation();
+        assert(qin.activeChannel == 2);
+        cc(65, 0);
+        assert(qin.activeChannel == 1);
+        cc(65, 127);
+        assert(qin.activeChannel == 2);
+        input->beginTechniqueLearn(Technique::mute);
+        assert(qin.activeChannel == 1);
+        cc(65, 0);
+        input->cancelTechniqueLearn();
+        assert(!input->consumeTechniqueLearnResult().ready);
+        cc(65, 127);
+        assert(qin.activeChannel == 2);
+        cc(65, 0);
+        assert(qin.activeChannel == 1);
+
+        for (int number : {5, 104})
+        {
+            const int pressed = number == 5 ? 10 : 127;
+            input->beginTechniqueLearn(Technique::mute);
+            cc(number, pressed);
+            cc(number, 100, 2); // A different channel cannot finish the pair.
+            cc(number, pressed);
+            assert(!input->consumeTechniqueLearnResult().ready);
+            cc(number, 100);
+            juce::Thread::sleep(55);
+            const auto mapping = installLearned();
+            assert(mapping.sourceNumber == number && mapping.ewiSoloGlidePressed == pressed
+                   && mapping.ewiSoloGlideReleased == 100);
+            cc(number, pressed);
+            assert(qin.activeChannel == 2);
+            cc(number, 50);
+            assert(qin.activeChannel == 2);
+            cc(number, 100);
+            assert(qin.activeChannel == 1);
+        }
+        cc(104, 127);
+        fengyin::MidiInputServiceTestAccess::sendWhileMappingBusy(*input, juce::MidiMessage::controllerEvent(1, 104, 100));
+        input->setTechniqueContext("kong-liuqin");
+        input->tickTechniqueAutomation();
+        assert(qin.activeChannel == 1);
+
+        // The calibrated pair is loaded again after reconnect. An unfinished
+        // learning gesture is discarded when the device is detached.
+        input->beginTechniqueLearn(Technique::mute);
+        cc(5, 12);
+        input->disconnect();
+        input->attachExternal("solo-test", "EWI-SOLO");
+        assert(!input->consumeTechniqueLearnResult().ready);
+        input->acceptExternalMessage(juce::MidiMessage::noteOn(1, 67, juce::uint8(90)));
+        cc(104, 127);
+        assert(qin.activeChannel == 2);
+        cc(104, 100);
+        assert(qin.activeChannel == 1);
+        cc(104, 127);
+        assert(qin.activeChannel == 2);
+        input->setBreathController(104);
+        assert(qin.activeChannel == 1);
+        cc(104, 127);
+        assert(qin.activeChannel == 1 && input->getSnapshot().breath == 1);
+        input->setBreathController(2);
+        cc(104, 127);
+        assert(qin.activeChannel == 2);
+        cc(104, 100);
+        assert(qin.activeChannel == 1);
+
+        // A saved single-CC mapping from an older release keeps its threshold
+        // and also gets the release handling without requiring a new mapping.
+        auto legacy = input->getTechniqueMappings().getFirst();
+        legacy.sourceNumber = 80;
+        legacy.ewiSoloGlidePressed = legacy.ewiSoloGlideReleased = -1;
+        input->setTechniqueMappings({legacy});
+        cc(80, 127);
+        assert(qin.activeChannel == 2);
+        fengyin::MidiInputServiceTestAccess::sendWhileMappingBusy(*input, juce::MidiMessage::controllerEvent(1, 80, 0));
+        input->tickTechniqueAutomation();
+        assert(qin.activeChannel == 1);
+
+        input->attachExternal("other-test", "EWI 5000");
+        assert(!input->isEwiSolo());
+        input->beginTechniqueLearn(Technique::mute);
+        cc(5, 127);
+        const auto ordinary = installLearned();
+        assert(ordinary.sourceNumber == 5 && ordinary.ewiSoloGlidePressed == -1);
+        input->setPerformanceSink(nullptr);
     }
     {
         auto defaultsOwner = std::make_unique<fengyin::MidiInputService>(false); auto& defaults = *defaultsOwner;

@@ -18,12 +18,13 @@ const tones=[...fs.readFileSync('native/Source/PublishedToneCatalog.h','utf8').m
    assert(geometry.every(x=>x.delta<1&&x.font==='20px'),JSON.stringify(geometry));
   }
   await page.evaluate(()=>localStorage.setItem('fengyin-card-order-swam',JSON.stringify(['builtin:kong-pipa','builtin:trumpet'])));
-  await page.reload();await show();assert.deepEqual(await ids(),expected,'legacy drag order must not override publisher order');
-  assert.equal(await page.locator('#restore-tone-order,.card-drag-handle,[draggable="true"]').count(),0);
+  const reordered=['builtin:kong-pipa','builtin:trumpet',...expected.filter(id=>id!=='builtin:kong-pipa'&&id!=='builtin:trumpet')];
+  await page.reload();await show();assert.deepEqual(await ids(),reordered,'saved user order takes precedence');
+  assert.equal(await page.locator('#restore-tone-order').count(),0);
   const custom=[{id:'studio-a',name:'自建方案甲',published:true},{id:'studio-b',name:'自建方案乙',published:true},{id:'draft',name:'草稿',published:true,studioDraft:true}];
   await page.evaluate(s=>window.listeners.backendState(s),{...state,presets:custom,publishedTones:[...tones].reverse()});
-  assert.deepEqual(await ids(),[...expected,'custom:studio-a','custom:studio-b'],'all builtins keep fixed order; user tones follow; drafts stay hidden');
-  await page.reload();await show();assert.deepEqual(await ids(),expected);
+  assert.deepEqual(await ids(),[...reordered,'custom:studio-a','custom:studio-b'],'user order survives refresh; new tones follow; drafts stay hidden');
+  await page.reload();await show();assert.deepEqual(await ids(),reordered);
   await page.locator('[data-page="play"]').click();
   for(const tone of tones){
    await page.evaluate(s=>window.listeners.backendState(s),{...state,instrumentKey:tone.instrumentKey,instrumentChineseName:'shared plugin label',activeToneVariantId:'builtin:'+tone.id});
@@ -67,10 +68,8 @@ const tones=[...fs.readFileSync('native/Source/PublishedToneCatalog.h','utf8').m
    await page.evaluate(({s,compact})=>{window.listeners.backendState({...s,compactMode:compact,breath:.9,instrumentKey:'kong-jinghu',instrumentChineseName:'京胡',activeToneVariantId:'builtin:kong-jinghu'});updateBreathRing(90)},{s:state,compact});
    const ring=await page.locator('#breath-ring').evaluate(n=>({display:getComputedStyle(n).display,opacity:+getComputedStyle(n).opacity,rect:n.getBoundingClientRect().toJSON(),box:n.getBBox()}));
    assert(ring.display!=='none'&&ring.opacity>0&&ring.rect.height>0);assert.equal(await page.locator('#breath-wind').count(),0);
-   await page.screenshot({path:`outputs/release-140-20261030/ring-${compact?'minimum':'full'}.png`});
   }
   assert.deepEqual(errors,[]);
-  fs.writeFileSync('outputs/release-140-20261030/ui-results.json',JSON.stringify({tones:41,geometricCenter:true,fixedPublisherOrder:true,userTonesAtEnd:true,allArtworkDecoded:true,exactSpeechIds:true,globalTechniqueButtons:true,fullCompactBreathRings:true,bench,limits:'Local browser only; not Windows GPU or live audio test'},null,2));
-  console.log('PASS fixed 41-tone order + user tones appended + 41 geometric centers/artwork/speech identities + global technique controls + full/compact breath ring:',bench);
+  console.log(`PASS default and saved tone order + ${tones.length} centered titles/artwork/speech identities + global technique controls + full/compact breath ring:`,bench);
  }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exit(1)});

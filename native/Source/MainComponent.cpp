@@ -1784,7 +1784,9 @@ void MainComponent::timerCallback()
             {
                 auto result = std::make_unique<juce::DynamicObject>();
                 result->setProperty("success", true);
-                result->setProperty("message", utf8("映射成功，已对这支电吹管全局保存"));
+                result->setProperty("message", utf8(mapping.ewiSoloGlidePressed >= 0
+                    ? "滑音条映射成功，触碰开启技巧，松手恢复"
+                    : "映射成功，已对这支电吹管全局保存"));
                 webInterface->emitEventIfBrowserIsVisible("techniqueLearnResult", juce::var(result.release()));
             }
         }
@@ -1870,6 +1872,7 @@ void MainComponent::timerCallback()
         }
         state->setProperty("deviceConnected", snapshot.deviceConnected);
         state->setProperty("deviceName", midi.getConnectedDeviceName());
+        state->setProperty("ewiSoloGlideLearning", midi.isEwiSolo());
         state->setProperty("deviceIdentifier", midi.getConnectedDeviceIdentifier());
         state->setProperty("connectionGeneration", static_cast<juce::int64>(midi.getConnectionGeneration()));
         state->setProperty("breathSensitivity", midi.getBreathSensitivity());

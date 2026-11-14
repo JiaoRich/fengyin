@@ -76,6 +76,18 @@ const path=require('node:path');
  assert.equal(await page.evaluate(()=>techniqueMappings.find(m=>m.id==='mute').sourceNumber),24);
  await vib.locator('[data-technique-mode="hardware"]').click();
  assert.equal(await vib.locator('.learn-source').innerText(),'点击映射');
+ const other=page.locator('[data-technique-id="mute"]');
+ await other.locator('[data-technique-mode="hardware"]').click();
+ await other.locator('.learn-source').click();
+ assert.match(await page.locator('#learning-dialog-message').innerText(),/普通音符和气息波动/);
+ await page.locator('#cancel-technique-learning').click();
+ await page.evaluate(()=>{latestBackendState.ewiSoloGlideLearning=true;});
+ await other.locator('.learn-source').click();
+ assert.match(await page.locator('#learning-dialog-message').innerText(),/滑音条.*松手/);
+ await page.locator('#cancel-technique-learning').click();
+ await vib.locator('.learn-source').click();
+ assert.match(await page.locator('#learning-dialog-message').innerText(),/普通音符和气息波动/);
+ await page.locator('#cancel-technique-learning').click();
  // Retain device match instructions only while a deliberate match is active.
  await page.evaluate(()=>setAdapterMatchPhase('matching',latestBackendState));
  assert.equal(await page.locator('#adapter-guide-detail').isVisible(),true);

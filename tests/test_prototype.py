@@ -236,7 +236,7 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertNotIn('class="plugin-original-name"', JS)
         self.assertIn('class="delete-tone"', JS)
         self.assertIn('.preset-grid{grid-template-columns:repeat(3,minmax(280px,1fr))', HTML)
-        self.assertNotIn('draggable="true"', JS)
+        self.assertIn('class="card-drag-handle" draggable="true"', JS)
         self.assertNotIn("nativeEvent('reorderInstrumentCards'", JS)
 
     def test_global_header_has_dynamic_greeting_and_no_duplicate_page_titles(self):

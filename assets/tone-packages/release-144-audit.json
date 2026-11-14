@@ -7,7 +7,7 @@
       "instrumentKey": "kontakt-kensa",
       "asset": "kontakt-kensa.fytonepack",
       "brand": "kontakt",
-      "sha256": "cb108266f67fca8498643e19df681ff258b9094cab7f60621bbb3655b5b15be8"
+      "sha256": "243043f9221a0665e99e8f6c13278e1b1608ffb14be392e82ec3d53db2942494"
     },
     {
       "id": "soprano-kenny",
@@ -31,7 +31,7 @@
       "instrumentKey": "alto-sax",
       "asset": "alto-jazz.fytonepack",
       "brand": "swam",
-      "sha256": "d3563940915ee4293c874b0f2232d5124d2f537c2ce5d0ef9ccf094640a85ae1"
+      "sha256": "de6b4ccd926f885b2379bb99bbc10ceff13ec47696d2cd3eb1188c5646eba847"
     },
     {
       "id": "alto-deep",
@@ -39,7 +39,7 @@
       "instrumentKey": "alto-sax",
       "asset": "alto-deep.fytonepack",
       "brand": "swam",
-      "sha256": "bb4a9f176e61cfa75534bc996dae7020e5914a1e1ea755221085d1d7dfc3332d"
+      "sha256": "fcb2bed9dc82fc58b728c1b5cf4189c7efa3b81897f6915350bd5319bb884485"
     },
     {
       "id": "alto-pop",
@@ -47,7 +47,7 @@
       "instrumentKey": "alto-sax",
       "asset": "alto-pop.fytonepack",
       "brand": "swam",
-      "sha256": "42ba6f069f7a306eecd96310224f5499273a3ca08f4c556a3514915a549d3ad9"
+      "sha256": "ac2d7d2af5dd4470d390cb996708af1911c1324a50c23b80dbfffd81e6faf8ff"
     },
     {
       "id": "alto-silky",
@@ -63,7 +63,7 @@
       "instrumentKey": "alto-sax",
       "asset": "alto-breath-growl.fytonepack",
       "brand": "swam",
-      "sha256": "9350cac15168b6903882b264079b5d5a52016ba77e5c0b7e3f69a83a60232328"
+      "sha256": "c37cf885751905d0de95465f337d8df758dfedb5b6cf6566c5c56011e06d00fd"
     },
     {
       "id": "alto-breathy",
@@ -71,7 +71,7 @@
       "instrumentKey": "alto-sax",
       "asset": "alto-breathy.fytonepack",
       "brand": "swam",
-      "sha256": "d7de2ba139eb43e4a18eaffdcbb50521a97451e3bf53c20c4e6694fc84e726e8"
+      "sha256": "89973ad5ce21a7da2d507360752b27a629c4c7d17c13c7303a15972f9ea94418"
     },
     {
       "id": "tenor-mellow",
@@ -79,7 +79,7 @@
       "instrumentKey": "tenor-sax",
       "asset": "tenor-mellow.fytonepack",
       "brand": "swam",
-      "sha256": "0a436ecb782dfd9cac04abaf85920b508fa0807b1ac76de05dc6437c634e82fb"
+      "sha256": "cf23c033ee33cd8f1023f140dd049b1d2924dc2725a6fb8d4a5ec7e67d4890b2"
     },
     {
       "id": "tenor-warm",
@@ -87,7 +87,7 @@
       "instrumentKey": "tenor-sax",
       "asset": "tenor-warm.fytonepack",
       "brand": "swam",
-      "sha256": "6dc753abdcda1b4dc607e5dccfc0ed826bc958f2ff8dbe1e0214e742e3ea0a8f"
+      "sha256": "19e8a03befd753cd7d4e69da92d80655441128b95bc23f16e1a7b2976a7d7f36"
     },
     {
       "id": "tenor-air-pocket",
@@ -95,7 +95,7 @@
       "instrumentKey": "tenor-sax",
       "asset": "tenor-air-pocket.fytonepack",
       "brand": "swam",
-      "sha256": "eb92e752fbb72c22e7f5b88c70604b9e927a3768703a861846835201a61e02c5"
+      "sha256": "ec9af7be8d2e79abdcb033c2a4deb94551894d8354d3de0887b1d6d06b33039e"
     },
     {
       "id": "tenor-silky",
@@ -111,7 +111,7 @@
       "instrumentKey": "tenor-sax",
       "asset": "tenor-breath-growl.fytonepack",
       "brand": "swam",
-      "sha256": "5936f9483f01f20314f612a54930bce2cd133daf115e9143480b88354ae6467e"
+      "sha256": "bdfae2ba98c0791893ec52fee1ea5806ecab43e6b43c2cd0df44431a173d322a"
     },
     {
       "id": "trumpet",
@@ -143,7 +143,7 @@
       "instrumentKey": "alto-trombone",
       "asset": "alto-trombone.fytonepack",
       "brand": "swam",
-      "sha256": "a71e41dacd47fd510c117641b7552b76bc96521c57e4183c2a45e68830a25f87"
+      "sha256": "87083bebd98851bd6e4568eaa878ca8c8da119bf81e5a78d8e97bfe6dd39df0c"
     },
     {
       "id": "bass-trombone",
@@ -151,7 +151,7 @@
       "instrumentKey": "bass-trombone",
       "asset": "bass-trombone.fytonepack",
       "brand": "swam",
-      "sha256": "9290b3461dc15b21df98dcd8495887df0c12204fb3bf2c83fbea2879e2bff6de"
+      "sha256": "8403a9558d271e05779f406c5ce5f16ca9d4ae9d13b15e9f427bff3b6b2b70ec"
     },
     {
       "id": "flute",

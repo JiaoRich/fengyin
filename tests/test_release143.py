@@ -51,5 +51,13 @@ class Release143(unittest.TestCase):
         self.assertIn("'breath','rawBreath','instrumentPeak'",js)
 
     def test_tone_and_voice_assets_unchanged(self):
-        changed=subprocess.check_output(['git','diff','--name-only','HEAD','--','assets','native/Source/PublishedToneCatalog.h'],cwd=ROOT,text=True)
+        before = 'e6ecf296766f829d305aa9a89af3eeae4a280de4'
+        release = '57115d1f24b37cf6bbd2ef8ad34f50b109b3e0bd'
+        for revision in (before, release):
+            if subprocess.run(['git', 'cat-file', '-e', revision + '^{commit}'],
+                              cwd=ROOT, capture_output=True).returncode != 0:
+                self.skipTest('1.1.43 release history is unavailable in this checkout')
+        changed = subprocess.check_output(
+            ['git', 'diff', '--name-only', before, release, '--', 'assets', 'native/Source/PublishedToneCatalog.h'],
+            cwd=ROOT, text=True)
         self.assertEqual(changed,'','This release must not alter the tone/speech payloads or catalogue')

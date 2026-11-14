@@ -60,6 +60,7 @@ const { pathToFileURL } = require('node:url');
     assert.equal(await page.locator('#preset-grid .active .tone-level').isVisible(),false);
     const reverse=await page.locator('#preset-grid [data-card-key]').evaluateAll(es=>es.map(e=>e.dataset.cardKey).reverse());
     await page.evaluate(order=>{localStorage.setItem('fengyin-card-order-swam',JSON.stringify(order));renderPresets();applyWindowMode(true);},reverse);
+    assert.deepEqual(await page.locator('#preset-grid [data-card-key]').evaluateAll(es=>es.map(e=>e.dataset.cardKey)),reverse);
     const fullNames=await page.locator('#preset-grid h3').allTextContents();
     assert.deepEqual(await page.locator('#compact-tones button span').allTextContents(),fullNames);
     assert.equal(await page.locator('.studio-names label').count(),1);
