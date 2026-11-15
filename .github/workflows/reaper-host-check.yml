@@ -85,6 +85,8 @@ jobs:
               $process.StartInfo.RedirectStandardOutput = $true
               $process.StartInfo.RedirectStandardError = $true
               $process.StartInfo.CreateNoWindow = $true
+              $process.StartInfo.StandardOutputEncoding = New-Object System.Text.UTF8Encoding($false)
+              $process.StartInfo.StandardErrorEncoding = New-Object System.Text.UTF8Encoding($false)
               $outputTask = $null; $errorTask = $null; $started = $false
               try {
                   $started = $process.Start()
@@ -134,7 +136,8 @@ jobs:
           using System.Threading;
           public class GuiChild {
            public static int Main(string[] a) {
-            Console.OutputEncoding = new System.Text.UTF8Encoding(false);
+            var o = new System.IO.StreamWriter(Console.OpenStandardOutput(), new System.Text.UTF8Encoding(false)); o.AutoFlush = true; Console.SetOut(o);
+            var e = new System.IO.StreamWriter(Console.OpenStandardError(), new System.Text.UTF8Encoding(false)); e.AutoFlush = true; Console.SetError(e);
             Console.Out.WriteLine(a.Length > 1 ? a[1] : "out");
             Console.Error.WriteLine("stderr");
             if(a[0]=="bulk") {Console.Out.Write(new string('x',200000));Console.Error.Write(new string('e',200000));}
@@ -158,7 +161,6 @@ jobs:
            foreach($case in @(@('ok',0),@('failure',17),@('crash',23))) {
             $stdout=Join-Path $dir 'out.txt';$stderr=Join-Path $dir 'err.txt'
             $code=Invoke-ComparisonChild -FilePath $exe -Arguments ($case[0]+' "中文 空格 &"') -StandardOutput $stdout -StandardError $stderr -TimeoutMilliseconds 5000
-            if ($i -eq 0) { Write-Host ('Process code: '+($code|ConvertTo-Json -Compress)+' type: '+$code.GetType().FullName); Write-Host ('stdout: '+[IO.File]::ReadAllText($stdout)); Write-Host ('stderr: '+[IO.File]::ReadAllText($stderr)) }
             Assert ($null-ne $code -and $code -is [int] -and $code-eq $case[1]) ('code '+$case[0])
             Assert (([IO.File]::ReadAllText($stdout)).Trim()-eq '中文 空格 &') 'unicode argv/stdout'
             Assert (([IO.File]::ReadAllText($stderr)).Trim()-eq 'stderr') 'stderr drained'
