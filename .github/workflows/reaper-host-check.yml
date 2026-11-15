@@ -1,0 +1,59 @@
+name: Isolated plugin host comparison tool
+on:
+  push:
+    branches: ['codex/reaper-host-check-*']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host-tool:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          lfs: false
+      - uses: actions/cache@v4
+        with:
+          path: build-host/_deps
+          key: isolated-host-juce902-windows-v1
+      - name: Build standalone host using unchanged production sources
+        shell: powershell
+        run: |
+          cmake -S tools/reaper-host-check -B build-host -G 'Visual Studio 17 2022' -A x64
+          if ($LASTEXITCODE) { throw 'Configure failed' }
+          cmake --build build-host --config Release --parallel 4
+          if ($LASTEXITCODE) { throw 'Compile failed' }
+      - name: Check output, sample timing, Unicode paths and failure handling
+        shell: powershell
+        run: |
+          ctest --test-dir build-host -C Release --output-on-failure
+          if ($LASTEXITCODE) { throw 'Self-test failed' }
+          $exe = (Resolve-Path 'build-host/Release/FengYinHostCheck.exe').Path
+          $dir = Join-Path (Resolve-Path build-host).Path 'unicode 中文 测试'
+          & $exe --self-test $dir
+          if ($LASTEXITCODE) { throw 'Unicode command line failed' }
+          & $exe --self-test $dir
+          if ($LASTEXITCODE -eq 0) { throw 'Existing output was incorrectly accepted' }
+          & $exe --job (Join-Path $dir 'absent.json')
+          if ($LASTEXITCODE -eq 0) { throw 'Missing job was incorrectly accepted' }
+          Get-FileHash -LiteralPath $exe -Algorithm SHA256 | Format-List | Out-File build-host/SHA256.txt -Encoding utf8
+          git rev-parse HEAD | Out-File build-host/source-revision.txt -Encoding ascii
+          $global:LASTEXITCODE = 0
+      - uses: actions/upload-artifact@v5
+        if: success()
+        with:
+          name: FengYin-Isolated-Host-Check-Windows-x64
+          path: |
+            build-host/Release/FengYinHostCheck.exe
+            build-host/SHA256.txt
+            build-host/source-revision.txt
+            build-host/self-test-results/self-test.json
+            build-host/Testing/Temporary/LastTest.log
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: isolated-host-failure-evidence
+          path: build-host/Testing/Temporary/*.log
+          if-no-files-found: warn
