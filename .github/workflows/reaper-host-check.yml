@@ -2,11 +2,18 @@ name: Isolated plugin host comparison tool
 on:
   push:
     branches: ['codex/reaper-host-check-*']
+    paths: ['tools/reaper-host-check/**']
   workflow_dispatch:
+    inputs:
+      process_only:
+        description: Run only the generic Windows process regression
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
   host-tool:
+    if: github.event_name != 'workflow_dispatch' || !inputs.process_only
     runs-on: windows-2022
     timeout-minutes: 25
     steps:
@@ -56,4 +63,132 @@ jobs:
         with:
           name: isolated-host-failure-evidence
           path: build-host/Testing/Temporary/*.log
+          if-no-files-found: warn
+  process-regression:
+    runs-on: windows-2022
+    timeout-minutes: 5
+    steps:
+      - name: Real Windows PowerShell 5.1 process lifecycle regression
+        shell: powershell
+        run: |
+          [void][IO.Directory]::CreateDirectory('process-check')
+          $helper = @'
+          function Invoke-ComparisonChild {
+              param([string]$FilePath, [string]$Arguments, [string]$StandardOutput,
+                    [string]$StandardError, [int]$TimeoutMilliseconds = 240000)
+              # Start-Process + redirected streams may return a detached Process on Windows
+              # PowerShell 5.1. Own the Process from Start through ExitCode and Dispose.
+              $process = New-Object System.Diagnostics.Process
+              $process.StartInfo.FileName = $FilePath
+              $process.StartInfo.Arguments = $Arguments
+              $process.StartInfo.UseShellExecute = $false
+              $process.StartInfo.RedirectStandardOutput = $true
+              $process.StartInfo.RedirectStandardError = $true
+              $process.StartInfo.CreateNoWindow = $true
+              $outputTask = $null; $errorTask = $null; $started = $false
+              try {
+                  $started = $process.Start()
+                  if (!$started) { throw '无法启动本段检查程序。' }
+                  # Drain both pipes concurrently so a verbose child cannot deadlock.
+                  $outputTask = $process.StandardOutput.ReadToEndAsync()
+                  $errorTask = $process.StandardError.ReadToEndAsync()
+                  if (!$process.WaitForExit($TimeoutMilliseconds)) {
+                      throw '本段检查超过等待时限，已停止本工具启动的进程，结果会保留。'
+                  }
+                  $exitCode = $process.ExitCode
+                  if ($null -eq $exitCode) { throw '未能取得检查程序的退出状态，结果会保留。' }
+                  if (!$outputTask.Wait(5000) -or !$errorTask.Wait(5000)) {
+                      throw '检查程序已退出，但日志输出未关闭，结果会保留。'
+                  }
+                  return [int]$exitCode
+              } finally {
+                  if ($started) {
+                      try {
+                          if (!$process.HasExited) { $process.Kill(); [void]$process.WaitForExit(5000) }
+                      } catch {}
+                  }
+                  $utf8 = New-Object System.Text.UTF8Encoding($false)
+                  foreach ($entry in @(@($outputTask,$StandardOutput),@($errorTask,$StandardError))) {
+                      $task = $entry[0]; $path = [string]$entry[1]
+                      $text = ''
+                      if ($task) {
+                          try {
+                              if ($task.Wait(1000)) { $text = $task.GetAwaiter().GetResult() }
+                              else { $text = '[诊断] 进程退出后输出流未关闭，未等待无限时长。' }
+                          } catch { $text = '[诊断] 读取进程输出失败：' + $_.Exception.Message }
+                      }
+                      [System.IO.File]::WriteAllText($path,$text,$utf8)
+                  }
+                  $process.Dispose()
+              }
+          }
+          '@
+          $test = @'
+          $ErrorActionPreference='Stop'
+          . (Join-Path $PSScriptRoot 'Compare-Process.ps1')
+          $dir=Join-Path $PSScriptRoot 'process 中文 space'
+          [void][IO.Directory]::CreateDirectory($dir)
+          $exe=Join-Path $dir 'child.exe'
+          Add-Type -TypeDefinition @"
+          using System;
+          using System.Threading;
+          public class GuiChild {
+           public static int Main(string[] a) {
+            Console.OutputEncoding = new System.Text.UTF8Encoding(false);
+            Console.Out.WriteLine(a.Length > 1 ? a[1] : "out");
+            Console.Error.WriteLine("stderr");
+            if(a[0]=="bulk") {Console.Out.Write(new string('x',200000));Console.Error.Write(new string('e',200000));}
+            if(a[0]=="slow") Thread.Sleep(10000);
+            if(a[0]=="failure") return 17;
+            if(a[0]=="crash") Environment.Exit(23);
+            return 0;
+           }
+          }
+          "@ -OutputAssembly $exe -OutputType WindowsApplication
+          $script:checks=0
+          function Assert($ok,$label) {if(!$ok){throw ('FAIL '+$label)};$script:checks++}
+          $legacy=@()
+          for($i=0;$i-lt 5;$i++) {
+           $p=Start-Process -FilePath $exe -ArgumentList 'ok' -PassThru -RedirectStandardOutput (Join-Path $dir 'old-out.txt') -RedirectStandardError (Join-Path $dir 'old-err.txt')
+           while(!$p.WaitForExit(1000)){}
+           $legacy += [pscustomobject]@{ExitCode=$p.ExitCode;IsNull=($null-eq $p.ExitCode)}
+           $p.Dispose()
+          }
+          for($i=0;$i-lt 20;$i++) {
+           foreach($case in @(@('ok',0),@('failure',17),@('crash',23))) {
+            $stdout=Join-Path $dir 'out.txt';$stderr=Join-Path $dir 'err.txt'
+            $code=Invoke-ComparisonChild -FilePath $exe -Arguments ($case[0]+' "中文 空格 &"') -StandardOutput $stdout -StandardError $stderr -TimeoutMilliseconds 5000
+            Assert ($null-ne $code -and $code -is [int] -and $code-eq $case[1]) ('code '+$case[0])
+            Assert (([IO.File]::ReadAllText($stdout)).Trim()-eq '中文 空格 &') 'unicode argv/stdout'
+            Assert (([IO.File]::ReadAllText($stderr)).Trim()-eq 'stderr') 'stderr drained'
+           }
+          }
+          $stdout=Join-Path $dir 'out.txt';$stderr=Join-Path $dir 'err.txt'
+          $code=Invoke-ComparisonChild -FilePath $exe -Arguments bulk -StandardOutput $stdout -StandardError $stderr -TimeoutMilliseconds 5000
+          Assert ($code-eq 0 -and (Get-Item $stdout).Length-gt 200000 -and (Get-Item $stderr).Length-gt 200000) 'both pipes larger than pipe buffer'
+          $timer=[Diagnostics.Stopwatch]::StartNew();$timeoutCaught=$false
+          try{Invoke-ComparisonChild -FilePath $exe -Arguments slow -StandardOutput $stdout -StandardError $stderr -TimeoutMilliseconds 200}catch{$timeoutCaught=$true}
+          Assert ($timeoutCaught -and $timer.Elapsed.TotalSeconds-lt 8) 'timeout bounded'
+          Assert (@(Get-Process child -ErrorAction SilentlyContinue|Where-Object {$_.Path-eq $exe}).Count-eq 0) 'only own timed-out child cleaned'
+          $missingCaught=$false
+          try{Invoke-ComparisonChild -FilePath (Join-Path $dir 'missing.exe') -Arguments ok -StandardOutput $stdout -StandardError $stderr}catch{$missingCaught=$true}
+          Assert $missingCaught 'launch failure not swallowed'
+          $done=@()
+          1..8|ForEach-Object {
+           $code=Invoke-ComparisonChild -FilePath $exe -Arguments ok -StandardOutput $stdout -StandardError $stderr
+           if($null-eq $code -or $code-ne 0){throw 'wrapper would stop'}
+           $done += $_
+          }
+          Assert ($done.Count-eq 8) 'same completion guard passes eight sequential jobs'
+          [pscustomobject]@{PSVersion=$PSVersionTable.PSVersion.ToString();Edition=$PSVersionTable.PSEdition;HelperSHA256=(Get-FileHash (Join-Path $PSScriptRoot 'Compare-Process.ps1')).Hash;Legacy=$legacy;Assertions=$checks;Passed=$true;Scope='Actual Windows GUI child processes, redirected streams, exit statuses, Unicode, pipe saturation, timeout, missing binary; no licensed instrument used'}|ConvertTo-Json -Depth 6|Set-Content -LiteralPath (Join-Path $PSScriptRoot 'process-proof.json') -Encoding utf8
+          Write-Host "PASS $checks checks"
+          '@
+          [IO.File]::WriteAllText((Join-Path $PWD 'process-check/Compare-Process.ps1'), ($helper.Replace("`r`n","`n").Replace("`n","`r`n")+"`r`n"), (New-Object Text.UTF8Encoding($true)))
+          [IO.File]::WriteAllText((Join-Path $PWD 'process-check/test.ps1'), $test, (New-Object Text.UTF8Encoding($true)))
+          & ./process-check/test.ps1
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: windows-powershell-process-proof
+          path: process-check/process-proof.json
           if-no-files-found: warn
