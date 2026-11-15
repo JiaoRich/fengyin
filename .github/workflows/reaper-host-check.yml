@@ -158,6 +158,7 @@ jobs:
            foreach($case in @(@('ok',0),@('failure',17),@('crash',23))) {
             $stdout=Join-Path $dir 'out.txt';$stderr=Join-Path $dir 'err.txt'
             $code=Invoke-ComparisonChild -FilePath $exe -Arguments ($case[0]+' "中文 空格 &"') -StandardOutput $stdout -StandardError $stderr -TimeoutMilliseconds 5000
+            if ($i -eq 0) { Write-Host ('Process code: '+($code|ConvertTo-Json -Compress)+' type: '+$code.GetType().FullName); Write-Host ('stdout: '+[IO.File]::ReadAllText($stdout)); Write-Host ('stderr: '+[IO.File]::ReadAllText($stderr)) }
             Assert ($null-ne $code -and $code -is [int] -and $code-eq $case[1]) ('code '+$case[0])
             Assert (([IO.File]::ReadAllText($stdout)).Trim()-eq '中文 空格 &') 'unicode argv/stdout'
             Assert (([IO.File]::ReadAllText($stderr)).Trim()-eq 'stderr') 'stderr drained'
