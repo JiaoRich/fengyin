@@ -25,6 +25,30 @@ int main() {
         dsp.setSampleRate(44100);l.fill(.1f);r.fill(.1f);dsp.processInstrument(channels,2,frames);
         assert(std::isfinite(l[0])&&std::isfinite(r[0]));
     }
+    // DJ bypass is bit-transparent at unity regardless of the formal DSP settings.
+    {
+        fengyin::MasterOutputService bypass, normal;
+        fengyin::ToneStyleSettings style; style.tone=.8f;style.warmth=.9f;style.air=.8f;
+        style.reverbMix=.4f;style.saturation=.7f;style.outputGain=.3f;
+        bypass.setToneStyle(style);normal.setToneStyle(style);bypass.setGain(1);normal.setGain(1);
+        // Start both devices at the saved style, as the production device-start path does.
+        bypass.setSampleRate(48000);normal.setSampleRate(48000);
+        std::array<float,frames>a{},b{},reference{};float* c[]{a.data(),b.data()};
+        bypass.setSourceEffectsBypassed(true);
+        for(int block=0;block<100;++block) {
+            for(int i=0;i<frames;++i)reference[i]=a[i]=b[i]=std::sin(float(block*frames+i)*.017f)*.4f;
+            bypass.processInstrument(c,2,frames);bypass.processMaster(c,2,frames);
+            assert(a==reference && b==reference);
+        }
+        // Return to a formal tone starts with clean state, equivalent to the original path.
+        bypass.setSourceEffectsBypassed(false);
+        std::array<float,frames>x{},y{};float* n[]{x.data(),y.data()};
+        for(int block=0;block<100;++block){
+            for(int i=0;i<frames;++i)a[i]=b[i]=x[i]=y[i]=std::sin(float(block*frames+i)*.01f)*.25f;
+            bypass.processInstrument(c,2,frames);normal.processInstrument(n,2,frames);
+            assert(a==x && b==y);
+        }
+    }
     // Internal arithmetic overflow must not poison subsequent valid blocks.
     fengyin::MasterOutputService dsp;dsp.setSampleRate(48000);
     std::array<float,frames> l{},r{};float* outputs[]{l.data(),r.data()};

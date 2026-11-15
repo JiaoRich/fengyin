@@ -17,7 +17,7 @@ const tones=[...fs.readFileSync('native/Source/PublishedToneCatalog.h','utf8').m
    const geometry=await page.locator('#preset-grid h3').evaluateAll(ns=>ns.map(n=>{const r=n.getBoundingClientRect(),p=n.parentElement.getBoundingClientRect();return {text:n.textContent,delta:Math.abs((r.left+r.right-p.left-p.right)/2),font:getComputedStyle(n).fontSize}}));
    assert(geometry.every(x=>x.delta<1&&x.font==='20px'),JSON.stringify(geometry));
   }
-  await page.evaluate(()=>localStorage.setItem('fengyin-card-order-swam',JSON.stringify(['builtin:kong-pipa','builtin:trumpet'])));
+  await page.evaluate(()=>localStorage.setItem('fengyin-dj-card-order-swam',JSON.stringify(['builtin:kong-pipa','builtin:trumpet'])));
   const reordered=['builtin:kong-pipa','builtin:trumpet',...expected.filter(id=>id!=='builtin:kong-pipa'&&id!=='builtin:trumpet')];
   await page.reload();await show();assert.deepEqual(await ids(),reordered,'saved user order takes precedence');
   assert.equal(await page.locator('#restore-tone-order').count(),0);

@@ -315,7 +315,7 @@ void MainComponent::setupWebInterface()
         .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
         .withWinWebView2Options(juce::WebBrowserComponent::Options::WinWebView2{}
             .withUserDataFolder(juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-                .getChildFile("FengYin").getChildFile("WebView2"))
+                .getChildFile("FengYinDJ").getChildFile("WebView2"))
             .withStatusBarDisabled()
             .withBackgroundColour(juce::Colour(0xff07101d)))
         .withNativeIntegrationEnabled()
@@ -672,7 +672,7 @@ void MainComponent::setupWebInterface()
         })
         .withEventListener("setToneStyle", [this](juce::var payload)
         {
-            if (! isActivated || ! pluginHost.hasPlugin()) return;
+            if (! isActivated || ! pluginHost.hasPlugin() || pluginHost.usesDjSource()) return;
             pluginHost.unloadEffect();
             const auto instrumentKey = currentInstrumentKey.isNotEmpty() ? currentInstrumentKey
                 : utf8(fengyin::SwamPluginClassifier::instrumentKey(pluginHost.getPluginName().toStdString()));
@@ -874,7 +874,7 @@ void MainComponent::setupWebInterface()
         })
         .withEventListener("exportAudioPathDiagnostic", [this](juce::var)
         {
-            const auto folder = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("FengYin");
+            const auto folder = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("FengYinDJ");
             const auto destination = juce::File::getSpecialLocation(juce::File::userDesktopDirectory)
                 .getNonexistentChildFile(utf8("风吟音频链路诊断-") + juce::Time::getCurrentTime().formatted("%Y%m%d-%H%M%S"), ".txt");
             const auto contents = juce::String("FengYin audio-path diagnostic v1\nExported: ")
@@ -945,7 +945,7 @@ void MainComponent::setupWebInterface()
 juce::File MainComponent::prepareLocalWebInterface()
 {
     const auto root = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-                          .getChildFile("FengYin").getChildFile("web-runtime");
+                          .getChildFile("FengYinDJ").getChildFile("web-runtime");
     const juce::StringArray files {
         "prototype/index.html", "prototype/styles.css", "prototype/app.js", "prototype/voice-catalog.js", "prototype/voice-guide.js", "assets/fengyin-app-icon.png",
         "assets/instruments/instrument_soprano_sax.png", "assets/instruments/instrument_alto_sax.png",
@@ -1569,7 +1569,7 @@ void MainComponent::logAudioDiagnostic(const fengyin::AudioDeviceStatus& status)
     if(now<nextAudioDiagnosticMs)return;
     nextAudioDiagnosticMs=now+5000;
     const bool detailed=pluginHost.isStageTimingEnabled();
-    const auto folder=juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("FengYin");
+    const auto folder=juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("FengYinDJ");
     folder.createDirectory();
     const auto log=folder.getChildFile(detailed?"audio-timing-diagnostic.log":"audio-source-diagnostic.log");
     if(log.getSize()>(detailed?16*1024*1024:256*1024))log.replaceWithText("");
@@ -1937,6 +1937,7 @@ void MainComponent::timerCallback()
         state->setProperty("targetKey", midi.getTargetKey());
         state->setProperty("growlSensitivity", midi.getGrowlSensitivity());
         state->setProperty("automaticBreathDetection", false);
+        state->setProperty("djSourceChain",pluginHost.usesDjSource());
         state->setProperty("reverbMix", masterOutput.getReverbMix());
         const auto tempo=fengyin::MusicTempoPolicy::forMode(midi.getMusicTempoMode());
         state->setProperty("musicTempoMode",midi.getMusicTempoMode());state->setProperty("musicTempoBpm",tempo.bpm);
@@ -2136,6 +2137,7 @@ void MainComponent::timerCallback()
             item->setProperty("instrumentChineseName", preset.instrumentChineseName);
             item->setProperty("customTone", preset.customTone);
             item->setProperty("studioDraft", preset.studioDraft);
+            item->setProperty("djSourceChain", preset.djSource.enabled);
             item->setProperty("published", preset.published);
             item->setProperty("baseToneStyleId", preset.baseToneStyleId);
             item->setProperty("containerInstrument", preset.containerInstrument);
@@ -2949,6 +2951,10 @@ void MainComponent::loadSelectedEffect()
 
 void MainComponent::removeEffect()
 {
+    if(pluginHost.usesDjSource()) {
+        if(webInterface)webInterface->emitEventIfBrowserIsVisible("editorResult",utf8("DJ 音色保留原效果链；可在效果器列表中旁通混响"));
+        return;
+    }
     effectLoading = false;
     pluginHost.unloadEffect();
     bypassEffectButton.setToggleState(false, juce::dontSendNotification);
@@ -2958,6 +2964,7 @@ void MainComponent::removeEffect()
 
 void MainComponent::useTestSynth()
 {
+    masterOutput.setSourceEffectsBypassed(false);
     effectLoading = false;
     midi.setPerformanceSink(nullptr);
     pluginHost.detach();
@@ -3029,6 +3036,7 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
     preset.instrumentDescriptionXml = pluginHost.getInstrumentDescriptionXml();
     preset.instrumentState = currentPluginBrand == "kong" ? juce::MemoryBlock() : pluginHost.captureInstrumentState();
     preset.effects = pluginHost.captureEffectChain();
+    preset.djSource = pluginHost.getDjSource();
     preset.toneParameters = pluginHost.captureToneParameters();
     preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureContainerState()
         : currentPluginBrand=="kontakt" ? preset.instrumentState : juce::MemoryBlock();
@@ -3138,6 +3146,7 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
     preset.instrumentDescriptionXml = pluginHost.getInstrumentDescriptionXml();
     preset.instrumentState = currentPluginBrand == "kong" ? juce::MemoryBlock() : pluginHost.captureInstrumentState();
     preset.effects = pluginHost.captureEffectChain();
+    preset.djSource = pluginHost.getDjSource();
     preset.toneParameters = pluginHost.captureToneParameters();
     preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureContainerState()
         : currentPluginBrand=="kontakt" ? preset.instrumentState : juce::MemoryBlock();
@@ -3406,7 +3415,7 @@ void MainComponent::showRecordingManager()
 juce::File MainComponent::getOnboardingMarkerFile()
 {
     return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-        .getChildFile("FengYin").getChildFile("setup-complete.txt");
+        .getChildFile("FengYinDJ").getChildFile("setup-complete.txt");
 }
 
 void MainComponent::showSetupGuide(bool automatic)
@@ -3474,6 +3483,7 @@ void MainComponent::captureToneBeforePresetEdit()
     editingReturnSamplerState = currentPluginBrand == "kong" ? pluginHost.captureKongState() : juce::MemoryBlock();
     editingReturnKongTechniques=pluginHost.getKongTechniqueProfile();
     editingReturnSwamBreathGrowl=pluginHost.usesSwamBreathGrowl();
+    editingReturnDjSource=pluginHost.getDjSource();
     editingReturnContainerProjectState.reset();
     if (currentPluginBrand == "kong")
         for (const auto& preset : cachedPresets)
@@ -3536,6 +3546,7 @@ void MainComponent::restoreToneBeforePresetEdit()
     const auto samplerState = editingReturnSamplerState;
     const auto kongTechniques=editingReturnKongTechniques;
     const auto swamBreathGrowl=editingReturnSwamBreathGrowl;
+    const auto djProfile=editingReturnDjSource;
     const auto toneSettings = editingReturnToneSettings;
     const auto effectStates = editingReturnEffects;
     const auto initialState = brand == "kong"
@@ -3553,7 +3564,7 @@ void MainComponent::restoreToneBeforePresetEdit()
                          status.bufferSize > 0 ? status.bufferSize : 128,
                          initialState,
                          [this, presetId, presetName, styleId, brand, instrumentKey, instrumentName,
-                          wasCustom, modelIndex, parameters, toneSettings, effectStates, kongTechniques, swamBreathGrowl, hasFullState]
+                          wasCustom, modelIndex, parameters, toneSettings, effectStates, kongTechniques, swamBreathGrowl, djProfile, hasFullState]
                          (bool success, const juce::String& message)
                          {
                              if (! success) { pluginLoading = false; return; }
@@ -3584,7 +3595,8 @@ void MainComponent::restoreToneBeforePresetEdit()
                                  safe->pluginLoading = false;
                                  safe->pluginStatus.setText(utf8("已取消修改，恢复原音色"), juce::dontSendNotification);
                              };
-                             activatePluginOutput(message, false, true, kongTechniques, swamBreathGrowl);
+                             if(djProfile.enabled && !pluginHost.configureDjSource(djProfile)) { pluginLoading=false; midi.setPerformanceSink(nullptr); pluginStatus.setText(utf8("DJ原始控制路由无法恢复"),juce::dontSendNotification);return; }
+                             activatePluginOutput(message, false, !djProfile.enabled, kongTechniques, swamBreathGrowl);
                              const auto audioStatus = audio.getStatus();
                              pluginHost.restoreEffectChain(effectStates, audioStatus.sampleRate > 0 ? audioStatus.sampleRate : 48000,
                                  audioStatus.bufferSize > 0 ? audioStatus.bufferSize : 128,
@@ -3593,6 +3605,7 @@ void MainComponent::restoreToneBeforePresetEdit()
                                      if (! safe) return;
                                      finish();
                                      if (! restored) safe->pluginStatus.setText(utf8("原效果链未完整恢复：") + error, juce::dontSendNotification);
+                                     if(safe->pluginHost.usesDjSource())safe->midi.setPerformanceSink(restored && !safe->recordingPerformancePaused ? &safe->pluginHost : nullptr);
                                  });
                          });
 }
@@ -3645,7 +3658,8 @@ void MainComponent::loadPreset(fengyin::SoundPreset preset,
                 {
                     availableVersion = candidate.version;
                     // Different versions may interpret opaque state differently.
-                    if (candidate.version != required.version) continue;
+                    if (candidate.version != required.version
+                        && !(preset.djSource.enabled && fengyin::djEffectVersionCompatible(required,candidate))) continue;
                     effect.descriptionXml = candidate.createXml()->toString();
                     matched = true;
                     break;
@@ -3768,6 +3782,11 @@ void MainComponent::loadPreset(fengyin::SoundPreset preset,
                                  if (completion) completion(false, utf8("方案载入失败：") + message);
                                  return;
                              }
+                             if(preset.djSource.enabled && !pluginHost.configureDjSource(preset.djSource)) {
+                                 pluginLoading=false;useTestSynth();
+                                 if(completion)completion(false,utf8("DJ原始控制路由无法恢复，请检查SWAM版本"));return;
+                             }
+                             masterOutput.setSourceEffectsBypassed(preset.djSource.enabled);
                              activatePluginOutput(message, preset.instrumentState.getSize() == 0 && preset.samplerState.getSize() == 0, false,preset.kongTechniques);
                              pluginLoading = false;
                              completeLoadedPreset(preset, completion);
@@ -3826,7 +3845,7 @@ void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
         pluginHost.configureKongTechniqueProfile(currentInstrumentKey,preset.kongTechniques);
         midi.setTechniqueContext(currentInstrumentKey);
     }
-    if(currentPluginBrand=="swam") pluginHost.applyStandardSwamExpressionCurve(false, preset.swamBreathGrowl);
+    if(currentPluginBrand=="swam" && !preset.djSource.enabled) pluginHost.applyStandardSwamExpressionCurve(false, preset.swamBreathGrowl);
     pluginStatus.setText(utf8("已恢复音色：") + preset.name, juce::dontSendNotification);
     juce::Logger::writeToLog("Preset parameters restored; restoring effect chain");
     pluginLoading = true;
@@ -3838,7 +3857,11 @@ void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
             if (! safe) return;
             safe->pluginLoading = false;
             safe->effectStatus.setText(message, juce::dontSendNotification);
-            if (! success) safe->pluginStatus.setText(utf8("音色未完整恢复：") + message, juce::dontSendNotification);
+            if (! success) {
+                if(safe->pluginHost.usesDjSource())safe->midi.setPerformanceSink(nullptr);
+                safe->pluginStatus.setText(utf8("音色未完整恢复：") + message, juce::dontSendNotification);
+            }
+            if(success && safe->pluginHost.usesDjSource())safe->midi.setPerformanceSink(safe->recordingPerformancePaused?nullptr:&safe->pluginHost);
             if (completion) completion(success, message + " " + restoreWarning);
         });
 }
@@ -3846,6 +3869,7 @@ void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
 void MainComponent::activatePluginOutput(const juce::String& pluginName, bool applyDefaults, bool configureRoutes,
                                          const fengyin::KongTechniqueProfile& kongProfile, bool swamBreathGrowl)
 {
+    masterOutput.setSourceEffectsBypassed(pluginHost.usesDjSource());
     juce::Logger::writeToLog("Plugin output activation begin; defaults=" + juce::String(applyDefaults ? 1 : 0));
     audio.getDeviceManager().removeAudioCallback(&testSynth);
     const auto brand = fengyin::SupportedInstrumentClassifier::classify(pluginName, {});
@@ -3879,7 +3903,8 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName, bool ap
     pluginHost.attachTo(audio.getDeviceManager());
     juce::Logger::writeToLog("Plugin output attached");
     midi.setTechniqueContext(currentInstrumentKey);
-    midi.setPerformanceSink(recordingPerformancePaused?nullptr:&pluginHost);
+    // DJ output is enabled by the complete effect-chain callback, never halfway through restoration.
+    midi.setPerformanceSink(recordingPerformancePaused || pluginHost.usesDjSource()?nullptr:&pluginHost);
     configureTechniqueDefaults();
     if (currentPluginBrand == "kong")
     {
@@ -3928,7 +3953,7 @@ namespace
 juce::File bendPreferencesFile()
 {
     return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-        .getChildFile("FengYin").getChildFile("bend-ranges.json");
+        .getChildFile("FengYinDJ").getChildFile("bend-ranges.json");
 }
 juce::var readBendPreferences()
 {

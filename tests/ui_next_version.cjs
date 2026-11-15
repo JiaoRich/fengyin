@@ -59,7 +59,7 @@ const path = require('node:path');
     await page.locator('.instrument-preset-card header').nth(0).dragTo(page.locator('.instrument-preset-card header').nth(2));
     const afterOrder = await page.locator('.instrument-preset-card').evaluateAll(nodes=>nodes.map(n=>n.dataset.cardKey));
     assert.notDeepEqual(afterOrder,beforeOrder,'drag must reorder cards');
-    assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('fengyin-card-order-swam'))),afterOrder);
+    assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('fengyin-dj-card-order-swam'))),afterOrder);
     const scrollBefore = await page.evaluate(()=>{
       const grid=document.querySelector('#preset-grid'); let host=grid.parentElement;
       while(host && !(/(auto|scroll)/.test(getComputedStyle(host).overflowY) && host.scrollHeight>host.clientHeight)) host=host.parentElement;

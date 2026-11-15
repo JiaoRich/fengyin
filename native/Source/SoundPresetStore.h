@@ -5,6 +5,7 @@
 #include <optional>
 #include "ToneParameterValue.h"
 #include "EffectChainState.h"
+#include "DjSourceProfile.h"
 
 namespace fengyin
 {
@@ -35,6 +36,7 @@ struct SoundPreset
     juce::String containerAdapter;
     KongTechniqueProfile kongTechniques;
     bool swamBreathGrowl = false;
+    DjSourceProfile djSource;
     bool customTone = false;
     float compressionThreshold = 0.58f;
     float compressionRatio = 1.7f;

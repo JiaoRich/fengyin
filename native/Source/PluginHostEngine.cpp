@@ -112,6 +112,15 @@ public:
 private:
     juce::MidiBuffer filteredMidi;
 };
+bool RecordingAudioProcessorPlayer::enqueueControllerPair(int route,int value,double timestamp) noexcept
+{
+    const auto status=static_cast<uint8_t>(0xb0|(DjMidiRoute::channel(route)-1));
+    const uint8_t bytes[]{status,static_cast<uint8_t>(DjMidiRoute::coarse(route)),static_cast<uint8_t>(value>>7),
+                          status,static_cast<uint8_t>(DjMidiRoute::fine(route)),static_cast<uint8_t>(value&127)};
+    if(midiQueue.pushPair(bytes,timestamp>0?timestamp:juce::Time::getMillisecondCounterHiRes()*.001))return true;
+    requestPerformanceReset();return false;
+}
+
 bool RecordingAudioProcessorPlayer::enqueueMidi(const juce::MidiMessage& message,
                                                 double timestampSeconds) noexcept
 {
@@ -197,9 +206,11 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
     RealtimeMidiEvent event;
     for (std::size_t count = 0; count < midiQueueSize && midiQueue.pop(event); ++count)
     {
-        juce::MidiMessage message(event.bytes.data(), static_cast<int>(event.size), event.timestampSeconds);
-        onsetTrace.record(message, event.timestampSeconds);
-        getMidiMessageCollector().addMessageToQueue(message);
+        for(int offset=0;offset<int(event.size);offset+=3) {
+            juce::MidiMessage message(event.bytes.data()+offset,juce::jmin(3,int(event.size)-offset),event.timestampSeconds);
+            onsetTrace.record(message,event.timestampSeconds);
+            getMidiMessageCollector().addMessageToQueue(message);
+        }
     }
     midiTime.finish();
 
@@ -438,7 +449,7 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
             };
             processingGraph->suppressTechniqueMidi = [this](const juce::MidiMessage& message)
             {
-                if (kongExpressionMode.load() || kontaktStandardControls.load() || !message.isController()) return false;
+                if (usesDjSource() || kongExpressionMode.load() || kontaktStandardControls.load() || !message.isController()) return false;
                 const int route=(message.getChannel()<<8)|(message.getControllerNumber()+1);
                 if (route==((swamExpressionChannel.load()<<8)|(swamExpressionController.load()+1))) return false;
                 for (const auto technique : {PerformanceTechnique::vibrato,PerformanceTechnique::growl,PerformanceTechnique::flutter})
@@ -586,6 +597,7 @@ void PluginHostEngine::unload()
     instrumentEditorWindow.reset();
     effectEditorWindow.reset();
     effectNodes.clear();
+    djTrackNode=nullptr;djBusNode=nullptr;djOutputNode=nullptr;djSource={};djSourceActive.store(false);djBreathRoute.store(0);
     instrumentNode = nullptr;
     audioOutputNode = nullptr;
     midiInputNode = nullptr;
@@ -715,6 +727,7 @@ int PluginHostEngine::restoreToneParameters(const juce::Array<ToneParameterValue
 
 bool PluginHostEngine::applyExpressionAttackControl()
 {
+    if(usesDjSource())return true; // DJ source Attack is deliberate, including the two soprano exceptions.
     const ScopedGraphPause pause(graph.get());
     auto* plugin = getPlugin();
     if (plugin == nullptr) return false;
@@ -749,6 +762,7 @@ bool PluginHostEngine::applyExpressionAttackControl()
 
 bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstrument, bool preferBreathGrowl)
 {
+    if(usesDjSource())return configureDjSource(djSource) && rebuildConnections();
     // The player may still be attached after replacing an instrument. Never
     // restore opaque plugin state concurrently with its audio callback.
     const ScopedGraphPause pause(graph.get());
@@ -878,11 +892,13 @@ void PluginHostEngine::loadEffectAsync(const juce::PluginDescription& descriptio
             }
             const ScopedGraphPause pause(graph.get());
             auto effectNode = graph->addNode(std::move(instance));
-            effectNodes.push_back({ effectNode, description });
+            // New inserts belong before the preserved source return bus.
+            const auto insertAt = usesDjSource() && !effectNodes.empty() ? effectNodes.size()-1 : effectNodes.size();
+            effectNodes.insert(effectNodes.begin()+static_cast<std::ptrdiff_t>(insertAt), { effectNode, description });
             if (! rebuildConnections())
             {
                 graph->removeNode(effectNode->nodeID);
-                effectNodes.pop_back();
+                effectNodes.erase(effectNodes.begin()+static_cast<std::ptrdiff_t>(insertAt));
                 rebuildConnections();
                 // Resume without releasing the existing instrument.
                 if (completion) completion(false, juce::String::fromUTF8("效果器音频通道不兼容，已恢复直接输出"));
@@ -895,6 +911,7 @@ void PluginHostEngine::loadEffectAsync(const juce::PluginDescription& descriptio
 
 void PluginHostEngine::unloadEffect()
 {
+    if (usesDjSource()) return; // The source return bus can be bypassed, not discarded.
     ++effectLoadGeneration;
     if (graph == nullptr || ! hasEffect()) return;
     const ScopedGraphPause pause(graph.get());
@@ -951,6 +968,7 @@ juce::var PluginHostEngine::describeEffectChain() const
         row->setProperty("version", effect.description.version);
         row->setProperty("bypassed", effect.node->isBypassed());
         row->setProperty("latencySamples", effect.node->getProcessor()->getLatencySamples());
+        row->setProperty("fixedBus", usesDjSource() && &effect == &effectNodes.back());
         result.add(juce::var(row));
     }
     return result;
@@ -959,6 +977,7 @@ juce::var PluginHostEngine::describeEffectChain() const
 bool PluginHostEngine::removeEffectAt(int index)
 {
     if (index < 0 || static_cast<size_t>(index) >= effectNodes.size() || ! graph) return false;
+    if (usesDjSource() && static_cast<size_t>(index)+1 == effectNodes.size()) return false;
     ++effectLoadGeneration;
     const ScopedGraphPause pause(graph.get());
     effectEditorWindow.reset();
@@ -973,6 +992,8 @@ bool PluginHostEngine::moveEffect(int index, int destination)
 {
     if (index < 0 || destination < 0 || static_cast<size_t>(index) >= effectNodes.size()
         || static_cast<size_t>(destination) >= effectNodes.size()) return false;
+    if (usesDjSource() && (static_cast<size_t>(index)+1 == effectNodes.size()
+        || static_cast<size_t>(destination)+1 == effectNodes.size())) return false;
     ++effectLoadGeneration;
     const ScopedGraphPause pause(graph.get());
     auto slot = effectNodes[static_cast<size_t>(index)];
@@ -1127,6 +1148,50 @@ void PluginHostEngine::closePluginEditor(bool effect)
     window.reset();
 }
 
+bool PluginHostEngine::sendDjController(int route,float value,double timestamp) noexcept
+{
+    if(!route || !std::isfinite(value))return false;
+    value=juce::jlimit(0.f,1.f,value);
+    if(DjMidiRoute::fine(route)>=0)return player.enqueueControllerPair(route,juce::roundToInt(value*16383.f),timestamp);
+    return queue(juce::MidiMessage::controllerEvent(DjMidiRoute::channel(route),DjMidiRoute::coarse(route),juce::roundToInt(value*127.f)),timestamp);
+}
+
+bool PluginHostEngine::configureDjSource(const DjSourceProfile& profile)
+{
+    if(!graph || !getPlugin())return false;
+    const ScopedGraphPause pause(graph.get());
+    djSource=profile;djSourceActive.store(profile.enabled);
+    if(!profile.enabled)return true;
+    juce::MemoryBlock state;getPlugin()->getStateInformation(state);
+    const auto root=SwamStateCompatibility::read(state);
+    if(!root){djSourceActive.store(false);return false;}
+    const int expression=DjMidiRoute::find(*root,"expression");
+    if(!expression){djSourceActive.store(false);return false;}
+    djBreathRoute.store(expression);
+    swamExpressionController.store(DjMidiRoute::coarse(expression));swamExpressionChannel.store(DjMidiRoute::channel(expression));
+    for(auto& r:nativeTechniqueRoutes)r.store(0);
+    const std::pair<const char*,PerformanceTechnique> names[]{
+        {"vibratoDepth",PerformanceTechnique::vibrato},{"growl",PerformanceTechnique::growl},
+        {"flutter",PerformanceTechnique::flutter},{"portamentoTime",PerformanceTechnique::portamento},
+        {"tremolo",PerformanceTechnique::tremolo},{"mute",PerformanceTechnique::mute},
+        {"halfValve",PerformanceTechnique::halfValve},{"pizzicato",PerformanceTechnique::pizzicato},
+        {"bowPressure",PerformanceTechnique::bowPressure},{"overBlow",PerformanceTechnique::overblow},
+        {"fallDown",PerformanceTechnique::fall},{"alternateFingering",PerformanceTechnique::alternateFingering},
+        {"legato",PerformanceTechnique::legato}};
+    for(const auto& [name,role]:names)nativeTechniqueRoutes[static_cast<size_t>(role)].store(DjMidiRoute::find(*root,name));
+    swamBreathGrowl.store(false);stringTremolo.clear();lastBreathMidiValue.store(-1);
+    for(auto& dirty:techniqueDirty)dirty.store(false);
+    prepareTempoVibrato(*getPlugin());
+    if(djTrackNode)graph->removeNode(djTrackNode->nodeID);
+    if(djOutputNode)graph->removeNode(djOutputNode->nodeID);
+    if(djBusNode)graph->removeNode(djBusNode->nodeID);
+    djTrackNode=graph->addNode(std::make_unique<DjFixedGainProcessor>(profile.trackGain));
+    djOutputNode=graph->addNode(std::make_unique<DjFixedGainProcessor>(profile.hardwareGain));
+    djBusNode=graph->addNode(std::make_unique<DjFixedGainProcessor>(1.f));
+    // Restore/route only: never modify the source state, Attack, or mapping curves.
+    return true;
+}
+
 bool PluginHostEngine::rebuildConnections()
 {
     if (graph == nullptr || instrumentNode == nullptr || audioOutputNode == nullptr || midiInputNode == nullptr) return false;
@@ -1135,6 +1200,17 @@ bool PluginHostEngine::rebuildConnections()
     const auto midiConnected = graph->addConnection(
         { { midiInputNode->nodeID, juce::AudioProcessorGraph::midiChannelIndex },
           { instrumentNode->nodeID, juce::AudioProcessorGraph::midiChannelIndex } });
+    if(usesDjSource()) {
+        if(!djTrackNode||!djBusNode||!djOutputNode||effectNodes.empty())return false;
+        // The final external effect is the original shared Pro-R 2 bus. Track 7
+        // also has a direct master send; preserving this parallel path matters.
+        const auto& bus=effectNodes.back();
+        if(!bus.description.name.containsIgnoreCase("Pro-R 2"))return false;
+        std::vector<juce::AudioProcessorGraph::Node::Ptr> pre;
+        for(size_t i=0;i+1<effectNodes.size();++i)pre.push_back(effectNodes[i].node);
+        return midiConnected && connectDjSourceGraph(*graph,instrumentNode,pre,djTrackNode,
+            bus.node,djBusNode,djOutputNode,audioOutputNode,djSource.directToMaster);
+    }
     std::vector<juce::AudioProcessorGraph::Node::Ptr> chain;
     for (const auto& slot : effectNodes)
         chain.push_back(slot.node);
@@ -1184,6 +1260,12 @@ void PluginHostEngine::noteOff(int noteNumber, double timestampSeconds) noexcept
 void PluginHostEngine::breathChanged(float value, double timestampSeconds) noexcept
 {
     const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
+    if(usesDjSource()) {
+        const int route=djBreathRoute.load();
+        const int raw=juce::roundToInt(juce::jlimit(0.f,1.f,value)*(DjMidiRoute::fine(route)>=0?16383.f:127.f));
+        if(lastBreathMidiValue.load()!=raw && sendDjController(route,value,timestampSeconds))lastBreathMidiValue.store(raw);
+        return;
+    }
     const auto midiValue = juce::jlimit(0, 127, juce::roundToInt(value * 127.0f));
     if (lastBreathMidiValue.exchange(midiValue, std::memory_order_relaxed) == midiValue)
         return;
@@ -1251,6 +1333,11 @@ void PluginHostEngine::routeTechnique(PerformanceTechnique technique, float valu
     if (index >= techniqueValues.size()) return;
     if (technique == PerformanceTechnique::growl && usesSwamBreathGrowl()) return;
     const auto safeValue = juce::jlimit(0.0f, 1.0f, value);
+    if(usesDjSource()) {
+        techniqueValues[index].store(safeValue);
+        if(hasIndependentTechniqueRoute(technique))sendDjController(nativeTechniqueRoutes[index].load(),safeValue,0);
+        return;
+    }
     if(technique==PerformanceTechnique::tremolo && !kongExpressionMode.load()) {
         // Never fall back to a similarly named "Tremolo Mode" parameter if
         // this plug-in/version failed the exact native articulation checks.
@@ -1385,7 +1472,8 @@ void PluginHostEngine::resetPerformance() noexcept
         kongTechniqueInputs[index].store(0.0f, std::memory_order_relaxed);
         if (techniqueValues[index].exchange(0.0f, std::memory_order_relaxed) != 0.0f)
         {
-            if (const int route = nativeTechniqueRoutes[index].load())
+            if(usesDjSource()) { if(hasIndependentTechniqueRoute(static_cast<PerformanceTechnique>(index)))sendDjController(nativeTechniqueRoutes[index].load(),0,0); }
+            else if (const int route = nativeTechniqueRoutes[index].load())
                 queue(juce::MidiMessage::controllerEvent(route >> 8, (route & 255) - 1, 0), 0.0);
             else techniqueDirty[index].store(true, std::memory_order_release);
         }
@@ -1590,6 +1678,7 @@ bool PluginHostEngine::selectInstrumentModel(int index)
 
 int PluginHostEngine::applySwamToneProfile(const SwamToneProfile& profile, bool restoreModel)
 {
+    if(usesDjSource())return 0;
     const ScopedGraphPause pause(graph.get());
     swamToneAudit = juce::var();
     auto* plugin = getPlugin();
@@ -1656,6 +1745,7 @@ void PluginHostEngine::flushTechniqueValues()
             if(target>=0)p->setValueNotifyingHost(target);
         }
     }
+    if(usesDjSource())return; // No direct parameter fallback may overwrite a source response curve.
     for (size_t index = 0; index < techniqueParameters.size(); ++index)
         if (techniqueDirty[index].exchange(false, std::memory_order_acq_rel)
             && !(index == static_cast<size_t>(PerformanceTechnique::growl) && usesSwamBreathGrowl()))

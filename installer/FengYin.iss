@@ -5,26 +5,26 @@
   #define OutputDir "."
 #endif
 #ifndef AppVersion
-  #define AppVersion "1.1.46"
+  #define AppVersion "1.0.0"
 #endif
 #ifndef ChineseMessages
   #define ChineseMessages "compiler:Languages\ChineseSimplified.isl"
 #endif
 
 [Setup]
-AppId={{BA041761-FF1B-4F84-B055-AE70EC8C883B}
-AppName=风吟
+AppId={{EE1A5E76-B5BA-44F0-9D05-57710440258B}
+AppName=风吟DJ版
 AppVersion={#AppVersion}
 VersionInfoVersion={#AppVersion}.0
 AppPublisher=风吟
-DefaultDirName={autopf}\风吟
-DefaultGroupName=风吟
+DefaultDirName={autopf}\风吟DJ版
+DefaultGroupName=风吟DJ版
 DisableProgramGroupPage=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 OutputDir={#OutputDir}
-OutputBaseFilename=风吟-{#AppVersion}-Windows-x64
+OutputBaseFilename=风吟DJ版-{#AppVersion}-Windows-x64
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
@@ -33,7 +33,7 @@ InfoBeforeFile={#SourceDir}\InstallNotice.txt
 CloseApplications=yes
 RestartApplications=no
 AlwaysRestart=yes
-UninstallDisplayName=风吟
+UninstallDisplayName=风吟DJ版
 
 [Languages]
 Name: "chinesesimp"; MessagesFile: "{#ChineseMessages}"
@@ -49,11 +49,11 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "MicrosoftEdgeWebView2Runt
 Source: "{#SourceDir}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Icons]
-Name: "{group}\风吟"; Filename: "{app}\FengYin.exe"
+Name: "{group}\风吟DJ版"; Filename: "{app}\FengYin.exe"
 Name: "{group}\安装 ASIO4ALL 低延迟组件"; Filename: "{app}\components\ASIO4ALL\ASIO4ALL_2_22.exe"
 Name: "{group}\安装 VB-CABLE 网页声音组件"; Filename: "{app}\components\VB-CABLE\VBCABLE_Setup_x64.exe"
 Name: "{group}\安装 Fresh Air 音色效果器"; Filename: "{app}\components\Fresh Air\Setup Fresh Air v1.0.8.exe"
-Name: "{autodesktop}\风吟"; Filename: "{app}\FengYin.exe"; Tasks: desktopicon
+Name: "{autodesktop}\风吟DJ版"; Filename: "{app}\FengYin.exe"; Tasks: desktopicon
 
 [InstallDelete]
 ; Remove only withdrawn application components on upgrade, never recordings.
@@ -71,7 +71,7 @@ Type: files; Name: "{app}\components\Recording\FengYinCapturePacketCopy.h"
 Filename: "{tmp}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; Parameters: "/silent /install"; StatusMsg: "正在安装视频与精美界面离线运行组件…"; Flags: waituntilterminated
 
 [Registry]
-Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "FengYinAudioRecovery"; ValueData: """{app}\FengYinAudioWatchdog.exe"" --login-recovery"; Flags: uninsdeletevalue
+Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "FengYinDJAudioRecovery"; ValueData: """{app}\FengYinAudioWatchdog.exe"" --login-recovery"; Flags: uninsdeletevalue
 
 [Code]
 
@@ -97,6 +97,21 @@ begin
     end;
     Choice := MsgBox(ExpandConstant('微软运行组件未准备完成，音源可能无法加载。请检查 {commonappdata}\FengYin\InstallLogs 中的错误记录；已有更新版本但损坏时，请在 Windows“已安装的应用”中修复该版本。处理后点击“重试”，或取消本次安装。'), mbError, MB_RETRYCANCEL);
     if Choice = IDCANCEL then RaiseException('微软运行组件尚未准备完成，安装已停止。');
+  until False;
+end;
+
+procedure PrepareFabFilter();
+var
+  Code, Choice: Integer;
+  Args: String;
+begin
+  WizardForm.StatusLabel.Caption := '正在检查 DJ 音色所需的 FabFilter Pro-R 2…';
+  Args := ExpandConstant('-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{app}\components\FabFilter\Install-FabFilter.ps1" -PackageDirectory "{app}\components\FabFilter"');
+  repeat
+    Code := -1;
+    if Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Args, '', SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0) then Exit;
+    Choice := MsgBox(ExpandConstant('FabFilter Pro-R 2 未安装完成。请查看 {commonappdata}\FengYinDJ\InstallLogs 中的记录，处理后重试。'), mbError, MB_RETRYCANCEL);
+    if Choice = IDCANCEL then RaiseException('DJ 音色依赖尚未准备完成，安装已停止。');
   until False;
 end;
 
@@ -238,6 +253,7 @@ var
 begin
   if CurStep <> ssPostInstall then Exit;
   PrepareVCRuntime();
+  PrepareFabFilter();
   { Capture the interactive user's defaults, not the elevated administrator's. }
   if not ExecAsOriginalUser(ExpandConstant('{app}\FengYinAudioWatchdog.exe'), '--snapshot-install', '',
       SW_HIDE, ewWaitUntilTerminated, ResultCode) then

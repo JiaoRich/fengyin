@@ -73,6 +73,28 @@ int main() {
     const auto reconnectSettings=juce::File::getSpecialLocation(juce::File::tempDirectory)
         .getNonexistentChildFile("fengyin-reconnect-tests","",false);
     assert(reconnectSettings.createDirectory().wasOk());
+    // Real production receive, learning and restoration paths: a second breath
+    // controller must never become a technique, in either message order.
+    for (int primary : {2,11}) for(int companion : {primary+32,7}) for(bool reversed : {false,true}) {
+        auto input=std::make_unique<fengyin::MidiInputService>(false);
+        fengyin::MidiInputServiceTestAccess::useTestSettings(*input,reconnectSettings);
+        input->attachExternal("family-"+juce::String(primary)+"-"+juce::String(companion)+"-"+juce::String(int(reversed)),"Test controller");
+        input->setBreathController(primary);input->setTechniqueContext("alto-sax");Sink sink;input->setPerformanceSink(&sink);
+        input->beginTechniqueLearn(fengyin::PerformanceTechnique::vibrato);
+        for(int value:{75,84,96,105,115}) {
+            const auto main=juce::MidiMessage::controllerEvent(1,primary,value);
+            const auto other=juce::MidiMessage::controllerEvent(1,companion,companion==primary+32?100:value);
+            input->acceptExternalMessage(reversed?other:main);input->acceptExternalMessage(reversed?main:other);
+            juce::Thread::sleep(12);
+        }
+        juce::Thread::sleep(60);assert(!input->consumeTechniqueLearnResult().ready);
+        // An independent CC1, even on another channel, remains learnable.
+        input->acceptExternalMessage(juce::MidiMessage::controllerEvent(2,1,100));juce::Thread::sleep(30);
+        const auto learned=input->consumeTechniqueLearnResult();assert(learned.ready&&learned.mapping.sourceNumber==1);
+        input->acceptExternalMessage(juce::MidiMessage::controllerEvent(1,primary,0));
+        input->acceptExternalMessage(juce::MidiMessage::controllerEvent(1,companion,0));
+        assert(input->getSnapshot().rawBreath==0);input->setPerformanceSink(nullptr);
+    }
     {
         struct RacingSink : fengyin::MidiPerformanceSink {
             std::atomic<bool> entered{false},release{false};std::atomic<int> calls{0};std::atomic<float> last{0};
@@ -339,6 +361,49 @@ int main() {
             assert(e.timestampSeconds>=time);time=e.timestampSeconds;}
         assert(counts[0]==1000 && counts[1]==1000 && ordered.droppedCount()==0);
     }
+    for(bool reverse:{false,true}){
+        fengyin::ControllerDetector detector;
+        for(int i=0;i<12;++i){
+            if(reverse){detector.observe(34,(i*47)%128);detector.observe(2,20+i);}
+            else{detector.observe(2,20+i);detector.observe(34,(i*47)%128);}}
+        assert(detector.bestContinuousController()==2);
+        detector.reset();for(int i=0;i<12;++i)detector.observe(34,i*10);
+        assert(detector.bestContinuousController()==34); // A standalone CC34 is still a valid user input.
+    }
+    // A controller that later diverges from breath must not remain suppressed
+    // as a permanently cached alias. Both message arrival orders are supported.
+    for(bool reverse:{false,true}){
+        fengyin::BreathControllerFamily family;family.reset(2);
+        for(int i=1;i<=4;++i){double t=i*.1;
+            if(reverse){family.observe(1,11,i*20,t);family.observe(1,2,i*20,t+.001);}
+            else{family.observe(1,2,i*20,t);family.observe(1,11,i*20,t+.001);}}
+        assert(family.protectedController(1,11));
+        family.observe(1,2,90,1);family.observe(1,11,20,1.001);
+        assert(!family.protectedController(1,11));
+        assert(!family.protectedController(2,11));
+    }
+    // A 14-bit CC update occupies one queue slot, so contention/full capacity
+    // can never deliver only its coarse half.
+    {
+        auto q=std::make_unique<fengyin::OrderedMidiQueue<2>>();
+        const std::uint8_t pair[]{0xb0,2,50,0xb0,34,33}, note[]{0x90,60,1};
+        assert(q->push(note,3,1)); assert(q->pushPair(pair,2));
+        assert(!q->pushPair(pair,3));fengyin::RealtimeMidiEvent e;
+        assert(q->pop(e)&&e.size==3);assert(q->pop(e)&&e.size==6);
+        for(int i=0;i<6;++i)assert(e.bytes[i]==pair[i]);assert(!q->pop(e));
+        assert(q->droppedCount()==1);
+    }
+    {
+        auto q=std::make_unique<fengyin::OrderedMidiQueue<4096>>();
+        auto paired=[&]{for(int i=0;i<1000;++i){const auto v=static_cast<std::uint8_t>(i%128);
+            const std::uint8_t p[]{0xb0,2,v,0xb0,34,v};assert(q->pushPair(p,i));}};
+        auto notes=[&]{for(int i=0;i<1000;++i){const std::uint8_t n[]{0x90,60,static_cast<std::uint8_t>(i%128)};assert(q->push(n,3,i));}};
+        std::thread a(paired),b(notes);a.join();b.join();int pairs=0,ns=0;fengyin::RealtimeMidiEvent e;
+        while(q->pop(e))if(e.size==6){assert(e.bytes[0]==0xb0&&e.bytes[3]==0xb0&&e.bytes[1]==2&&e.bytes[4]==34);
+            assert(e.bytes[2]==pairs%128&&e.bytes[5]==pairs%128);++pairs;}
+        else{assert(e.size==3&&e.bytes[2]==ns%128);++ns;}
+        assert(pairs==1000&&ns==1000&&q->droppedCount()==0);
+    }
     Sink sink;
     // Kensa mouthpiece CC/pressure drives the technique, never pitch bend.
     for(const auto source:{fengyin::TechniqueSourceType::controller,fengyin::TechniqueSourceType::channelPressure}) {
@@ -430,6 +495,8 @@ int main() {
             input->acceptExternalMessage(juce::MidiMessage::controllerEvent(channel, number, value));
         };
         const auto installLearned = [&] {
+            // UI polls after the bounded CC-family observation window.
+            juce::Thread::sleep(30);
             auto learned = input->consumeTechniqueLearnResult();
             assert(learned.ready);
             learned.mapping.mode = fengyin::TechniqueControlMode::hardware;

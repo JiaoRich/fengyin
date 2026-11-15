@@ -19,7 +19,7 @@ MidiInputService::MidiInputService(bool persistSettings)
     juce::PropertiesFile::Options options;
     options.applicationName = "FengYinMidi";
     options.filenameSuffix = ".settings";
-    options.folderName = "FengYin";
+    options.folderName = "FengYinDJ";
     options.osxLibrarySubFolder = "Application Support";
     properties.setStorageParameters(options);
     if (auto* settingsFile = properties.getUserSettings()) {
@@ -126,6 +126,7 @@ void MidiInputService::disconnect()
     }
     if (auto* sink = performanceSink.load(std::memory_order_acquire))
         sink->resetPerformance();
+    { const juce::SpinLock::ScopedLockType lock(breathFamilyLock); breathFamily.reset(getBreathController()); }
     connectedName.clear();
     connectedIdentifier.clear();
     activeProfile = DeviceProfileMatcher::match("");
@@ -228,7 +229,7 @@ void MidiInputService::restoreBreathController()
         // a separate output route and must not overwrite this input selection.
         savedController = settingsFile->getIntValue(controllerSettingKey(), savedController);
     }
-    breathController.store(juce::jlimit(0, 127, savedController));
+    updateBreathController(juce::jlimit(0, 127, savedController));
     activeProfile.breathController = breathController.load();
 }
 
@@ -252,6 +253,7 @@ void MidiInputService::setBreathController(int controllerNumber)
 void MidiInputService::updateBreathController(int controllerNumber) noexcept
 {
     const auto previous = breathController.exchange(controllerNumber);
+    { const juce::SpinLock::ScopedLockType lock(breathFamilyLock); breathFamily.reset(controllerNumber); }
     activeProfile.breathController = controllerNumber;
     if (isEwiSolo() && previous != controllerNumber)
     {
@@ -686,6 +688,16 @@ TechniqueLearnResult MidiInputService::consumeTechniqueLearnResult() noexcept
             }
         }
     }
+    if (learnedSourceReady.load(std::memory_order_acquire)
+        && learnedSourceType.load() == static_cast<int>(TechniqueSourceType::controller))
+    {
+        const auto now = juce::Time::getMillisecondCounterHiRes() * .001;
+        if (now - learnedSourceAt.load() < .025) return {};
+        if (isBreathFamily(learnedSourceChannel.load(), learnedSourceNumber.load(), now))
+        {
+            learnedSourceReady.store(false); learningTechnique.store(true); return {};
+        }
+    }
     if (! learnedSourceReady.exchange(false, std::memory_order_acq_rel))
         return {};
     TechniqueLearnResult result;
@@ -704,6 +716,12 @@ float MidiInputService::techniqueMessageValue(const juce::MidiMessage& message) 
     if (message.isNoteOn()) return message.getFloatVelocity();
     if (message.isNoteOff()) return 0.0f;
     return 0.0f;
+}
+
+bool MidiInputService::isBreathFamily(int channel, int cc, double now) noexcept
+{
+    const juce::SpinLock::ScopedLockType lock(breathFamilyLock);
+    return breathFamily.probableBreath(channel, cc, now);
 }
 
 bool MidiInputService::handleTechniqueMessage(const juce::MidiMessage& message, MidiPerformanceSink* sink)
@@ -740,7 +758,7 @@ bool MidiInputService::handleTechniqueMessage(const juce::MidiMessage& message, 
         ? inputValue > 0.36f : inputValue > 0.55f;
     const auto validLearningSignal = sourceType == TechniqueSourceType::note
         ? message.isNoteOn() && ! ordinaryPlayedNote : meaningfulContinuousSignal;
-    const bool nonBreathController = sourceType == TechniqueSourceType::controller && sourceNumber != getBreathController();
+    const bool nonBreathController = sourceType == TechniqueSourceType::controller && !isBreathFamily(message.getChannel(), sourceNumber, juce::Time::getMillisecondCounterHiRes() * .001);
     const bool ewiSoloConnected = isEwiSolo();
     bool learningGlideMessage = false;
     bool waitingForGlideRelease = false;
@@ -761,6 +779,8 @@ bool MidiInputService::handleTechniqueMessage(const juce::MidiMessage& message, 
     {
         learnedSourceType.store(static_cast<int>(sourceType), std::memory_order_relaxed);
         learnedSourceNumber.store(sourceNumber, std::memory_order_relaxed);
+        learnedSourceChannel.store(message.getChannel(), std::memory_order_relaxed);
+        learnedSourceAt.store(juce::Time::getMillisecondCounterHiRes() * .001, std::memory_order_relaxed);
         learningTechnique.store(false, std::memory_order_release);
         learnedSourceReady.store(true, std::memory_order_release);
         capturedByLearn = true;
@@ -789,6 +809,14 @@ bool MidiInputService::handleTechniqueMessage(const juce::MidiMessage& message, 
             && (!nonBreathController || learningGlideMessage || ewiSoloGlideGate.usesController(sourceNumber)))
             continue;
         const auto index = static_cast<size_t>(mapping.technique);
+        if (sourceType == TechniqueSourceType::controller && !nonBreathController)
+        {
+            // A legacy false match must not continuously retrigger a technique.
+            techniqueHardwareInput[index] = 0; techniquePreviousInput[index] = 0;
+            techniqueToggleState[index] = false;
+            if (sink) sink->techniqueChanged(targetForRole(mapping.technique), 0);
+            continue;
+        }
         auto outputValue = inputValue;
         if (mapping.toggle)
         {
@@ -839,6 +867,22 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
     const auto timestampSeconds = message.getTimeStamp() > 0.0
         ? message.getTimeStamp() : juce::Time::getMillisecondCounterHiRes() * 0.001;
     onsetTrace.record(message, timestampSeconds);
+    BreathControllerFamily::Result familyBreath;
+    if (message.isController())
+    {
+        const juce::SpinLock::ScopedLockType lock(breathFamilyLock);
+        familyBreath = breathFamily.observe(message.getChannel(), message.getControllerNumber(),
+            message.getControllerValue(), juce::Time::getMillisecondCounterHiRes() * .001);
+    }
+    // A coarse byte can arrive after its candidate fine/parallel controller.
+    // Invalidate a pending learn as soon as the second message proves the pair;
+    // do not depend on when the UI next polls its result.
+    if (learnedSourceReady.load(std::memory_order_acquire)
+        && learnedSourceType.load() == static_cast<int>(TechniqueSourceType::controller)
+        && isBreathFamily(learnedSourceChannel.load(), learnedSourceNumber.load(), juce::Time::getMillisecondCounterHiRes()*.001))
+    {
+        learnedSourceReady.store(false); learningTechnique.store(true);
+    }
     if (sink != nullptr && message.isChannelPressure())
         sink->channelPressureChanged(message.getChannelPressureValue(), timestampSeconds);
     const bool techniqueConsumed = handleTechniqueMessage(message, sink);
@@ -849,7 +893,7 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
         releaseExistingMusicalNote = activeOutputNotes[static_cast<size_t>(message.getNoteNumber())] >= 0;
     }
     if (techniqueConsumed && ! releaseExistingMusicalNote
-        && !(message.isController() && message.getControllerNumber() == breathController.load()))
+        && !familyBreath.breath)
         return;
 
     if (message.isNoteOn())
@@ -891,9 +935,9 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
             intelligentTechniques.noteEnded();
         if (sink != nullptr) sink->noteOff(outputNote, timestampSeconds);
     }
-    else if (message.isController() && message.getControllerNumber() == breathController.load())
+    else if (familyBreath.breath)
     {
-        const auto rawBreath = static_cast<float>(message.getControllerValue()) / 127.0f;
+        const auto rawBreath = familyBreath.value;
         {
             const juce::SpinLock::ScopedLockType lock(breathEventLock);
             breath.store(rawBreath, std::memory_order_relaxed);
@@ -914,7 +958,7 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
     {
         const juce::SpinLock::ScopedTryLockType lock(detectorLock);
         if (lock.isLocked() && detectingBreath.load(std::memory_order_acquire))
-            controllerDetector.observe(message.getControllerNumber(), message.getControllerValue());
+            controllerDetector.observe(message.getControllerNumber(), message.getControllerValue(), message.getChannel());
     }
 }
 void MidiInputService::tickTechniqueAutomation()

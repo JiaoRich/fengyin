@@ -53,7 +53,7 @@ class PrototypeStructureTests(unittest.TestCase):
     def test_sound_libraries_follow_scanned_plugins(self):
         self.assertIn('id="library-tabs"', HTML)
         self.assertIn("for (const tone of orderedTones)", JS)
-        self.assertIn('std::array<PublishedToneDefinition, 44>', (ROOT / "native" / "Source" / "PublishedToneCatalog.h").read_text(encoding="utf-8"))
+        self.assertIn('std::array<PublishedToneDefinition, 73>', (ROOT / "native" / "Source" / "PublishedToneCatalog.h").read_text(encoding="utf-8"))
         self.assertIn("if(p.studioDraft || !p.published) return", JS)
         self.assertIn("$('#library-tabs').hidden=true", JS)
         self.assertIn("key.startsWith('kong-suona')", JS)
@@ -256,8 +256,8 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertIsNotNone(match)
         version = match.group(1)
         self.assertIn(f'$Version = "{version}"', build_script)
-        self.assertIn(f"风吟 {version}", JS)
-        self.assertIn(f"风吟 {version}", HTML)
+        self.assertIn(f"风吟 DJ 版 {version}", JS)
+        self.assertIn(f"风吟 DJ 版 {version}", HTML)
 
     def test_professional_settings_save_a_separate_named_plan(self):
         for control_id in ("tone-expert", "expert-confirm-dialog", "expert-dialog", "preset-name-dialog",

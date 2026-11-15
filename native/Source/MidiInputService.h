@@ -10,6 +10,7 @@
 
 #include "DeviceProfile.h"
 #include "ControllerDetector.h"
+#include "BreathControllerFamily.h"
 #include "IntelligentTechniqueProcessor.h"
 #include "MidiPerformanceSink.h"
 #include "PitchKey.h"
@@ -125,6 +126,11 @@ private:
     juce::ApplicationProperties properties;
     DeviceProfile activeProfile = DeviceProfileMatcher::match("");
     ControllerDetector controllerDetector;
+    BreathControllerFamily breathFamily;
+    juce::SpinLock breathFamilyLock;
+    bool isBreathFamily(int channel, int cc, double now) noexcept;
+    std::atomic<int> learnedSourceChannel {1};
+    std::atomic<double> learnedSourceAt {0};
     juce::SpinLock detectorLock;
     std::atomic<bool> detectingBreath { false };
     std::atomic<MidiPerformanceSink*> performanceSink { nullptr };

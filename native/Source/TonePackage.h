@@ -50,7 +50,7 @@ struct TonePackage
             return fail("方案包缺少清单或音色数据");
         const auto manifest = juce::JSON::parse(manifestBytes.toString());
         const int packageVersion=static_cast<int>(manifest["version"]);
-        if (manifest["format"].toString() != "fengyin-tone-package" || (packageVersion!=1 && packageVersion!=2)
+        if (manifest["format"].toString() != "fengyin-tone-package" || (packageVersion!=1 && packageVersion!=2 && packageVersion!=3)
             || static_cast<bool>(manifest["pluginBinariesIncluded"])) return fail("方案包版本或格式不支持");
         const auto* files = manifest["files"].getArray();
         if (! files || files->size() != zip.getNumEntries() - 1) return fail("方案包清单不完整");
@@ -78,6 +78,7 @@ struct TonePackage
         const auto presets = SoundPresetStore::fromXml(*xml);
         if (presets.size() != 1 || presets[0].instrumentChineseName.isEmpty()) return fail("音色数据不完整");
         auto preset = presets[0];
+        if((packageVersion==3)!=preset.djSource.enabled) return fail("DJ方案需要风吟DJ版，不能丢弃原始效果链信息");
         if(packageVersion==2 && (preset.pluginBrand!="kong" || !preset.kongTechniques.enabled))
             return fail("新版民乐方案缺少明确的技巧路由");
         if(preset.kongTechniques.enabled && (preset.kongTechniques.vibratoCC!=-1 && preset.kongTechniques.vibratoCC!=1))
@@ -90,6 +91,10 @@ struct TonePackage
             preset.reverbRoomSize, preset.reverbDamping, preset.reverbWidth, preset.outputGain };
         for (const auto value : scalars)
             if (! std::isfinite(value) || std::abs(value) > 100) return fail("方案包包含异常效果参数");
+        if(preset.djSource.enabled && (preset.pluginBrand!="swam" || !std::isfinite(preset.djSource.trackGain)
+            || !std::isfinite(preset.djSource.hardwareGain) || preset.djSource.trackGain<0 || preset.djSource.trackGain>8
+            || preset.djSource.hardwareGain<0 || preset.djSource.hardwareGain>4 || preset.effects.empty()))
+            return fail("DJ原始效果链信息不完整或异常");
         if (preset.outputGain < 0 || preset.outputGain > 2) return fail("方案包输出音量超出支持范围");
         for (const auto& parameter : preset.toneParameters)
             if (! std::isfinite(parameter.value) || parameter.value < 0 || parameter.value > 1)
@@ -167,7 +172,7 @@ struct TonePackage
         auto* root = new juce::DynamicObject();
         juce::var manifest(root);
         root->setProperty("format", "fengyin-tone-package");
-        root->setProperty("version", preset.kongTechniques.enabled ? 2 : 1);
+        root->setProperty("version", preset.djSource.enabled ? 3 : (preset.kongTechniques.enabled ? 2 : 1));
         root->setProperty("instrument", preset.instrumentChineseName);
         root->setProperty("style", preset.name);
         root->setProperty("dependencies", dependencies);

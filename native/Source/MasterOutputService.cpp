@@ -112,6 +112,9 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
     // are deliberately left untouched: this is not a limiter or gain policy.
     const auto invalidInput = removeNonfinite(outputs, channels, samples);
     if (invalidInput) invalidInputSamples.fetch_add(invalidInput, std::memory_order_relaxed);
+    const bool bypass=sourceEffectsBypassed.load(std::memory_order_relaxed);
+    if(bypass!=wasSourceBypassed){resetSignalState();wasSourceBypassed=bypass;}
+    if(!bypass) {
     const auto settings = currentProfileSettings();
     const auto requestedTone = eqTone.load(std::memory_order_relaxed);
     const auto tone = juce::jlimit(-1.0f, 1.0f, requestedTone);
@@ -202,6 +205,8 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
         wetPreDelay.reset();
         wetStateNeedsClear = false;
     }
+
+    } // DJ tones retain their original external chain, without a second tone DSP.
 
     // The visible performance fader owns only the instrument bus. No limiter,
     // fixed makeup gain or master gain is applied to the accompaniment.

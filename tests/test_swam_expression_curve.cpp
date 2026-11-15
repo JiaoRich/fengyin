@@ -174,13 +174,15 @@ int main(int argc, char** argv)
         assert(!fengyin::SwamTechniqueRouting::prepare(state,true,false,false,true,true).changed);
         assert(once==state);
     }
-    // Every shipped SWAM state: only the two explicitly breath-driven
+    // Formal SWAM states retain the existing normalization policy. DJ states use
+    // their separate production-host regression and must never enter this policy.
+    // Only the two explicitly breath-driven
     // Growl presets may share expression.
     // Restoring these two control destinations must leave all other routes,
     // curves, scalar parameters, effects, volume and native portamento intact.
     int audited=0,repaired=0,breathGrowls=0;
     for(const auto& tone:fengyin::publishedToneCatalog) {
-        if(tone.kind!=fengyin::PublishedToneKind::swamPackage)continue;
+        if(tone.kind!=fengyin::PublishedToneKind::swamPackage || tone.id.starts_with("dj-source-"))continue;
         juce::ZipFile zip(root.getChildFile("assets/tone-packages").getChildFile(juce::String(tone.assetName.data())));
         std::unique_ptr<juce::InputStream> input(zip.createStreamForEntry(zip.getIndexOfFileName("tone.xml")));
         assert(input);auto doc=juce::parseXML(input->readEntireStreamAsString());assert(doc);

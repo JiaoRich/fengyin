@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.1.46",
+    [string]$Version = "1.0.0",
     [switch]$SkipInstaller
 )
 
@@ -203,6 +203,7 @@ Copy-Item (Join-Path $ProjectRoot "third_party\ble-midi\LICENSE.txt") (Join-Path
 & (Join-Path $PSScriptRoot "prepare-vbcable.ps1") -Destination (Join-Path $PackageDir "components\VB-CABLE")
 & (Join-Path $PSScriptRoot "prepare-asio4all.ps1") -Destination (Join-Path $PackageDir "components\ASIO4ALL")
 & (Join-Path $PSScriptRoot "prepare-fresh-air.ps1") -Destination (Join-Path $PackageDir "components\Fresh Air")
+& (Join-Path $PSScriptRoot "prepare-fabfilter.ps1") -Destination (Join-Path $PackageDir "components\FabFilter")
 $MagicDestination = Join-Path $PackageDir "components\magic.CURVE"
 Copy-Item -LiteralPath $VlcRoot -Destination (Join-Path $PackageDir "components\VLC") -Recurse -Force
 Invoke-Checked "Final private VLC plugin index" {

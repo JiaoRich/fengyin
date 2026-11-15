@@ -1,0 +1,677 @@
+[
+  {
+    "track": 2,
+    "id": "dj-source-02",
+    "name": "DJ · 高萨",
+    "instrumentKey": "soprano-sax",
+    "asset": "dj-source-02.fytonepack",
+    "sourceStateSHA": "253be1e60cddf8e5abf8558919e4faace954ce091193b6c2c879a447c7361699",
+    "packStateSHA": "253be1e60cddf8e5abf8558919e4faace954ce091193b6c2c879a447c7361699",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 2.15590200445434,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "783cf17ced4686f748f48cc6ea61c404cc5cd526cebbaf687397ce119fa07c3b",
+    "nativeXmlSHA": "0bba5a9e13cc1213a382db7743e48e65004ce16b33e6e2419a9a41c400ad29d0",
+    "attack": []
+  },
+  {
+    "track": 3,
+    "id": "dj-source-03",
+    "name": "DJ · 高萨2",
+    "instrumentKey": "soprano-sax",
+    "asset": "dj-source-03.fytonepack",
+    "sourceStateSHA": "a964d7241961f0a80f217f9a5c570e4805a5e4a8063c65243dc35c3ce6711d42",
+    "packStateSHA": "a964d7241961f0a80f217f9a5c570e4805a5e4a8063c65243dc35c3ce6711d42",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 2.15590200445434,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "009ee0b7c5b7b9a19f8e36bf4ff3e4bb96a6185b017e8b674cb173a16d1010ab",
+    "nativeXmlSHA": "9136ddc4bb9202108ad34ee1ceac5b853112e5e408ea171b863d829cc391cb41",
+    "attack": []
+  },
+  {
+    "track": 4,
+    "id": "dj-source-04",
+    "name": "DJ · 中音萨克斯",
+    "instrumentKey": "alto-sax",
+    "asset": "dj-source-04.fytonepack",
+    "sourceStateSHA": "933e406b2bbc73f478b385cc346cbd4700f0f17204199367805218ffff95db13",
+    "packStateSHA": "933e406b2bbc73f478b385cc346cbd4700f0f17204199367805218ffff95db13",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "8d826fbae22c50ea67568574f8c5b69d1695b6f4ffa01e363bea0dbd17d72cab",
+    "nativeXmlSHA": "d3adc0e8410369a77d2509b0d5663b3495e42d3aceb18904f6071f819afbc582",
+    "attack": []
+  },
+  {
+    "track": 5,
+    "id": "dj-source-05",
+    "name": "DJ · 中音明亮萨克斯",
+    "instrumentKey": "alto-sax",
+    "asset": "dj-source-05.fytonepack",
+    "sourceStateSHA": "7c330776a6bacc6b66f5cda6c43006e1e466ff462882d5f0a3d1d4dbdf6d7f95",
+    "packStateSHA": "7c330776a6bacc6b66f5cda6c43006e1e466ff462882d5f0a3d1d4dbdf6d7f95",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "e0f811a315497b53589a73638954c2867eed756302983a2b3778a51c6a355ee3",
+    "nativeXmlSHA": "815cdffadd104071b281757f9e343b2a4b17f75bf3827e047ca913fc8e22651e",
+    "attack": []
+  },
+  {
+    "track": 6,
+    "id": "dj-source-06",
+    "name": "DJ · 中音温暖萨克斯",
+    "instrumentKey": "alto-sax",
+    "asset": "dj-source-06.fytonepack",
+    "sourceStateSHA": "8caa5fbdf7835c273ec280cdb3ab08d72f6b0649b850f2111388c054064069e0",
+    "packStateSHA": "8caa5fbdf7835c273ec280cdb3ab08d72f6b0649b850f2111388c054064069e0",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "586487d95598a10bbc2d05b7cda7868f037dddaa4892c6626b045d5e6adbd921",
+    "nativeXmlSHA": "17839345d583bbd062ab2311351faf3dc4b29a27fdb8fd1d2d25e245bdb6d81b",
+    "attack": []
+  },
+  {
+    "track": 7,
+    "id": "dj-source-07",
+    "name": "DJ · 中音顺滑萨克斯",
+    "instrumentKey": "alto-sax",
+    "asset": "dj-source-07.fytonepack",
+    "sourceStateSHA": "067b2e4f11afc2b9e9f6dd18979a5f34c0a402f143fc26a259b0cafb6b72f3be",
+    "packStateSHA": "067b2e4f11afc2b9e9f6dd18979a5f34c0a402f143fc26a259b0cafb6b72f3be",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": true,
+    "sha256": "dfcc23e1fcc81b1d42b568f5a85587490cb14ce89b37a15e40a93c424b460c5c",
+    "nativeXmlSHA": "e2245b26ad8bf078a15936c583861c6882856a974d752fd7f4e1ac77557d169a",
+    "attack": []
+  },
+  {
+    "track": 8,
+    "id": "dj-source-08",
+    "name": "DJ · 流行中音萨克斯",
+    "instrumentKey": "alto-sax",
+    "asset": "dj-source-08.fytonepack",
+    "sourceStateSHA": "d4ea346ed1c4379433c8b80b9d709a672625d07f049ef34bf0464b015495a222",
+    "packStateSHA": "d4ea346ed1c4379433c8b80b9d709a672625d07f049ef34bf0464b015495a222",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "9ca6bb4085d12030b89182f68b1ae509e968b151f0702036916f02775b08357d",
+    "nativeXmlSHA": "899d3e820d051e6a3c72b1be4b5e0f658ab7f149e4513368f7af306626f4079b",
+    "attack": []
+  },
+  {
+    "track": 9,
+    "id": "dj-source-09",
+    "name": "DJ · 中音爵士萨克斯",
+    "instrumentKey": "alto-sax",
+    "asset": "dj-source-09.fytonepack",
+    "sourceStateSHA": "99f2a732eb9ac67ab5ebe9810af4d9ac5eefb3c49159bea1cfbd140d78889561",
+    "packStateSHA": "99f2a732eb9ac67ab5ebe9810af4d9ac5eefb3c49159bea1cfbd140d78889561",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "75697dcef9e562a31814c3916882d303a139a606bf5401790dc33877a4b45dcb",
+    "nativeXmlSHA": "16f59e0325587d25e0357281c556c24bcd4d4eb76f04e2f6e57e88a0935f232f",
+    "attack": []
+  },
+  {
+    "track": 10,
+    "id": "dj-source-10",
+    "name": "DJ · 次中音萨克斯",
+    "instrumentKey": "tenor-sax",
+    "asset": "dj-source-10.fytonepack",
+    "sourceStateSHA": "08c1aed4d7a6a58a1fc22cae030ded30845039e19a4bfa60daeaaf403c9803bb",
+    "packStateSHA": "08c1aed4d7a6a58a1fc22cae030ded30845039e19a4bfa60daeaaf403c9803bb",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "646bd07a730292dcbb2936443e19acf41b7773deb36cc3e0f3467dee39396dbf",
+    "nativeXmlSHA": "c9077678e8da3af7453d67da7f8c20aa153a88e9077cd66459a7215124bd5f50",
+    "attack": []
+  },
+  {
+    "track": 11,
+    "id": "dj-source-11",
+    "name": "DJ · 次中音明亮萨克斯",
+    "instrumentKey": "tenor-sax",
+    "asset": "dj-source-11.fytonepack",
+    "sourceStateSHA": "b2047a401ecec6cecfb7222d856a679dcc84e00ed5ae9c4c2afa536bec247f85",
+    "packStateSHA": "b2047a401ecec6cecfb7222d856a679dcc84e00ed5ae9c4c2afa536bec247f85",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "a3e5daf48ed1df7cee66b3d8b97414bf6edee1fbf531b8a4a4418398166c56bc",
+    "nativeXmlSHA": "754514462b9ed33a89bb23191d7af2b14b89ee0eac195d7dd44c98f619168772",
+    "attack": []
+  },
+  {
+    "track": 12,
+    "id": "dj-source-12",
+    "name": "DJ · 次中音温暖萨克斯",
+    "instrumentKey": "tenor-sax",
+    "asset": "dj-source-12.fytonepack",
+    "sourceStateSHA": "33aecd0cac76f07d5aa8f932235d3d1c74eb08dbdd28cb1cfad5459fc9a52482",
+    "packStateSHA": "33aecd0cac76f07d5aa8f932235d3d1c74eb08dbdd28cb1cfad5459fc9a52482",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "e84fbda89a78d5063913c2f14afe5e6feb8b4079b25dec8f8ffd0600d732c4c0",
+    "nativeXmlSHA": "690b3eda49e01f8223ba1775b74fa67302dbfd2e89755e410e3aca9a054e7778",
+    "attack": []
+  },
+  {
+    "track": 13,
+    "id": "dj-source-13",
+    "name": "DJ · 次中音顺滑萨克斯",
+    "instrumentKey": "tenor-sax",
+    "asset": "dj-source-13.fytonepack",
+    "sourceStateSHA": "b321ca281d4a45081168f9d05373008538f11e3d35c53740d32136839d523dab",
+    "packStateSHA": "b321ca281d4a45081168f9d05373008538f11e3d35c53740d32136839d523dab",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "002d8fc995543461b1de1a318e3330660535452c482544fc14688eadb3516035",
+    "nativeXmlSHA": "625c246864ed73e7feca2c7507804f2ff84e8368dc7cb8200950a4bfa8599bec",
+    "attack": []
+  },
+  {
+    "track": 14,
+    "id": "dj-source-14",
+    "name": "DJ · 次中音特定萨克斯",
+    "instrumentKey": "tenor-sax",
+    "asset": "dj-source-14.fytonepack",
+    "sourceStateSHA": "d8e2d6d90c2df96c325ecf55a8d3cd72af04d5977c8f1a5d2af51cd06e89c36c",
+    "packStateSHA": "d8e2d6d90c2df96c325ecf55a8d3cd72af04d5977c8f1a5d2af51cd06e89c36c",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "747b52116092ed4a525ed9b0ae61b77243b11427bd7ae496863426b4bd5b4906",
+    "nativeXmlSHA": "72f94f551deaa90c8380a75073492fd99fe29868122f8fb84c3eb4709d336648",
+    "attack": []
+  },
+  {
+    "track": 15,
+    "id": "dj-source-15",
+    "name": "DJ · 次中音克特兰萨克斯",
+    "instrumentKey": "tenor-sax",
+    "asset": "dj-source-15.fytonepack",
+    "sourceStateSHA": "b4e6ec1298e816cb74aa4b5724088fb241f2c253512f306431eacc6c15e24031",
+    "packStateSHA": "f2943bf6f334d0eb8047079f030d6376f2bdf112d6b0ef224784cb06fb003cf2",
+    "exception": "CC1 vibratoDepth added",
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "e9e4330c782ed973f4537a64ddd1152d4b71eb7e54e41b5d4ece86e8f0904d13",
+    "nativeXmlSHA": "9b8c8d829262e974ef6b866866e8d179207850b73ea86dab3ed795ace82226aa",
+    "attack": []
+  },
+  {
+    "track": 16,
+    "id": "dj-source-16",
+    "name": "DJ · 次中气包音萨克斯",
+    "instrumentKey": "tenor-sax",
+    "asset": "dj-source-16.fytonepack",
+    "sourceStateSHA": "1075f64b67f042b237f4885929db84b3799ae2c850632d7fbcd615ff78964db3",
+    "packStateSHA": "1075f64b67f042b237f4885929db84b3799ae2c850632d7fbcd615ff78964db3",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Fresh Air",
+        "sha256": "7f86a0bd7e3d6c814defbb2d0c0cde651504e4fd2b683c11baada1428db7e17c"
+      },
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "2ba864f4b22291a7e4dff5b9feb6e4e5a602bc10bd1448dcb055c9111bcb3097",
+    "nativeXmlSHA": "8a6946b10930c86f0b9371557b935c014d681a5ec6037a60a4fd00cb59e8c550",
+    "attack": []
+  },
+  {
+    "track": 17,
+    "id": "dj-source-17",
+    "name": "DJ · 次中气包明亮萨克斯",
+    "instrumentKey": "tenor-sax",
+    "asset": "dj-source-17.fytonepack",
+    "sourceStateSHA": "74a4b0127e083df25c3b58aa678c9e5bc63ae87ee0458d21564787d0509c5d43",
+    "packStateSHA": "74a4b0127e083df25c3b58aa678c9e5bc63ae87ee0458d21564787d0509c5d43",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Fresh Air",
+        "sha256": "fccecff0171137d3585df5c8b721ae9ef89aa5b1b965b8bd2744bde9e3b665af"
+      },
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "bf21b48dfc2849ddeac03de316c829349bf611a6c28d0d8f9bb4025edfaedb6a",
+    "nativeXmlSHA": "79a374eb95c62030e4da6e9157f4d827a09f2f1c249bb84452158a4aab398e89",
+    "attack": []
+  },
+  {
+    "track": 18,
+    "id": "dj-source-18",
+    "name": "DJ · 次中气包特定萨克斯",
+    "instrumentKey": "tenor-sax",
+    "asset": "dj-source-18.fytonepack",
+    "sourceStateSHA": "171a8f0370c5b4e3c742cc1e8c21c4d0f18078ced62e87c5e0572bae845357c8",
+    "packStateSHA": "171a8f0370c5b4e3c742cc1e8c21c4d0f18078ced62e87c5e0572bae845357c8",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Fresh Air",
+        "sha256": "11888e493dc8b60d4a0ead5f43d366a945355fb7513bb8ded7858ed5e62dc9df"
+      },
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "ec5d332359f81f759b6a751fb4fcc79b32b204e6c2a64b227f2a884afc94794c",
+    "nativeXmlSHA": "63703bd58d38acebf4fe4990c22e5b342e5377d5de0125b09ea62d6c02a8ce1a",
+    "attack": []
+  },
+  {
+    "track": 19,
+    "id": "dj-source-19",
+    "name": "DJ · 低音萨克斯",
+    "instrumentKey": "baritone-sax",
+    "asset": "dj-source-19.fytonepack",
+    "sourceStateSHA": "2f9ba46aad0e31546ba271501c5e98c94ac1654ccd8490b156032e2ed8dc7609",
+    "packStateSHA": "2f9ba46aad0e31546ba271501c5e98c94ac1654ccd8490b156032e2ed8dc7609",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Fresh Air",
+        "sha256": "2d38ff9bb387e290faa1257d2560feedb78c84ded62e75e819cb939f9a6454b8"
+      },
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "9f5c7829d053c36eecf0e826bf3012e08f2ca37d1c6c668295d8f369600ab262",
+    "nativeXmlSHA": "4fc3158d6d83d113243224b1adc287e619bc8a6c364d816ac2da94221185ba01",
+    "attack": []
+  },
+  {
+    "track": 20,
+    "id": "dj-source-20",
+    "name": "DJ · 低音顺滑萨克斯",
+    "instrumentKey": "baritone-sax",
+    "asset": "dj-source-20.fytonepack",
+    "sourceStateSHA": "0eb5074e010e2a3aa8b54f6204e5e050e7eefdf0c8d3ac19f34bd1476ba268af",
+    "packStateSHA": "0eb5074e010e2a3aa8b54f6204e5e050e7eefdf0c8d3ac19f34bd1476ba268af",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Fresh Air",
+        "sha256": "2d38ff9bb387e290faa1257d2560feedb78c84ded62e75e819cb939f9a6454b8"
+      },
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "d3eaa30b3b86a292e8eae2efa7f6cc67735089b34ea0becb7d834b57da9496d2",
+    "nativeXmlSHA": "ab67019d7b3c7c82d264d51b4fa7ee59a0cfd3ca3f22d035cdcc199ed7613c20",
+    "attack": []
+  },
+  {
+    "track": 21,
+    "id": "dj-source-21",
+    "name": "DJ · 双簧管",
+    "instrumentKey": "oboe",
+    "asset": "dj-source-21.fytonepack",
+    "sourceStateSHA": "bc5a934a64af9451a554d3d04792992d5c070ba960baf0062090bcc63d742eb9",
+    "packStateSHA": "bc5a934a64af9451a554d3d04792992d5c070ba960baf0062090bcc63d742eb9",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "efc16381a815ac61dcc25eb9936110d2b9d73592f0e813752ee5d9c14a42d126",
+    "nativeXmlSHA": "f8dba6c063fa82ae79153487d83ac83b7f0232c560c5ae2424e094a66aba835a",
+    "attack": []
+  },
+  {
+    "track": 22,
+    "id": "dj-source-22",
+    "name": "DJ · 单簧管",
+    "instrumentKey": "clarinet",
+    "asset": "dj-source-22.fytonepack",
+    "sourceStateSHA": "1fbd8971768df7ebac0334bdf7879097d12310d986bb8bb14eef8a786f297b6c",
+    "packStateSHA": "1fbd8971768df7ebac0334bdf7879097d12310d986bb8bb14eef8a786f297b6c",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "7ec0c26c184c616d274da1ac0f9d964463dd45e06124e00bb8511e786b27d622",
+    "nativeXmlSHA": "008571df315757c6f87d375627cea58631b5a7352548676ab73f8122ad336935",
+    "attack": []
+  },
+  {
+    "track": 23,
+    "id": "dj-source-23",
+    "name": "DJ · 长笛",
+    "instrumentKey": "flute",
+    "asset": "dj-source-23.fytonepack",
+    "sourceStateSHA": "fd665cd0d239e582b64dca222fc003a5e8c9ffedd871a70b4a1e4925bf67dbc6",
+    "packStateSHA": "fd665cd0d239e582b64dca222fc003a5e8c9ffedd871a70b4a1e4925bf67dbc6",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "d7f7cc454f5c1299776dea64fb332cce6e88ab2c7523fee46df47896d8ff59cf",
+    "nativeXmlSHA": "6eb5100662aa84c1166745a78a002071b1b03e48c99819048dffe654e4a3e615",
+    "attack": []
+  },
+  {
+    "track": 24,
+    "id": "dj-source-24",
+    "name": "DJ · 小号1",
+    "instrumentKey": "trumpet",
+    "asset": "dj-source-24.fytonepack",
+    "sourceStateSHA": "5d0363ecbc7206efd364862c3375e8c4c6834b6a2aa1dec29556c3b658cd21f5",
+    "packStateSHA": "5d0363ecbc7206efd364862c3375e8c4c6834b6a2aa1dec29556c3b658cd21f5",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "180357347c90bf547984c21d2285a284d44badff65891e7345930a982adbd4cb",
+    "nativeXmlSHA": "141e730bd2635d1f66c5379c8e7b129fcf7a4954793d796d9dae670643c79902",
+    "attack": [
+      {
+        "id": "attackControl",
+        "value": "2.0"
+      }
+    ]
+  },
+  {
+    "track": 26,
+    "id": "dj-source-26",
+    "name": "DJ · 小提琴",
+    "instrumentKey": "violin",
+    "asset": "dj-source-26.fytonepack",
+    "sourceStateSHA": "8df9e65c78c8f6d4c3fa022ee8170dcf9cfa32df5a5a235e90ced4c451947b97",
+    "packStateSHA": "8df9e65c78c8f6d4c3fa022ee8170dcf9cfa32df5a5a235e90ced4c451947b97",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "28f53a647006eb51643698ba975f47926696391cd7221c3b96bb8d0e54c88d1a",
+    "nativeXmlSHA": "5389cbdd5749cb28a832b31c8bd8c890f75236a311e917923dc7469d5e3a32a4",
+    "attack": []
+  },
+  {
+    "track": 27,
+    "id": "dj-source-27",
+    "name": "DJ · 小提琴环绕",
+    "instrumentKey": "violin",
+    "asset": "dj-source-27.fytonepack",
+    "sourceStateSHA": "f4733990cc4a83de18a97051bb865b73ed77481da29f9f07d9e5497eb4e75250",
+    "packStateSHA": "f4733990cc4a83de18a97051bb865b73ed77481da29f9f07d9e5497eb4e75250",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "0da0cb1b79b0ee9181b92bd2d4b4a4244374ad8dd927596d10f00d212a0b4b48",
+    "nativeXmlSHA": "484b8a466a3ffdb084edb8dc3a96b50697676a4dc6b951c5f09b4c8ea82db80a",
+    "attack": []
+  },
+  {
+    "track": 28,
+    "id": "dj-source-28",
+    "name": "DJ · 大提琴",
+    "instrumentKey": "cello",
+    "asset": "dj-source-28.fytonepack",
+    "sourceStateSHA": "e2365258616440a06856bc6818132357c39e2f6bee55c3655e4505770fae5303",
+    "packStateSHA": "e2365258616440a06856bc6818132357c39e2f6bee55c3655e4505770fae5303",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "a13227288e730d29b83fd0b3a9c1a945be05def057fb33fc3d52ecdec41ced31",
+    "nativeXmlSHA": "96f65d28b07b0bc87b2b233801f558e2e70e5870191edb213b366d83b0da2c0f",
+    "attack": []
+  },
+  {
+    "track": 33,
+    "id": "dj-source-33",
+    "name": "DJ · 箫1",
+    "instrumentKey": "alto-flute",
+    "asset": "dj-source-33.fytonepack",
+    "sourceStateSHA": "9af866eed90bf33f520b69f913a099b092327afe92bc113739b7c13aa121a9a0",
+    "packStateSHA": "9af866eed90bf33f520b69f913a099b092327afe92bc113739b7c13aa121a9a0",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Fresh Air",
+        "sha256": "ba77843d69d3cc3bf0b057449e84b8693a806da230d1a75a9bfca3c74cdbfb58"
+      },
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "e44a1a8a790a43d0697faebe2bda518cc5f6e54c196848381ea66d426cd90bff",
+    "nativeXmlSHA": "6cb4c3e8c07168ce89bf3ffe10ca0b087e40795069b5c851098d32e8296d4d6b",
+    "attack": []
+  },
+  {
+    "track": 34,
+    "id": "dj-source-34",
+    "name": "DJ · 箫2",
+    "instrumentKey": "bass-flute",
+    "asset": "dj-source-34.fytonepack",
+    "sourceStateSHA": "35a114f84946ca5c437016a4b4957e2ac5163acf632235fc6a69cc3bd70c0e38",
+    "packStateSHA": "35a114f84946ca5c437016a4b4957e2ac5163acf632235fc6a69cc3bd70c0e38",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Fresh Air",
+        "sha256": "3f1f5d24337bcb06ef68cb3c3a9fc20ba5e7ded880a39281949606824138d0f7"
+      },
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.65265226072288,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "7821fd5b99d14cb429ecd159446ce44aafd74d131f2f3d81e9bdbd23fd48539b",
+    "nativeXmlSHA": "42e5753044ff7fc33275028f412e4112bdfe3c230eeffb73d23422399b159aa8",
+    "attack": []
+  },
+  {
+    "track": 35,
+    "id": "dj-source-35",
+    "name": "DJ · 马头琴",
+    "instrumentKey": "cello",
+    "asset": "dj-source-35.fytonepack",
+    "sourceStateSHA": "d5065adcd9901b4f9a24cd4dbaffb5420e72d2465a90d28d572611b0168de23f",
+    "packStateSHA": "d5065adcd9901b4f9a24cd4dbaffb5420e72d2465a90d28d572611b0168de23f",
+    "exception": null,
+    "effects": [
+      {
+        "name": "Fresh Air",
+        "sha256": "773e0df2503a12cf6d2f5f105aaa8904e133c6d6931e6bc0e99d15d1c2349219"
+      },
+      {
+        "name": "Pro-R 2",
+        "sha256": "a6254880be2b442f4836777c664e7dd34b8872f9ad62ad486326d07a0bd91c37"
+      }
+    ],
+    "trackGain": 1.0,
+    "hardwareGain": 1.52555847394115,
+    "directMaster": false,
+    "sha256": "272c8fcf064127e787a33a07885e843842a5adb5ee64108e0bfc49e986eafc8b",
+    "nativeXmlSHA": "f837634be876e863fd644eed4dabe08af35095b73f320651ec6bc2500e05e479",
+    "attack": []
+  }
+]

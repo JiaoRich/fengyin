@@ -225,6 +225,7 @@ private:
     juce::MemoryBlock editingReturnContainerProjectState;
     fengyin::KongTechniqueProfile editingReturnKongTechniques;
     bool editingReturnSwamBreathGrowl = false;
+    fengyin::DjSourceProfile editingReturnDjSource;
     fengyin::ToneStyleSettings editingReturnToneSettings;
     juce::String currentToneStyleId { "natural" };
     juce::String currentPluginBrand { "swam" };

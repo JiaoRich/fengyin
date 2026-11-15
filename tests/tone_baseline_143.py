@@ -14,6 +14,11 @@ TONE_PATH = Path('assets/tone-packages')
 
 def previous_bytes(relative_path):
     path = Path(relative_path)
+    if path.as_posix() in ("native/Source/MasterOutputService.cpp","native/Source/MasterOutputService.h"):
+        return (ROOT/("tests/fixtures/master-output-before-dj"+path.suffix)).read_bytes()
+    special=ROOT/('tests/fixtures/'+path.stem+'-before-dj'+path.suffix)
+    if path.as_posix() in ('native/Source/TonePackage.h','native/Source/SoundPresetStore.cpp') and special.exists():
+        return special.read_bytes()
     with ZipFile(FIXTURE) as archive:
         try:
             return archive.read(path.as_posix())

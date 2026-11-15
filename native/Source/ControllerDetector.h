@@ -15,14 +15,21 @@ public:
         maximum.fill(0);
         changes.fill(0);
         last.fill(-1);
+        pairEvidence.fill(0); previousController = -1; previousChannel = -1;
     }
 
     ControllerDetector() { reset(); }
 
-    void observe(int controller, int value) noexcept
+    void observe(int controller, int value, int channel = 1) noexcept
     {
         if (controller < 0 || controller > 127)
             return;
+        if (previousChannel == channel && controller >= 32 && controller < 64
+            && previousController == controller - 32)
+            pairEvidence[static_cast<std::size_t>(controller - 32)] = std::min(4, pairEvidence[static_cast<std::size_t>(controller - 32)] + 1);
+        if (previousChannel == channel && controller < 32 && previousController == controller + 32)
+            pairEvidence[static_cast<std::size_t>(controller)] = std::min(4, pairEvidence[static_cast<std::size_t>(controller)] + 1);
+        previousController = controller; previousChannel = channel;
         value = std::clamp(value, 0, 127);
         const auto index = static_cast<std::size_t>(controller);
         minimum[index] = std::min(minimum[index], value);
@@ -38,12 +45,13 @@ public:
         int bestScore = 0;
         for (int controller = 0; controller < 128; ++controller)
         {
-            if (controller == 64 || changes[static_cast<std::size_t>(controller)] < 4)
+            if ((controller >= 32 && controller < 64 && pairEvidence[static_cast<std::size_t>(controller-32)] >= 3)
+                || controller == 64 || changes[static_cast<std::size_t>(controller)] < 4)
                 continue;
             const auto range = maximum[static_cast<std::size_t>(controller)]
                              - minimum[static_cast<std::size_t>(controller)];
             const auto score = range * 8 + std::min(changes[static_cast<std::size_t>(controller)], 127);
-            if (range >= 12 && score > bestScore)
+            if ((range >= 12 || (controller < 32 && pairEvidence[static_cast<std::size_t>(controller)] >= 3 && range >= 1)) && score > bestScore)
             {
                 bestScore = score;
                 best = controller;
@@ -53,6 +61,8 @@ public:
     }
 
 private:
+    std::array<int, 32> pairEvidence {};
+    int previousController = -1, previousChannel = -1;
     std::array<int, 128> minimum {};
     std::array<int, 128> maximum {};
     std::array<int, 128> changes {};

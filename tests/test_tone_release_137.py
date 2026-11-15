@@ -18,10 +18,10 @@ class ToneRelease137(unittest.TestCase):
         self.assertEqual(len({r['name'] for r in rows}), 44)
         source = (ROOT/'native/Source/PublishedToneCatalog.h').read_text(encoding='utf-8')
         actual = re.findall(r'\{ "([^"]+)",\s*"([^"]+)",\s*"([^"]+)",\s*"[^"]+",\s*PublishedToneKind::\w+,\s*"([^"]+)"', source)
-        self.assertEqual(actual, [(r['id'], r['name'], r['instrumentKey'], r['asset']) for r in rows])
+        self.assertEqual([r for r in actual if not r[0].startswith('dj-source-')], [(r['id'], r['name'], r['instrumentKey'], r['asset']) for r in rows])
         cmake = (ROOT/'CMakeLists.txt').read_text(encoding='utf-8')
         embedded = re.findall(r'assets/tone-packages/([^\s]+\.fytonepack)',cmake)
-        self.assertEqual(set(embedded), {r['asset'] for r in rows})
+        self.assertEqual({p for p in embedded if not p.startswith('dj-source-')}, {r['asset'] for r in rows})
         for row in rows:
             with self.subTest(tone=row['name']):
                 raw=(ROOT/'assets/tone-packages'/row['asset']).read_bytes()

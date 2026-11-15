@@ -15,7 +15,7 @@
 class FengYinApplication final : public juce::JUCEApplication
 {
 public:
-    const juce::String getApplicationName() override { return juce::String::fromUTF8("风吟"); }
+    const juce::String getApplicationName() override { return juce::String::fromUTF8("风吟 DJ 版"); }
     const juce::String getApplicationVersion() override { return JUCE_APPLICATION_VERSION_STRING; }
     bool moreThanOneInstanceAllowed() override
     {
@@ -43,7 +43,7 @@ public:
             scanWorker = std::make_unique<PluginScanWorker>(arguments[1].unquoted(), juce::File(arguments[2].unquoted()));
             return;
         }
-        logger.reset(juce::FileLogger::createDefaultAppLogger("FengYin", "plugin-host.log",
+        logger.reset(juce::FileLogger::createDefaultAppLogger("FengYinDJ", "plugin-host.log",
             "FengYin " + getApplicationVersion() + " started"));
         juce::Logger::setCurrentLogger(logger.get());
         juce::Logger::writeToLog("BUILD revision=" FENGYIN_BUILD_REVISION " onset=2 ordered-midi=1");

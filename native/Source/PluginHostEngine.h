@@ -19,6 +19,7 @@
 #include "RecordingService.h"
 #include "AccompanimentAudioService.h"
 #include "MasterOutputService.h"
+#include "DjSourceRouting.h"
 #include "RealtimeMidiQueue.h"
 #include "OrderedMidiQueue.h"
 #include "MidiOnsetTrace.h"
@@ -35,6 +36,7 @@ namespace fengyin
 {
 class RecordingAudioProcessorPlayer final : public juce::AudioProcessorPlayer
 {
+    friend struct DjHostTestAccess;
     friend struct PluginHostEngineTestAccess;
 public:
     // Preparing/releasing a third-party processor may take hundreds of ms.
@@ -46,6 +48,7 @@ public:
     void setAccompanimentService(AccompanimentAudioService* service) noexcept { accompaniment = service; }
     void setMasterOutputService(MasterOutputService* service) noexcept { masterOutput = service; }
     bool enqueueMidi(const juce::MidiMessage& message, double timestampSeconds) noexcept;
+    bool enqueueControllerPair(int route,int value,double timestampSeconds) noexcept;
     void beginOnsetTrace() noexcept { onsetTrace.begin(); }
     void flushOnsetTrace() { onsetTrace.flush("audio-collector"); }
     void requestPerformanceReset() noexcept { resetRequested.store(true, std::memory_order_release); }
@@ -80,6 +83,7 @@ private:
 
 class PluginHostEngine final : public MidiPerformanceSink
 {
+    friend struct DjHostTestAccess;
     friend struct PluginHostEngineTestAccess;
 public:
     using LoadCallback = std::function<void(bool success, const juce::String& message)>;
@@ -87,6 +91,9 @@ public:
     PluginHostEngine();
     ~PluginHostEngine() override;
 
+    bool configureDjSource(const DjSourceProfile& profile);
+    DjSourceProfile getDjSource() const { return djSource; }
+    bool usesDjSource() const noexcept { return djSourceActive.load(); }
     void attachTo(juce::AudioDeviceManager& deviceManager);
     void detach();
     [[nodiscard]] bool hasIndependentTechniqueRoute(PerformanceTechnique technique) const noexcept
@@ -101,6 +108,11 @@ public:
             return technique==PerformanceTechnique::flutter && kongDualSlot.active();
         }
         const int route=nativeTechniqueRoutes[index].load();
+        if(usesDjSource()) {
+            if(route==0 || DjMidiRoute::overlaps(route,djBreathRoute.load()))return false;
+            for(size_t i=0;i<nativeTechniqueRoutes.size();++i)if(i!=index&&DjMidiRoute::overlaps(nativeTechniqueRoutes[i].load(),route))return false;
+            return true;
+        }
         if(route==0 || route==((swamExpressionChannel.load()<<8)|(swamExpressionController.load()+1)))return false;
         for(size_t i=0;i<nativeTechniqueRoutes.size();++i)
             if(i!=index && nativeTechniqueRoutes[i].load()==route)return false;
@@ -258,6 +270,11 @@ private:
     std::vector<float> instrumentModelValues;
     std::atomic<bool> kongExpressionMode { false };
     std::atomic<bool> swamBreathGrowl { false };
+    DjSourceProfile djSource;
+    std::atomic<bool> djSourceActive{false};
+    std::atomic<int> djBreathRoute{0};
+    juce::AudioProcessorGraph::Node::Ptr djTrackNode, djBusNode, djOutputNode;
+    bool sendDjController(int route,float value,double timestamp) noexcept;
     std::atomic<int> swamExpressionController { 11 };
     std::atomic<int> swamExpressionChannel { 1 };
     std::array<std::atomic<int>, static_cast<size_t>(PerformanceTechnique::count)> nativeTechniqueRoutes {};

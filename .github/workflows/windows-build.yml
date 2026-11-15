@@ -598,6 +598,17 @@ jobs:
           path: vc-runtime-test/
           if-no-files-found: warn
 
+      - name: Verify official FabFilter install and repeat skip
+        shell: powershell
+        run: ./scripts/test-fabfilter-install.ps1
+
+      - name: Preserve FabFilter verification evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: DJ-FabFilter-install-evidence
+          path: fabfilter-install-test/*.json
+
       - name: 验证 Fresh Air 全新安装
         shell: powershell
         run: ./scripts/test-fresh-air-install.ps1
@@ -673,7 +684,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v5
         with:
-          name: 风吟-Windows-x64-安装包
+          name: 风吟DJ版-Windows-x64-安装包
           path: dist/installer/*.exe
           if-no-files-found: error
           retention-days: 14

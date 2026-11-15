@@ -181,7 +181,7 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
     def test_release_tone_catalog_is_explicit_and_all_embedded_assets_exist(self):
         catalog = self.read("native/Source/PublishedToneCatalog.h")
         expected_names = ['肯萨', '原声高萨', '明亮高萨', '爵士中萨', '深情中萨', '流行中萨', '浪漫中萨', '嘶吼中萨', '气声中萨', '醇厚次中萨', '温暖次中萨', '气包音次中萨', '浪漫次中萨', '嘶吼次中萨', '小号1', '小号2', '高音小号', '中音长号', '低音长号', '长笛', '短笛', '单簧管1', '单簧管2', '双簧管1', '双簧管2', '小提琴1', '小提琴2', '大提琴', '二胡1', '二胡2', '京胡', '葫芦丝-直音', '葫芦丝-颤音', '曲笛1', '曲笛2*', '梆笛*', '南箫', '洞箫', '埙', '唢呐1', '唢呐2*', '柳琴', '三弦', '琵琶']
-        self.assertIn("std::array<PublishedToneDefinition, 44>", catalog)
+        self.assertIn("std::array<PublishedToneDefinition, 73>", catalog)
         for name in expected_names:
             self.assertEqual(catalog.count(f'"{name}"'), 1, name)
         self.assertNotIn("扫描本机", catalog)

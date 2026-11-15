@@ -138,7 +138,7 @@ struct BluetoothMidiService::Impl : juce::Thread
     {
         juce::PropertiesFile::Options options;
         options.applicationName="FengYinBluetoothMidi"; options.filenameSuffix=".settings";
-        options.folderName="FengYin"; options.osxLibrarySubFolder="Application Support";
+        options.folderName="FengYinDJ"; options.osxLibrarySubFolder="Application Support";
         if(persistSettings) settings.setStorageParameters(options);
         juce::var savedHistory;
         if(auto* file=settings.getUserSettings()) savedHistory=juce::JSON::parse(file->getValue("history"));

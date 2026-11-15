@@ -10,7 +10,7 @@ namespace fengyin
 {
 struct RealtimeMidiEvent
 {
-    std::array<std::uint8_t, 3> bytes {};
+    std::array<std::uint8_t, 6> bytes {};
     std::uint8_t size = 0;
     double timestampSeconds = 0.0;
 };

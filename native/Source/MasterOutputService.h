@@ -32,6 +32,8 @@ class MasterOutputService
 public:
     static constexpr int spectrumBands = 54;
 
+    void setSourceEffectsBypassed(bool value) noexcept { sourceEffectsBypassed.store(value); }
+    bool getSourceEffectsBypassed() const noexcept { return sourceEffectsBypassed.load(); }
     void setGain(float value) noexcept { gain.store(juce::jlimit(0.0f, 1.5f, value)); }
     void setEqTone(float value) noexcept { eqTone.store(juce::jlimit(-1.0f, 1.0f, value)); }
     void setWarmth(float value) noexcept { warmth.store(juce::jlimit(0.0f, 1.0f, value)); }
@@ -60,6 +62,8 @@ public:
     bool getSpectrum(std::array<float, spectrumBands>& result);
 
 private:
+    std::atomic<bool> sourceEffectsBypassed{false};
+    bool wasSourceBypassed=false; // Audio-thread owned.
     std::atomic<float> instrumentPeak { 0.0f };
     struct ProfileSettings
     {

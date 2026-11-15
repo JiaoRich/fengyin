@@ -1,0 +1,119 @@
+#pragma once
+
+#include <juce_dsp/juce_dsp.h>
+#include <array>
+#include <atomic>
+#include "AirProcessor.h"
+#include "WetPreDelay.h"
+
+namespace fengyin
+{
+enum class InstrumentMixProfile { generic = 0, saxophone, brass, woodwind, strings };
+
+struct ToneStyleSettings
+{
+    float tone = 0.0f;
+    float warmth = 0.2f;
+    float reverbMix = 0.2f;
+    float compressionThreshold = 0.58f;
+    float compressionRatio = 1.7f;
+    float saturation = 0.04f;
+    float harshControl = 0.10f;
+    float reverbRoomSize = 0.42f;
+    float reverbDamping = 0.54f;
+    float reverbWidth = 0.88f;
+    float outputGain = 1.0f;
+    float bass = 0.0f; // independent low-shelf gain, -1..1 = -12..+12 dB
+    float air = 0.0f; // 0..1; appended to preserve existing preset initialisers
+};
+
+class MasterOutputService
+{
+public:
+    static constexpr int spectrumBands = 54;
+
+    void setGain(float value) noexcept { gain.store(juce::jlimit(0.0f, 1.5f, value)); }
+    void setEqTone(float value) noexcept { eqTone.store(juce::jlimit(-1.0f, 1.0f, value)); }
+    void setWarmth(float value) noexcept { warmth.store(juce::jlimit(0.0f, 1.0f, value)); }
+    void setReverbMix(float value) noexcept { reverbMix.store(juce::jlimit(0.0f, 0.6f, value)); }
+    void setReverbPreDelay(float ms) noexcept { reverbPreDelayMs.store(std::isfinite(ms)?juce::jlimit(0.0f,80.0f,ms):0.0f); }
+    void setInstrumentProfile(InstrumentMixProfile value) noexcept { instrumentProfile.store(static_cast<int>(value)); }
+    void setToneStyle(const ToneStyleSettings& settings) noexcept;
+
+    [[nodiscard]] float getGain() const noexcept { return gain.load(); }
+    [[nodiscard]] float getEqTone() const noexcept { return eqTone.load(); }
+    [[nodiscard]] float getReverbMix() const noexcept { return reverbMix.load(); }
+    [[nodiscard]] float getWarmth() const noexcept { return warmth.load(); }
+    [[nodiscard]] ToneStyleSettings getToneStyle() const noexcept;
+    [[nodiscard]] float getLeftPeak() const noexcept { return leftPeak.load(); }
+    [[nodiscard]] float getInstrumentPeak() const noexcept { return instrumentPeak.load(std::memory_order_relaxed); }
+    [[nodiscard]] float getRightPeak() const noexcept { return rightPeak.load(); }
+    [[nodiscard]] uint64_t getOverloadSamples() const noexcept { return overloadSamples.load(); }
+    [[nodiscard]] uint64_t getInvalidInputSamples() const noexcept { return invalidInputSamples.load(std::memory_order_relaxed); }
+    [[nodiscard]] uint64_t getInvalidOutputSamples() const noexcept { return invalidOutputSamples.load(std::memory_order_relaxed); }
+    [[nodiscard]] uint64_t getSignalRecoveries() const noexcept { return signalRecoveries.load(std::memory_order_relaxed); }
+
+    void setSampleRate(double value) noexcept;
+    void processInstrument(float* const* outputs, int channels, int samples) noexcept;
+    void processMaster(float* const* outputs, int channels, int samples) noexcept;
+    void process(float* const* outputs, int channels, int samples) noexcept { processMaster(outputs, channels, samples); }
+    bool getSpectrum(std::array<float, spectrumBands>& result);
+
+private:
+    std::atomic<float> instrumentPeak { 0.0f };
+    struct ProfileSettings
+    {
+        float toneBias = 0.0f;
+        float compressionThreshold = 0.58f;
+        float compressionRatio = 1.7f;
+        float reverbRoomSize = 0.42f;
+        float reverbDamping = 0.54f;
+        float reverbScale = 1.0f;
+    };
+
+    [[nodiscard]] ProfileSettings currentProfileSettings() const noexcept;
+    void updateInstrumentReverb(float mix, const ProfileSettings& settings) noexcept;
+    void updateSpectrumAndPeaks(float* const* outputs, int channels, int samples) noexcept;
+    void resetSignalState() noexcept;
+    static uint64_t removeNonfinite(float* const* outputs, int channels, int samples) noexcept;
+    bool signalStateIsFinite() const noexcept;
+
+    static constexpr std::size_t fifoSize = 8192;
+    static constexpr int fftOrder = 11;
+    static constexpr int fftSize = 1 << fftOrder;
+    std::array<float, fifoSize> fifo {};
+    std::atomic<std::size_t> writeIndex { 0 }, readIndex { 0 };
+    std::atomic<float> gain { 0.8f }, leftPeak { 0.0f }, rightPeak { 0.0f };
+    std::atomic<float> eqTone { 0.0f }, reverbMix { 0.0f };
+    std::atomic<float> warmth { 0.2f }, styleCompressionThreshold { 0.58f }, styleCompressionRatio { 1.7f };
+    std::atomic<float> styleSaturation { 0.04f }, styleHarshControl { 0.10f };
+    std::atomic<float> styleRoomSize { 0.42f }, styleDamping { 0.54f }, styleWidth { 0.88f };
+    std::atomic<float> styleOutputGain { 1.0f };
+    std::atomic<float> bassTone { 0.0f };
+    std::atomic<float> airAmount { 0.0f };
+    AirProcessor airProcessor;
+    std::atomic<uint64_t> overloadSamples { 0 };
+    std::atomic<uint64_t> invalidInputSamples { 0 }, invalidOutputSamples { 0 }, signalRecoveries { 0 };
+    float smoothedBassGain = 1.0f;
+    float smoothedOutputGain = 1.0f;
+    std::array<float, 2> bassLowPass {};
+    std::atomic<int> instrumentProfile { static_cast<int>(InstrumentMixProfile::generic) };
+    std::atomic<double> sampleRate { 48000.0 };
+
+    juce::Reverb instrumentReverb;
+    WetPreDelay wetPreDelay;
+    std::atomic<float> reverbPreDelayMs {40.0f};
+    std::array<std::array<float,512>,2> wetScratch {};
+    std::atomic<bool> reverbParametersDirty { true };
+    float lastInstrumentReverbMix = -1.0f;
+    bool wetStateNeedsClear = false; // Audio-thread owned; prepare runs with audio stopped.
+    int lastInstrumentProfile = -1;
+    float instrumentEnvelope = 0.0f;
+    float compressorGain = 1.0f;
+    std::array<float, 2> toneLowPass {};
+
+    juce::dsp::FFT fft { fftOrder };
+    juce::dsp::WindowingFunction<float> window { fftSize, juce::dsp::WindowingFunction<float>::hann };
+    std::array<float, fftSize * 2> fftData {};
+};
+}

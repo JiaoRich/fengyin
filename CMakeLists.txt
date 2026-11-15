@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.46 LANGUAGES C CXX)
+project(FengYin VERSION 1.0.0 LANGUAGES C CXX)
 option(FENGYIN_ARCHIVED_VIDEO_RECORDING "Build archived video-recording diagnostics, never for release" OFF)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
@@ -29,7 +29,7 @@ FetchContent_MakeAvailable(JUCE)
 juce_add_gui_app(FengYin
     PRODUCT_NAME "FengYin"
     COMPANY_NAME "FengYin"
-    BUNDLE_ID "cn.fengyin.windstation"
+    BUNDLE_ID "cn.fengyin.windstation.dj"
     ICON_BIG "${CMAKE_SOURCE_DIR}/assets/fengyin-app-icon.png"
     NEEDS_WEBVIEW2 TRUE
 )
@@ -52,6 +52,35 @@ juce_add_binary_data(FengYinWebAssets SOURCES
     prototype/styles.css
     prototype/app.js
     assets/fengyin-app-icon.png
+    assets/tone-packages/dj-source-02.fytonepack
+    assets/tone-packages/dj-source-03.fytonepack
+    assets/tone-packages/dj-source-04.fytonepack
+    assets/tone-packages/dj-source-05.fytonepack
+    assets/tone-packages/dj-source-06.fytonepack
+    assets/tone-packages/dj-source-07.fytonepack
+    assets/tone-packages/dj-source-08.fytonepack
+    assets/tone-packages/dj-source-09.fytonepack
+    assets/tone-packages/dj-source-10.fytonepack
+    assets/tone-packages/dj-source-11.fytonepack
+    assets/tone-packages/dj-source-12.fytonepack
+    assets/tone-packages/dj-source-13.fytonepack
+    assets/tone-packages/dj-source-14.fytonepack
+    assets/tone-packages/dj-source-15.fytonepack
+    assets/tone-packages/dj-source-16.fytonepack
+    assets/tone-packages/dj-source-17.fytonepack
+    assets/tone-packages/dj-source-18.fytonepack
+    assets/tone-packages/dj-source-19.fytonepack
+    assets/tone-packages/dj-source-20.fytonepack
+    assets/tone-packages/dj-source-21.fytonepack
+    assets/tone-packages/dj-source-22.fytonepack
+    assets/tone-packages/dj-source-23.fytonepack
+    assets/tone-packages/dj-source-24.fytonepack
+    assets/tone-packages/dj-source-26.fytonepack
+    assets/tone-packages/dj-source-27.fytonepack
+    assets/tone-packages/dj-source-28.fytonepack
+    assets/tone-packages/dj-source-33.fytonepack
+    assets/tone-packages/dj-source-34.fytonepack
+    assets/tone-packages/dj-source-35.fytonepack
     assets/tone-packages/soprano-kenny.fytonepack
     assets/tone-packages/soprano-pop.fytonepack
     assets/tone-packages/alto-jazz.fytonepack
@@ -491,6 +520,15 @@ if(BUILD_TESTING)
         juce::juce_recommended_warning_flags
     )
     add_test(NAME sound_preset_roundtrip COMMAND FengYinPresetTests)
+    if(WIN32)
+        add_executable(FengYinDjEffectTests tests/test_dj_effect_runtime.cpp native/Source/SoundPresetStore.cpp)
+        target_include_directories(FengYinDjEffectTests PRIVATE native/Source)
+        target_compile_definitions(FengYinDjEffectTests PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_PLUGINHOST_VST3=1)
+        target_link_libraries(FengYinDjEffectTests PRIVATE juce::juce_audio_processors juce::juce_cryptography juce::juce_recommended_config_flags)
+        target_compile_options(FengYinDjEffectTests PRIVATE /UNDEBUG)
+        add_test(NAME dj_actual_effect_state_audio COMMAND FengYinDjEffectTests)
+        set_tests_properties(dj_actual_effect_state_audio PROPERTIES TIMEOUT 120)
+    endif()
     add_executable(FengYinStudioTests tests/test_tone_studio.cpp native/Source/SoundPresetStore.cpp)
     target_include_directories(FengYinStudioTests PRIVATE native/Source)
     target_compile_definitions(FengYinStudioTests PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 FENGYIN_TRACE_AUDIO_LOCKS=1 FENGYIN_RETAIN_AUDIO_SETUP=1)
@@ -576,6 +614,22 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME bluetooth_midi_lifecycle COMMAND FengYinBluetoothMidiTests)
     set_tests_properties(bluetooth_midi_lifecycle PROPERTIES TIMEOUT 20)
+    add_executable(FengYinDjHostTests tests/test_dj_host.cpp
+        native/Source/PluginHostEngine.cpp native/Source/SwamExpressionCurve.cpp
+        native/Source/RecordingService.cpp native/Source/AccompanimentAudioService.cpp
+        native/Source/MasterOutputService.cpp native/Source/SoundPresetStore.cpp)
+    target_include_directories(FengYinDjHostTests PRIVATE native/Source)
+    target_compile_definitions(FengYinDjHostTests PRIVATE JUCE_PLUGINHOST_VST3=1 JUCE_MODAL_LOOPS_PERMITTED=1 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+    target_link_libraries(FengYinDjHostTests PRIVATE juce::juce_audio_utils juce::juce_dsp juce::juce_cryptography juce::juce_recommended_config_flags)
+    if(MSVC)
+        target_compile_options(FengYinDjHostTests PRIVATE /UNDEBUG)
+        target_link_libraries(FengYinDjHostTests PRIVATE shell32)
+    else()
+        target_compile_options(FengYinDjHostTests PRIVATE -UNDEBUG)
+    endif()
+    add_test(NAME dj_production_host_state_routes COMMAND FengYinDjHostTests)
+    set_tests_properties(dj_production_host_state_routes PROPERTIES TIMEOUT 90)
+
     add_executable(FengYinMidiOnsetTests tests/test_midi_onset.cpp native/Source/MidiInputService.cpp)
     target_include_directories(FengYinMidiOnsetTests PRIVATE native/Source)
     target_link_libraries(FengYinMidiOnsetTests PRIVATE juce::juce_audio_devices juce::juce_data_structures juce::juce_recommended_config_flags)

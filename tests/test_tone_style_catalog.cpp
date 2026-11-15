@@ -99,8 +99,12 @@ int main()
         std::cout<<"DSP first RMS="<<first<<" second RMS="<<second<<" ratio="<<ratio<<"\n";
         assert(std::isfinite(ratio) && ratio>.8 && ratio<1.25);
     }
-    static_assert(fengyin::publishedToneCatalog.size() == 44);
-    constexpr auto& catalog = fengyin::publishedToneCatalog;
+    static_assert(fengyin::publishedToneCatalog.size() == 73);
+    constexpr auto catalog = [] {
+        std::array<fengyin::PublishedToneDefinition,44> original{};size_t index=0;
+        for(const auto& row:fengyin::publishedToneCatalog)if(!row.id.starts_with("dj-source-"))original[index++]=row;
+        return original;
+    }();
     static_assert(catalog[0].id == "kontakt-kensa");
     static_assert(catalog[6].name == "浪漫中萨" && catalog[7].name == "嘶吼中萨" && catalog[8].name == "气声中萨");
     static_assert(catalog[12].name == "浪漫次中萨" && catalog[13].name == "嘶吼次中萨");

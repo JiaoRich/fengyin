@@ -1,4 +1,5 @@
 #include "TonePackage.h"
+#include "DjSourceRouting.h"
 #include "PublishedToneCatalog.h"
 #include "KongProjectFile.h"
 #include "SerialEffectRouting.h"
@@ -45,6 +46,37 @@ private:
 
 int main()
 {
+    juce::ScopedJuceInitialiser_GUI init;
+    // Coarse/fine overlaps are semantic conflicts, even if only the fine CC matches.
+    {
+        auto route=[](int ch,int cc,int type){juce::XmlElement e("MIDIRemappingEntry");
+            e.setAttribute("enabled",true);e.setAttribute("messageType",type);e.setAttribute("channel",ch);
+            e.setAttribute("msb",cc);e.setAttribute("lsb",cc+32);return fengyin::DjMidiRoute::encode(e);};
+        const int paired=route(1,2,2);assert(paired);
+        assert(fengyin::DjMidiRoute::overlaps(paired,route(1,2,1)));
+        assert(fengyin::DjMidiRoute::overlaps(paired,route(1,34,1)));
+        assert(!fengyin::DjMidiRoute::overlaps(paired,route(2,2,2)));
+        assert(!fengyin::DjMidiRoute::overlaps(paired,route(1,1,1)));
+    }
+    // The production DJ graph must preserve post-fader sends and the one
+    // parallel direct path, including when a tuner bypasses the bus effect.
+    for(bool direct:{false,true})for(bool bypass:{false,true}) {
+        juce::AudioProcessorGraph graph;graph.setPlayConfigDetails(0,2,48000,128);
+        auto source=graph.addNode(std::make_unique<TestEffect>(0,.2f));
+        auto pre=graph.addNode(std::make_unique<TestEffect>(2,.1f));
+        auto track=graph.addNode(std::make_unique<fengyin::DjFixedGainProcessor>(1.7f));
+        auto reverb=graph.addNode(std::make_unique<TestEffect>(.5f,.03f));reverb->setBypassed(bypass);
+        auto bus=graph.addNode(std::make_unique<fengyin::DjFixedGainProcessor>(1));
+        auto hardware=graph.addNode(std::make_unique<fengyin::DjFixedGainProcessor>(1.5f));
+        auto output=graph.addNode(std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(
+            juce::AudioProcessorGraph::AudioGraphIOProcessor::audioOutputNode));
+        assert(fengyin::connectDjSourceGraph(graph,source,{pre},track,reverb,bus,hardware,output,direct));
+        graph.prepareToPlay(48000,128);juce::MidiBuffer midi;juce::AudioBuffer<float> audio(2,128);
+        const float dry=(.2f*2+.1f)*1.7f;
+        const float expected=((bypass?dry:dry*.5f+.03f)+(direct?dry:0))*1.5f;
+        for(int i=0;i<5;++i){audio.clear();graph.processBlock(audio,midi);}
+        for(int c=0;c<2;++c)for(int i=0;i<128;++i)assert(std::abs(audio.getSample(c,i)-expected)<1e-6f);
+    }
     {
         TestEffect fake(1,0);
         fake.addParameter(new juce::AudioParameterFloat("unused","#000",0.f,1.f,0.f));
@@ -106,7 +138,6 @@ int main()
     assert(!fengyin::toneValueNeedsWrite(.5f, .5f));
     assert(fengyin::toneValueNeedsWrite(.5f, .6f));
     assert(!fengyin::toneValueNeedsWrite(.5f, 2.0f));
-    juce::ScopedJuceInitialiser_GUI init;
     // Current two-slot migrations preserve the original full CH1 and rack;
     // the new secondary slot keeps the same library/mix with its saved technique.
     const auto repository = juce::File(juce::String::fromUTF8(__FILE__)).getParentDirectory().getParentDirectory();
@@ -325,7 +356,7 @@ int main()
     const auto bundled=juce::File(juce::String::fromUTF8(__FILE__)).getParentDirectory().getParentDirectory().getChildFile("assets/tone-packages");
     const auto files=bundled.findChildFiles(juce::File::findFiles,false,"*.fytonepack");
     // 44 published packages plus seven retained historical package fixtures.
-    assert(files.size()==51);
+    assert(files.size()==80);
     const auto gainAudit=juce::JSON::parse(bundled.getChildFile("kong-headroom-134-audit.json"));
     assert(gainAudit["targets"].isArray() && gainAudit["targets"].size()==13);
     int routedFolkPackages=0, breathGrowlPackages=0, freshAirPackages=0;
@@ -345,7 +376,7 @@ int main()
                         description && description->getStringAttribute("name") == "Fresh Air")
                     {
                         ++freshAirPackages;
-                        assert(tone.id == "tenor-air-pocket");
+                        assert(tone.id == "tenor-air-pocket" || tone.id.starts_with("dj-source-"));
                     }
         // Every package must preserve all tuning fields and full state on export/import.
         {
@@ -378,6 +409,6 @@ int main()
         }
     }
     assert(routedFolkPackages==13);
-    assert(breathGrowlPackages==2 && freshAirPackages==1);
+    assert(breathGrowlPackages==2 && freshAirPackages==9);
     assert(directory.deleteRecursively());
 }

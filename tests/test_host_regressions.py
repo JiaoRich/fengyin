@@ -116,7 +116,7 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("sink->resetPerformance()", MIDI)
         note_block = MIDI.split("if (message.isNoteOn())", 1)[1].split("else if (message.isNoteOff())", 1)[0]
         self.assertLess(note_block.index("sink->breathChanged(BreathSensitivity::apply(currentBreath"), note_block.index("sink->noteOn"))
-        self.assertIn("const auto rawBreath = static_cast<float>(message.getControllerValue()) / 127.0f", MIDI)
+        self.assertIn("const auto rawBreath = familyBreath.value", MIDI)
         self.assertNotIn("processMidiValue", MIDI)
         self.assertNotIn("0.28f + currentBreath * 0.52f", MIDI)
         self.assertIn('updateBreathDrivenTechniques(rawBreath, sink', MIDI)

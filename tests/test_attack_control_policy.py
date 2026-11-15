@@ -18,7 +18,12 @@ class AttackControlPolicyTests(unittest.TestCase):
                 controls = [p for p in ET.fromstring(xml).iter('TONE_PARAMETER')
                             if p.get('id', '').endswith(':attackcontrol')]
                 preset=ET.fromstring(xml).find('PRESET')
-                if preset.get('pluginBrand')=='swam':
+                if preset.get('djSourceChain')=='1':
+                    # Source fidelity takes precedence for the DJ copies; exact native
+                    # Attack values + all native state hashes checked in test_dj_release.
+                    self.assertEqual(controls, [])
+                    self.assertTrue(preset.findtext('INSTRUMENT_STATE'))
+                elif preset.get('pluginBrand')=='swam':
                     self.assertEqual(len(controls), 1)
                     # Verified Windows enums differ between saxophones and strings.
                     expected=0.666666686534882 if preset.get('instrumentKey') in ('violin','cello') else 1.0

@@ -5,7 +5,7 @@ namespace fengyin
 SoundPresetStore::SoundPresetStore(juce::File storageDirectory)
 {
     directory = storageDirectory == juce::File()
-        ? juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("FengYin")
+        ? juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("FengYinDJ")
         : std::move(storageDirectory);
 }
 
@@ -111,6 +111,12 @@ std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<Soun
         child->setAttribute("pluginProgramName", preset.pluginProgramName);
         child->setAttribute("containerInstrument", preset.containerInstrument);
         child->setAttribute("containerAdapter", preset.containerAdapter);
+        if(preset.djSource.enabled) {
+            child->setAttribute("djSourceChain",true);
+            child->setAttribute("djTrackGain",double(preset.djSource.trackGain));
+            child->setAttribute("djHardwareGain",double(preset.djSource.hardwareGain));
+            child->setAttribute("djDirectMaster",preset.djSource.directToMaster);
+        }
         if (preset.swamBreathGrowl) child->setAttribute("swamBreathGrowl", true);
         child->setAttribute("kongTechniqueProfile",preset.kongTechniques.enabled);
         child->setAttribute("kongVibratoCC",preset.kongTechniques.vibratoCC);
@@ -180,6 +186,10 @@ juce::Array<SoundPreset> SoundPresetStore::fromXml(const juce::XmlElement& root)
         preset.containerInstrument = child->getBoolAttribute("containerInstrument", false);
         preset.containerAdapter = child->getStringAttribute("containerAdapter");
         preset.swamBreathGrowl = preset.pluginBrand == "swam" && child->getBoolAttribute("swamBreathGrowl");
+        preset.djSource.enabled=child->getBoolAttribute("djSourceChain",false);
+        preset.djSource.trackGain=float(child->getDoubleAttribute("djTrackGain",1));
+        preset.djSource.hardwareGain=float(child->getDoubleAttribute("djHardwareGain",1));
+        preset.djSource.directToMaster=child->getBoolAttribute("djDirectMaster",false);
         preset.kongTechniques.enabled=child->getBoolAttribute("kongTechniqueProfile",false);
         preset.kongTechniques.vibratoCC=child->getIntAttribute("kongVibratoCC",-1);
         preset.kongTechniques.otherChannel=child->getIntAttribute("kongOtherChannel",0);

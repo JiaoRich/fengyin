@@ -21,6 +21,12 @@ public:
     bool push(const std::uint8_t* bytes, int size, double time) noexcept
     {
         if (!bytes || size <= 0 || size > 3) return false;
+        return pushEvent(bytes,size,time);
+    }
+    bool pushPair(const std::uint8_t* bytes, double time) noexcept { return bytes && pushEvent(bytes,6,time); }
+private:
+    bool pushEvent(const std::uint8_t* bytes,int size,double time) noexcept
+    {
         auto position = write.load(std::memory_order_relaxed);
         Slot* slot;
         for (;;)
@@ -45,6 +51,7 @@ public:
         slot->sequence.store(position + 1, std::memory_order_release);
         return true;
     }
+public:
     bool pop(RealtimeMidiEvent& event) noexcept
     {
         auto& slot = slots[read % capacity];
