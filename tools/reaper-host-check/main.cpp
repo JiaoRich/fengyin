@@ -1,6 +1,9 @@
 // Standalone diagnostic, not the released application. No audio device is opened.
 // Original MIDI is pre-mapped offline. This tests the production host's state
 // restore + graph, NOT MainComponent's adaptation or device MIDI receive path.
+#ifndef NOMINMAX
+ #define NOMINMAX
+#endif
 #include "PluginHostEngine.h"
 #include "SwamStateCompatibility.h"
 #include <thread>
