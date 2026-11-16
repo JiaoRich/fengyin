@@ -3,20 +3,22 @@ $ErrorActionPreference = 'Stop'
 # Never install/update a developer's or customer's runtime from this test helper.
 if ($env:GITHUB_ACTIONS -ne 'true') { throw 'This helper is restricted to the disposable GitHub runner.' }
 $cache = Join-Path (Split-Path -Parent $PSScriptRoot) 'third_party\ci-webview\WebView2RuntimeInstallerX64.exe'
-$expectedSha = '0625fb5c1e75be58a164e14f95aa58a3e5badb859b3d17c952385f3e4a9ff3e8'
+# Audited official Microsoft object, 2026-11-16. Do not use the mutable latest link.
+$expectedSha = 'd3cbe8fedb104282d745fff106993efead51ae94f5595a4e75804446a974f9c3'
+$installerUrl = 'https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/52cfd0a8-f256-48d4-9b18-467f2b3cda78/MicrosoftEdgeWebView2RuntimeInstallerX64.exe'
 try {
     if (-not $Installer) {
         $Installer = $cache
         if (-not (Test-Path -LiteralPath $Installer)) {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent $cache) | Out-Null
-            Invoke-WebRequest -UseBasicParsing -TimeoutSec 300 -Uri 'https://go.microsoft.com/fwlink/?linkid=2124701' -OutFile $Installer
+            Invoke-WebRequest -UseBasicParsing -TimeoutSec 300 -Uri $installerUrl -OutFile $Installer
         }
     }
     if (-not (Test-Path -LiteralPath $Installer) -or (Get-Item -LiteralPath $Installer).Length -lt 100MB) { throw 'Incomplete WebView2 offline installer' }
     $signature = Get-AuthenticodeSignature -FilePath $Installer
     if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') { throw 'WebView2 Microsoft signature check failed' }
     $installerSha = (Get-FileHash -LiteralPath $Installer -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($installerSha -ne $expectedSha) { throw 'WebView2 155.0.4283.62 installer SHA mismatch; re-audit the upstream update, never silently mix runtime versions.' }
+    if ($installerSha -ne $expectedSha) { throw 'Pinned WebView2 installer SHA mismatch; re-audit the upstream package, never silently mix runtime versions.' }
     if ($Installer -ne $cache) {
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $cache) | Out-Null
         Copy-Item -LiteralPath $Installer -Destination $cache -Force

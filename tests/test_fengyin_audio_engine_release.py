@@ -159,7 +159,7 @@ class FengYinAudioEngineReleaseTests(unittest.TestCase):
         release = self.read("scripts/check-release.ps1")
         installer = self.read("installer/FengYin.iss")
         expected_name = "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
-        self.assertIn("linkid=2124701", build)
+        self.assertIn("https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/52cfd0a8-f256-48d4-9b18-467f2b3cda78/" + expected_name, build)
         self.assertIn(expected_name, build)
         self.assertIn(expected_name, release)
         self.assertIn(expected_name, installer)

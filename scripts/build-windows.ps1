@@ -52,7 +52,7 @@ for ($attempt = 1; $attempt -le 4; $attempt++) {
             Copy-Item -LiteralPath $CachedCiWebView -Destination $PreparedWebView -Force
         } else {
             Invoke-WebRequest -UseBasicParsing -TimeoutSec 300 `
-                -Uri "https://go.microsoft.com/fwlink/?linkid=2124701" -OutFile $PreparedWebView
+                -Uri "https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/52cfd0a8-f256-48d4-9b18-467f2b3cda78/MicrosoftEdgeWebView2RuntimeInstallerX64.exe" -OutFile $PreparedWebView
         }
         if ((Get-Item $PreparedWebView).Length -lt 100MB) {
             throw "WebView2 下载不完整，实际字节数：$((Get-Item $PreparedWebView).Length)"

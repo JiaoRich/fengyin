@@ -305,7 +305,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: third_party/ci-webview/WebView2RuntimeInstallerX64.exe
-          key: win2022-webview155-0625fb5c1e75be58
+          key: win2022-webview-d3cbe8fedb104282
       - name: Prepare real VLC and WebView2 diagnostic
         shell: powershell
         run: |
@@ -582,7 +582,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: third_party/ci-webview/WebView2RuntimeInstallerX64.exe
-          key: win2022-webview155-0625fb5c1e75be58
+          key: win2022-webview-d3cbe8fedb104282
 
       - name: 验证官方VC++运行组件及安装决策
         shell: powershell
