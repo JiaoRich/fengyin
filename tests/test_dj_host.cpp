@@ -160,7 +160,20 @@ int main(int argc,char** argv){
     {juce::PluginDescription a,b;a.name=b.name="Pro-R 2";a.manufacturerName=b.manufacturerName="FabFilter";
      a.version="2.06";b.version="2.00";assert(!fengyin::djEffectVersionCompatible(a,b));
      b.version="2.06";assert(fengyin::djEffectVersionCompatible(a,b));b.version="2.07";assert(fengyin::djEffectVersionCompatible(a,b));
-     a.version="2.00";b.version="2.06";assert(fengyin::djEffectVersionCompatible(a,b));}
+     a.version="2.00";b.version="2.06";assert(fengyin::djEffectVersionCompatible(a,b));
+     for(const auto* required:{"2.06","2.0.6","2.0.6.0"}){
+         a.version=required;
+         for(const auto* installed:{"2.06","2.0.6","2.0.6.0","2.0.6.25","2.07","2.0.7.0","2.10","2.1.0.0"}){
+             b.version=installed;assert(fengyin::djEffectVersionCompatible(a,b));
+         }
+         for(const auto* installed:{"2.00","2.0.0.0","2.05","2.0.5.25","1.0.6.0","3.0.0.0","2.0.6-beta","2..6.0",""}){
+             b.version=installed;assert(!fengyin::djEffectVersionCompatible(a,b));
+         }
+     }
+     a.version="2.00";b.version="2.0.6.25";assert(fengyin::djEffectVersionCompatible(a,b));
+     a.version="2.0.6.25";b.version="2.0.6.0";assert(!fengyin::djEffectVersionCompatible(a,b));
+     a.manufacturerName=b.manufacturerName="Other";a.version="2.06";b.version="2.0.6.0";
+     assert(!fengyin::djEffectVersionCompatible(a,b));b.version=a.version;assert(fengyin::djEffectVersionCompatible(a,b));}
     testPerformanceResetDelivery();
     const auto root=juce::File(juce::String::fromUTF8(__FILE__)).getParentDirectory().getParentDirectory();
     int count=0;

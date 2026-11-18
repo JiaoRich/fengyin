@@ -17,7 +17,7 @@
     "trackGain": 2.15590200445434,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "a607660b31e34ba01c6648a6815eae0e478ebd426e1c8fadbec0aa782e5bae76",
+    "sha256": "2f78dcb6e7506030ffdbf5ca8e42157c834f19bc1b964c7cc6a11e8d50105403",
     "nativeXmlSHA": "0bba5a9e13cc1213a382db7743e48e65004ce16b33e6e2419a9a41c400ad29d0",
     "attack": []
   },
@@ -39,7 +39,7 @@
     "trackGain": 2.15590200445434,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "eee515f686aa510379029fa2ad4f3093f73d642e67660e790f5b69f5d78665df",
+    "sha256": "9ce5df27084f93387bcd1d745ab477cf68e6466254d4a9796797c62e9762e8cd",
     "nativeXmlSHA": "9136ddc4bb9202108ad34ee1ceac5b853112e5e408ea171b863d829cc391cb41",
     "attack": []
   },
@@ -61,7 +61,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "ff43ad503d4bf59d0a3c00f9999e278d4729944cbd6a90f33a14b54f8f8ec728",
+    "sha256": "a747c581943fee45e47aadc54e0fa2d16c0d7400d749d76678058b76bba786c9",
     "nativeXmlSHA": "d3adc0e8410369a77d2509b0d5663b3495e42d3aceb18904f6071f819afbc582",
     "attack": []
   },
@@ -83,7 +83,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "7933964faea18b66000dbaee0355afab54fa71075d229eadf8df2fc1d6950400",
+    "sha256": "1ec18e6126a8f4e22640db337a1292a5a2880d00f716bf3a94f0d0145fe7e7bd",
     "nativeXmlSHA": "815cdffadd104071b281757f9e343b2a4b17f75bf3827e047ca913fc8e22651e",
     "attack": []
   },
@@ -105,7 +105,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "4aaac9af556fb95d978fc6422c070319124f9711bdbc4398d5abd3b9b129fd81",
+    "sha256": "63b3fcd469c7fe432693a34e0f4196e3fc16897f992caa205e6cf2533361bc32",
     "nativeXmlSHA": "17839345d583bbd062ab2311351faf3dc4b29a27fdb8fd1d2d25e245bdb6d81b",
     "attack": []
   },
@@ -127,7 +127,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": true,
-    "sha256": "c7a21bacd8b3df55176a373e0ec3d067489985c29ea9389bef9aa091ca27dd09",
+    "sha256": "b724720e3debc28b53e812d4497b9ca4926d757ce16b31c1dae234bcc53b6b72",
     "nativeXmlSHA": "e2245b26ad8bf078a15936c583861c6882856a974d752fd7f4e1ac77557d169a",
     "attack": []
   },
@@ -149,7 +149,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "6966c80f830ba118f57c52dbe110fe13fe559deb2ddaa2ecf80f4e0566951046",
+    "sha256": "9bed7e0f2b777d0d52a5d1084615028574bf5a98b24d45d913bb3e7d66883c22",
     "nativeXmlSHA": "899d3e820d051e6a3c72b1be4b5e0f658ab7f149e4513368f7af306626f4079b",
     "attack": []
   },
@@ -171,7 +171,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "11273ae563e1715c6ccddbf4b72b9c4473dc9a122be96537c9fee49bb55f1cad",
+    "sha256": "12fcb913c95915c908137ba746b351b5f89af0492594aed41ed0e8c88d0cdaea",
     "nativeXmlSHA": "16f59e0325587d25e0357281c556c24bcd4d4eb76f04e2f6e57e88a0935f232f",
     "attack": []
   },
@@ -193,7 +193,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "8705aed05d78c7a7edf031b36dc75e7a16cb0ad725ff8c5a0aeb0ebf3e4d122d",
+    "sha256": "be5613fe37e40f038ae1e8e32a28dae51c56acd30aa79bbc35a1e8b757066149",
     "nativeXmlSHA": "c9077678e8da3af7453d67da7f8c20aa153a88e9077cd66459a7215124bd5f50",
     "attack": []
   },
@@ -215,7 +215,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "d06fa027e64d6fca8ce41c0d4378d19da5e452862d74e3d1f20f7dfc91c11486",
+    "sha256": "4c817fb6503cdfb59a664afa5878adf45f0207c917039acffa97bb581e2be0ef",
     "nativeXmlSHA": "754514462b9ed33a89bb23191d7af2b14b89ee0eac195d7dd44c98f619168772",
     "attack": []
   },
@@ -237,7 +237,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "51d5eee753033f7223fabf8f687c5f2ac0af42dff97c247b2b0ed1bb9475453f",
+    "sha256": "f4a2610c010b1b302bcbd5f1bbada3432b63549991d0cbd72ca28959c30432f6",
     "nativeXmlSHA": "690b3eda49e01f8223ba1775b74fa67302dbfd2e89755e410e3aca9a054e7778",
     "attack": []
   },
@@ -259,7 +259,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "7c9a5b7cdba88e3c16a2130573dcb40150cefa5833514b211a3470b5b1cf176b",
+    "sha256": "40dfbd61214d30e2f1576b32aa07891d2849781aaf286971bdabeb8fb0c657ee",
     "nativeXmlSHA": "625c246864ed73e7feca2c7507804f2ff84e8368dc7cb8200950a4bfa8599bec",
     "attack": []
   },
@@ -281,7 +281,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "f4a23f571893d583026446298b82589066c68defd14cfa011cbd658ef9ce6246",
+    "sha256": "be0e8b9f50bedd6f23dd2a701506a5cb72b7ed45016f5e274d85534dfa9004df",
     "nativeXmlSHA": "72f94f551deaa90c8380a75073492fd99fe29868122f8fb84c3eb4709d336648",
     "attack": []
   },
@@ -303,7 +303,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "263f2559342da97ea3cbb1525924888f278b4251946291c83561383178d43446",
+    "sha256": "11ee4fc089446049af61383421853930ef015cfeafb33502326a9916d1af3e84",
     "nativeXmlSHA": "9b8c8d829262e974ef6b866866e8d179207850b73ea86dab3ed795ace82226aa",
     "attack": []
   },
@@ -329,7 +329,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "cd5e5a2b7ab5cc0adf2b09328449ac519a915838479fcb63003ec9cb38ddfaa1",
+    "sha256": "836c3a697aed006b159c6934d0443d11a1a2b61fad40f4d5318a873b41919283",
     "nativeXmlSHA": "8a6946b10930c86f0b9371557b935c014d681a5ec6037a60a4fd00cb59e8c550",
     "attack": []
   },
@@ -355,7 +355,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "36c91323e014d1c8b28c62f56d098edf90d16460251d5f750ae492701732b27c",
+    "sha256": "75f024834ee7b63d4d71a5bc673321b9b608e2f3569b6751e64ffc8a384a565f",
     "nativeXmlSHA": "79a374eb95c62030e4da6e9157f4d827a09f2f1c249bb84452158a4aab398e89",
     "attack": []
   },
@@ -381,7 +381,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "d9435c443fec21c42c0ae226ec9bc2fcc7e003c105659b65af35da9face6b202",
+    "sha256": "0252847fafffae2aa96e5c4307cd9b20f2dbaed6a3d56f1737e3960f3c3f35e4",
     "nativeXmlSHA": "63703bd58d38acebf4fe4990c22e5b342e5377d5de0125b09ea62d6c02a8ce1a",
     "attack": []
   },
@@ -407,7 +407,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "9f14c98ca8ec1e548b52414fd6e189cb65f4e8be1e662cadddebc280d68352b3",
+    "sha256": "f2791f374440ed848c684b94bd78c440e1be957cf2219cca3bd4ffd8faac39d1",
     "nativeXmlSHA": "4fc3158d6d83d113243224b1adc287e619bc8a6c364d816ac2da94221185ba01",
     "attack": []
   },
@@ -433,7 +433,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "f2244de2536cfc01e96e05ee4290ee974090a5ac2bf91fecf56a2b6ed7893efa",
+    "sha256": "2e33d67b1ffd16617d243ad6fa1d5b0582ddc181fa29317921a1e99e25c355be",
     "nativeXmlSHA": "ab67019d7b3c7c82d264d51b4fa7ee59a0cfd3ca3f22d035cdcc199ed7613c20",
     "attack": []
   },
@@ -455,7 +455,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "827d23610de81facf78798bbf3833be3656deca8858737d20456bb40e16dc038",
+    "sha256": "20dd45407422a11772489e1e58950724d4b1790a8765e99650eb81b8e295f71a",
     "nativeXmlSHA": "f8dba6c063fa82ae79153487d83ac83b7f0232c560c5ae2424e094a66aba835a",
     "attack": []
   },
@@ -477,7 +477,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "7c9207ddb2b3dc327013837feed046d41412d10a77f795e5d7ce5d3088988ff7",
+    "sha256": "9e2bf69b32175f95fa48b87509f8bf41f38715f6e75b9bb3f097983f8c8ea830",
     "nativeXmlSHA": "008571df315757c6f87d375627cea58631b5a7352548676ab73f8122ad336935",
     "attack": []
   },
@@ -499,7 +499,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "85edabc4da4ccf1f77822db2628bc93e5f1b168c016d8eb486a64eaff0246f54",
+    "sha256": "e1c0f5d5a8bc4ccb23d790520c4ccc972997776ddef5d4a8df7b463e0181133b",
     "nativeXmlSHA": "6eb5100662aa84c1166745a78a002071b1b03e48c99819048dffe654e4a3e615",
     "attack": []
   },
@@ -521,7 +521,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "92848c406f99c8426f0d7a54bfbda0caae4bdc9a5c981b3864acebadfe7312b1",
+    "sha256": "aeefd18a8350c3f5d26b27959348a16c277d470339ad0606384c1ae2d7f9b868",
     "nativeXmlSHA": "141e730bd2635d1f66c5379c8e7b129fcf7a4954793d796d9dae670643c79902",
     "attack": [
       {
@@ -548,7 +548,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "a47a14252639039e3df3fdd2ee38e13596dbea9b9fc9bc96d1f284823e6503fa",
+    "sha256": "f4189bd8c283ac0c8f757d284d2ff160d9de9e8c2394c8ca37b20e9cd4df7842",
     "nativeXmlSHA": "5389cbdd5749cb28a832b31c8bd8c890f75236a311e917923dc7469d5e3a32a4",
     "attack": []
   },
@@ -570,7 +570,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "a1ce7b7016e8f9ae5dc0ca1d5221e68c2a9e5adcead6259190e04f911e587d7c",
+    "sha256": "3ab3925e5249f1d454767f80a70a206a426677e3350fb6bacc755c55aba35f11",
     "nativeXmlSHA": "484b8a466a3ffdb084edb8dc3a96b50697676a4dc6b951c5f09b4c8ea82db80a",
     "attack": []
   },
@@ -592,7 +592,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "b54076e5aee9f79c553def0fd24de79a62a3a12a01b5af5cdc0435a1922b338d",
+    "sha256": "d9e853b5fe29b6fce0d98e3a4503cbe290ecbd55759801f9a4b018432284cb14",
     "nativeXmlSHA": "96f65d28b07b0bc87b2b233801f558e2e70e5870191edb213b366d83b0da2c0f",
     "attack": []
   },
@@ -618,7 +618,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "6aaaa786d6a6bf0e48f252b58324ac9f91e31a23cb5e7861937cc505224b22e0",
+    "sha256": "eb1565666064264c1a1e5f8745d8c87e39da9cda397d08af29112676966f9caf",
     "nativeXmlSHA": "6cb4c3e8c07168ce89bf3ffe10ca0b087e40795069b5c851098d32e8296d4d6b",
     "attack": []
   },
@@ -644,7 +644,7 @@
     "trackGain": 1.65265226072288,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "c2f34d7b270b9929841bf66b35bce33ad82175ec8b7ef2fd12df59668bd7d549",
+    "sha256": "dc9d911895fae604c2650e1c878434cbcd3fd6c5abf589b6726d6fa658b6c73e",
     "nativeXmlSHA": "42e5753044ff7fc33275028f412e4112bdfe3c230eeffb73d23422399b159aa8",
     "attack": []
   },
@@ -670,7 +670,7 @@
     "trackGain": 1.0,
     "hardwareGain": 1.52555847394115,
     "directMaster": false,
-    "sha256": "dfa656a59c22494f6b2706d86d4431dd566aba913c9568620e720e2504b97747",
+    "sha256": "a76c7f6fea588a1005e4b3708478652cc601327c3e5653eb21e2dda15b26d0d5",
     "nativeXmlSHA": "f837634be876e863fd644eed4dabe08af35095b73f320651ec6bc2500e05e479",
     "attack": []
   }

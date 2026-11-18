@@ -3,17 +3,38 @@
 #include "SwamStateCompatibility.h"
 #include "SerialEffectRouting.h"
 #include "DjSourceProfile.h"
+#include <array>
+#include <optional>
 namespace fengyin
 {
+inline std::optional<std::array<int,4>> proR2Version(const juce::String& text)
+{
+    const auto parts=juce::StringArray::fromTokens(text,".","");
+    if(parts.size()<2 || parts.size()>4)return {};
+    std::array<int,4> result{};
+    for(int i=0;i<parts.size();++i){
+        if(parts[i].isEmpty() || parts[i].length()>5 || !parts[i].containsOnly("0123456789"))return {};
+        result[static_cast<size_t>(i)]=parts[i].getIntValue();
+    }
+    if(result[0]!=2)return {};
+    // Legacy FabFilter display versions 2.00 / 2.06 correspond to the
+    // VST3's numeric 2.0.0.x / 2.0.6.x, not minor versions 0 / 6.
+    if(parts.size()==2 && parts[1].length()==2){
+        result[1]=parts[1].substring(0,1).getIntValue();
+        result[2]=parts[1].substring(1,2).getIntValue();
+    }
+    return result;
+}
 // Permit forward Pro-R 2 minor-version restores, never send a newer state
 // to an older installed plugin. Exact tested package/runtime version is 2.06.
 inline bool djEffectVersionCompatible(const juce::PluginDescription& required,const juce::PluginDescription& candidate)
 {
-    return required.version==candidate.version
-        || (required.manufacturerName=="FabFilter" && candidate.manufacturerName=="FabFilter"
-            && required.name=="Pro-R 2" && candidate.name==required.name
-            && required.version.getIntValue()==2 && candidate.version.getIntValue()==2
-            && candidate.version.compareNatural(required.version)>=0);
+    if(required.manufacturerName=="FabFilter" && candidate.manufacturerName=="FabFilter"
+        && required.name=="Pro-R 2" && candidate.name==required.name){
+        const auto source=proR2Version(required.version),installed=proR2Version(candidate.version);
+        return source && installed && *installed>=*source;
+    }
+    return required.version==candidate.version;
 }
 struct DjMidiRoute
 {

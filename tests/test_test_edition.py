@@ -19,6 +19,8 @@ class TestEdition(unittest.TestCase):
     self.assertEqual(p.get('name'),row['name'] if row['id'].startswith('dj-source-') else row['previousName'])
     last=p.findall('SERIAL_EFFECT')[-1];self.assertEqual(last.get('bypassed'),'0')
     self.assertEqual(E.fromstring(last.findtext('DESCRIPTION')).get('name'),'Pro-R 2')
+    self.assertEqual(E.fromstring(last.findtext('DESCRIPTION')).get('version'),'2.0.6.0')
+    self.assertEqual(m['dependencies'][-1]['version'],'2.0.6.0')
     p.remove(last);p.attrib.pop('performanceReverb');p.set('reverbMix',row['previousReverbMix']);p.set('name',row['previousName'])
     self.assertEqual(sha(E.tostring(p)),row['protectedContentSHA'])
  def test_names_voice_and_identity(self):

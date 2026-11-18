@@ -1,6 +1,7 @@
 #include "TonePackage.h"
 #include "PerformanceReverb.h"
 #include "PublishedToneCatalog.h"
+#include "DjSourceRouting.h"
 #include <cassert>
 #include <cmath>
 #include <iostream>
@@ -62,6 +63,11 @@ void testPerformanceReverbPlugin(const juce::String& path,const juce::String& ou
     for(const auto& tone:fengyin::publishedToneCatalog) {
         auto preset=fengyin::TonePackage::read(root.getChildFile("assets/tone-packages/"+juce::String(tone.assetName.data())),error);
         assert(preset && preset->performanceReverb && std::abs(preset->reverbMix-.2f)<.0001f);
+        juce::PluginDescription required;
+        const auto effectXml=juce::parseXML(preset->effects.back().descriptionXml);
+        assert(effectXml && required.loadFromXml(*effectXml));
+        std::cout<<tone.id.data()<<" Pro-R2 required="<<required.version<<" scanned="<<description.version<<std::endl;
+        assert(required.uniqueId==description.uniqueId && fengyin::djEffectVersionCompatible(required,description));
         const auto& bytes=preset->effects.back().state;p->setStateInformation(bytes.getData(),int(bytes.getSize()));
         flush();assert(std::abs(mix->getValue()-.2f)<.0001f);maxLatency=std::max(maxLatency,p->getLatencySamples());++count;
     }

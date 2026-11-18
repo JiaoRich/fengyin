@@ -23,6 +23,7 @@ int main() {
             juce::OwnedArray<juce::PluginDescription> types;scanner.findAllTypesForFile(types,file);
             for(auto* candidate:types)if(candidate->uniqueId==description.uniqueId
                 &&candidate->manufacturerName==description.manufacturerName) {
+                std::cout<<description.name<<" required="<<description.version<<" scanned="<<candidate->version<<std::endl;
                 assert(fengyin::djEffectVersionCompatible(description,*candidate));
                 assert(candidate->deprecatedUid==description.deprecatedUid);
                 description=*candidate;found=true;break;
