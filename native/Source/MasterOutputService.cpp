@@ -107,6 +107,12 @@ void MasterOutputService::updateInstrumentReverb(float mix, const ProfileSetting
 
 void MasterOutputService::processInstrument(float* const* outputs, int channels, int samples) noexcept
 {
+    processInstrumentEffects(outputs, channels, samples, true);
+    processInstrumentOutput(outputs, channels, samples);
+}
+
+void MasterOutputService::processInstrumentEffects(float* const* outputs, int channels, int samples, bool includeReverb) noexcept
+{
     if (outputs == nullptr || channels <= 0 || samples <= 0) return;
     // Invalid data must never enter stateful filters. Finite over-range samples
     // are deliberately left untouched: this is not a limiter or gain policy.
@@ -183,7 +189,7 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
         }
     }
     airProcessor.process(outputs, channels, samples, airAmount.load(std::memory_order_relaxed));
-    const auto wetMix = reverbMix.load(std::memory_order_relaxed);
+    const auto wetMix = includeReverb ? reverbMix.load(std::memory_order_relaxed) : 0.0f;
     updateInstrumentReverb(wetMix, settings);
     if (wetMix > 0.0f)
     {
@@ -208,6 +214,11 @@ void MasterOutputService::processInstrument(float* const* outputs, int channels,
 
     } // DJ tones retain their original external chain, without a second tone DSP.
 
+}
+
+void MasterOutputService::processInstrumentOutput(float* const* outputs, int channels, int samples) noexcept
+{
+    if (outputs == nullptr || channels <= 0 || samples <= 0) return;
     // The visible performance fader owns only the instrument bus. No limiter,
     // fixed makeup gain or master gain is applied to the accompaniment.
     const auto performanceVolume = gain.load(std::memory_order_relaxed);

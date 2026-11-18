@@ -17,13 +17,15 @@ class FolkPackages(unittest.TestCase):
             with self.subTest(name=name),zipfile.ZipFile(ROOT/'assets/tone-packages'/name) as package:
                 self.assertIsNone(package.testzip())
                 manifest=json.loads(package.read('manifest.json'))
-                self.assertIn(manifest['version'], (1, 2))
+                self.assertIn(manifest['version'], (1, 2, 4))
                 for item in manifest['files']:
                     payload=package.read(item['path'])
                     self.assertEqual(len(payload),item['bytes'])
                     self.assertEqual(hashlib.sha256(payload).hexdigest(),item['sha256'])
                 preset=ET.fromstring(package.read('tone.xml')).find('PRESET')
-                self.assertEqual(preset.get('kongTechniqueProfile'), '1' if manifest['version']==2 else '0')
+                if manifest['version']==4:
+                    self.assertEqual(preset.get('performanceReverb'),'1');self.assertIn(preset.get('kongTechniqueProfile'),('0','1'))
+                else:self.assertEqual(preset.get('kongTechniqueProfile'), '1' if manifest['version']==2 else '0')
                 self.assertEqual(preset.get('pluginBrand'),'kong')
                 self.assertTrue(preset.find('SAMPLER_STATE').text)
                 self.assertTrue(preset.find('KAM_PROJECT').text)

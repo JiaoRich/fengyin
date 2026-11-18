@@ -515,14 +515,14 @@ window.FENGYIN_TONE_MEDIA = {
     "voiceId": "V014_02"
   },
   "dj-source-02": {
-    "name": "DJ · 高萨",
+    "name": "#清韵高萨",
     "artwork": "instrument_soprano_sax.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_02"
   },
   "dj-source-03": {
-    "name": "DJ · 高萨2",
+    "name": "#悠扬高萨",
     "artwork": "instrument_soprano_sax.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_03"
   },
   "alto-jazz": {
     "name": "爵士中萨",
@@ -555,34 +555,34 @@ window.FENGYIN_TONE_MEDIA = {
     "voiceId": "NEW_TONE_GENERIC"
   },
   "dj-source-04": {
-    "name": "DJ · 中音萨克斯",
+    "name": "#原声中萨",
     "artwork": "instrument_alto_sax.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_04"
   },
   "dj-source-05": {
-    "name": "DJ · 中音明亮萨克斯",
+    "name": "#明亮中萨",
     "artwork": "instrument_alto_sax.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_05"
   },
   "dj-source-06": {
-    "name": "DJ · 中音温暖萨克斯",
+    "name": "#温润中萨",
     "artwork": "instrument_alto_sax.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_06"
   },
   "dj-source-07": {
-    "name": "DJ · 中音顺滑萨克斯",
+    "name": "#丝滑中萨",
     "artwork": "instrument_alto_sax.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_07"
   },
   "dj-source-08": {
-    "name": "DJ · 流行中音萨克斯",
+    "name": "#都市中萨",
     "artwork": "instrument_alto_sax.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_08"
   },
   "dj-source-09": {
-    "name": "DJ · 中音爵士萨克斯",
+    "name": "#摇摆中萨",
     "artwork": "instrument_alto_sax.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_09"
   },
   "tenor-mellow": {
     "name": "醇厚次中萨",
@@ -610,59 +610,59 @@ window.FENGYIN_TONE_MEDIA = {
     "voiceId": "NEW_TONE_GENERIC"
   },
   "dj-source-10": {
-    "name": "DJ · 次中音萨克斯",
+    "name": "#原声次中萨",
     "artwork": "instrument_tenor_sax.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_10"
   },
   "dj-source-11": {
-    "name": "DJ · 次中音明亮萨克斯",
+    "name": "#明亮次中萨",
     "artwork": "instrument_tenor_sax.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_11"
   },
   "dj-source-12": {
-    "name": "DJ · 次中音温暖萨克斯",
+    "name": "#柔暖次中萨",
     "artwork": "instrument_tenor_sax.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_12"
   },
   "dj-source-13": {
-    "name": "DJ · 次中音顺滑萨克斯",
+    "name": "#丝滑次中萨",
     "artwork": "instrument_tenor_sax.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_13"
   },
   "dj-source-14": {
-    "name": "DJ · 次中音特定萨克斯",
+    "name": "#醇韵次中萨",
     "artwork": "instrument_tenor_sax.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_14"
   },
   "dj-source-15": {
-    "name": "DJ · 次中音克特兰萨克斯",
+    "name": "#经典爵士次中萨",
     "artwork": "instrument_tenor_sax.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_15"
   },
   "dj-source-16": {
-    "name": "DJ · 次中气包音萨克斯",
+    "name": "#柔和气包次中萨",
     "artwork": "instrument_tenor_sax.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_16"
   },
   "dj-source-17": {
-    "name": "DJ · 次中气包明亮萨克斯",
+    "name": "#明亮气包次中萨",
     "artwork": "instrument_tenor_sax.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_17"
   },
   "dj-source-18": {
-    "name": "DJ · 次中气包特定萨克斯",
+    "name": "#浓郁气包次中萨",
     "artwork": "instrument_tenor_sax.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_18"
   },
   "dj-source-19": {
-    "name": "DJ · 低音萨克斯",
+    "name": "#浑厚低萨",
     "artwork": "instrument_tenor_sax.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_19"
   },
   "dj-source-20": {
-    "name": "DJ · 低音顺滑萨克斯",
+    "name": "#丝滑低萨",
     "artwork": "instrument_tenor_sax.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_20"
   },
   "trumpet": {
     "name": "小号1",
@@ -675,9 +675,9 @@ window.FENGYIN_TONE_MEDIA = {
     "voiceId": "TONE_140_TRUMPET_2"
   },
   "dj-source-24": {
-    "name": "DJ · 小号1",
+    "name": "#明亮小号",
     "artwork": "instrument_trumpet.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_24"
   },
   "piccolo-trumpet": {
     "name": "高音小号",
@@ -700,9 +700,9 @@ window.FENGYIN_TONE_MEDIA = {
     "voiceId": "V014_15"
   },
   "dj-source-23": {
-    "name": "DJ · 长笛",
+    "name": "#清亮长笛",
     "artwork": "instrument_flute.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_23"
   },
   "piccolo": {
     "name": "短笛",
@@ -715,9 +715,9 @@ window.FENGYIN_TONE_MEDIA = {
     "voiceId": "TONE_140_CLARINET"
   },
   "dj-source-22": {
-    "name": "DJ · 单簧管",
+    "name": "#柔和单簧管",
     "artwork": "instrument_clarinet.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_22"
   },
   "kong-clarinet-2": {
     "name": "单簧管2",
@@ -730,9 +730,9 @@ window.FENGYIN_TONE_MEDIA = {
     "voiceId": "TONE_140_OBOE"
   },
   "dj-source-21": {
-    "name": "DJ · 双簧管",
+    "name": "#田园双簧管",
     "artwork": "instrument_oboe.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_21"
   },
   "kong-oboe-2": {
     "name": "双簧管2",
@@ -745,14 +745,14 @@ window.FENGYIN_TONE_MEDIA = {
     "voiceId": "TONE_140_VIOLIN_SOFT"
   },
   "dj-source-26": {
-    "name": "DJ · 小提琴",
+    "name": "#抒情小提琴",
     "artwork": "instrument_violin.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_26"
   },
   "dj-source-27": {
-    "name": "DJ · 小提琴环绕",
+    "name": "#环绕小提琴",
     "artwork": "instrument_violin.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_27"
   },
   "kong-violin-2": {
     "name": "小提琴2",
@@ -765,14 +765,14 @@ window.FENGYIN_TONE_MEDIA = {
     "voiceId": "V014_22"
   },
   "dj-source-28": {
-    "name": "DJ · 大提琴",
+    "name": "#深沉大提琴",
     "artwork": "instrument_cello.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_28"
   },
   "dj-source-35": {
-    "name": "DJ · 马头琴",
+    "name": "#草原马头琴",
     "artwork": "instrument_cello.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_35"
   },
   "kong-erhu": {
     "name": "二胡1",
@@ -825,14 +825,14 @@ window.FENGYIN_TONE_MEDIA = {
     "voiceId": "TONE_DONGXIAO"
   },
   "dj-source-33": {
-    "name": "DJ · 箫1",
+    "name": "#清韵箫",
     "artwork": "instrument_kong_xiao.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_33"
   },
   "dj-source-34": {
-    "name": "DJ · 箫2",
+    "name": "#幽谷箫",
     "artwork": "instrument_kong_xiao.png",
-    "voiceId": "NEW_TONE_GENERIC"
+    "voiceId": "TONE_TEST_34"
   },
   "kong-xun": {
     "name": "埙",
@@ -1205,8 +1205,13 @@ function toneStyleToExpert() {
     return Object.fromEntries(expertControls.map(([id,,fallback]) => [id,Number(latestBackendState.toneSettings[id] ?? fallback)]));
   return {bass:50,air:0,brightness:Math.round((Number(style.eq || 0)+100)/2),warmth:Number(style.warmth ?? 20),compression:35,harsh:25,reverb:Number(style.reverb ?? 18),room:42,output:50};
 }
+function expertControlEnabled(kind,state=latestBackendState) {
+  if(!state.pluginLoaded || state.pluginLoading || state.effectLoading)return false;
+  if(kind==='reverb' && state.externalReverb)return state.reverbAvailable!==false;
+  return !state.djSourceChain && !(state.externalReverb && ['room','damping','width'].includes(kind));
+}
 function renderExpertControls() {
-  $('#expert-grid').innerHTML = expertControls.map(([id,label,fallback]) => `<div class="expert-control"><label for="expert-${id}"><span>${label}</span><b id="expert-${id}-value">${expertDisplay(id,expertSettings?.[id] ?? fallback)}</b></label><input id="expert-${id}" data-expert="${id}" type="range" min="0" max="100" step="0.001" value="${expertSettings?.[id] ?? fallback}" ${currentPluginLoaded && !latestBackendState.djSourceChain ? '' : 'disabled'}></div>`).join('');
+  $('#expert-grid').innerHTML = expertControls.map(([id,label,fallback]) => `<div class="expert-control"><label for="expert-${id}"><span>${label}</span><b id="expert-${id}-value">${expertDisplay(id,expertSettings?.[id] ?? fallback)}</b></label><input id="expert-${id}" data-expert="${id}" type="range" min="0" max="100" step="0.001" value="${expertSettings?.[id] ?? fallback}" ${expertControlEnabled(id) ? '' : 'disabled'}></div>`).join('');
   $$('[data-expert]').forEach(input => input.addEventListener('input', () => {
     expertSettings[input.dataset.expert] = Number(input.value);
     $(`#expert-${input.dataset.expert}-value`).textContent = expertDisplay(input.dataset.expert,Number(input.value));
@@ -2536,7 +2541,7 @@ $('#load-effect').addEventListener('click', () => {
   if (!Number.isInteger(index) || index < 0) return toast('请先选择一个外部效果器');
   nativeEvent('loadEffect', {index}); toast('正在加载效果器…');
 });
-$('#remove-effect').addEventListener('click', () => { if(latestBackendState.djSourceChain){toast('DJ 音色保留原效果链，可在列表中旁通混响');return;} nativeEvent('removeEffect'); toast('已移除外部效果器'); });
+$('#remove-effect').addEventListener('click', () => { if(latestBackendState.djSourceChain || latestBackendState.externalReverb){toast('混响插槽已保留，可在列表中旁通或打开调节');return;} nativeEvent('removeEffect'); toast('已移除外部效果器'); });
 $('#open-effect').addEventListener('click', () => { toast('正在打开效果器界面…'); nativeEvent('openEffect'); });
 
 function updateBuiltinEffects() {
@@ -2781,11 +2786,21 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
   if (Number.isFinite(Number(state.growlSensitivity)))
     techniqueSensitivity = ['easy','standard','hard'][Number(state.growlSensitivity)] || 'standard';
   const sourceEffects = state.djSourceChain === true;
+  const externalReverb = state.externalReverb === true;
+  const reverbReady = state.pluginLoaded && !state.pluginLoading && !state.effectLoading && state.reverbAvailable !== false;
   for (const id of ['#performance-reverb','#reverb-mix','#eq-tone','#tone-warmth','#reverb-room','#reverb-damping','#reverb-width']) {
-    const control=$(id); if(control) { control.disabled=sourceEffects; control.title=sourceEffects?'DJ音色使用原方案效果链，请在调音师中调整原效果器':''; }
+    const control=$(id); if(!control)continue;
+    const mix=['#performance-reverb','#reverb-mix'].includes(id);
+    const oldRoom=['#reverb-room','#reverb-damping','#reverb-width'].includes(id);
+    control.disabled=mix ? (externalReverb?!reverbReady:sourceEffects) : sourceEffects || (externalReverb&&oldRoom);
+    control.title=externalReverb&&oldRoom?'请在调音师的肥波混响界面调节':control.disabled?'当前效果尚不可调节':'';
+    if(mix)control.max=externalReverb?'100':'60';
   }
-  $$('[data-expert]').forEach(control=>control.disabled=sourceEffects || !state.pluginLoaded);
-  const backendReverb = Math.round(Math.max(0,Math.min(.6,Number(state.reverbMix ?? .28)))*100);
+  $$('[data-expert]').forEach(control=> {
+    const kind=control.dataset.expert;
+    control.disabled=!expertControlEnabled(kind,state);
+  });
+  const backendReverb = Math.round(Math.max(0,Math.min(externalReverb?1:.6,Number(state.reverbMix ?? .28)))*100);
   if (!reverbDragging && document.activeElement !== performanceReverb && document.activeElement !== $('#reverb-mix')) {
     performanceReverb.value = String(backendReverb);
     $('#performance-reverb-value').textContent = `${backendReverb}%`;
@@ -3129,7 +3144,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 DJ 版 1.0.0 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟·音色测试版 1.0.1 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

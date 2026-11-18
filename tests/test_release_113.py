@@ -17,7 +17,7 @@ class Release113(unittest.TestCase):
         self.assertIn('KongProjectFile::readPluginComponentState(state)',source)
         self.assertIn('eventLock(performanceEventLock)',source)
         self.assertIn('suppressTechniqueMidi',source)
-        self.assertIn('messages.swapWith(filteredMidi)',source)
+        self.assertIn('messages.swapWith(filteredMidi)',self.read('native/Source/TechniqueProcessingGraph.h'))
         self.assertIn('activeVelocities[static_cast<size_t>(note)]',source)
         self.assertIn('kongDualSlot.setTechnique',source)
         policy=self.read('native/Source/KongPerformancePolicy.h')

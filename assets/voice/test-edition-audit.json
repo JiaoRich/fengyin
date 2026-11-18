@@ -1,0 +1,727 @@
+[
+  {
+    "id": "TONE_TEST_02",
+    "text": "清韵高萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "52556c3b2cd25e26e6545af5f7471d4816250afd7c3ecad9fdcea717ea308891",
+    "sha256": "7b7ebc6c4bb47ca0386c12f50c1fb2f3760fd5c96432620b31aeaa2cc6781a03",
+    "seconds": 1.8
+  },
+  {
+    "id": "TONE_TEST_03",
+    "text": "悠扬高萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "88132c9dae7f55a89e7bd481e19549872707e39d9e165a0c142e3583200cc557",
+    "sha256": "fe977be3c750602a033fff3a0a9b81139f62936b97d9a573cd66efef71915b7a",
+    "seconds": 1.88
+  },
+  {
+    "id": "TONE_TEST_04",
+    "text": "原声中萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "91a5dcbcdb09e9ba0c9b1c7b7b386b43db31c4dca1cfba9e24d0b634ae229781",
+    "sha256": "4927064296bd8c6c095b087a792fabf16fda8e6a78a10c56e5376f531a607d78",
+    "seconds": 1.84
+  },
+  {
+    "id": "TONE_TEST_05",
+    "text": "明亮中萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "0a771d36da33494002a08349d1aabf9f0491414f9fe701472c928c994c3dcbfc",
+    "sha256": "24f9a952912829999ef32ff0fb73c7fa5e8f6e103bab0218063836d555055de6",
+    "seconds": 1.84
+  },
+  {
+    "id": "TONE_TEST_06",
+    "text": "温润中萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "425cace13f4778bad9cc75e2e1cce084683ca2c97ff30185b6a0bc9658f9eb68",
+    "sha256": "0034e3357165389861c379f60a6643d8fa56a184033b015b1b18e916322c26fd",
+    "seconds": 1.76
+  },
+  {
+    "id": "TONE_TEST_07",
+    "text": "丝滑中萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "eb6158274fc65c1ea96f45e2a1c13cc6526268879252998121cccd5260332dc7",
+    "sha256": "6f1ac8b0205ec30bbf4becb1a6610a1f0ac2647f59bfe3c9c336ea9e27cdf203",
+    "seconds": 1.8
+  },
+  {
+    "id": "TONE_TEST_08",
+    "text": "都市中萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "8179f9565bfe53cbc43e8678fdf25fcfce57cf334dc6c6e2e78498c20b55235d",
+    "sha256": "7280ad0693333979713b41f5c67e6d51749e6ecc012df3508c097b0a64ce2cd4",
+    "seconds": 1.68
+  },
+  {
+    "id": "TONE_TEST_09",
+    "text": "摇摆中萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "8ac21c0b8e5b99889ee6c98cb21e4314a04f3b393087690b81012fad7a3c5b12",
+    "sha256": "5b1e6df1c3ab97a112b0d60f11d0dc037445ba56a2c28dd5d6911c876862cd54",
+    "seconds": 1.84
+  },
+  {
+    "id": "TONE_TEST_10",
+    "text": "原声次中萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "c4e3e22dd76f21a0e0f88f7660c511387f0b7c71b314008b83170d408d7602c2",
+    "sha256": "8a21b284ab89bfeb12e081ebaac6a53b2495ecc5bf2ccf7a74b879e1085e540d",
+    "seconds": 2.12
+  },
+  {
+    "id": "TONE_TEST_11",
+    "text": "明亮次中萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "ab2be445b04002ae88905b370213529a138981a15eb431309697681932c4ed29",
+    "sha256": "1a1f481e5edbdd17ddd83291f33995779d7adeb2ee9a7ee6f88ed675e2a593b6",
+    "seconds": 2
+  },
+  {
+    "id": "TONE_TEST_12",
+    "text": "柔暖次中萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "224f5da0c51286be0c496e1e76dc1b32c851800e1adefc8936a16b728a96a6ca",
+    "sha256": "d8a3c515b9bb0816fe7e1da42e5aa385adc7834ce4bdb0cd0a1c88a6fa617afb",
+    "seconds": 2
+  },
+  {
+    "id": "TONE_TEST_13",
+    "text": "丝滑次中萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "be2af4b229988704ce3a5a5ba07afc2ef10dbe82299071d298d180a245f565fc",
+    "sha256": "a7addae41d764de4e9429c8a56d04d4b8ba1cb99f7e2f27af0e97672fdaf941e",
+    "seconds": 2
+  },
+  {
+    "id": "TONE_TEST_14",
+    "text": "醇韵次中萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "c78517c6e145c39ca4bc6f8f356f82a24e52b332ed11ac7e56b60e2981a9d18f",
+    "sha256": "493a44be83a5df4d092b8477f210a174aaa136dadc8959c0f82f36b41d1882d0",
+    "seconds": 2.2
+  },
+  {
+    "id": "TONE_TEST_15",
+    "text": "经典爵士次中萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "4d44c6022136f4c763f23cfc981f6c7d73d48b6729b339210687f27939b655cf",
+    "sha256": "7a064eb12e59032e43552f59319fa8a3d7e059f8b8393d83e8d5c37cb997a8aa",
+    "seconds": 2.6
+  },
+  {
+    "id": "TONE_TEST_16",
+    "text": "柔和气包次中萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "2c7c297cb8b9863828c071a9a7867f4f80ffbb1f0fce3a88fca5bb4c089f3a9c",
+    "sha256": "1e5046e2840157607d2bfe4928a8e80d01b351e5c31e8330ccf6898213f55942",
+    "seconds": 2.68
+  },
+  {
+    "id": "TONE_TEST_17",
+    "text": "明亮气包次中萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "40d1ee066d970b37e406a437455233cb998649a536a83993c9098a4e25d08642",
+    "sha256": "10f4832864f97d01972bf7b1ff76c8bffbf119291dcaa3988705c6346fb8c9e2",
+    "seconds": 2.92
+  },
+  {
+    "id": "TONE_TEST_18",
+    "text": "浓郁气包次中萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "3a3d2cf320545f9a599e6465a06b3e980eb8d261b53fb6de56ddcf6864ec9f84",
+    "sha256": "fe1298577cc9b771adca2ab98ba1f9550bdc78eaebb00a5f8bddd3d342984483",
+    "seconds": 2.44
+  },
+  {
+    "id": "TONE_TEST_19",
+    "text": "浑厚低萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "8664d67531f55e97fd55d36e6b339949786a6e92ad4c3d65fc0e238cb4e664f8",
+    "sha256": "6b135e2d3a47ed8c40ed8f9649acee210dea8736d13f63305dc1dfdc9336c520",
+    "seconds": 1.84
+  },
+  {
+    "id": "TONE_TEST_20",
+    "text": "丝滑低萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "88003eb7acde64d31b8d70f6d65f4a365aa5aa9660622f5727a80960193006b6",
+    "sha256": "cd4671cc6646678515640047943f2ae584a961248fb21d1784d3c2590ed6187a",
+    "seconds": 1.84
+  },
+  {
+    "id": "TONE_TEST_24",
+    "text": "明亮小号。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "a7e44c334c27eb11307ea252df2c49d001dbe7aa2bebe5e7b146c440b279f2eb",
+    "sha256": "472dd91dfe8fb00bcf6ac85cc1571a1d4a50fbd64feb2ebdcc8abd6bf89a0ddd",
+    "seconds": 1.88
+  },
+  {
+    "id": "TONE_TEST_23",
+    "text": "清亮长笛。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "14f97ab9c5a8c6bfbc3c968d4ec778caeda4803469c873878e0b255b58fcb031",
+    "sha256": "f4045cecf6209a10a1e64c3486d4f55fd62f16b657b23cbdb2f6ee62826a8109",
+    "seconds": 1.96
+  },
+  {
+    "id": "TONE_TEST_22",
+    "text": "柔和单簧管。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "1e55975248882df7ef47c7fabad6af7d3d3e5188dca5fd54f99eaa2a5e8d8ada",
+    "sha256": "2d6ed446197c32e5603672d617a3fb7013ecd01640fc120fc329f414448ce99c",
+    "seconds": 2
+  },
+  {
+    "id": "TONE_TEST_21",
+    "text": "田园双簧管。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "f4f5e119da1f768a4ec112b6faa02dd97d4e4f8f02c83e0150d1444b7e7e8714",
+    "sha256": "aeba8f50b358f0770ffa5b4c56464f8d6bd3865fbfeeec928ab080a60d78af5d",
+    "seconds": 1.96
+  },
+  {
+    "id": "TONE_TEST_26",
+    "text": "抒情小提琴。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "b5fdcfc33e4feee9b9db162d9c9c06cb79d840fc410df73f1a9fa712423f3276",
+    "sha256": "c479fb62e22d94bf40bd198adc8ef225dd2d4a595dc70b794c4863d5f1edf2a2",
+    "seconds": 2
+  },
+  {
+    "id": "TONE_TEST_27",
+    "text": "环绕小提琴。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "8b3626c3a406095c44a4cb42d1f52c6de247b5fa3750dbd6c48d9000e0072753",
+    "sha256": "013e563563c9742cbad0948e5f03e0315cee14d1c10b2d5a063a1ba3a349c5e1",
+    "seconds": 1.88
+  },
+  {
+    "id": "TONE_TEST_28",
+    "text": "深沉大提琴。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "0e00dc4aec959328696c62adef9b5f87bb8101606b9e0c6bac2432470ab27d6d",
+    "sha256": "d1459978d3abf487fa18df7c943cca30162fbcb0942746da77bc7770c9671655",
+    "seconds": 2.16
+  },
+  {
+    "id": "TONE_TEST_35",
+    "text": "草原马头琴。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "642c542f4f6733290f932638f958ec23aad9c66baac8fe0e02744629d723cf64",
+    "sha256": "e249cfcd64c849ebbf13ceb661c431b54a5f8c75039a6584ca5332fb76a94eeb",
+    "seconds": 2.28
+  },
+  {
+    "id": "TONE_TEST_33",
+    "text": "清韵箫。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "0cf01ed3e51e856929dd9f3fb9f991eaa4a77d1da17c9b8ef7c4b770c8dcc933",
+    "sha256": "38ab1a41c139a6c4a1ffd4b6b4150e762eb6d6b831584e090c45a8755e32b223",
+    "seconds": 1.64
+  },
+  {
+    "id": "TONE_TEST_34",
+    "text": "幽谷箫。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "2b7b5992dcbbf502554aebad388df58af7ddf67dad234eed50fa9d31af19ecaa",
+    "sha256": "9f8528a93266469a18c3cba4d408686e7c34a67175e5516c17650333c224de3b",
+    "seconds": 1.64
+  }
+]

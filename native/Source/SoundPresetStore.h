@@ -37,6 +37,7 @@ struct SoundPreset
     KongTechniqueProfile kongTechniques;
     bool swamBreathGrowl = false;
     DjSourceProfile djSource;
+    bool performanceReverb = false; // Explicit Pro-R 2 insert; legacy packages retain their path.
     bool customTone = false;
     float compressionThreshold = 0.58f;
     float compressionRatio = 1.7f;

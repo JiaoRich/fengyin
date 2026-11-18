@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.0.0",
+    [string]$Version = "1.0.1",
     [switch]$SkipInstaller
 )
 
@@ -160,6 +160,14 @@ Invoke-Checked "激活工具编译" { cmake --build $BuildDir --config Release -
 
 Write-Host "[3/5] 运行自动测试..." -ForegroundColor Cyan
 Invoke-Checked "自动测试" { ctest --test-dir $BuildDir -C Release --output-on-failure }
+$FabFilterEvidence = Join-Path $ProjectRoot "fabfilter-install-test\first.json"
+if (-not (Test-Path -LiteralPath $FabFilterEvidence)) { throw "Missing actual FabFilter installation evidence" }
+$FabFilterPlugin = (Get-Content -LiteralPath $FabFilterEvidence -Raw | ConvertFrom-Json).plugin
+if (-not (Test-Path -LiteralPath $FabFilterPlugin)) { throw "Installed Pro-R 2 plugin is missing" }
+Invoke-Checked "73 exact package Pro-R2 Mix and full state restore" {
+    & (Join-Path $BuildDir "Release\FengYinDjHostTests.exe") --reverb-plugin $FabFilterPlugin (Join-Path $BuildDir "evidence\performance-reverb")
+}
+
 $ProxyInput = Join-Path $BuildDir "video-proxy-input.mp4"
 $ProxyOutput = Join-Path $BuildDir "verified-proxy.mp4"
 Invoke-Checked "Video proxy 60fps input preparation" {

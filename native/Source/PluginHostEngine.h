@@ -39,6 +39,7 @@ class RecordingAudioProcessorPlayer final : public juce::AudioProcessorPlayer
     friend struct DjHostTestAccess;
     friend struct PluginHostEngineTestAccess;
 public:
+    RecordingAudioProcessorPlayer() { resetMidi.ensureSize(256 * 1024); }
     // Preparing/releasing a third-party processor may take hundreds of ms.
     // Let the callback skip only the changing instrument, not accompaniment.
     void setProcessor(juce::AudioProcessor* processor) {
@@ -51,7 +52,11 @@ public:
     bool enqueueControllerPair(int route,int value,double timestampSeconds) noexcept;
     void beginOnsetTrace() noexcept { onsetTrace.begin(); }
     void flushOnsetTrace() { onsetTrace.flush("audio-collector"); }
-    void requestPerformanceReset() noexcept { resetRequested.store(true, std::memory_order_release); }
+    void requestPerformanceReset() noexcept { resetGeneration.fetch_add(1, std::memory_order_acq_rel); }
+    // Called by the live graph, after the player has acquired its callback lock.
+    // A suspended/skipped block must never acknowledge delivery of a reset.
+    void preparePerformanceMidi(juce::MidiBuffer& messages);
+    std::atomic<bool> instrumentEffectsInGraph{false};
     void setKongResetMode(bool enabled) noexcept { kongResetMode.store(enabled, std::memory_order_release); }
     [[nodiscard]] uint64_t getDroppedMidiEventCount() const noexcept { return midiQueue.droppedCount(); }
     std::atomic<uint64_t> callbackCount { 0 }, callbackOverruns { 0 }, signalBlocks { 0 };
@@ -70,10 +75,11 @@ private:
     ProcessorChangeGate processorChangeGate;
     static constexpr std::size_t midiQueueSize = 8192;
     MidiOnsetTrace onsetTrace;
-    void addResetMessages(double timestampSeconds);
-
     OrderedMidiQueue<midiQueueSize> midiQueue;
-    std::atomic<bool> resetRequested { false };
+    std::atomic<std::uint64_t> resetGeneration { 0 };
+    std::uint64_t blockGeneration = 0, deliveredResetGeneration = 0;
+    std::optional<RealtimeMidiEvent> deferredMidi;
+    juce::MidiBuffer resetMidi;
     std::atomic<bool> kongResetMode { false };
     double currentSampleRate = 48000.0;
     RecordingService* recorder = nullptr;
@@ -92,6 +98,11 @@ public:
     ~PluginHostEngine() override;
 
     bool configureDjSource(const DjSourceProfile& profile);
+    void configurePerformanceReverb(bool enabled);
+    bool usesPerformanceReverb() const noexcept { return performanceReverbEnabled; }
+    bool performanceReverbAvailable() const noexcept;
+    float getPerformanceReverbMix() const noexcept;
+    bool setPerformanceReverbMix(float value);
     DjSourceProfile getDjSource() const { return djSource; }
     bool usesDjSource() const noexcept { return djSourceActive.load(); }
     void attachTo(juce::AudioDeviceManager& deviceManager);
@@ -140,7 +151,7 @@ public:
     juce::String takeCallbackCadenceReport();
     bool isStageTimingEnabled() const noexcept {return player.timingEnabled;}
     void setAccompanimentService(AccompanimentAudioService* service) noexcept { player.setAccompanimentService(service); }
-    void setMasterOutputService(MasterOutputService* service) noexcept { player.setMasterOutputService(service); }
+    void setMasterOutputService(MasterOutputService* service) noexcept { masterOutputService=service; player.setMasterOutputService(service); }
     [[nodiscard]] uint64_t getDroppedMidiEventCount() const noexcept { return player.getDroppedMidiEventCount(); }
     [[nodiscard]] uint64_t getCallbackCount() const noexcept { return player.callbackCount.load(); }
     [[nodiscard]] uint64_t getCallbackOverruns() const noexcept { return player.callbackOverruns.load(); }
@@ -238,6 +249,10 @@ private:
         juce::PluginDescription description;
     };
     std::vector<EffectSlot> effectNodes;
+    MasterOutputService* masterOutputService = nullptr;
+    bool performanceReverbEnabled = false; // Message thread, changed while graph paused.
+    juce::AudioProcessorGraph::Node::Ptr instrumentToneNode;
+    juce::AudioProcessorParameter* performanceReverbMix = nullptr; // Message thread only.
     struct CachedContainer
     {
         std::unique_ptr<juce::AudioPluginInstance> instance;

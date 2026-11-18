@@ -1,5 +1,6 @@
 #include "SwamTechniqueParameterPolicy.h"
 #include "PluginHostEngine.h"
+#include "PerformanceReverb.h"
 #include "KensaVibratoRange.h"
 #include "KensaBendRange.h"
 #include "TechniqueMidiDeduplication.h"
@@ -15,6 +16,7 @@
 #include "KongPerformancePolicy.h"
 #include "BendRangeParameters.h"
 #include "PerformanceReset.h"
+#include "TechniqueProcessingGraph.h"
 #include "ToneRestorePlan.h"
 
 #include <algorithm>
@@ -86,38 +88,13 @@ juce::String stableParameterIdentifier(juce::AudioProcessorParameter& parameter,
 }
 }
 
-class TechniqueProcessingGraph final : public juce::AudioProcessorGraph
-{
-public:
-    TechniqueProcessingGraph() { filteredMidi.ensureSize(256 * 1024); }
-    std::function<void()> applyTechniqueValues;
-    std::function<bool(const juce::MidiMessage&)> suppressTechniqueMidi;
-    std::function<void(juce::MidiBuffer&,int,double)> transformPerformanceMidi;
-    void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& messages) override
-    {
-        audioTrace::Scope techniqueTime(audioTrace::Event::techniques);
-        if (applyTechniqueValues) applyTechniqueValues();
-        if (suppressTechniqueMidi)
-        {
-            filteredMidi.clear();
-            for (const auto metadata : messages)
-                if (!suppressTechniqueMidi(metadata.getMessage()))
-                    filteredMidi.addEvent(metadata.data,metadata.numBytes,metadata.samplePosition);
-            messages.swapWith(filteredMidi);
-        }
-        if (transformPerformanceMidi) transformPerformanceMidi(messages,buffer.getNumSamples(),getSampleRate());
-        techniqueTime.finish();
-        juce::AudioProcessorGraph::processBlock(buffer, messages);
-    }
-private:
-    juce::MidiBuffer filteredMidi;
-};
 bool RecordingAudioProcessorPlayer::enqueueControllerPair(int route,int value,double timestamp) noexcept
 {
     const auto status=static_cast<uint8_t>(0xb0|(DjMidiRoute::channel(route)-1));
     const uint8_t bytes[]{status,static_cast<uint8_t>(DjMidiRoute::coarse(route)),static_cast<uint8_t>(value>>7),
                           status,static_cast<uint8_t>(DjMidiRoute::fine(route)),static_cast<uint8_t>(value&127)};
-    if(midiQueue.pushPair(bytes,timestamp>0?timestamp:juce::Time::getMillisecondCounterHiRes()*.001))return true;
+    if(midiQueue.pushPair(bytes,timestamp>0?timestamp:juce::Time::getMillisecondCounterHiRes()*.001,
+                          resetGeneration.load(std::memory_order_acquire)))return true;
     requestPerformanceReset();return false;
 }
 
@@ -130,23 +107,25 @@ bool RecordingAudioProcessorPlayer::enqueueMidi(const juce::MidiMessage& message
 
     const auto timestamp = timestampSeconds > 0.0
         ? timestampSeconds : juce::Time::getMillisecondCounterHiRes() * 0.001;
-    if (! midiQueue.push(message.getRawData(), size, timestamp))
+    if (! midiQueue.push(message.getRawData(), size, timestamp, resetGeneration.load(std::memory_order_acquire)))
     {
-        resetRequested.store(true, std::memory_order_release);
+        requestPerformanceReset();
         return false;
     }
     return true;
 }
 
-void RecordingAudioProcessorPlayer::addResetMessages(double timestampSeconds)
+void RecordingAudioProcessorPlayer::preparePerformanceMidi(juce::MidiBuffer& messages)
 {
-    auto& collector = getMidiMessageCollector();
-    auto send = [&collector, timestampSeconds](juce::MidiMessage message)
-    {
-        message.setTimeStamp(timestampSeconds);
-        collector.addMessageToQueue(message);
-    };
-    sendPerformanceReset(kongResetMode.load(std::memory_order_acquire), send);
+    if (deliveredResetGeneration == blockGeneration) return;
+    resetMidi.clear();
+    sendPerformanceReset(kongResetMode.load(std::memory_order_acquire),
+        [this](const juce::MidiMessage& message) { resetMidi.addEvent(message, 0); });
+    // Explicit sample-zero ordering: fresh notes/bends at the same sample follow
+    // the reset, even when their device timestamp predates this audio callback.
+    resetMidi.addEvents(messages, 0, -1, 0);
+    messages.swapWith(resetMidi);
+    deliveredResetGeneration = blockGeneration;
 }
 
 class PluginHostEngine::PluginEditorWindow final : public juce::DocumentWindow
@@ -200,23 +179,45 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
     callbackCadence.record(static_cast<uint64_t>(nowSeconds * 1.0e9), numSamples);
     auto traceSink=detailedTiming.sink();
     const audioTrace::Session traceSession(timingEnabled?&traceSink:nullptr);
-    audioTrace::Scope midiTime(audioTrace::Event::midiDrain);
-    if (resetRequested.exchange(false, std::memory_order_acq_rel))
-        addResetMessages(nowSeconds);
-    RealtimeMidiEvent event;
-    for (std::size_t count = 0; count < midiQueueSize && midiQueue.pop(event); ++count)
+    bool toneProcessedInGraph=instrumentEffectsInGraph.load(std::memory_order_acquire);
     {
-        for(int offset=0;offset<int(event.size);offset+=3) {
-            juce::MidiMessage message(event.bytes.data()+offset,juce::jmin(3,int(event.size)-offset),event.timestampSeconds);
-            onsetTrace.record(message,event.timestampSeconds);
-            getMidiMessageCollector().addMessageToQueue(message);
-        }
-    }
-    midiTime.finish();
-
-    {
-        const bool processed=processorChangeGate.processIfAvailable([&]{
+        bool processed = false;
+        processorChangeGate.processIfAvailable([&]{
+            auto* processor = getCurrentProcessor();
+            if (processor == nullptr) return;
+            // Hold the same lock used by ScopedGraphPause through the base
+            // player's suspension check. Never wait on UI/plugin state work.
+            const juce::ScopedTryLock callbackLock(processor->getCallbackLock());
+            if (! callbackLock.isLocked() || processor->isSuspended()) return;
+            audioTrace::Scope midiTime(audioTrace::Event::midiDrain);
+            blockGeneration = resetGeneration.load(std::memory_order_acquire);
+            if (blockGeneration != deliveredResetGeneration)
+                getMidiMessageCollector().reset(currentSampleRate);
+            auto deliver = [&](const RealtimeMidiEvent& event) {
+                if (event.generation < blockGeneration) return true;
+                if (event.generation > blockGeneration) { deferredMidi = event; return false; }
+                for (int offset=0;offset<int(event.size);offset+=3) {
+                    juce::MidiMessage message(event.bytes.data()+offset,juce::jmin(3,int(event.size)-offset),event.timestampSeconds);
+                    onsetTrace.record(message,event.timestampSeconds);
+                    getMidiMessageCollector().addMessageToQueue(message);
+                }
+                return true;
+            };
+            bool drain = true;
+            if (deferredMidi) {
+                const auto event = *deferredMidi;
+                deferredMidi.reset();
+                drain = deliver(event);
+            }
+            if (drain) {
+                RealtimeMidiEvent event;
+                for (std::size_t count = 0; count < midiQueueSize && midiQueue.pop(event); ++count)
+                    if (! deliver(event)) break;
+            }
+            midiTime.finish();
             juce::AudioProcessorPlayer::audioDeviceIOCallbackWithContext(inputs, numInputs, outputs, numOutputs, numSamples, context);
+            toneProcessedInGraph=instrumentEffectsInGraph.load(std::memory_order_acquire);
+            processed = true;
         });
         if(!processed) {
             if(timingEnabled)changeSkippedBlocks.fetch_add(1,std::memory_order_relaxed);
@@ -238,8 +239,10 @@ void RecordingAudioProcessorPlayer::audioDeviceIOCallbackWithContext(const float
                 peak = std::max(peak, std::abs(outputs[channel][i]));
     auto previousPeak = diagnosticSourcePeak.load(std::memory_order_relaxed);
     while (previousPeak < peak && ! diagnosticSourcePeak.compare_exchange_weak(previousPeak, peak)) {}
-    if (masterOutput != nullptr)
-        masterOutput->processInstrument(outputs, numOutputs, numSamples);
+    if (masterOutput != nullptr) {
+        if(toneProcessedInGraph) masterOutput->processInstrumentOutput(outputs, numOutputs, numSamples);
+        else masterOutput->processInstrument(outputs, numOutputs, numSamples);
+    }
     const auto afterInstrument = timingEnabled ? juce::Time::getMillisecondCounterHiRes()*.001 : 0.0;
     if (accompaniment != nullptr)
         accompaniment->mixInto(outputs, numOutputs, numSamples);
@@ -316,22 +319,26 @@ juce::String PluginHostEngine::takeCallbackCadenceReport()
 
 void RecordingAudioProcessorPlayer::audioDeviceAboutToStart(juce::AudioIODevice* device)
 {
-    callbackCadence.restart();
-    juce::AudioProcessorPlayer::audioDeviceAboutToStart(device);
-    getMidiMessageCollector().ensureStorageAllocated(256 * 1024);
-    currentSampleRate = device != nullptr && device->getCurrentSampleRate() > 0.0
-        ? device->getCurrentSampleRate() : 48000.0;
-    if (accompaniment != nullptr && device != nullptr)
-        accompaniment->prepare(device->getCurrentSampleRate(), device->getCurrentBufferSizeSamples());
-    if (masterOutput != nullptr && device != nullptr)
-        masterOutput->setSampleRate(device->getCurrentSampleRate());
+    processorChangeGate.change([&] {
+        callbackCadence.restart();
+        juce::AudioProcessorPlayer::audioDeviceAboutToStart(device);
+        getMidiMessageCollector().ensureStorageAllocated(256 * 1024);
+        currentSampleRate = device != nullptr && device->getCurrentSampleRate() > 0.0
+            ? device->getCurrentSampleRate() : 48000.0;
+        if (accompaniment != nullptr && device != nullptr)
+            accompaniment->prepare(device->getCurrentSampleRate(), device->getCurrentBufferSizeSamples());
+        if (masterOutput != nullptr && device != nullptr)
+            masterOutput->setSampleRate(device->getCurrentSampleRate());
+    });
 }
 
 void RecordingAudioProcessorPlayer::audioDeviceStopped()
 {
-    if (accompaniment != nullptr)
-        accompaniment->release();
-    juce::AudioProcessorPlayer::audioDeviceStopped();
+    processorChangeGate.change([&] {
+        if (accompaniment != nullptr)
+            accompaniment->release();
+        juce::AudioProcessorPlayer::audioDeviceStopped();
+    });
 }
 
 PluginHostEngine::PluginHostEngine()
@@ -440,6 +447,7 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
             else
             {
             auto processingGraph = std::make_unique<TechniqueProcessingGraph>();
+            processingGraph->preparePerformanceMidi = [this](juce::MidiBuffer& messages) { player.preparePerformanceMidi(messages); };
             processingGraph->applyTechniqueValues = [this] { flushTechniqueValues(); };
             processingGraph->transformPerformanceMidi = [this](juce::MidiBuffer& messages,int count,double rate) {
                 juce::ignoreUnused(count);
@@ -526,6 +534,8 @@ void PluginHostEngine::parkCurrentContainer()
     graph->suspendProcessing(true);
     for (const auto& effect : effectNodes) graph->removeNode(effect.node->nodeID);
     effectNodes.clear();
+    if(instrumentToneNode)graph->removeNode(instrumentToneNode->nodeID);
+    instrumentToneNode=nullptr;performanceReverbMix=nullptr;
     auto entry = std::make_shared<CachedContainer>();
     entry->graph = std::move(graph);
     entry->instrument = instrumentNode;
@@ -598,6 +608,8 @@ void PluginHostEngine::unload()
     effectEditorWindow.reset();
     effectNodes.clear();
     djTrackNode=nullptr;djBusNode=nullptr;djOutputNode=nullptr;djSource={};djSourceActive.store(false);djBreathRoute.store(0);
+    instrumentToneNode=nullptr;performanceReverbMix=nullptr;performanceReverbEnabled=false;
+    player.instrumentEffectsInGraph.store(false,std::memory_order_release);
     instrumentNode = nullptr;
     audioOutputNode = nullptr;
     midiInputNode = nullptr;
@@ -893,7 +905,7 @@ void PluginHostEngine::loadEffectAsync(const juce::PluginDescription& descriptio
             const ScopedGraphPause pause(graph.get());
             auto effectNode = graph->addNode(std::move(instance));
             // New inserts belong before the preserved source return bus.
-            const auto insertAt = usesDjSource() && !effectNodes.empty() ? effectNodes.size()-1 : effectNodes.size();
+            const auto insertAt = (usesDjSource() || performanceReverbEnabled) && !effectNodes.empty() ? effectNodes.size()-1 : effectNodes.size();
             effectNodes.insert(effectNodes.begin()+static_cast<std::ptrdiff_t>(insertAt), { effectNode, description });
             if (! rebuildConnections())
             {
@@ -911,7 +923,7 @@ void PluginHostEngine::loadEffectAsync(const juce::PluginDescription& descriptio
 
 void PluginHostEngine::unloadEffect()
 {
-    if (usesDjSource()) return; // The source return bus can be bypassed, not discarded.
+    if (usesDjSource() || performanceReverbEnabled) return; // Keep the performance reverb slot.
     ++effectLoadGeneration;
     if (graph == nullptr || ! hasEffect()) return;
     const ScopedGraphPause pause(graph.get());
@@ -968,7 +980,7 @@ juce::var PluginHostEngine::describeEffectChain() const
         row->setProperty("version", effect.description.version);
         row->setProperty("bypassed", effect.node->isBypassed());
         row->setProperty("latencySamples", effect.node->getProcessor()->getLatencySamples());
-        row->setProperty("fixedBus", usesDjSource() && &effect == &effectNodes.back());
+        row->setProperty("fixedBus", (usesDjSource() || performanceReverbEnabled) && &effect == &effectNodes.back());
         result.add(juce::var(row));
     }
     return result;
@@ -977,7 +989,7 @@ juce::var PluginHostEngine::describeEffectChain() const
 bool PluginHostEngine::removeEffectAt(int index)
 {
     if (index < 0 || static_cast<size_t>(index) >= effectNodes.size() || ! graph) return false;
-    if (usesDjSource() && static_cast<size_t>(index)+1 == effectNodes.size()) return false;
+    if ((usesDjSource() || performanceReverbEnabled) && static_cast<size_t>(index)+1 == effectNodes.size()) return false;
     ++effectLoadGeneration;
     const ScopedGraphPause pause(graph.get());
     effectEditorWindow.reset();
@@ -992,7 +1004,7 @@ bool PluginHostEngine::moveEffect(int index, int destination)
 {
     if (index < 0 || destination < 0 || static_cast<size_t>(index) >= effectNodes.size()
         || static_cast<size_t>(destination) >= effectNodes.size()) return false;
-    if (usesDjSource() && (static_cast<size_t>(index)+1 == effectNodes.size()
+    if ((usesDjSource() || performanceReverbEnabled) && (static_cast<size_t>(index)+1 == effectNodes.size()
         || static_cast<size_t>(destination)+1 == effectNodes.size())) return false;
     ++effectLoadGeneration;
     const ScopedGraphPause pause(graph.get());
@@ -1192,9 +1204,47 @@ bool PluginHostEngine::configureDjSource(const DjSourceProfile& profile)
     return true;
 }
 
+void PluginHostEngine::configurePerformanceReverb(bool enabled)
+{
+    const ScopedGraphPause pause(graph.get());
+    performanceReverbEnabled=enabled;
+    performanceReverbMix=nullptr;
+    player.instrumentEffectsInGraph.store(false,std::memory_order_release);
+}
+
+bool PluginHostEngine::performanceReverbAvailable() const noexcept
+{
+    return performanceReverbEnabled && performanceReverbMix && !effectNodes.empty()
+        && !effectNodes.back().node->isBypassed();
+}
+float PluginHostEngine::getPerformanceReverbMix() const noexcept
+{
+    return performanceReverbMix ? juce::jlimit(0.f,1.f,performanceReverbMix->getValue()) : 0.f;
+}
+bool PluginHostEngine::setPerformanceReverbMix(float value)
+{
+    if(!performanceReverbEnabled || !performanceReverbMix || !std::isfinite(value))return false;
+    performanceReverbMix->beginChangeGesture();
+    performanceReverbMix->setValueNotifyingHost(juce::jlimit(0.f,1.f,value));
+    performanceReverbMix->endChangeGesture();
+    return true;
+}
+
 bool PluginHostEngine::rebuildConnections()
 {
     if (graph == nullptr || instrumentNode == nullptr || audioOutputNode == nullptr || midiInputNode == nullptr) return false;
+    performanceReverbMix=nullptr;
+    player.instrumentEffectsInGraph.store(false,std::memory_order_release);
+    if(performanceReverbEnabled) {
+        if(effectNodes.empty() || effectNodes.back().description.manufacturerName!="FabFilter"
+            || !effectNodes.back().description.name.containsIgnoreCase("Pro-R 2")) return false;
+        performanceReverbMix=proR2MixParameter(*effectNodes.back().node->getProcessor());
+        if(!performanceReverbMix) return false;
+        if(!usesDjSource() && !instrumentToneNode) {
+            if(!masterOutputService)return false;
+            instrumentToneNode=graph->addNode(std::make_unique<InstrumentToneProcessor>(*masterOutputService));
+        }
+    }
     for (const auto& connection : graph->getConnections())
         graph->removeConnection(connection);
     const auto midiConnected = graph->addConnection(
@@ -1202,18 +1252,22 @@ bool PluginHostEngine::rebuildConnections()
           { instrumentNode->nodeID, juce::AudioProcessorGraph::midiChannelIndex } });
     if(usesDjSource()) {
         if(!djTrackNode||!djBusNode||!djOutputNode||effectNodes.empty())return false;
-        // The final external effect is the original shared Pro-R 2 bus. Track 7
-        // also has a direct master send; preserving this parallel path matters.
+        // Legacy source packages preserve their parallel master send. The new
+        // controllable insert owns dry/wet once, so it must not duplicate dry audio.
         const auto& bus=effectNodes.back();
         if(!bus.description.name.containsIgnoreCase("Pro-R 2"))return false;
         std::vector<juce::AudioProcessorGraph::Node::Ptr> pre;
         for(size_t i=0;i+1<effectNodes.size();++i)pre.push_back(effectNodes[i].node);
         return midiConnected && connectDjSourceGraph(*graph,instrumentNode,pre,djTrackNode,
-            bus.node,djBusNode,djOutputNode,audioOutputNode,djSource.directToMaster);
+            bus.node,djBusNode,djOutputNode,audioOutputNode,
+            djSource.directToMaster && !performanceReverbEnabled);
     }
     std::vector<juce::AudioProcessorGraph::Node::Ptr> chain;
-    for (const auto& slot : effectNodes)
+    for (const auto& slot : effectNodes) {
+        if(performanceReverbEnabled && &slot==&effectNodes.back())chain.push_back(instrumentToneNode);
         chain.push_back(slot.node);
+    }
+    player.instrumentEffectsInGraph.store(performanceReverbEnabled,std::memory_order_release);
     return midiConnected && connectSerialEffects(*graph, instrumentNode, chain, audioOutputNode);
 }
 
@@ -1454,6 +1508,9 @@ void PluginHostEngine::resetPerformance() noexcept
 {
     stringTremolo.request(false);
     const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
+    // Start the epoch before enqueueing CH2/technique releases so those messages
+    // survive along with new input; older queued notes/bends belong to the old sound.
+    player.requestPerformanceReset();
     kongDualSlot.reset([this](const auto& message) { queue(message, 0.0); });
     if(kontaktStandardControls.load())queue(juce::MidiMessage::controllerEvent(1,1,0),0.0);
     if(kongVibratoCC.load()==1) {
@@ -1463,7 +1520,6 @@ void PluginHostEngine::resetPerformance() noexcept
     }
     for (auto& value : lastNativeTechniqueMessages) value.store(0, std::memory_order_relaxed);
     lastBreathMidiValue.store(-1, std::memory_order_relaxed);
-    player.requestPerformanceReset();
     performanceChannel.store(1, std::memory_order_relaxed);
     lastPitchWheel.store(8192, std::memory_order_relaxed);
     for (auto& note : activeNotes) note.store(false, std::memory_order_relaxed);

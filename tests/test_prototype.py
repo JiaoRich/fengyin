@@ -256,8 +256,8 @@ class PrototypeStructureTests(unittest.TestCase):
         self.assertIsNotNone(match)
         version = match.group(1)
         self.assertIn(f'$Version = "{version}"', build_script)
-        self.assertIn(f"风吟 DJ 版 {version}", JS)
-        self.assertIn(f"风吟 DJ 版 {version}", HTML)
+        self.assertIn(f"风吟·音色测试版 {version}", JS)
+        self.assertIn(f"风吟·音色测试版 {version}", HTML)
 
     def test_professional_settings_save_a_separate_named_plan(self):
         for control_id in ("tone-expert", "expert-confirm-dialog", "expert-dialog", "preset-name-dialog",

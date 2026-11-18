@@ -8,6 +8,8 @@ class Release115(unittest.TestCase):
         audit=json.loads(audit_file.read_text(encoding='utf-8'))
         catalog=json.loads((ROOT/'prototype/voice-catalog.js').read_text(encoding='utf-8').split('=',1)[1].strip().rstrip(';'))
         self.assertEqual(len(audit),152 if audit_file.name in ('release-116-audit.json','release-140-audit.json') else 122)
+        added=json.loads((ROOT/'assets/voice/test-edition-audit.json').read_text(encoding='utf-8'));self.assertEqual(len(added),29)
+        audit+=added
         self.assertEqual({x['id'] for x in audit},{x['id'] for x in catalog['items']})
         self.assertEqual(catalog['voice'],'x6_lingyuyan_pro')
         for row in audit:

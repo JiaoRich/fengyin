@@ -24,8 +24,11 @@ class ToneRelease137(unittest.TestCase):
         self.assertEqual({p for p in embedded if not p.startswith('dj-source-')}, {r['asset'] for r in rows})
         for row in rows:
             with self.subTest(tone=row['name']):
+                changes=json.loads((ROOT/'assets/tone-packages/test-edition-audit.json').read_text(encoding='utf-8'))
+                changed=next(r for r in changes if r['asset']==row['asset'])
+                self.assertEqual(changed['oldSHA'],row['sha256'])
                 raw=(ROOT/'assets/tone-packages'/row['asset']).read_bytes()
-                self.assertEqual(hashlib.sha256(raw).hexdigest(),row['sha256'])
+                self.assertEqual(hashlib.sha256(raw).hexdigest(),changed['sha256'])
         names={r['name'] for r in rows}
         self.assertTrue({'梆笛*','曲笛2*','唢呐2*','小号1','小号2','浪漫中萨','浪漫次中萨','嘶吼中萨','嘶吼次中萨','气声中萨'} <= names)
         self.assertTrue({'小提琴-明亮','马头琴','葫芦丝'}.isdisjoint(names))

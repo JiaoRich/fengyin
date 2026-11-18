@@ -14,7 +14,7 @@ class DjRelease(unittest.TestCase):
   for row in rows:
    with self.subTest(tone=row['name']),zipfile.ZipFile(R/'assets/tone-packages'/row['asset']) as z:
     self.assertIsNone(z.testzip());self.assertEqual(sha((R/'assets/tone-packages'/row['asset']).read_bytes()),row['sha256'])
-    manifest=json.loads(z.read('manifest.json'));self.assertEqual(manifest['version'],3)
+    manifest=json.loads(z.read('manifest.json'));self.assertEqual(manifest['version'],4)
     self.assertFalse(manifest['pluginBinariesIncluded'])
     p=E.fromstring(z.read('tone.xml')).find('PRESET');self.assertEqual(p.get('djSourceChain'),'1')
     for name,key in [('djTrackGain','trackGain'),('djHardwareGain','hardwareGain')]:self.assertAlmostEqual(float(p.get(name)),row[key])
@@ -41,9 +41,10 @@ class DjRelease(unittest.TestCase):
   self.assertEqual(len(names),73)
   rows=json.loads((R/'assets/tone-packages/release-144-audit.json').read_text(encoding='utf-8'))['tones']
   self.assertEqual([n[0] for n in names if not n[0].startswith('dj-source-')],[r['id'] for r in rows])
-  for r in rows:self.assertEqual(sha((R/'assets/tone-packages'/r['asset']).read_bytes()),r['sha256'])
+  changes={r['id']:r for r in json.loads((R/'assets/tone-packages/test-edition-audit.json').read_text(encoding='utf-8'))}
+  for r in rows:self.assertEqual(changes[r['id']]['oldSHA'],r['sha256'])
   installer=(R/'installer/FengYin.iss').read_text(encoding='utf-8')
-  self.assertIn('DefaultDirName={autopf}\\风吟DJ版',installer)
+  self.assertIn('DefaultDirName={autopf}\\风吟·音色测试版',installer)
   self.assertIn('EE1A5E76-B5BA-44F0-9D05-57710440258B',installer)
   for f in ('MainComponent.cpp','MidiInputService.cpp','SoundPresetStore.cpp'):
    self.assertIn('FengYinDJ',(R/'native/Source'/f).read_text(encoding='utf-8'))

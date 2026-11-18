@@ -36,7 +36,8 @@ class Release146Tuning(unittest.TestCase):
         preset = self.preset('kontakt-kensa.fytonepack')
         self.assertEqual(preset.get('name'), '肯萨')
         self.assertEqual(preset.get('instrumentKey'), 'kontakt-kensa')
-        self.assertEqual(preset.findall('SERIAL_EFFECT'), [])
+        effects=preset.findall('SERIAL_EFFECT');self.assertEqual(len(effects),1)
+        self.assertEqual(ET.fromstring(effects[0].findtext('DESCRIPTION')).get('manufacturer'),'FabFilter')
         # Accepted 1115 export, after live user verification of soft onset/legato.
         # Host display name and unused bypassed effect are outside this state.
         digest = hashlib.sha256(codec.decode(preset.findtext('INSTRUMENT_STATE'))).hexdigest()

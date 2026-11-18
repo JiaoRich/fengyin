@@ -667,8 +667,10 @@ void MainComponent::setupWebInterface()
         })
         .withEventListener("setPerformanceReverb", [this](juce::var payload)
         {
-            if (isActivated)
-                masterOutput.setReverbMix(static_cast<float>(static_cast<double>(payload.getProperty("value", 0.28))));
+            if (!isActivated || pluginLoading || effectLoading) return;
+            const auto value=static_cast<float>(static_cast<double>(payload.getProperty("value", 0.2)));
+            if(pluginHost.usesPerformanceReverb())pluginHost.setPerformanceReverbMix(value);
+            else masterOutput.setReverbMix(value);
         })
         .withEventListener("setToneStyle", [this](juce::var payload)
         {
@@ -699,12 +701,18 @@ void MainComponent::setupWebInterface()
         })
         .withEventListener("previewCustomTone", [this](juce::var payload)
         {
-            if (isActivated && studioUnlocked && pluginHost.hasPlugin())
+            if (isActivated && studioUnlocked && pluginHost.hasPlugin() && !pluginLoading && !effectLoading) {
                 masterOutput.setToneStyle(customToneSettingsFromPayload(payload));
+                if(pluginHost.usesPerformanceReverb() && payload.hasProperty("reverb"))
+                    pluginHost.setPerformanceReverbMix(static_cast<float>(static_cast<double>(payload["reverb"])/100.0));
+            }
         })
         .withEventListener("cancelCustomTone", [this](juce::var)
         {
-            if (pluginHost.hasPlugin()) masterOutput.setToneStyle(currentBaseToneSettings);
+            if (pluginHost.hasPlugin()) {
+                masterOutput.setToneStyle(currentBaseToneSettings);
+                if(pluginHost.usesPerformanceReverb())pluginHost.setPerformanceReverbMix(currentBaseToneSettings.reverbMix);
+            }
         })
         .withEventListener("saveCustomPreset", [this](juce::var payload)
         {
@@ -855,7 +863,11 @@ void MainComponent::setupWebInterface()
         {
             masterOutput.setEqTone(static_cast<float>(static_cast<double>(payload.getProperty("eq", 0.2))));
             masterOutput.setWarmth(static_cast<float>(static_cast<double>(payload.getProperty("warmth", masterOutput.getWarmth()))));
-            masterOutput.setReverbMix(static_cast<float>(static_cast<double>(payload.getProperty("reverb", 0.28))));
+            if(!pluginLoading && !effectLoading) {
+                const auto mix=static_cast<float>(static_cast<double>(payload.getProperty("reverb", 0.28)));
+                if(pluginHost.usesPerformanceReverb())pluginHost.setPerformanceReverbMix(mix);
+                else masterOutput.setReverbMix(mix);
+            }
         })
         .withEventListener("showMidiSetup", [this](juce::var) { showMidiSetup(); })
         .withEventListener("showExpressionSettings", [this](juce::var) { showExpressionSettings(); })
@@ -1938,7 +1950,11 @@ void MainComponent::timerCallback()
         state->setProperty("growlSensitivity", midi.getGrowlSensitivity());
         state->setProperty("automaticBreathDetection", false);
         state->setProperty("djSourceChain",pluginHost.usesDjSource());
-        state->setProperty("reverbMix", masterOutput.getReverbMix());
+        const bool externalReverb=pluginHost.usesPerformanceReverb();
+        const float effectiveReverb=externalReverb?pluginHost.getPerformanceReverbMix():masterOutput.getReverbMix();
+        state->setProperty("externalReverb",externalReverb);
+        state->setProperty("reverbAvailable",externalReverb?pluginHost.performanceReverbAvailable():true);
+        state->setProperty("reverbMix",effectiveReverb);
         const auto tempo=fengyin::MusicTempoPolicy::forMode(midi.getMusicTempoMode());
         state->setProperty("musicTempoMode",midi.getMusicTempoMode());state->setProperty("musicTempoBpm",tempo.bpm);
         state->setProperty("reverbPreDelayMs",tempo.predelayMs);
@@ -1957,7 +1973,7 @@ void MainComponent::timerCallback()
         toneObject->setProperty("damping", toneSettings.reverbDamping * 100.0f);
         toneObject->setProperty("width", toneSettings.reverbWidth * 100.0f);
         toneObject->setProperty("harsh", toneSettings.harshControl / 0.35f * 100.0f);
-        toneObject->setProperty("reverb", toneSettings.reverbMix / 0.6f * 100.0f);
+        toneObject->setProperty("reverb", effectiveReverb / (externalReverb?1.f:0.6f) * 100.0f);
         toneObject->setProperty("room", toneSettings.reverbRoomSize * 100.0f);
         toneObject->setProperty("output", toneSettings.outputGain * 50.0f);
         state->setProperty("toneSettings", juce::var(toneObject.release()));
@@ -3037,6 +3053,7 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
     preset.instrumentState = currentPluginBrand == "kong" ? juce::MemoryBlock() : pluginHost.captureInstrumentState();
     preset.effects = pluginHost.captureEffectChain();
     preset.djSource = pluginHost.getDjSource();
+    preset.performanceReverb=pluginHost.usesPerformanceReverb();
     preset.toneParameters = pluginHost.captureToneParameters();
     preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureContainerState()
         : currentPluginBrand=="kontakt" ? preset.instrumentState : juce::MemoryBlock();
@@ -3054,7 +3071,7 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
     preset.instrumentModelName = pluginHost.getCurrentInstrumentModelName();
     preset.eqTone = masterOutput.getEqTone();
     preset.warmth = masterOutput.getWarmth();
-    preset.reverbMix = masterOutput.getReverbMix();
+    preset.reverbMix = preset.performanceReverb?pluginHost.getPerformanceReverbMix():masterOutput.getReverbMix();
     const auto settings = masterOutput.getToneStyle();
     preset.compressionThreshold = settings.compressionThreshold;
     preset.compressionRatio = settings.compressionRatio;
@@ -3147,6 +3164,7 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
     preset.instrumentState = currentPluginBrand == "kong" ? juce::MemoryBlock() : pluginHost.captureInstrumentState();
     preset.effects = pluginHost.captureEffectChain();
     preset.djSource = pluginHost.getDjSource();
+    preset.performanceReverb=pluginHost.usesPerformanceReverb();
     preset.toneParameters = pluginHost.captureToneParameters();
     preset.samplerState = currentPluginBrand == "kong" ? pluginHost.captureContainerState()
         : currentPluginBrand=="kontakt" ? preset.instrumentState : juce::MemoryBlock();
@@ -3204,7 +3222,7 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
     const auto settings = masterOutput.getToneStyle();
     preset.eqTone = settings.tone;
     preset.warmth = settings.warmth;
-    preset.reverbMix = settings.reverbMix;
+    preset.reverbMix = preset.performanceReverb?pluginHost.getPerformanceReverbMix():settings.reverbMix;
     preset.compressionThreshold = settings.compressionThreshold;
     preset.compressionRatio = settings.compressionRatio;
     preset.saturation = settings.saturation;
@@ -3221,6 +3239,7 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
         currentPresetId = preset.id;
         currentPresetIsCustom = true;
         currentBaseToneSettings = settings;
+        if(preset.performanceReverb)currentBaseToneSettings.reverbMix=preset.reverbMix;
         editingPresetId = preset.id;
         refreshPresetChoices();
         pluginStatus.setText(utf8("已保存草稿：") + name, juce::dontSendNotification);
@@ -3484,6 +3503,7 @@ void MainComponent::captureToneBeforePresetEdit()
     editingReturnKongTechniques=pluginHost.getKongTechniqueProfile();
     editingReturnSwamBreathGrowl=pluginHost.usesSwamBreathGrowl();
     editingReturnDjSource=pluginHost.getDjSource();
+    editingReturnPerformanceReverb=pluginHost.usesPerformanceReverb();
     editingReturnContainerProjectState.reset();
     if (currentPluginBrand == "kong")
         for (const auto& preset : cachedPresets)
@@ -3502,6 +3522,7 @@ void MainComponent::captureToneBeforePresetEdit()
                 break;
             }
     editingReturnToneSettings = masterOutput.getToneStyle();
+    if(editingReturnPerformanceReverb)editingReturnToneSettings.reverbMix=pluginHost.getPerformanceReverbMix();
 }
 
 void MainComponent::restoreToneBeforePresetEdit()
@@ -3547,6 +3568,7 @@ void MainComponent::restoreToneBeforePresetEdit()
     const auto kongTechniques=editingReturnKongTechniques;
     const auto swamBreathGrowl=editingReturnSwamBreathGrowl;
     const auto djProfile=editingReturnDjSource;
+    const auto externalReverb=editingReturnPerformanceReverb;
     const auto toneSettings = editingReturnToneSettings;
     const auto effectStates = editingReturnEffects;
     const auto initialState = brand == "kong"
@@ -3564,7 +3586,7 @@ void MainComponent::restoreToneBeforePresetEdit()
                          status.bufferSize > 0 ? status.bufferSize : 128,
                          initialState,
                          [this, presetId, presetName, styleId, brand, instrumentKey, instrumentName,
-                          wasCustom, modelIndex, parameters, toneSettings, effectStates, kongTechniques, swamBreathGrowl, djProfile, hasFullState]
+                          wasCustom, modelIndex, parameters, toneSettings, effectStates, kongTechniques, swamBreathGrowl, djProfile, externalReverb, hasFullState]
                          (bool success, const juce::String& message)
                          {
                              if (! success) { pluginLoading = false; return; }
@@ -3598,14 +3620,17 @@ void MainComponent::restoreToneBeforePresetEdit()
                              if(djProfile.enabled && !pluginHost.configureDjSource(djProfile)) { pluginLoading=false; midi.setPerformanceSink(nullptr); pluginStatus.setText(utf8("DJ原始控制路由无法恢复"),juce::dontSendNotification);return; }
                              activatePluginOutput(message, false, !djProfile.enabled, kongTechniques, swamBreathGrowl);
                              const auto audioStatus = audio.getStatus();
+                             pluginHost.configurePerformanceReverb(externalReverb);
+                             if(externalReverb)midi.setPerformanceSink(nullptr);
                              pluginHost.restoreEffectChain(effectStates, audioStatus.sampleRate > 0 ? audioStatus.sampleRate : 48000,
                                  audioStatus.bufferSize > 0 ? audioStatus.bufferSize : 128,
-                                 [safe = juce::Component::SafePointer<MainComponent>(this), finish](bool restored, const juce::String& error)
+                                 [safe = juce::Component::SafePointer<MainComponent>(this), finish, externalReverb, toneSettings](bool restored, const juce::String& error)
                                  {
                                      if (! safe) return;
                                      finish();
+                                     if(restored && externalReverb)restored=safe->pluginHost.setPerformanceReverbMix(toneSettings.reverbMix);
                                      if (! restored) safe->pluginStatus.setText(utf8("原效果链未完整恢复：") + error, juce::dontSendNotification);
-                                     if(safe->pluginHost.usesDjSource())safe->midi.setPerformanceSink(restored && !safe->recordingPerformancePaused ? &safe->pluginHost : nullptr);
+                                     if(safe->pluginHost.usesDjSource() || externalReverb)safe->midi.setPerformanceSink(restored && !safe->recordingPerformancePaused ? &safe->pluginHost : nullptr);
                                  });
                          });
 }
@@ -3659,7 +3684,7 @@ void MainComponent::loadPreset(fengyin::SoundPreset preset,
                     availableVersion = candidate.version;
                     // Different versions may interpret opaque state differently.
                     if (candidate.version != required.version
-                        && !(preset.djSource.enabled && fengyin::djEffectVersionCompatible(required,candidate))) continue;
+                        && !((preset.djSource.enabled || preset.performanceReverb) && fengyin::djEffectVersionCompatible(required,candidate))) continue;
                     effect.descriptionXml = candidate.createXml()->toString();
                     matched = true;
                     break;
@@ -3849,19 +3874,24 @@ void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
     pluginStatus.setText(utf8("已恢复音色：") + preset.name, juce::dontSendNotification);
     juce::Logger::writeToLog("Preset parameters restored; restoring effect chain");
     pluginLoading = true;
+    if(preset.performanceReverb)midi.setPerformanceSink(nullptr);
     const auto audioStatus = audio.getStatus();
+    pluginHost.configurePerformanceReverb(preset.performanceReverb);
     pluginHost.restoreEffectChain(preset.effects, audioStatus.sampleRate > 0 ? audioStatus.sampleRate : 48000,
         audioStatus.bufferSize > 0 ? audioStatus.bufferSize : 128,
-        [safe = juce::Component::SafePointer<MainComponent>(this), completion, restoreWarning](bool success, const juce::String& message)
+        [safe = juce::Component::SafePointer<MainComponent>(this), completion, restoreWarning, reverbEnabled=preset.performanceReverb, reverbMix=preset.reverbMix](bool success, const juce::String& message)
         {
             if (! safe) return;
             safe->pluginLoading = false;
             safe->effectStatus.setText(message, juce::dontSendNotification);
+            // VST3 parameter changes may be pending until the next audio block.
+            // The separately saved controller value also makes immediate-save/reload reliable.
+            if(success && reverbEnabled)success=safe->pluginHost.setPerformanceReverbMix(reverbMix);
             if (! success) {
-                if(safe->pluginHost.usesDjSource())safe->midi.setPerformanceSink(nullptr);
+                if(safe->pluginHost.usesDjSource() || safe->pluginHost.usesPerformanceReverb())safe->midi.setPerformanceSink(nullptr);
                 safe->pluginStatus.setText(utf8("音色未完整恢复：") + message, juce::dontSendNotification);
             }
-            if(success && safe->pluginHost.usesDjSource())safe->midi.setPerformanceSink(safe->recordingPerformancePaused?nullptr:&safe->pluginHost);
+            if(success && (safe->pluginHost.usesDjSource() || safe->pluginHost.usesPerformanceReverb()))safe->midi.setPerformanceSink(safe->recordingPerformancePaused?nullptr:&safe->pluginHost);
             if (completion) completion(success, message + " " + restoreWarning);
         });
 }

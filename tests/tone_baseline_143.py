@@ -23,6 +23,12 @@ def previous_bytes(relative_path):
         try:
             return archive.read(path.as_posix())
         except KeyError:
+            # These historical gain tests predate the approved external-reverb
+            # migration. Their unchanged gain fixtures already live in the audit.
+            if path.parent==TONE_PATH:
+                audit=json.loads((ROOT/TONE_PATH/'kong-volume-restore-137-audit.json').read_text(encoding='utf-8'))
+                if path.name in {r['file'] for r in audit['targets']}:
+                    with ZipFile(ROOT/audit['restoredBaseline']) as baseline:return baseline.read(path.name)
             return (ROOT / path).read_bytes()
 
 

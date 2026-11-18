@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.0.0 LANGUAGES C CXX)
+project(FengYin VERSION 1.0.1 LANGUAGES C CXX)
 option(FENGYIN_ARCHIVED_VIDEO_RECORDING "Build archived video-recording diagnostics, never for release" OFF)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
@@ -614,7 +614,7 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME bluetooth_midi_lifecycle COMMAND FengYinBluetoothMidiTests)
     set_tests_properties(bluetooth_midi_lifecycle PROPERTIES TIMEOUT 20)
-    add_executable(FengYinDjHostTests tests/test_dj_host.cpp
+    add_executable(FengYinDjHostTests tests/test_dj_host.cpp tests/test_performance_reset_delivery.cpp tests/test_performance_reverb_runtime.cpp
         native/Source/PluginHostEngine.cpp native/Source/SwamExpressionCurve.cpp
         native/Source/RecordingService.cpp native/Source/AccompanimentAudioService.cpp
         native/Source/MasterOutputService.cpp native/Source/SoundPresetStore.cpp)

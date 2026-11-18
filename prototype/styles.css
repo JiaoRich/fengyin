@@ -182,7 +182,4 @@ body:not(.compact-mode) .compact-action-row #music-tempo,body:not(.compact-mode)
 @media(max-height:850px){#page-settings.active{height:calc(100vh - 104px)}}
 @media(prefers-reduced-motion:reduce){#record.saving::before{animation:none}}
 
-/* DJ source tones remain unmistakable in all themes, including selected state. */
-.instrument-preset-card.dj-source-card { border-color: #ed993d; background: linear-gradient(135deg,rgba(216,111,27,.25),rgba(241,163,69,.12)); }
-.instrument-preset-card.dj-source-card h3 { color: var(--text-primary,inherit); }
-.instrument-preset-card.dj-source-card.active { border-color:#ffb55b; box-shadow: inset 4px 0 #f79d35,0 0 0 1px rgba(247,157,53,.4); }
+/* DJ source tones use the same theme and selection colours as other tones. */

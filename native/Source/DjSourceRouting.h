@@ -5,14 +5,15 @@
 #include "DjSourceProfile.h"
 namespace fengyin
 {
-// Pro-R 2 minor releases retain the original state format. Keep the source
-// version in the package; allow an already installed compatible 2.x release.
+// Permit forward Pro-R 2 minor-version restores, never send a newer state
+// to an older installed plugin. Exact tested package/runtime version is 2.06.
 inline bool djEffectVersionCompatible(const juce::PluginDescription& required,const juce::PluginDescription& candidate)
 {
     return required.version==candidate.version
         || (required.manufacturerName=="FabFilter" && candidate.manufacturerName=="FabFilter"
             && required.name=="Pro-R 2" && candidate.name==required.name
-            && required.version.getIntValue()==2 && candidate.version.getIntValue()==2);
+            && required.version.getIntValue()==2 && candidate.version.getIntValue()==2
+            && candidate.version.compareNatural(required.version)>=0);
 }
 struct DjMidiRoute
 {

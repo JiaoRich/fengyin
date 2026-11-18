@@ -5,7 +5,7 @@
   #define OutputDir "."
 #endif
 #ifndef AppVersion
-  #define AppVersion "1.0.0"
+  #define AppVersion "1.0.1"
 #endif
 #ifndef ChineseMessages
   #define ChineseMessages "compiler:Languages\ChineseSimplified.isl"
@@ -13,18 +13,18 @@
 
 [Setup]
 AppId={{EE1A5E76-B5BA-44F0-9D05-57710440258B}
-AppName=风吟DJ版
+AppName=风吟·音色测试版
 AppVersion={#AppVersion}
 VersionInfoVersion={#AppVersion}.0
 AppPublisher=风吟
-DefaultDirName={autopf}\风吟DJ版
-DefaultGroupName=风吟DJ版
+DefaultDirName={autopf}\风吟·音色测试版
+DefaultGroupName=风吟·音色测试版
 DisableProgramGroupPage=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 OutputDir={#OutputDir}
-OutputBaseFilename=风吟DJ版-{#AppVersion}-Windows-x64
+OutputBaseFilename=风吟·音色测试版-{#AppVersion}-Windows-x64
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
@@ -33,7 +33,7 @@ InfoBeforeFile={#SourceDir}\InstallNotice.txt
 CloseApplications=yes
 RestartApplications=no
 AlwaysRestart=yes
-UninstallDisplayName=风吟DJ版
+UninstallDisplayName=风吟·音色测试版
 
 [Languages]
 Name: "chinesesimp"; MessagesFile: "{#ChineseMessages}"
@@ -49,11 +49,11 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "MicrosoftEdgeWebView2Runt
 Source: "{#SourceDir}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Icons]
-Name: "{group}\风吟DJ版"; Filename: "{app}\FengYin.exe"
+Name: "{group}\风吟·音色测试版"; Filename: "{app}\FengYin.exe"
 Name: "{group}\安装 ASIO4ALL 低延迟组件"; Filename: "{app}\components\ASIO4ALL\ASIO4ALL_2_22.exe"
 Name: "{group}\安装 VB-CABLE 网页声音组件"; Filename: "{app}\components\VB-CABLE\VBCABLE_Setup_x64.exe"
 Name: "{group}\安装 Fresh Air 音色效果器"; Filename: "{app}\components\Fresh Air\Setup Fresh Air v1.0.8.exe"
-Name: "{autodesktop}\风吟DJ版"; Filename: "{app}\FengYin.exe"; Tasks: desktopicon
+Name: "{autodesktop}\风吟·音色测试版"; Filename: "{app}\FengYin.exe"; Tasks: desktopicon
 
 [InstallDelete]
 ; Remove only withdrawn application components on upgrade, never recordings.
@@ -105,7 +105,7 @@ var
   Code, Choice: Integer;
   Args: String;
 begin
-  WizardForm.StatusLabel.Caption := '正在检查 DJ 音色所需的 FabFilter Pro-R 2…';
+  WizardForm.StatusLabel.Caption := '正在检查音色所需的 FabFilter Pro-R 2…';
   Args := ExpandConstant('-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{app}\components\FabFilter\Install-FabFilter.ps1" -PackageDirectory "{app}\components\FabFilter"');
   repeat
     Code := -1;

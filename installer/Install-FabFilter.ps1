@@ -3,6 +3,9 @@ $ErrorActionPreference='Stop'
 $LogDir=Join-Path $env:ProgramData 'FengYinDJ/InstallLogs'
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $Log=Join-Path $LogDir 'FabFilter-Pro-R-2.txt'
+function Test-ProRVersion([version]$Version) {
+    return $Version.Major -eq 2 -and $Version -ge [version]'2.0.6.0'
+}
 function Find-ProR {
     foreach($Root in @($env:CommonProgramW6432,"$env:ProgramFiles/Common Files")) {
         if (-not $Root) {continue}
@@ -18,7 +21,8 @@ function Find-ProR {
                 if ($Reader.ReadUInt32() -ne 0x4550 -or $Reader.ReadUInt16() -ne 0x8664) {continue}
             } finally {$Stream.Dispose()}
             $V=(Get-Item -LiteralPath $Candidate).VersionInfo
-            if ($V.FileMajorPart -ge 2) {return $Candidate}
+            $InstalledVersion=[version]::new($V.FileMajorPart,$V.FileMinorPart,$V.FileBuildPart,$V.FilePrivatePart)
+            if (Test-ProRVersion $InstalledVersion) {return $Candidate}
         }
     }
     return $null

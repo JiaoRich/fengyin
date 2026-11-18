@@ -50,7 +50,7 @@ struct TonePackage
             return fail("方案包缺少清单或音色数据");
         const auto manifest = juce::JSON::parse(manifestBytes.toString());
         const int packageVersion=static_cast<int>(manifest["version"]);
-        if (manifest["format"].toString() != "fengyin-tone-package" || (packageVersion!=1 && packageVersion!=2 && packageVersion!=3)
+        if (manifest["format"].toString() != "fengyin-tone-package" || (packageVersion!=1 && packageVersion!=2 && packageVersion!=3 && packageVersion!=4)
             || static_cast<bool>(manifest["pluginBinariesIncluded"])) return fail("方案包版本或格式不支持");
         const auto* files = manifest["files"].getArray();
         if (! files || files->size() != zip.getNumEntries() - 1) return fail("方案包清单不完整");
@@ -78,7 +78,10 @@ struct TonePackage
         const auto presets = SoundPresetStore::fromXml(*xml);
         if (presets.size() != 1 || presets[0].instrumentChineseName.isEmpty()) return fail("音色数据不完整");
         auto preset = presets[0];
-        if((packageVersion==3)!=preset.djSource.enabled) return fail("DJ方案需要风吟DJ版，不能丢弃原始效果链信息");
+        if ((packageVersion==4)!=preset.performanceReverb) return fail("测试版混响方案元数据不完整");
+        if (packageVersion!=4 && (packageVersion==3)!=preset.djSource.enabled) return fail("DJ方案需要风吟DJ版，不能丢弃原始效果链信息");
+        if (preset.performanceReverb && (preset.effects.empty() || preset.reverbMix<0 || preset.reverbMix>1))
+            return fail("测试版混响方案缺少效果器或强度异常");
         if(packageVersion==2 && (preset.pluginBrand!="kong" || !preset.kongTechniques.enabled))
             return fail("新版民乐方案缺少明确的技巧路由");
         if(preset.kongTechniques.enabled && (preset.kongTechniques.vibratoCC!=-1 && preset.kongTechniques.vibratoCC!=1))
@@ -172,7 +175,7 @@ struct TonePackage
         auto* root = new juce::DynamicObject();
         juce::var manifest(root);
         root->setProperty("format", "fengyin-tone-package");
-        root->setProperty("version", preset.djSource.enabled ? 3 : (preset.kongTechniques.enabled ? 2 : 1));
+        root->setProperty("version", preset.performanceReverb ? 4 : (preset.djSource.enabled ? 3 : (preset.kongTechniques.enabled ? 2 : 1)));
         root->setProperty("instrument", preset.instrumentChineseName);
         root->setProperty("style", preset.name);
         root->setProperty("dependencies", dependencies);

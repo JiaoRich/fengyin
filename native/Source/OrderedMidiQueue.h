@@ -18,14 +18,14 @@ public:
     {
         for (std::size_t i = 0; i < capacity; ++i) slots[i].sequence.store(i);
     }
-    bool push(const std::uint8_t* bytes, int size, double time) noexcept
+    bool push(const std::uint8_t* bytes, int size, double time, std::uint64_t generation = 0) noexcept
     {
         if (!bytes || size <= 0 || size > 3) return false;
-        return pushEvent(bytes,size,time);
+        return pushEvent(bytes,size,time,generation);
     }
-    bool pushPair(const std::uint8_t* bytes, double time) noexcept { return bytes && pushEvent(bytes,6,time); }
+    bool pushPair(const std::uint8_t* bytes, double time, std::uint64_t generation = 0) noexcept { return bytes && pushEvent(bytes,6,time,generation); }
 private:
-    bool pushEvent(const std::uint8_t* bytes,int size,double time) noexcept
+    bool pushEvent(const std::uint8_t* bytes,int size,double time,std::uint64_t generation) noexcept
     {
         auto position = write.load(std::memory_order_relaxed);
         Slot* slot;
@@ -48,6 +48,7 @@ private:
         std::copy_n(bytes, static_cast<std::size_t>(size), slot->event.bytes.begin());
         slot->event.size = static_cast<std::uint8_t>(size);
         slot->event.timestampSeconds = time;
+        slot->event.generation = generation;
         slot->sequence.store(position + 1, std::memory_order_release);
         return true;
     }

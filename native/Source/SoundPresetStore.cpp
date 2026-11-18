@@ -111,6 +111,7 @@ std::unique_ptr<juce::XmlElement> SoundPresetStore::toXml(const juce::Array<Soun
         child->setAttribute("pluginProgramName", preset.pluginProgramName);
         child->setAttribute("containerInstrument", preset.containerInstrument);
         child->setAttribute("containerAdapter", preset.containerAdapter);
+        child->setAttribute("performanceReverb",preset.performanceReverb);
         if(preset.djSource.enabled) {
             child->setAttribute("djSourceChain",true);
             child->setAttribute("djTrackGain",double(preset.djSource.trackGain));
@@ -186,6 +187,7 @@ juce::Array<SoundPreset> SoundPresetStore::fromXml(const juce::XmlElement& root)
         preset.containerInstrument = child->getBoolAttribute("containerInstrument", false);
         preset.containerAdapter = child->getStringAttribute("containerAdapter");
         preset.swamBreathGrowl = preset.pluginBrand == "swam" && child->getBoolAttribute("swamBreathGrowl");
+        preset.performanceReverb=child->getBoolAttribute("performanceReverb",false);
         preset.djSource.enabled=child->getBoolAttribute("djSourceChain",false);
         preset.djSource.trackGain=float(child->getDoubleAttribute("djTrackGain",1));
         preset.djSource.hardwareGain=float(child->getDoubleAttribute("djHardwareGain",1));

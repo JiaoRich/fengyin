@@ -13,6 +13,9 @@ struct RealtimeMidiEvent
     std::array<std::uint8_t, 6> bytes {};
     std::uint8_t size = 0;
     double timestampSeconds = 0.0;
+    // Used by the host's ordered queue to separate performance-reset epochs.
+    // Ordinary SPSC users retain epoch zero.
+    std::uint64_t generation = 0;
 };
 
 // Single MIDI callback producer, single audio callback consumer. The storage is

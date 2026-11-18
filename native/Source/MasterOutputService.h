@@ -57,6 +57,10 @@ public:
 
     void setSampleRate(double value) noexcept;
     void processInstrument(float* const* outputs, int channels, int samples) noexcept;
+    // The test edition can place the existing tone processing before an external
+    // reverb. The performance fader/meter remain after it, before accompaniment.
+    void processInstrumentEffects(float* const* outputs, int channels, int samples, bool includeReverb) noexcept;
+    void processInstrumentOutput(float* const* outputs, int channels, int samples) noexcept;
     void processMaster(float* const* outputs, int channels, int samples) noexcept;
     void process(float* const* outputs, int channels, int samples) noexcept { processMaster(outputs, channels, samples); }
     bool getSpectrum(std::array<float, spectrumBands>& result);
