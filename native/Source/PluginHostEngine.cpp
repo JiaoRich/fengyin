@@ -6,6 +6,7 @@
 #include "TechniqueMidiDeduplication.h"
 #include "SwamTechniqueRouting.h"
 #include "SwamStateCompatibility.h"
+#include "SwamPerformanceState.h"
 #include "SimpleTechniquePolicy.h"
 #include "SwamPluginClassifier.h"
 #include "BreathResponse.h"
@@ -381,8 +382,21 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                                  double sampleRate,
                                  int bufferSize,
                                  const juce::MemoryBlock& initialState,
-                                 LoadCallback callback, bool verifyStateRoundtrip)
+                                 LoadCallback callback, bool verifyStateRoundtrip, bool centreSavedSwamBend)
 {
+    auto stateToRestore=initialState;
+    if(centreSavedSwamBend) {
+        const auto brand=SupportedInstrumentClassifier::classify(description.name,
+            description.manufacturerName,description.fileOrIdentifier);
+        if(brand!=SupportedInstrumentClassifier::Brand::swam || stateToRestore.getSize()>64u*1024u*1024u) {
+            if(callback)callback(false,juce::String::fromUTF8("音源状态无法安全恢复"));return;
+        }
+        const auto reset=SwamPerformanceState::centreSavedBend(stateToRestore);
+        if(!reset.supported) {
+            if(callback)callback(false,juce::String::fromUTF8("无法确认方案中的临时弯音状态，请重新导出方案"));return;
+        }
+        if(reset.changed)juce::Logger::writeToLog("SWAM load snapshot pitch centred; saved="+juce::String(reset.previous,8));
+    }
     parkCurrentContainer();
     unload();
     const auto generation = loadGeneration;
@@ -395,7 +409,7 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
         containerCache.erase(found);
     }
     juce::Logger::writeToLog("Plugin load request " + juce::String(generation) + ": " + description.name);
-    auto finish = [this, description, sampleRate, bufferSize, initialState, generation, verifyStateRoundtrip, cached,
+    auto finish = [this, description, sampleRate, bufferSize, initialState=std::move(stateToRestore), generation, verifyStateRoundtrip, cached,
          guard = lifetime, completion = std::move(callback)]
         (std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error) mutable
         {

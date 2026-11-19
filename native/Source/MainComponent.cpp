@@ -3632,7 +3632,7 @@ void MainComponent::restoreToneBeforePresetEdit()
                                      if (! restored) safe->pluginStatus.setText(utf8("原效果链未完整恢复：") + error, juce::dontSendNotification);
                                      if(safe->pluginHost.usesDjSource() || externalReverb)safe->midi.setPerformanceSink(restored && !safe->recordingPerformancePaused ? &safe->pluginHost : nullptr);
                                  });
-                         });
+                         },false,djProfile.enabled);
 }
 
 void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::String&)> completion)
@@ -3815,7 +3815,7 @@ void MainComponent::loadPreset(fengyin::SoundPreset preset,
                              activatePluginOutput(message, preset.instrumentState.getSize() == 0 && preset.samplerState.getSize() == 0, false,preset.kongTechniques);
                              pluginLoading = false;
                              completeLoadedPreset(preset, completion);
-                         },verifiedForwardMigration);
+                         },verifiedForwardMigration,preset.djSource.enabled);
 }
 
 void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,

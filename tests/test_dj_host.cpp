@@ -3,6 +3,7 @@
 #include "ToneStyleCatalog.h"
 #include "PublishedToneCatalog.h"
 #include "PerformanceReverb.h"
+#include "SwamPerformanceState.h"
 #include <cassert>
 #include <iostream>
 
@@ -58,6 +59,36 @@ public:
 };
 namespace fengyin {
 struct DjHostTestAccess {
+    static void checkSavedPitchLoad(const SoundPreset& preset) {
+        auto centred=preset.instrumentState;
+        const auto result=SwamPerformanceState::centreSavedBend(centred);assert(result.supported);
+        auto before=SwamStateCompatibility::read(preset.instrumentState),after=SwamStateCompatibility::read(centred);
+        assert(before && after);
+        std::map<juce::String,double> a,b;SwamStateCompatibility::params(*before,a);SwamStateCompatibility::params(*after,b);
+        assert(a.contains("pitchBend") && b.at("pitchBend")==0);a["pitchBend"]=0;assert(a==b);
+        auto* expected=before->getChildByName("program")->getChildByName("soundengine")->getChildByName("params");
+        for(auto* p:expected->getChildIterator())if(p->getStringAttribute("id")=="pitchBend")p->setAttribute("value","0.0");
+        assert(before->isEquivalentTo(after.get(),true));
+        const auto once=centred;const auto twice=SwamPerformanceState::centreSavedBend(centred);
+        assert(twice.supported && !twice.changed && centred==once);
+        // Exercise the production loadAsync state boundary, with and without the
+        // DJ-only option. This observer does not claim to synthesize SWAM audio.
+        juce::PluginDescription d;auto description=juce::parseXML(preset.instrumentDescriptionXml);
+        assert(description && d.loadFromXml(*description));
+        for(const bool enable:{false,true}) {
+            auto host=std::make_unique<PluginHostEngine>();
+            auto cached=std::make_shared<PluginHostEngine::CachedContainer>();
+            cached->instance=std::make_unique<SourceInstrument>(juce::MemoryBlock{});
+            host->containerCache[d.createIdentifierString()]=cached;
+            bool done=false;
+            host->loadAsync(d,48000,128,preset.instrumentState,[&](bool ok,const juce::String&){assert(ok);done=true;},false,enable);
+            assert(done && host->captureInstrumentState()==(enable?centred:preset.instrumentState));
+            assert(host->configureDjSource(preset.djSource));
+            assert(host->captureInstrumentState()==(enable?centred:preset.instrumentState));
+        }
+        auto malformed=preset.instrumentState;malformed.setSize(16);
+        auto untouched=malformed;assert(!SwamPerformanceState::centreSavedBend(malformed).supported && malformed==untouched);
+    }
     static SourceInstrument& install(PluginHostEngine& h,const SoundPreset& preset) {
         h.graph=std::make_unique<juce::AudioProcessorGraph>();h.graph->setPlayConfigDetails(0,2,48000,128);
         auto source=std::make_unique<SourceInstrument>(preset.instrumentState);auto* raw=source.get();
@@ -182,6 +213,7 @@ int main(int argc,char** argv){
         juce::String error;
         auto p=fengyin::TonePackage::read(root.getChildFile("assets/tone-packages/"+juce::String(tone.assetName.data())),error);
         assert(p);auto host=std::make_unique<fengyin::PluginHostEngine>();
+        fengyin::DjHostTestAccess::checkSavedPitchLoad(*p);
         auto& fake=fengyin::DjHostTestAccess::install(*host,*p);
         assert(host->configureDjSource(p->djSource));
         assert(host->applyExpressionAttackControl());assert(fake.attack->getIndex()==0);

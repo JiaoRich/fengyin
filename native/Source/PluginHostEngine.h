@@ -137,7 +137,8 @@ public:
                    double sampleRate,
                    int bufferSize,
                    const juce::MemoryBlock& initialState,
-                   LoadCallback callback, bool verifyStateRoundtrip = false);
+                   LoadCallback callback, bool verifyStateRoundtrip = false,
+                   bool centreSavedSwamBend = false);
     void unload();
     void prewarmContainers(const juce::Array<juce::PluginDescription>& descriptions,
                            double sampleRate, int bufferSize);
