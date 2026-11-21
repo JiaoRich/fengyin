@@ -33,6 +33,24 @@ let toast=await page.locator('#midi-connection-success').boundingBox(),dialog=aw
 await page.waitForTimeout(2100);assert(await page.locator('#midi-connection-success').isHidden());await render(connected);assert(await page.locator('#midi-connection-success').isHidden());
 await page.locator('#midi-current .midi-more').click();await page.locator('#midi-current').getByRole('button',{name:'忘记设备'}).click();assert(await page.locator('#midi-confirm').isVisible());assert((await page.locator('#midi-confirm-text').textContent()).includes('断开'));await page.locator('#midi-confirm-cancel').click();
 await page.locator('#midi-current .midi-more').click();await page.locator('#midi-current').getByRole('button',{name:'忘记设备'}).click();await page.locator('#midi-confirm-ok').click();assert.equal((await last()).action,'forget');assert.equal((await last()).id,'b');
+// Repair only appears for the exact native authentication failure and needs confirmation.
+const broken={...state,operationFailed:true,failedId:'b',repairId:'b',message:'设备配对认证未通过，请重新配对'};
+await render(broken);assert((await page.locator('#midi-device-list').textContent()).includes('已发现'));
+await page.locator('#midi-device-list').getByRole('button',{name:'重新配对',exact:true}).click();
+assert.equal(await page.locator('#midi-confirm-title').textContent(),'重新配对此设备？');
+await page.locator('#midi-confirm-cancel').click();assert.notEqual((await last()).action,'repair');
+await page.locator('#midi-device-list').getByRole('button',{name:'重新配对',exact:true}).click();
+await page.locator('#midi-confirm-ok').click();assert.equal((await last()).action,'repair');assert.equal((await last()).id,'b');
+// USB arriving while the repair confirmation is open must still block unpairing.
+await page.locator('#midi-device-list').getByRole('button',{name:'重新配对',exact:true}).click();
+await render({...broken,inputConnected:true,inputTransport:'usb',inputName:'USB wind',inputId:'usb-a'});
+const repairCount=await page.evaluate(()=>events.filter(e=>e.action==='repair').length);
+await page.locator('#midi-confirm-ok').click();assert.equal(await page.evaluate(()=>events.filter(e=>e.action==='repair').length),repairCount);
+await render({...state,connectingId:'b',devices:state.devices.map(d=>({...d,available:false}))});
+assert(await page.locator('#midi-history').getByRole('button',{name:'取消',exact:true}).isEnabled());
+await render(connected);
+await page.locator('#midi-current .midi-more').click();await page.locator('#midi-current').getByRole('button',{name:'忘记设备'}).click();
+assert.equal(await page.locator('#midi-confirm-title').textContent(),'忘记此设备？');assert.equal(await page.locator('#midi-confirm-ok').textContent(),'忘记设备');await page.locator('#midi-confirm-cancel').click();
 // Native USB takeover is reflected immediately; no stale BLE connected card.
 await render({...state,inputConnected:true,inputId:'usb-a',inputGeneration:3,inputName:'oodi C2',inputTransport:'usb'});assert.equal(await page.locator('#midi-current button').count(),0);assert(await page.locator('#midi-connection-success').isVisible());
 await page.locator('#midi-connection-close').click();assert.equal((await last()).action,'stopScan');

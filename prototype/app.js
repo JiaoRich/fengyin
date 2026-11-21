@@ -3679,7 +3679,8 @@ function positionMidiSuccess(){const target=!$('#midi-connection-dialog').hidden
 function showMidiSuccess(state){hideMidiSuccess();$('#midi-connection-success-name').textContent=`${state.inputName||'电吹管'} · ${state.inputTransport==='bluetooth'?'蓝牙':'USB'}`;const e=$('#midi-connection-success');positionMidiSuccess();e.hidden=false;if(!matchMedia('(prefers-reduced-motion: reduce)').matches)midiSuccessAnimation=e.animate([{opacity:0,transform:'translate(-50%, calc(-50% - 12px)) scale(.97)',offset:0},{opacity:1,transform:'translate(-50%, -50%) scale(1)',offset:.15},{opacity:1,transform:'translate(-50%, -50%) scale(1)',offset:.86},{opacity:0,transform:'translate(-50%, calc(-50% - 5px)) scale(.99)',offset:1}],{duration:2000,easing:'ease-out',fill:'forwards'});midiSuccessTimer=setTimeout(hideMidiSuccess,2000);}
 window.addEventListener('resize',()=>{if(!$('#midi-connection-success').hidden)positionMidiSuccess();});
 function midiDeviceDisambiguator(id){let hash=2166136261;for(const c of String(id)){hash^=c.codePointAt(0);hash=Math.imul(hash,16777619);}return(hash>>>0).toString(16).padStart(8,'0').toUpperCase();}
-function confirmMidiForget(row,connected){midiMenu='';$('#midi-confirm-text').textContent=`${row.name||'此设备'} 的连接记录将被清除${connected?'，当前蓝牙连接也会断开':''}。下次使用需要重新连接。`;midiConfirmation=()=>midiCommand('forget',row.id);$('#midi-confirm').hidden=false;$('#midi-confirm-cancel').focus();renderMidiConnection(midiConnectionState);}
+function confirmMidiForget(row,connected){midiMenu='';$('#midi-confirm-title').textContent='忘记此设备？';$('#midi-confirm-ok').textContent='忘记设备';$('#midi-confirm-text').textContent=`${row.name||'此设备'} 的连接记录将被清除${connected?'，当前蓝牙连接也会断开':''}。下次使用需要重新连接。`;midiConfirmation=()=>midiCommand('forget',row.id);$('#midi-confirm').hidden=false;$('#midi-confirm-cancel').focus();renderMidiConnection(midiConnectionState);}
+function confirmMidiRepair(row){midiMenu='';$('#midi-confirm-title').textContent='重新配对此设备？';$('#midi-confirm-text').textContent='将更新这台电吹管的 Windows 蓝牙配对记录，保留风吟中的设备设置。请在系统提示中允许连接。';$('#midi-confirm-ok').textContent='重新配对';midiConfirmation=()=>{if(midiConnectionState.inputConnected&&midiConnectionState.inputTransport==='usb'){midiNotice=usbMidiNotice;setTextIfChanged($('#midi-connection-message'),midiNotice);return;}midiCommand('repair',row.id);};$('#midi-confirm').hidden=false;$('#midi-confirm-cancel').focus();}
 function midiButton(text,action,cls=''){const b=document.createElement('button');b.type='button';b.textContent=text;if(cls)b.className=cls;b.onclick=action;return b;}
 function renderMidiConnection(state){
  midiConnectionState=state;const busy=!!state.connectingId,usb=state.inputConnected&&state.inputTransport==='usb';if(!usb)midiNotice='';
@@ -3688,7 +3689,7 @@ function renderMidiConnection(state){
  $('#midi-search').disabled=!state.supported||busy;$('#midi-search').textContent=state.scanning?'停止搜索':'搜索设备';
  const message=midiNotice||state.notice||(busy?state.message||'正在连接蓝牙 MIDI…':state.operationFailed&&!state.failedId?state.message:state.scanning?'正在查找附近的电吹管…':'');
  setTextIfChanged($('#midi-connection-message'),message||'');
- const signature=JSON.stringify([state.devices,state.connectedId,state.connectingId,state.inputConnected,state.inputName,state.inputTransport,state.inputId,state.operationFailed,state.failedId,state.operationFailed?state.message:'',midiMenu]);
+ const signature=JSON.stringify([state.devices,state.connectedId,state.connectingId,state.inputConnected,state.inputName,state.inputTransport,state.inputId,state.operationFailed,state.failedId,state.repairId,state.operationFailed?state.message:'',midiMenu]);
  if($('#midi-device-list').dataset.signature!==signature){
   $('#midi-device-list').dataset.signature=signature;const card=document.createElement('div');card.className='midi-current'+(!state.inputConnected?' offline':'');const icon=document.createElement('span');icon.className='midi-transport-icon';icon.textContent=state.inputConnected?(usb?'USB':'蓝牙'):'○';const label=document.createElement('div');label.className='device-label';const eye=document.createElement('small');eye.textContent='当前连接';const name=document.createElement('b');name.textContent=state.inputConnected?(state.inputName||'电吹管'):'尚未连接电吹管';const detail=document.createElement('small');detail.className='midi-current-status';detail.textContent=state.inputConnected?(usb?'● USB · 已连接':'● 蓝牙 · 已连接'):'插入 USB 数据线，或连接下方蓝牙设备';label.append(eye,name,detail);card.append(icon,label);
   const more=(parent,row,connected)=>{const b=midiButton('⋯',()=>{midiMenu=midiMenu===row.id?'':row.id;renderMidiConnection(midiConnectionState);},'midi-more');b.setAttribute('aria-label',`管理 ${row.name}`);b.disabled=busy;parent.append(b);if(midiMenu===row.id){const menu=document.createElement('div');menu.className='midi-device-menu';menu.append(midiButton('忘记设备',()=>confirmMidiForget(row,connected)));parent.append(menu);}};
@@ -3700,9 +3701,9 @@ function renderMidiConnection(state){
    const d=document.createElement('div');d.className='device-label';
    const n=document.createElement('b');
    n.textContent=(row.name||'蓝牙电吹管')+((state.devices||[]).filter(v=>v.name===row.name).length>1?` · ${midiDeviceDisambiguator(row.id)}`:'');
-   const pending=row.id===state.connectingId,failed=state.operationFailed&&state.failedId===row.id;
+   const pending=row.id===state.connectingId,failed=state.operationFailed&&state.failedId===row.id,repair=failed&&state.repairId===row.id;
    const status=document.createElement('small');
-   status.textContent=pending?'正在连接…':offline?'当前未发现':'可连接';
+   status.textContent=pending?'正在连接…':offline?'当前未发现':'已发现';
    d.append(n,status);
    if(failed){
     const error=document.createElement('small');error.className='midi-row-error';
@@ -3710,12 +3711,12 @@ function renderMidiConnection(state){
     d.append(error);
    }
    e.append(d);
-   const button=midiButton(pending?'取消':failed?'重试':'连接',()=>{
+   const button=midiButton(pending?'取消':repair?'重新配对':failed?'重试':'连接',()=>{
     if(pending){midiCommand('cancel');return;}
     if(usb){midiNotice=usbMidiNotice;setTextIfChanged($('#midi-connection-message'),midiNotice);return;}
-    midiNotice='';midiCommand('connect',row.id);
+    midiNotice='';if(repair){confirmMidiRepair(row);return;}midiCommand('connect',row.id);
    },pending?'':'primary-button');
-   button.disabled=offline||(busy&&!pending);
+   button.disabled=(offline&&!pending)||(busy&&!pending);
    e.append(button);
    if(row.remembered||row.paired)more(e,row,false);
    return e;

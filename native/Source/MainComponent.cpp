@@ -4701,7 +4701,7 @@ void MainComponent::handleMidiConnectionAction(const juce::var& payload)
         activeBluetoothId.clear(); desiredBluetoothId.clear(); midi.suspendAutomaticConnection(false);
         midi.connect(id); lastWebStateAtMs = 0; emitMidiConnectionState(); return;
     }
-    if (action == "connect")
+    if (action == "connect" || action == "repair")
     {
         reconcileMidiInputs();
         if (midi.getSnapshot().deviceConnected && !midi.isExternalConnected())
@@ -4711,7 +4711,7 @@ void MainComponent::handleMidiConnectionAction(const juce::var& payload)
         }
     }
     midiConnectionNotice.clear();
-    if (action == "connect" || action == "forget")
+    if (action == "connect" || action == "repair" || action == "forget")
     {
         bool known = false;
         const auto state = bluetoothMidi.snapshot();
@@ -4719,9 +4719,10 @@ void MainComponent::handleMidiConnectionAction(const juce::var& payload)
             for (const auto& row : *rows) known |= row["id"].toString() == id;
         if (!known) { emitMidiConnectionState(); return; }
     }
-    if (action == "connect") desiredBluetoothId = id;
+    if (action == "repair" && bluetoothMidi.snapshot()["repairId"].toString() != id) { emitMidiConnectionState(); return; }
+    if (action == "connect" || action == "repair") desiredBluetoothId = id;
     if (action == "disconnect" || action == "cancel" || (action == "forget" && id == desiredBluetoothId)) desiredBluetoothId.clear();
-    if (action == "connect" || action == "disconnect" || action == "cancel" || action == "forget")
+    if (action == "connect" || action == "repair" || action == "disconnect" || action == "cancel" || action == "forget")
     {
         midi.suspendAutomaticConnection(false);
         if (action == "disconnect" || action == "cancel" || (action == "forget" && id == activeBluetoothId))
@@ -4731,7 +4732,7 @@ void MainComponent::handleMidiConnectionAction(const juce::var& payload)
             activeBluetoothId.clear(); lastWebStateAtMs = 0;
         }
     }
-    if (action == "connect" || action == "disconnect" || action == "cancel" || action == "forget"
+    if (action == "connect" || action == "repair" || action == "disconnect" || action == "cancel" || action == "forget"
         || action == "scan" || action == "stopScan") bluetoothMidi.command(action, id);
     emitMidiConnectionState();
 }
@@ -4745,6 +4746,7 @@ void MainComponent::reconcileMidiInputs()
     if (usbPresent && (midi.isExternalConnected() || activeBluetoothId.isNotEmpty() || desiredBluetoothId.isNotEmpty()))
     {
         // Stop delivery and invalidate the BLE request before opening USB.
+        juce::Logger::writeToLog("Bluetooth MIDI: USB/system MIDI takeover; available inputs="+juce::String(static_cast<int>(midi.getLastAvailableDevices().size())));
         bluetoothMidi.setReceiver({});
         bluetoothMidi.command("disconnect");
         desiredBluetoothId.clear(); activeBluetoothId.clear();
