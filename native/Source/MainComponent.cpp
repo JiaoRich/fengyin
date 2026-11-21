@@ -315,7 +315,7 @@ void MainComponent::setupWebInterface()
         .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
         .withWinWebView2Options(juce::WebBrowserComponent::Options::WinWebView2{}
             .withUserDataFolder(juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-                .getChildFile("FengYinDJ").getChildFile("WebView2"))
+                .getChildFile("FengYin").getChildFile("WebView2"))
             .withStatusBarDisabled()
             .withBackgroundColour(juce::Colour(0xff07101d)))
         .withNativeIntegrationEnabled()
@@ -886,7 +886,7 @@ void MainComponent::setupWebInterface()
         })
         .withEventListener("exportAudioPathDiagnostic", [this](juce::var)
         {
-            const auto folder = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("FengYinDJ");
+            const auto folder = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("FengYin");
             const auto destination = juce::File::getSpecialLocation(juce::File::userDesktopDirectory)
                 .getNonexistentChildFile(utf8("风吟音频链路诊断-") + juce::Time::getCurrentTime().formatted("%Y%m%d-%H%M%S"), ".txt");
             const auto contents = juce::String("FengYin audio-path diagnostic v1\nExported: ")
@@ -957,7 +957,7 @@ void MainComponent::setupWebInterface()
 juce::File MainComponent::prepareLocalWebInterface()
 {
     const auto root = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-                          .getChildFile("FengYinDJ").getChildFile("web-runtime");
+                          .getChildFile("FengYin").getChildFile("web-runtime");
     const juce::StringArray files {
         "prototype/index.html", "prototype/styles.css", "prototype/app.js", "prototype/voice-catalog.js", "prototype/voice-guide.js", "assets/fengyin-app-icon.png",
         "assets/instruments/instrument_soprano_sax.png", "assets/instruments/instrument_alto_sax.png",
@@ -1581,7 +1581,7 @@ void MainComponent::logAudioDiagnostic(const fengyin::AudioDeviceStatus& status)
     if(now<nextAudioDiagnosticMs)return;
     nextAudioDiagnosticMs=now+5000;
     const bool detailed=pluginHost.isStageTimingEnabled();
-    const auto folder=juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("FengYinDJ");
+    const auto folder=juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("FengYin");
     folder.createDirectory();
     const auto log=folder.getChildFile(detailed?"audio-timing-diagnostic.log":"audio-source-diagnostic.log");
     if(log.getSize()>(detailed?16*1024*1024:256*1024))log.replaceWithText("");
@@ -3434,7 +3434,7 @@ void MainComponent::showRecordingManager()
 juce::File MainComponent::getOnboardingMarkerFile()
 {
     return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-        .getChildFile("FengYinDJ").getChildFile("setup-complete.txt");
+        .getChildFile("FengYin").getChildFile("setup-complete.txt");
 }
 
 void MainComponent::showSetupGuide(bool automatic)
@@ -3983,7 +3983,7 @@ namespace
 juce::File bendPreferencesFile()
 {
     return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-        .getChildFile("FengYinDJ").getChildFile("bend-ranges.json");
+        .getChildFile("FengYin").getChildFile("bend-ranges.json");
 }
 juce::var readBendPreferences()
 {

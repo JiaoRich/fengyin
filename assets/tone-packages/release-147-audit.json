@@ -1,0 +1,2737 @@
+{
+  "baseline": "70ea05ba27a5839d686bea002398522e57825c69",
+  "count": 60,
+  "swam": 40,
+  "rows": [
+    {
+      "id": "kontakt-kensa",
+      "asset": "kontakt-kensa.fytonepack",
+      "name": "肯萨",
+      "swam": false,
+      "sourceSHA": "1ee08b4ab3a177d2969adb56511b449576343ae83d5c88b770a3b567ed176d70",
+      "resultSHA": "1ee08b4ab3a177d2969adb56511b449576343ae83d5c88b770a3b567ed176d70",
+      "sourceXML": "29015bd719f0b21c18cb4070a82d175dced937748d2af60ea43b77a64e0cbb19",
+      "resultXML": "29015bd719f0b21c18cb4070a82d175dced937748d2af60ea43b77a64e0cbb19",
+      "changes": [],
+      "instrumentKey": "kontakt-kensa"
+    },
+    {
+      "id": "soprano-kenny",
+      "asset": "soprano-kenny.fytonepack",
+      "name": "原声高萨",
+      "swam": true,
+      "sourceSHA": "177ecacd08485fd9ee1d22d2755887a85710d3d4bdcaadbad0e5aa7924e3c04e",
+      "resultSHA": "2bf7500de14e7451c789eaddbc6fcd4e97b37bb99d81ce40755fe8a1e644c9ed",
+      "sourceXML": "a8bca0f943d1d236f50b9090ba19a5b66ecb5b5df5326920e74fedf05f0839a9",
+      "resultXML": "9a9767521aa557d92c39b5ea5f612dfccc195df108aff3c5503ff7522e5f333b",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-19.5",
+          "after": "0.0"
+        },
+        {
+          "parameter": "voiceComb1Wet",
+          "before": "-0.1599999964237213",
+          "after": "0.01000000536441803"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "voiceComb1Wet",
+          "before": {
+            "enabled": "1",
+            "parameterId": "voiceComb1Wet",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "voiceComb1Wet",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        },
+        {
+          "route": "formant",
+          "before": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        },
+        {
+          "curve": "formant",
+          "before": {
+            "input_min": "35.0",
+            "input_max": "127.0",
+            "out_min": "39.0",
+            "out_max": "127.0",
+            "shape": "0.25",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          },
+          "after": {
+            "input_min": "0",
+            "input_max": "127",
+            "out_min": "78",
+            "out_max": "127",
+            "shape": "0",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          }
+        }
+      ],
+      "instrumentKey": "soprano-sax"
+    },
+    {
+      "id": "soprano-pop",
+      "asset": "soprano-pop.fytonepack",
+      "name": "明亮高萨",
+      "swam": true,
+      "sourceSHA": "4ec54b705c8b9c2d7b962000525e1f4d847fa7ef5447a016c40475cbb7986b57",
+      "resultSHA": "4c2dc391784a3467821142db25b07545675cda6b9e5c4f467f5b81d5265f6071",
+      "sourceXML": "08fdcf1d65230cdcd48a701c0b9a6941814744498b305fb1b25f5d7c0fac63e1",
+      "resultXML": "2e51f99aa59672d53b72463023663e2286ea7fe998033bd90aca7e926414b962",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-21.90000152587891",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "formant",
+          "before": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        },
+        {
+          "curve": "formant",
+          "before": {
+            "input_min": "0.0",
+            "input_max": "127.0",
+            "out_min": "0.0",
+            "out_max": "127.0",
+            "shape": "0.0",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          },
+          "after": {
+            "input_min": "0",
+            "input_max": "127",
+            "out_min": "78",
+            "out_max": "127",
+            "shape": "0",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          }
+        }
+      ],
+      "instrumentKey": "soprano-sax"
+    },
+    {
+      "id": "dj-source-02",
+      "asset": "dj-source-02.fytonepack",
+      "name": "#清韵高萨",
+      "swam": true,
+      "sourceSHA": "2f78dcb6e7506030ffdbf5ca8e42157c834f19bc1b964c7cc6a11e8d50105403",
+      "resultSHA": "a495360559da09565478dc20dc06debdbc2e13e980fd45782fdbbbaabd0807fe",
+      "sourceXML": "a9beaaa35e3404703ab7275b4d24625c5925db8a12dc6d358af9c1d680cc98e6",
+      "resultXML": "efc47f3239c7e9e15ef70da06f0bf353394b44cb24e69e65123eaddb83f8ba66",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-2.699996948242188",
+          "after": "0.0"
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        }
+      ],
+      "instrumentKey": "soprano-sax"
+    },
+    {
+      "id": "dj-source-03",
+      "asset": "dj-source-03.fytonepack",
+      "name": "#悠扬高萨",
+      "swam": true,
+      "sourceSHA": "9ce5df27084f93387bcd1d745ab477cf68e6466254d4a9796797c62e9762e8cd",
+      "resultSHA": "afb24401c32af57014d0867656ceb4f192276d2d46459ca722bcc832d2a8b860",
+      "sourceXML": "c55f3446b9f98ce3778f00ce2889fa29bdb71ccff11c425599a7fe3fed52a19a",
+      "resultXML": "5e5ea3436acf008bb60dd6e2c075678bfd6bdc14d3a8c65e23204300dab8772a",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-2.699996948242188",
+          "after": "0.0"
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        }
+      ],
+      "instrumentKey": "soprano-sax"
+    },
+    {
+      "id": "alto-jazz",
+      "asset": "alto-jazz.fytonepack",
+      "name": "爵士中萨",
+      "swam": true,
+      "sourceSHA": "eaaeb8ecfd3b9bbe8bd2a2f0f66e59d2e34aa91006826fe44dd310a0baa551cd",
+      "resultSHA": "7a594b4d92a5a113beff513b2a9adfd7343e92a460176012eb3175dd54c109f9",
+      "sourceXML": "d16239b525c19a5f99fd1238feef9f845b8bd7890234083835199d56c820285e",
+      "resultXML": "92b2a22b620b4a32f8e5c2abb71a0b85c0a5404f66a4826d1a2b0b3e92e26f96",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-18.0",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "formant",
+          "before": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        },
+        {
+          "curve": "formant",
+          "before": {
+            "input_min": "87.0",
+            "input_max": "127.0",
+            "out_min": "0.0",
+            "out_max": "92.0",
+            "shape": "0.0",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          },
+          "after": {
+            "input_min": "0",
+            "input_max": "127",
+            "out_min": "85",
+            "out_max": "115",
+            "shape": "0",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          }
+        }
+      ],
+      "instrumentKey": "alto-sax"
+    },
+    {
+      "id": "alto-deep",
+      "asset": "alto-deep.fytonepack",
+      "name": "深情中萨",
+      "swam": true,
+      "sourceSHA": "ec9485138be8e20c8b12c8a9cf9dec25035791b32c6a8e318370cf22cf3014c6",
+      "resultSHA": "f69a8b0b447a06fc933f5c73c6ab38ec5c5d1a63981278d91eb9909c09bce8ae",
+      "sourceXML": "5d21b0ee074cb1916e14169a0fc9e238ed1640f4d582ddddee303c5f3989a70c",
+      "resultXML": "64acf33416d818c529ac30417bd7f1e71accc30181979abd9adddc2c24e82bf4",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-24.59999847412109",
+          "after": "0.0"
+        },
+        {
+          "parameter": "voiceComb1Wet",
+          "before": "-0.1599999964237213",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "voiceComb1Wet",
+          "before": {
+            "enabled": "1",
+            "parameterId": "voiceComb1Wet",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "voiceComb1Wet",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        },
+        {
+          "route": "formant",
+          "before": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        },
+        {
+          "curve": "formant",
+          "before": {
+            "input_min": "55.0",
+            "input_max": "127.0",
+            "out_min": "0.0",
+            "out_max": "75.0",
+            "shape": "0.0",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          },
+          "after": {
+            "input_min": "0",
+            "input_max": "127",
+            "out_min": "39",
+            "out_max": "127",
+            "shape": "0",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          }
+        }
+      ],
+      "instrumentKey": "alto-sax"
+    },
+    {
+      "id": "alto-pop",
+      "asset": "alto-pop.fytonepack",
+      "name": "流行中萨",
+      "swam": true,
+      "sourceSHA": "64888b957c571517df54420271ec67594f138536108e2858b31730ed19fd0ef8",
+      "resultSHA": "266128e6cb73a8856ea91b7f1f43c1101e260859c6df977979d60230497a6da7",
+      "sourceXML": "c44820f12fb7fc25d45eec3c309da3d79481c2f2bfdceccb6ab1af2587711d38",
+      "resultXML": "90ae0f551208f40d3fb468fa0a58137620fef6abe8c908f9d1f21ca3e75772fb",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-24.59999847412109",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        }
+      ],
+      "instrumentKey": "alto-sax"
+    },
+    {
+      "id": "alto-silky",
+      "asset": "tone137-alto-silky.fytonepack",
+      "name": "浪漫中萨",
+      "swam": true,
+      "sourceSHA": "e6d711ca29331ecf8412cf2dae5840748df27f00dd379b877c781baf8fa56b50",
+      "resultSHA": "90439a8c55c848d59c0cbf5efbdaf940cf7998b5439ce7413b737b8549867a59",
+      "sourceXML": "226aef2671adc80bf4c640f9f3baa78d2a2ca7bb28007c6736c0f3b076ce89c9",
+      "resultXML": "812b1a57f10c0f6d417f928fb285933948e897a5deb8c99460ccc17b869c6299",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "0.0",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "formant",
+          "before": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "curve": "formant",
+          "before": {
+            "input_min": "73.0",
+            "input_max": "127.0",
+            "out_min": "1.0",
+            "out_max": "77.0",
+            "shape": "0.25",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          },
+          "after": {
+            "input_min": "0",
+            "input_max": "127",
+            "out_min": "39",
+            "out_max": "127",
+            "shape": "0",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          }
+        }
+      ],
+      "instrumentKey": "alto-sax"
+    },
+    {
+      "id": "alto-breath-growl",
+      "asset": "alto-breath-growl.fytonepack",
+      "name": "嘶吼中萨",
+      "swam": true,
+      "sourceSHA": "55344c546e208d7a011f8dca6f634f459d960333b023b35822e1869aec86ac01",
+      "resultSHA": "fe584e694d08aa4a8ae3d09bd4396ecb4603280f30c027bfac60db0d68efb12d",
+      "sourceXML": "10c273c7da00b0ac4c2037134920e9ef4714a6e52342addcc76fac1be0f02694",
+      "resultXML": "39cf185c6b042e225c9a8951b6c49f14ab27f629a3327caf74a6027353f83d19",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-24.59999847412109",
+          "after": "0.0"
+        },
+        {
+          "parameter": "voiceComb1Wet",
+          "before": "-0.1599999964237213",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "voiceComb1Wet",
+          "before": {
+            "enabled": "1",
+            "parameterId": "voiceComb1Wet",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "voiceComb1Wet",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        },
+        {
+          "route": "growl",
+          "before": {
+            "enabled": "1",
+            "parameterId": "growl",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "growl",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "formant",
+          "before": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        },
+        {
+          "curve": "formant",
+          "before": {
+            "input_min": "55.0",
+            "input_max": "127.0",
+            "out_min": "0.0",
+            "out_max": "75.0",
+            "shape": "0.0",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          },
+          "after": {
+            "input_min": "0",
+            "input_max": "127",
+            "out_min": "39",
+            "out_max": "127",
+            "shape": "0",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          }
+        }
+      ],
+      "instrumentKey": "alto-sax"
+    },
+    {
+      "id": "alto-breathy",
+      "asset": "alto-breathy.fytonepack",
+      "name": "气声中萨",
+      "swam": true,
+      "sourceSHA": "40b29f3e9d4e43c5ae32ed3a7f327fe93d983359b192c69adf6493e4d629258b",
+      "resultSHA": "a3ea229ddc34be46e8915e3e492e14b6ca50bfcd6feff5125fd17f2b6a79c88b",
+      "sourceXML": "66f0978fae01b5bdfb48b7fbd594b7c252db2b1a02992f2d87daf8b066eaa72b",
+      "resultXML": "f6339c420d5dbd20322c401bf7c164535b654f218e2eb3a5c7ce2cb2a81fcbc3",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-24.59999847412109",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "breathNoise",
+          "before": {
+            "enabled": "1",
+            "parameterId": "breathNoise",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "breathNoise",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        }
+      ],
+      "instrumentKey": "alto-sax"
+    },
+    {
+      "id": "dj-source-05",
+      "asset": "dj-source-05.fytonepack",
+      "name": "#明亮中萨",
+      "swam": true,
+      "sourceSHA": "1ec18e6126a8f4e22640db337a1292a5a2880d00f716bf3a94f0d0145fe7e7bd",
+      "resultSHA": "bd3b96d2ceb770da3b52f17fd5d44815076b3173b72eff5149529f5c07c79425",
+      "sourceXML": "e1af7fd187adc5ccbeb187c6fe5dfd6fe1ad7e49b62d93847d5cd13e3c62cfda",
+      "resultXML": "bf0fe558f916972e227a9de01b9374dbcc529dc5284d2610bd08f0357042cc2f",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-3.099998474121094",
+          "after": "0.0"
+        }
+      ],
+      "instrumentKey": "alto-sax"
+    },
+    {
+      "id": "dj-source-06",
+      "asset": "dj-source-06.fytonepack",
+      "name": "#温润中萨",
+      "swam": true,
+      "sourceSHA": "63b3fcd469c7fe432693a34e0f4196e3fc16897f992caa205e6cf2533361bc32",
+      "resultSHA": "f0798f656c1172568ff1ade196dfb8f2e7f5fa87a4fb983a783bd45fd2d8a8b5",
+      "sourceXML": "a013a28312a8fbf4392960d52b2db5eda3cecaf40a6ffd87b07b0f0ef94d743d",
+      "resultXML": "0d90a3a54a2ad21dea5d3a1a23a1dfb0f949c1032adab1d8a9d15c6039e868ef",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-1.099998474121094",
+          "after": "0.0"
+        }
+      ],
+      "instrumentKey": "alto-sax"
+    },
+    {
+      "id": "dj-source-07",
+      "asset": "dj-source-07.fytonepack",
+      "name": "#丝滑中萨",
+      "swam": true,
+      "sourceSHA": "b724720e3debc28b53e812d4497b9ca4926d757ce16b31c1dae234bcc53b6b72",
+      "resultSHA": "64730b254af0fab378eb87aecf70fa71475ffe859fce9417cca1f5a2fd70f9e9",
+      "sourceXML": "7580d1970d9c229bbbc6c76279164809aab494084bcc09abf280010a20cabbf2",
+      "resultXML": "edb7059501041b5f4a264565ff469d5f5fbbe9886ed5c73b4cd23a5153454d34",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-6.900001525878906",
+          "after": "0.0"
+        }
+      ],
+      "instrumentKey": "alto-sax"
+    },
+    {
+      "id": "tenor-mellow",
+      "asset": "tenor-mellow.fytonepack",
+      "name": "醇厚次中萨",
+      "swam": true,
+      "sourceSHA": "cb0c0f81e5a63681a42cdd9ec4729141dbb67957a60dcdf1572379edc88f3610",
+      "resultSHA": "8e4cdcb8bc71ceb83087dbe17fd14323599ec8cf28396afd60ef59d3833facb3",
+      "sourceXML": "45989d18ae29e807fff98f21dde653ab335044b220880477a7a839b8fbce7543",
+      "resultXML": "6d4910429e2f4ac43374079f4b3e6a1b28afed9f76ca25fbb533b0aba3e89c12",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-24.09999847412109",
+          "after": "0.0"
+        },
+        {
+          "parameter": "voiceComb1Wet",
+          "before": "-0.1599999964237213",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "voiceComb1Wet",
+          "before": {
+            "enabled": "1",
+            "parameterId": "voiceComb1Wet",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "voiceComb1Wet",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        },
+        {
+          "route": "formant",
+          "before": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        },
+        {
+          "curve": "formant",
+          "before": {
+            "input_min": "77.0",
+            "input_max": "127.0",
+            "out_min": "0.0",
+            "out_max": "89.0",
+            "shape": "0.25",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          },
+          "after": {
+            "input_min": "0",
+            "input_max": "127",
+            "out_min": "70",
+            "out_max": "127",
+            "shape": "0",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          }
+        }
+      ],
+      "instrumentKey": "tenor-sax"
+    },
+    {
+      "id": "tenor-warm",
+      "asset": "tenor-warm.fytonepack",
+      "name": "温暖次中萨",
+      "swam": true,
+      "sourceSHA": "8a7adcaa5a20850a1f4decf0d0853e884d1e4df86ac493b435c45e53a601fa4e",
+      "resultSHA": "863d70856bc3505f71c5f3c55485abcd11f8110c1a5e1c99b2bd99e1cb91d7ee",
+      "sourceXML": "487116dcd0880fb3c171e2b0853db13820bcdd0d486d15664d20f0d2721ce670",
+      "resultXML": "d9410ecabd65370cb871acb518559f9f4d49e22059aa647262a56ea412581212",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-24.59999847412109",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "formant",
+          "before": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        },
+        {
+          "curve": "formant",
+          "before": {
+            "input_min": "79.0",
+            "input_max": "127.0",
+            "out_min": "0.0",
+            "out_max": "64.0",
+            "shape": "0.25",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          },
+          "after": {
+            "input_min": "0",
+            "input_max": "127",
+            "out_min": "35",
+            "out_max": "127",
+            "shape": "0",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          }
+        }
+      ],
+      "instrumentKey": "tenor-sax"
+    },
+    {
+      "id": "tenor-silky",
+      "asset": "tone137-tenor-silky.fytonepack",
+      "name": "浪漫次中萨",
+      "swam": true,
+      "sourceSHA": "47a496da1cd894e8fda3bdfc800a64b7af0781fdaaa936945f9622886bc83fba",
+      "resultSHA": "d6a809da2c1de92b68050b356c025bba50acf7e68351bb056532bb3e8376d510",
+      "sourceXML": "3c17fb88feaa9f0b752d54886a45a3caa43eb3367895c476354d666ab4d0d811",
+      "resultXML": "aded026507f59036a9045ad8c552742b8c29d93fc7a2130187ae8324b90e9cb2",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-18.40000152587891",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "formant",
+          "before": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        },
+        {
+          "curve": "formant",
+          "before": {
+            "input_min": "28.0",
+            "input_max": "127.0",
+            "out_min": "1.0",
+            "out_max": "71.0",
+            "shape": "0.25",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          },
+          "after": {
+            "input_min": "0",
+            "input_max": "127",
+            "out_min": "35",
+            "out_max": "127",
+            "shape": "0",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          }
+        }
+      ],
+      "instrumentKey": "tenor-sax"
+    },
+    {
+      "id": "tenor-breath-growl",
+      "asset": "tenor-breath-growl.fytonepack",
+      "name": "嘶吼次中萨",
+      "swam": true,
+      "sourceSHA": "d730f133e4a3d32050fe77fa2b653417dc359aa51cf0c7e00d4a1eab47280d53",
+      "resultSHA": "7357907072351a271190da93c505a63ca92180e0b8b98f826f2f79feb6bcf3d3",
+      "sourceXML": "c1899451ed77957fa4bed2054a73a94aecfdadd3756241044e4c15cd8091ee36",
+      "resultXML": "5b5f5d4e14e25cb40c5d820c07484e56db3d6d513a20badb3c9acfe930173ba4",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-24.59999847412109",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "growl",
+          "before": {
+            "enabled": "1",
+            "parameterId": "growl",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "growl",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "formant",
+          "before": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        },
+        {
+          "curve": "formant",
+          "before": {
+            "input_min": "79.0",
+            "input_max": "127.0",
+            "out_min": "0.0",
+            "out_max": "64.0",
+            "shape": "0.25",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          },
+          "after": {
+            "input_min": "0",
+            "input_max": "127",
+            "out_min": "70",
+            "out_max": "127",
+            "shape": "0",
+            "symmetry": "0.5",
+            "bypass": "0",
+            "bipolar": "0"
+          }
+        }
+      ],
+      "instrumentKey": "tenor-sax"
+    },
+    {
+      "id": "dj-source-10",
+      "asset": "dj-source-10.fytonepack",
+      "name": "#原声次中萨",
+      "swam": true,
+      "sourceSHA": "be5613fe37e40f038ae1e8e32a28dae51c56acd30aa79bbc35a1e8b757066149",
+      "resultSHA": "0d45c00556330e31115fe95dc72f5357b276708c99e7710290ca93c9835f4137",
+      "sourceXML": "4db54a84fca296dd20ff11ab59ca9dcee5dbdc806195e269ab784acef2f9071b",
+      "resultXML": "876a96cd10e9181fcd4ba0c6f05980f188211771c9c641306ac377fdeb284ab3",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-7.699996948242188",
+          "after": "0.0"
+        }
+      ],
+      "instrumentKey": "tenor-sax"
+    },
+    {
+      "id": "dj-source-13",
+      "asset": "dj-source-13.fytonepack",
+      "name": "#丝滑次中萨",
+      "swam": true,
+      "sourceSHA": "40dfbd61214d30e2f1576b32aa07891d2849781aaf286971bdabeb8fb0c657ee",
+      "resultSHA": "e39d49275a23e5c9ec283027efd57a488771c8620df68dd221c4dd5965e8679d",
+      "sourceXML": "dfb38de0026f23e99d7ba6d7c1b8f1354bd46614fc52b09f377774ab176a6161",
+      "resultXML": "79be91308ca5b4ff6df0bcf5facc5fb3d85e81363eb41743af2a81f10237c0b6",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-3.799995422363281",
+          "after": "0.0"
+        }
+      ],
+      "instrumentKey": "tenor-sax"
+    },
+    {
+      "id": "dj-source-14",
+      "asset": "dj-source-14.fytonepack",
+      "name": "#醇韵次中萨",
+      "swam": true,
+      "sourceSHA": "be0e8b9f50bedd6f23dd2a701506a5cb72b7ed45016f5e274d85534dfa9004df",
+      "resultSHA": "69cd94e5c286700bb5b1631b95dbd13eb8e8d8f19a7c9f76904b8530430f8571",
+      "sourceXML": "a03a8a58a0568a6fee342e7c10d729547255696420fe5fc2227448dc6d50ec31",
+      "resultXML": "a1580f2c906f8b796f7a63ba28f102d17a5d9e459cdec1c19743870abc9dc6d0",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-3.699996948242188",
+          "after": "0.0"
+        }
+      ],
+      "instrumentKey": "tenor-sax"
+    },
+    {
+      "id": "dj-source-15",
+      "asset": "dj-source-15.fytonepack",
+      "name": "#经典爵士次中萨",
+      "swam": true,
+      "sourceSHA": "11ee4fc089446049af61383421853930ef015cfeafb33502326a9916d1af3e84",
+      "resultSHA": "a113e3a2778fc8a098aeb8de9ad7102f40fc7a38a6ee30f06d9d1ad7755b5610",
+      "sourceXML": "8b714488966509cba2b834acbb9ee9300e5ed0f5cd6f1195629b577ed4f10dd8",
+      "resultXML": "0c61644ea9a040a6d1df1008f14f2e9630a917efb4a278755d4d082f9dd571de",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-1.099998474121094",
+          "after": "0.0"
+        }
+      ],
+      "instrumentKey": "tenor-sax"
+    },
+    {
+      "id": "tenor-air-pocket",
+      "asset": "tenor-air-pocket.fytonepack",
+      "name": "经典气包次中萨",
+      "swam": true,
+      "sourceSHA": "d407318352fa30ad2b8360af3f86142fbd300de91262081b426eafd55624b047",
+      "resultSHA": "76ab7d8a21b8b9817ae65462d6b8db19f8dd718b7aec52747cce55a335561131",
+      "sourceXML": "af37b33727f9c635bbdc8fa13f21b5613acaadfe1f3e8da73a2097d6284790c9",
+      "resultXML": "13b28bf15914d5e58e5b44838c6217f4dbf30e98007b0db9514f4d7e046c3062",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-24.59999847412109",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "breathNoise",
+          "before": {
+            "enabled": "1",
+            "parameterId": "breathNoise",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "breathNoise",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        }
+      ],
+      "instrumentKey": "tenor-sax"
+    },
+    {
+      "id": "dj-source-16",
+      "asset": "dj-source-16.fytonepack",
+      "name": "#柔和气包次中萨",
+      "swam": true,
+      "sourceSHA": "836c3a697aed006b159c6934d0443d11a1a2b61fad40f4d5318a873b41919283",
+      "resultSHA": "cbdc7b0e94400376582795dc4e05e8eabb75bce469b4a1059c7de30720a5ebd3",
+      "sourceXML": "edfdcbcbcf1b297f401a9261a510ec762170e0005b0c557b9e9e595e3edae7e8",
+      "resultXML": "c05fad12bc0ad546c2218c26952b537211d5ca9936f9694f705cdd138ac533fc",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-7.699996948242188",
+          "after": "0.0"
+        }
+      ],
+      "instrumentKey": "tenor-sax"
+    },
+    {
+      "id": "dj-source-18",
+      "asset": "dj-source-18.fytonepack",
+      "name": "#浓郁气包次中萨",
+      "swam": true,
+      "sourceSHA": "0252847fafffae2aa96e5c4307cd9b20f2dbaed6a3d56f1737e3960f3c3f35e4",
+      "resultSHA": "fc0ce78ecb0535666a2ba07d831ef61718ed723ee35a9cf84e8a2138b902e0e8",
+      "sourceXML": "14188e0755fad2feabb6d6dfabf0a7d0675de990d74371938c78d3091e260933",
+      "resultXML": "e11f2e6cb744daaf20f8e8cd7d437494db8e8d638e0d343a9f0f53c1144c1f09",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-4.199996948242188",
+          "after": "0.0"
+        }
+      ],
+      "instrumentKey": "tenor-sax"
+    },
+    {
+      "id": "dj-source-19",
+      "asset": "dj-source-19.fytonepack",
+      "name": "#浑厚低萨",
+      "swam": true,
+      "sourceSHA": "f2791f374440ed848c684b94bd78c440e1be957cf2219cca3bd4ffd8faac39d1",
+      "resultSHA": "951759a227bef6f26b28acf5ed4e4042f20f5a8aa9cb6e4698618023cba11e01",
+      "sourceXML": "88528d153887d83886bdbc93ea2ac172eafa9f1dd3409675bfedc31e58ba81c3",
+      "resultXML": "76b7134f36c16d42cd3a83ab13522062d10ea60d3ac3a16c2577cd17417f57f8",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-20.59999847412109",
+          "after": "0.0"
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        }
+      ],
+      "instrumentKey": "baritone-sax"
+    },
+    {
+      "id": "dj-source-20",
+      "asset": "dj-source-20.fytonepack",
+      "name": "#丝滑低萨",
+      "swam": true,
+      "sourceSHA": "2e33d67b1ffd16617d243ad6fa1d5b0582ddc181fa29317921a1e99e25c355be",
+      "resultSHA": "f9cabd25af8e4ce67a2d85f3edbf4f3a390299905828bb6525c08cb840bee10f",
+      "sourceXML": "15655dbfa9434b025a578e3568de2681ba2460645f0b056f3afdc83350652362",
+      "resultXML": "7b4b0b6e7828a4aa7df7b4d47beb4293823bce39e86082803d350e51a6123e56",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-25.09999847412109",
+          "after": "0.0"
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        }
+      ],
+      "instrumentKey": "baritone-sax"
+    },
+    {
+      "id": "trumpet",
+      "asset": "trumpet.fytonepack",
+      "name": "小号1",
+      "swam": true,
+      "sourceSHA": "048fb7f6b2e8f6219c748704141facd1b87c9770cb3f7158aa429242a8000835",
+      "resultSHA": "41fc19a448e861479c12412e5dcf7d77a5f08e35bb4bf7666ae4ec23ca2fd029",
+      "sourceXML": "67ef33d6724c4a24aeea181d551945c2b9091f559d022f465cd3966ccd979b52",
+      "resultXML": "8f6814c4f53f5b9387523084ddba2ca1acd6e62b86e25adf0e33a15afb0c5383",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-26.59999847412109",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        }
+      ],
+      "instrumentKey": "trumpet"
+    },
+    {
+      "id": "trumpet-2",
+      "asset": "tone137-trumpet-2.fytonepack",
+      "name": "小号2",
+      "swam": true,
+      "sourceSHA": "ca9bf3c6be06fec90d569ff2085afa4aa2fd17207b07980a1177f0a7981a0ded",
+      "resultSHA": "5e58f0b071c9e5af00a5822ba6d5fff8f74f7e21f1c8dd2d1daac993dcd1e8d5",
+      "sourceXML": "4e87cce19265225ef768f1713fbb8f96bca0ae29afb417ddfad865689aacdf27",
+      "resultXML": "4252c59d5466baeca5e4de9531d4c640694f10caabd75dc4b0bc0be6ea236ddd",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-17.69999694824219",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        }
+      ],
+      "instrumentKey": "trumpet"
+    },
+    {
+      "id": "piccolo-trumpet",
+      "asset": "piccolo-trumpet.fytonepack",
+      "name": "高音小号",
+      "swam": true,
+      "sourceSHA": "ac1c4d3d832b4ca8b738eb39a3dc59ba6ebb9064f4aa1dc6d452b5e6ed30b766",
+      "resultSHA": "446acc85af9d4e90b2a89bbe9e4d459fa4614df200d816a545a5a3d280e6aa5f",
+      "sourceXML": "cfd9d05b30ffd09ec549754f42c3c44cd51ade8fbf93b282b77d96de6b9198b5",
+      "resultXML": "2708a6f7dbafcbfecd5e7cd5e07c7da9302e774c4f932d35b499d02f5bcf16d7",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-24.59999847412109",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        }
+      ],
+      "instrumentKey": "piccolo-trumpet"
+    },
+    {
+      "id": "alto-trombone",
+      "asset": "alto-trombone.fytonepack",
+      "name": "中音长号",
+      "swam": true,
+      "sourceSHA": "c6d7e603b064a749aecd55a5b2ac815533a3f44d1413aa111bd4d5f44dd82795",
+      "resultSHA": "6283a5427193de245ddf3e3b4a5bbca2fde332a97809dc3d21ef3ab33a5c5ea7",
+      "sourceXML": "dcd4262f4ecb1b8e5c037f91ac1973481e69d9e14e5474a3c5a92d7d746909cf",
+      "resultXML": "1eba147f90c6b0a742f2413118dc4a3e12b4e64382bebb60d68bb6db582b6c54",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-20.19999694824219",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        }
+      ],
+      "instrumentKey": "alto-trombone"
+    },
+    {
+      "id": "bass-trombone",
+      "asset": "bass-trombone.fytonepack",
+      "name": "低音长号",
+      "swam": true,
+      "sourceSHA": "d2a0070723a1ce1e32294cd630d39fa4748163857c689d9b92c6d4b79677aa01",
+      "resultSHA": "124024a8f111a3c981b79fe2a25f71e503b508707c43addef2f6af6b3003dcfb",
+      "sourceXML": "1af3e692c17bf393f6a70a8654c844feab0b326f00fc4db5a0ae035f1753edd1",
+      "resultXML": "3a23cf425822f2161cfba9a7eada7c3ad9d6f59dd8793f6669894dec23b4f83a",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-23.59999847412109",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        }
+      ],
+      "instrumentKey": "bass-trombone"
+    },
+    {
+      "id": "flute",
+      "asset": "flute.fytonepack",
+      "name": "长笛",
+      "swam": true,
+      "sourceSHA": "23bfbfb0fe754a49e6302c9a289ba1ee45a61d58ad2f1bbc152614549fb46483",
+      "resultSHA": "57bbd8fc195bf7b9fa4948a044057a48eec8c2207e2146096ca34476ba94b057",
+      "sourceXML": "2a04e103a98ad9d76233b63b3846e8e6ac3f8435f987c761dd757e8e0c8ad3f4",
+      "resultXML": "38fff3e14370d6e49f12f26e01b7b3b33648b2f7c627ec707fa0e979e79e5fc4",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-62.0",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "formant",
+          "before": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        }
+      ],
+      "instrumentKey": "flute"
+    },
+    {
+      "id": "piccolo",
+      "asset": "piccolo.fytonepack",
+      "name": "短笛",
+      "swam": true,
+      "sourceSHA": "4d2a8a0c6ff7290f9dc89e5d3d7a19902e166343e5692e7f05106921febfd9a8",
+      "resultSHA": "f20d3258b343b64af108c234ec26a572baf053185ca161d02cbb1f3b32bccc97",
+      "sourceXML": "7de667be772d85c533499836082228a653b28e0bfcf320b2cc50968f28062a53",
+      "resultXML": "bcaef3979f6de4926cebf583d3939cdbfedd09c49c0f14849fe202c9285bc05d",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-62.0",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "formant",
+          "before": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        }
+      ],
+      "instrumentKey": "piccolo"
+    },
+    {
+      "id": "clarinet",
+      "asset": "clarinet.fytonepack",
+      "name": "单簧管1",
+      "swam": true,
+      "sourceSHA": "f7fe5ef3e9aa16ee45f111f0f890a707265a6b0d1d36e51d5a3a611bc36d7211",
+      "resultSHA": "6f7641ec8c6caa4a5ea4f4d028f3f5d75ce57ac098868c76cd827a8e349db251",
+      "sourceXML": "4825e74312aa0a8952bdf3a854f4ddcd4a5d7f7fda3d1e93f25fb09ecdcbd9ce",
+      "resultXML": "4c628e176a009ff144acbdda211795c77ca77625b99944ebbfbd945f84f0af4b",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-6.0",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "voiceComb1Wet",
+          "before": {
+            "enabled": "1",
+            "parameterId": "voiceComb1Wet",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "voiceComb1Wet",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "formant",
+          "before": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        }
+      ],
+      "instrumentKey": "clarinet"
+    },
+    {
+      "id": "kong-clarinet-2",
+      "asset": "tone137-kong-clarinet-2.fytonepack",
+      "name": "单簧管2",
+      "swam": false,
+      "sourceSHA": "24731dda805b8be694317caf46bcd8a3e81d3663bdf6c90ae8379bb9fdd5269e",
+      "resultSHA": "24731dda805b8be694317caf46bcd8a3e81d3663bdf6c90ae8379bb9fdd5269e",
+      "sourceXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resultXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": [],
+      "instrumentKey": "container:kong-v3:khka_woodwinds"
+    },
+    {
+      "id": "oboe",
+      "asset": "oboe.fytonepack",
+      "name": "双簧管1",
+      "swam": true,
+      "sourceSHA": "2e16a210d5899f3a631abeb4bef7527c39c7680d580174ee44c170224d507610",
+      "resultSHA": "4f5b7314d2a772c1b454d1150feb5bc8248961592f9a504d1b3bdb98b6ad867d",
+      "sourceXML": "f45a39d67cf2749224e5108c327c6fbe03362301e6fa5b81b1de2c27a5a2010e",
+      "resultXML": "f720687a72b859254abfbf8e821c4de72bef84b94572c29dfbfb006c1dcc45a4",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-62.0",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "voiceComb1Wet",
+          "before": {
+            "enabled": "1",
+            "parameterId": "voiceComb1Wet",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "voiceComb1Wet",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "formant",
+          "before": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "formant",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        }
+      ],
+      "instrumentKey": "oboe"
+    },
+    {
+      "id": "kong-oboe-2",
+      "asset": "tone137-kong-oboe-2.fytonepack",
+      "name": "双簧管2",
+      "swam": false,
+      "sourceSHA": "3e82908f83e1879015c5ccd1d31312a9c833713b61b1ea0c92f7151a073fc273",
+      "resultSHA": "3e82908f83e1879015c5ccd1d31312a9c833713b61b1ea0c92f7151a073fc273",
+      "sourceXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resultXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": [],
+      "instrumentKey": "container:kong-v3:khka_woodwinds"
+    },
+    {
+      "id": "violin-soft",
+      "asset": "violin-soft.fytonepack",
+      "name": "小提琴1",
+      "swam": true,
+      "sourceSHA": "60f27c40e5f5c79aa036c4db8caaa13aad15a220530648c3afddc034d66ab7f2",
+      "resultSHA": "31dc1018cbc57e5bc082ab1d3d8ae7c361168346f67b9f68387fc89da5a5fa95",
+      "sourceXML": "53bce50a2f3f28ac230fc425453b3ffc8140262e4c251e8ffbe308ed010791c1",
+      "resultXML": "d215cfb78757e8334092b7a6d3ab536d03c20d10f44e445404053de179f1a26e",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-8.400001525878906",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "bowPositionParam",
+          "before": {
+            "enabled": "1",
+            "parameterId": "bowPositionParam",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "bowPositionParam",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        }
+      ],
+      "instrumentKey": "violin"
+    },
+    {
+      "id": "kong-violin-2",
+      "asset": "tone137-kong-violin-2.fytonepack",
+      "name": "小提琴2",
+      "swam": false,
+      "sourceSHA": "5ef6c0bde1eaf03c821c3ef4f2a7417cc0c5acf6ce0ae653c92171e2687ef882",
+      "resultSHA": "5ef6c0bde1eaf03c821c3ef4f2a7417cc0c5acf6ce0ae653c92171e2687ef882",
+      "sourceXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resultXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": [],
+      "instrumentKey": "container:kong-v3:khka_strings"
+    },
+    {
+      "id": "dj-source-27",
+      "asset": "dj-source-27.fytonepack",
+      "name": "#小提琴3",
+      "swam": true,
+      "sourceSHA": "3ab3925e5249f1d454767f80a70a206a426677e3350fb6bacc755c55aba35f11",
+      "resultSHA": "f2b409c10a0167f1ae700bc9211c399c52371f478a24cf63dffb95d498e74889",
+      "sourceXML": "84d66da9482c98ad1369157c803710f86357380df00722b04d69a484b4053206",
+      "resultXML": "6d5b15044b9beb0468339ac322d1d89791f0b8df3cdfde50f2842df4aa1ae579",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-8.799995422363281",
+          "after": "0.0"
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        }
+      ],
+      "instrumentKey": "violin"
+    },
+    {
+      "id": "cello",
+      "asset": "cello.fytonepack",
+      "name": "大提琴1",
+      "swam": true,
+      "sourceSHA": "e3da5a90675d4f093058d68a21ae8632775e475ec4f550e7b36169d559d07283",
+      "resultSHA": "7c4feffab9fd6482931d2e387f413a11452043ee3278b7c1d9ce57a5f695458a",
+      "sourceXML": "9f9b53510198e8a0971065932874efff60392d73ea805b5804818218805cf7f5",
+      "resultXML": "4b57a298f08ebe195f4dfaa6d3dcd29982814b79a38c59e9c744d1191c53704e",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-25.09999847412109",
+          "after": "0.0"
+        },
+        {
+          "route": "expression",
+          "before": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "expression",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "bowPositionParam",
+          "before": {
+            "enabled": "1",
+            "parameterId": "bowPositionParam",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "1",
+            "parameterId": "bowPositionParam",
+            "channel": "1",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "1",
+            "messageType": "1",
+            "msb": "11",
+            "lsb": "-1"
+          }
+        }
+      ],
+      "instrumentKey": "cello"
+    },
+    {
+      "id": "dj-source-28",
+      "asset": "dj-source-28.fytonepack",
+      "name": "#大提琴2",
+      "swam": true,
+      "sourceSHA": "d9e853b5fe29b6fce0d98e3a4503cbe290ecbd55759801f9a4b018432284cb14",
+      "resultSHA": "11c35cc5f5d15c2aabab88412710ee5f00b0980ba8ae6393f4bd3d096e253e5d",
+      "sourceXML": "c217df7276124e45bb485ac32b1ed5bbb1ecf6065ffa17161367fcbe7ce69c78",
+      "resultXML": "1c72916357053f1dc10d0da41e65598b531a2398eb0e03e9de9459a2e9436b3c",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-10.5",
+          "after": "0.0"
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        }
+      ],
+      "instrumentKey": "cello"
+    },
+    {
+      "id": "dj-source-35",
+      "asset": "dj-source-35.fytonepack",
+      "name": "#马头琴",
+      "swam": true,
+      "sourceSHA": "a76c7f6fea588a1005e4b3708478652cc601327c3e5653eb21e2dda15b26d0d5",
+      "resultSHA": "422c35b58bbf26dec0ab6cc0ecb293b5c5608a574874b8ef284dca0b72eeb1c7",
+      "sourceXML": "e19a07c113ae26944347f23af17ce61fd24e88d8e0b4979de98c9e4696e6d7c6",
+      "resultXML": "372b6ce9762db504fd189525874a958baaea9e36611511137a4a657061242f95",
+      "changes": [
+        {
+          "parameter": "mainVolume",
+          "before": "-21.0",
+          "after": "0.0"
+        },
+        {
+          "route": "mainVolume",
+          "before": {
+            "enabled": "1",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          },
+          "after": {
+            "enabled": "0",
+            "parameterId": "mainVolume",
+            "channel": "17",
+            "messageType": "2",
+            "msb": "2",
+            "lsb": "34"
+          }
+        }
+      ],
+      "instrumentKey": "cello"
+    },
+    {
+      "id": "kong-erhu",
+      "asset": "folk-erhu.fytonepack",
+      "name": "二胡1",
+      "swam": false,
+      "sourceSHA": "94055bf23af901a08fb5b4402ea1dbe41ad047ec17e0bc0f7b199f482dbbcf9f",
+      "resultSHA": "94055bf23af901a08fb5b4402ea1dbe41ad047ec17e0bc0f7b199f482dbbcf9f",
+      "sourceXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resultXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": [],
+      "instrumentKey": "kong-erhu-2"
+    },
+    {
+      "id": "kong-erhu-new-2",
+      "asset": "tone137-kong-erhu-new-2.fytonepack",
+      "name": "二胡2",
+      "swam": false,
+      "sourceSHA": "78dcbd1a92bc90e40f176ec84cbf1392d4589332fb2cbc3d192efa36be7c9aba",
+      "resultSHA": "78dcbd1a92bc90e40f176ec84cbf1392d4589332fb2cbc3d192efa36be7c9aba",
+      "sourceXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resultXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": [],
+      "instrumentKey": "kong-erhu"
+    },
+    {
+      "id": "kong-jinghu",
+      "asset": "folk-jinghu.fytonepack",
+      "name": "京胡",
+      "swam": false,
+      "sourceSHA": "54eed81afee86e586652137d955e607d471c36b4715762bcc0edbfc665194559",
+      "resultSHA": "54eed81afee86e586652137d955e607d471c36b4715762bcc0edbfc665194559",
+      "sourceXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resultXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": [],
+      "instrumentKey": "kong-jinghu"
+    },
+    {
+      "id": "kong-hulusi-straight",
+      "asset": "tone137-kong-hulusi-straight.fytonepack",
+      "name": "葫芦丝-直音",
+      "swam": false,
+      "sourceSHA": "5db5e8c2c384b3d34d3c7488a1c7c2a13ac7228c1638d909650e979dbfefac1b",
+      "resultSHA": "5db5e8c2c384b3d34d3c7488a1c7c2a13ac7228c1638d909650e979dbfefac1b",
+      "sourceXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resultXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": [],
+      "instrumentKey": "kong-hulusi"
+    },
+    {
+      "id": "kong-hulusi-vibrato",
+      "asset": "tone137-kong-hulusi-vibrato.fytonepack",
+      "name": "葫芦丝-颤音",
+      "swam": false,
+      "sourceSHA": "c61e626c295d495fac477722cef4569adc6db3b6ce39d6577cabf088a5e35673",
+      "resultSHA": "c61e626c295d495fac477722cef4569adc6db3b6ce39d6577cabf088a5e35673",
+      "sourceXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resultXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": [],
+      "instrumentKey": "kong-hulusi"
+    },
+    {
+      "id": "kong-qudi-straight",
+      "asset": "tone137-kong-qudi-straight.fytonepack",
+      "name": "曲笛1",
+      "swam": false,
+      "sourceSHA": "09319a58e4ff9b9ff84aa69965b5e39739f4ecc8721e25dfc9568858fe7c4191",
+      "resultSHA": "09319a58e4ff9b9ff84aa69965b5e39739f4ecc8721e25dfc9568858fe7c4191",
+      "sourceXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resultXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": [],
+      "instrumentKey": "container:kong-v3:winds"
+    },
+    {
+      "id": "kong-qudi",
+      "asset": "folk-qudi.fytonepack",
+      "name": "曲笛2*",
+      "swam": false,
+      "sourceSHA": "6adab9248ce264fbbc22218310db272e13dce2514fa3f2a23d56fa56c20926bc",
+      "resultSHA": "6adab9248ce264fbbc22218310db272e13dce2514fa3f2a23d56fa56c20926bc",
+      "sourceXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resultXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": [],
+      "instrumentKey": "kong-dizi"
+    },
+    {
+      "id": "kong-bangdi",
+      "asset": "folk-bangdi.fytonepack",
+      "name": "梆笛*",
+      "swam": false,
+      "sourceSHA": "c3af6e389d6eb7304100acbf2238dad1a59ceee49779fc81b0553e4783739888",
+      "resultSHA": "c3af6e389d6eb7304100acbf2238dad1a59ceee49779fc81b0553e4783739888",
+      "sourceXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resultXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": [],
+      "instrumentKey": "kong-dizi-2"
+    },
+    {
+      "id": "kong-nanxiao",
+      "asset": "tone137-kong-nanxiao.fytonepack",
+      "name": "南箫",
+      "swam": false,
+      "sourceSHA": "8886837524b8add63f91638f18fd4cb5ecbc580fbb42911afee05fadf94dd714",
+      "resultSHA": "8886837524b8add63f91638f18fd4cb5ecbc580fbb42911afee05fadf94dd714",
+      "sourceXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resultXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": [],
+      "instrumentKey": "kong-nanxiao"
+    },
+    {
+      "id": "kong-dongxiao",
+      "asset": "tone137-kong-dongxiao.fytonepack",
+      "name": "洞箫",
+      "swam": false,
+      "sourceSHA": "7b2262ca789131682ab2600474ab4fadfdfd59f718fcb400550510a6569afadb",
+      "resultSHA": "7b2262ca789131682ab2600474ab4fadfdfd59f718fcb400550510a6569afadb",
+      "sourceXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resultXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": [],
+      "instrumentKey": "container:kong-v3:winds"
+    },
+    {
+      "id": "kong-xun",
+      "asset": "tone137-kong-xun.fytonepack",
+      "name": "埙",
+      "swam": false,
+      "sourceSHA": "4c2ffa5b2931c717ef2e110d1ca24fd58096fb93eec7545d36ba9573df8d13cb",
+      "resultSHA": "4c2ffa5b2931c717ef2e110d1ca24fd58096fb93eec7545d36ba9573df8d13cb",
+      "sourceXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resultXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": [],
+      "instrumentKey": "kong-xun"
+    },
+    {
+      "id": "kong-suona-vibrato",
+      "asset": "tone137-kong-suona-vibrato.fytonepack",
+      "name": "唢呐1",
+      "swam": false,
+      "sourceSHA": "188fd02a3c5029793a2a88ffcc03511a25b26ae2f7bec18fb8687bec5af3af26",
+      "resultSHA": "188fd02a3c5029793a2a88ffcc03511a25b26ae2f7bec18fb8687bec5af3af26",
+      "sourceXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resultXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": [],
+      "instrumentKey": "kong-suona"
+    },
+    {
+      "id": "kong-suona",
+      "asset": "folk-suona.fytonepack",
+      "name": "唢呐2*",
+      "swam": false,
+      "sourceSHA": "26f3d90cc84f234b634266d661eac2fc77f08d115280de9cc7965e6c7af59e87",
+      "resultSHA": "26f3d90cc84f234b634266d661eac2fc77f08d115280de9cc7965e6c7af59e87",
+      "sourceXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resultXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": [],
+      "instrumentKey": "kong-suona-2"
+    },
+    {
+      "id": "kong-liuqin",
+      "asset": "folk-liuqin.fytonepack",
+      "name": "柳琴",
+      "swam": false,
+      "sourceSHA": "61630899496f6ce61aac70ef42ffe89de658a5560e137bb6fee2a1abc8ffd288",
+      "resultSHA": "61630899496f6ce61aac70ef42ffe89de658a5560e137bb6fee2a1abc8ffd288",
+      "sourceXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resultXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": [],
+      "instrumentKey": "kong-liuqin"
+    },
+    {
+      "id": "kong-sanxian",
+      "asset": "folk-sanxian.fytonepack",
+      "name": "三弦",
+      "swam": false,
+      "sourceSHA": "f1fe6db1af845806e02ab7e267843449422939d94af4590fd715f969c0ef79d9",
+      "resultSHA": "f1fe6db1af845806e02ab7e267843449422939d94af4590fd715f969c0ef79d9",
+      "sourceXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resultXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": [],
+      "instrumentKey": "kong-sanxian"
+    },
+    {
+      "id": "kong-pipa",
+      "asset": "folk-pipa.fytonepack",
+      "name": "琵琶",
+      "swam": false,
+      "sourceSHA": "672b59427c5b0218f67a57c17badfc1e5ba40a2adcd600afb42f7eb3de2dbe5b",
+      "resultSHA": "672b59427c5b0218f67a57c17badfc1e5ba40a2adcd600afb42f7eb3de2dbe5b",
+      "sourceXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resultXML": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": [],
+      "instrumentKey": "kong-pipa"
+    }
+  ]
+}

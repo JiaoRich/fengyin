@@ -87,7 +87,7 @@ AudioDeviceService::AudioDeviceService()
     juce::PropertiesFile::Options options;
     options.applicationName = "FengYin";
     options.filenameSuffix = ".settings";
-    options.folderName = "FengYinDJ";
+    options.folderName = "FengYin";
     options.osxLibrarySubFolder = "Application Support";
     properties.setStorageParameters(options);
 }

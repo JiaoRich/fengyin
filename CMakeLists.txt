@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.0.2 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.47 LANGUAGES C CXX)
 option(FENGYIN_ARCHIVED_VIDEO_RECORDING "Build archived video-recording diagnostics, never for release" OFF)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
@@ -29,7 +29,7 @@ FetchContent_MakeAvailable(JUCE)
 juce_add_gui_app(FengYin
     PRODUCT_NAME "FengYin"
     COMPANY_NAME "FengYin"
-    BUNDLE_ID "cn.fengyin.windstation.dj"
+    BUNDLE_ID "cn.fengyin.windstation"
     ICON_BIG "${CMAKE_SOURCE_DIR}/assets/fengyin-app-icon.png"
     NEEDS_WEBVIEW2 TRUE
 )
@@ -54,32 +54,19 @@ juce_add_binary_data(FengYinWebAssets SOURCES
     assets/fengyin-app-icon.png
     assets/tone-packages/dj-source-02.fytonepack
     assets/tone-packages/dj-source-03.fytonepack
-    assets/tone-packages/dj-source-04.fytonepack
     assets/tone-packages/dj-source-05.fytonepack
     assets/tone-packages/dj-source-06.fytonepack
     assets/tone-packages/dj-source-07.fytonepack
-    assets/tone-packages/dj-source-08.fytonepack
-    assets/tone-packages/dj-source-09.fytonepack
     assets/tone-packages/dj-source-10.fytonepack
-    assets/tone-packages/dj-source-11.fytonepack
-    assets/tone-packages/dj-source-12.fytonepack
     assets/tone-packages/dj-source-13.fytonepack
     assets/tone-packages/dj-source-14.fytonepack
     assets/tone-packages/dj-source-15.fytonepack
     assets/tone-packages/dj-source-16.fytonepack
-    assets/tone-packages/dj-source-17.fytonepack
     assets/tone-packages/dj-source-18.fytonepack
     assets/tone-packages/dj-source-19.fytonepack
     assets/tone-packages/dj-source-20.fytonepack
-    assets/tone-packages/dj-source-21.fytonepack
-    assets/tone-packages/dj-source-22.fytonepack
-    assets/tone-packages/dj-source-23.fytonepack
-    assets/tone-packages/dj-source-24.fytonepack
-    assets/tone-packages/dj-source-26.fytonepack
     assets/tone-packages/dj-source-27.fytonepack
     assets/tone-packages/dj-source-28.fytonepack
-    assets/tone-packages/dj-source-33.fytonepack
-    assets/tone-packages/dj-source-34.fytonepack
     assets/tone-packages/dj-source-35.fytonepack
     assets/tone-packages/soprano-kenny.fytonepack
     assets/tone-packages/soprano-pop.fytonepack

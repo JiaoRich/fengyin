@@ -1,4 +1,5 @@
 #include "SwamExpressionCurve.h"
+#include "DjSourceRouting.h"
 
 namespace fengyin
 {
@@ -11,12 +12,11 @@ void inspect(juce::XmlElement& element, SwamExpressionCurve::Result& result, boo
         const auto parameter = element.getStringAttribute("parameterId");
         const int cc = element.getIntAttribute("msb", -1);
         const int channel = element.getIntAttribute("channel", 17);
-        if (element.getIntAttribute("enabled", 0) == 1
-            && element.getIntAttribute("messageType", -1) == 1
-            && element.getIntAttribute("lsb", -1) <= 0 && cc >= 0 && cc <= 127
-            && channel >= 1 && channel <= 17)
+        const int encoded = DjMidiRoute::encode(element);
+        if (encoded != 0)
         {
             result.routes.push_back({parameter, cc, channel == 17 ? 1 : channel});
+            result.routes.back().encoded = encoded;
             if(auto* curve=element.getChildByName("MIDIRemappingCurve")) {
                 auto& route=result.routes.back();
                 route.inputMin=static_cast<float>(curve->getDoubleAttribute("input_min",0));route.inputMax=static_cast<float>(curve->getDoubleAttribute("input_max",127));
@@ -28,6 +28,7 @@ void inspect(juce::XmlElement& element, SwamExpressionCurve::Result& result, boo
             {
                 result.found = true;
                 result.controller = cc;
+                result.expressionRoute = encoded;
                 if (editable && element.getChildByName("MIDIRemappingCurve") == nullptr)
                 {
                     auto* curve = element.createNewChildElement("MIDIRemappingCurve");

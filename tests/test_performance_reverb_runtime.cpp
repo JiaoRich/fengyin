@@ -71,7 +71,7 @@ void testPerformanceReverbPlugin(const juce::String& path,const juce::String& ou
         const auto& bytes=preset->effects.back().state;p->setStateInformation(bytes.getData(),int(bytes.getSize()));
         flush();assert(std::abs(mix->getValue()-.2f)<.0001f);maxLatency=std::max(maxLatency,p->getLatencySamples());++count;
     }
-    assert(count==73);std::cout<<"73 exact package Pro-R2 states restored at 20%; maximum reported latency samples="<<maxLatency<<std::endl;
+    assert(count==60);std::cout<<"60 exact package Pro-R2 states restored at 20%; maximum reported latency samples="<<maxLatency<<std::endl;
     p->releaseResources();
     testActualReverbHost(description,roundtrip);
     std::cout<<"Actual Pro-R2 production async host restore, immediate save, 0/20/80/100%, bypass and failed replacement PASS"<<std::endl;

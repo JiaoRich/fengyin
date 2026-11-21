@@ -124,9 +124,9 @@ public:
             for(size_t i=0;i<nativeTechniqueRoutes.size();++i)if(i!=index&&DjMidiRoute::overlaps(nativeTechniqueRoutes[i].load(),route))return false;
             return true;
         }
-        if(route==0 || route==((swamExpressionChannel.load()<<8)|(swamExpressionController.load()+1)))return false;
+        if(route==0 || DjMidiRoute::overlaps(route,swamExpressionRoute.load()))return false;
         for(size_t i=0;i<nativeTechniqueRoutes.size();++i)
-            if(i!=index && nativeTechniqueRoutes[i].load()==route)return false;
+            if(i!=index && DjMidiRoute::overlaps(nativeTechniqueRoutes[i].load(),route))return false;
         return true;
     }
     void loadAsync(const juce::PluginDescription& description,
@@ -293,6 +293,9 @@ private:
     bool sendDjController(int route,float value,double timestamp) noexcept;
     std::atomic<int> swamExpressionController { 11 };
     std::atomic<int> swamExpressionChannel { 1 };
+    // One atomic route prevents mixing a new MSB with an old LSB/channel.
+    // Routing precision is independent of DJ audio-graph/DSP policy.
+    std::atomic<int> swamExpressionRoute { (1 << 8) | 12 };
     std::array<std::atomic<int>, static_cast<size_t>(PerformanceTechnique::count)> nativeTechniqueRoutes {};
     std::array<std::atomic<int>, static_cast<size_t>(PerformanceTechnique::count)> lastNativeTechniqueMessages {};
     std::atomic<int> lastBreathMidiValue { -1 };

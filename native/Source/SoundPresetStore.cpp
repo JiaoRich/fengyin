@@ -5,7 +5,7 @@ namespace fengyin
 SoundPresetStore::SoundPresetStore(juce::File storageDirectory)
 {
     directory = storageDirectory == juce::File()
-        ? juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("FengYinDJ")
+        ? juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("FengYin")
         : std::move(storageDirectory);
 }
 

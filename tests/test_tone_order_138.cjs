@@ -9,7 +9,7 @@ const tones = [...catalog.matchAll(/\{ "([^"]+)", "([^"]+)", "([^"]+)", "([^"]+)
     kind: kind.startsWith('kong') ? 'kong' : kind.startsWith('kontakt') ? 'kontakt' : 'package',
   }));
 const expected = tones.map(tone => 'builtin:' + tone.id);
-const storageKey = 'fengyin-dj-card-order-swam';
+const storageKey = 'fengyin-card-order-swam';
 
 (async () => {
   const browser = await chromium.launch({

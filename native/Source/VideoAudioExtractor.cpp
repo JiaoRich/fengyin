@@ -94,7 +94,7 @@ void VideoAudioExtractor::extractAsync(const juce::File& video, Completion compl
         return;
     }
     const auto cache = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-                           .getChildFile("FengYinDJ").getChildFile("audio-cache");
+                           .getChildFile("FengYin").getChildFile("audio-cache");
     pool.addJob(new ExtractionJob(executable, video, cacheFileFor(video, cache), std::move(completion)), true);
 }
 }

@@ -473,11 +473,11 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
             {
                 if (usesDjSource() || kongExpressionMode.load() || kontaktStandardControls.load() || !message.isController()) return false;
                 const int route=(message.getChannel()<<8)|(message.getControllerNumber()+1);
-                if (route==((swamExpressionChannel.load()<<8)|(swamExpressionController.load()+1))) return false;
+                if (DjMidiRoute::overlaps(route,swamExpressionRoute.load())) return false;
                 for (const auto technique : {PerformanceTechnique::vibrato,PerformanceTechnique::growl,PerformanceTechnique::flutter})
                 {
                     const auto index=static_cast<size_t>(technique);
-                    if (nativeTechniqueRoutes[index].load()==route && techniqueValues[index].load()==0.0f) return true;
+                    if (DjMidiRoute::overlaps(nativeTechniqueRoutes[index].load(),route) && techniqueValues[index].load()==0.0f) return true;
                 }
                 return false;
             };
@@ -645,6 +645,7 @@ void PluginHostEngine::unload()
     swamBreathGrowl.store(false);
     swamExpressionController.store(11, std::memory_order_relaxed);
     swamExpressionChannel.store(1, std::memory_order_relaxed);
+    swamExpressionRoute.store((1 << 8) | 12, std::memory_order_relaxed);
     for (auto& route : nativeTechniqueRoutes) route.store(0, std::memory_order_relaxed);
     vibratoRateParameter.store(nullptr);automaticVibratoActive.store(false);
     juce::Logger::writeToLog("Plugin unload complete");
@@ -797,6 +798,7 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstru
     swamBreathGrowl.store(false);
     swamExpressionController.store(11, std::memory_order_relaxed);
     swamExpressionChannel.store(1, std::memory_order_relaxed);
+    swamExpressionRoute.store((1 << 8) | 12, std::memory_order_relaxed);
     for (auto& route : nativeTechniqueRoutes) route.store(0, std::memory_order_relaxed);
     auto* plugin = getPlugin();
     if (plugin == nullptr) return false;
@@ -807,13 +809,15 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstru
     const std::string_view key=SwamPluginClassifier::instrumentKey(plugin->getName().toStdString());
     const bool wantFlutter=simpleOther(key)==PerformanceTechnique::flutter;
     const bool ownTremolo=key=="violin" || key=="cello";
+    // Fresh instrument setup must not recreate a Main Volume/breath binding.
+    // Complete custom states otherwise retain their own volume mappings.
     // Full tuner state remains authoritative except for the two destinations
     // owned by global wind techniques. Old packages bind vibrato/growl to CC11,
     // so raw breath defeats OFF/hardware/tempo modes. Reserve independent
     // controllers for those roles; preserve every existing response curve and
     // all unrelated MIDI routes (especially native portamento/Aftertouch).
     const auto configured=SwamTechniqueRouting::prepare(state,simpleVibrato(key),simpleGrowl(key),
-        initialiseNewInstrument&&wantFlutter,initialiseNewInstrument,initialiseNewInstrument&&ownTremolo,!initialiseNewInstrument,preferBreathGrowl);
+        initialiseNewInstrument&&wantFlutter,false,initialiseNewInstrument&&ownTremolo,!initialiseNewInstrument,preferBreathGrowl);
     if(configured.supported && configured.changed)
     {
         // Once per activation, while the graph is paused, never on each CC or mode switch.
@@ -821,7 +825,7 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstru
         juce::MemoryBlock verified;plugin->getStateInformation(verified);
         auto check=verified;
         const auto routing=SwamTechniqueRouting::prepare(check,simpleVibrato(key),simpleGrowl(key),
-            initialiseNewInstrument&&wantFlutter,initialiseNewInstrument,initialiseNewInstrument&&ownTremolo,!initialiseNewInstrument,preferBreathGrowl);
+            initialiseNewInstrument&&wantFlutter,false,initialiseNewInstrument&&ownTremolo,!initialiseNewInstrument,preferBreathGrowl);
         if(!routing.supported || routing.changed || routing.breathGrowl!=configured.breathGrowl || routing.vibrato!=configured.vibrato || routing.growl!=configured.growl || routing.flutter!=configured.flutter || routing.volume!=configured.volume)
         {
             plugin->setStateInformation(original.getData(),static_cast<int>(original.getSize()));
@@ -855,7 +859,7 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstru
         };
         for (const auto& name : names)
             if (parameter == name.first && !(name.second == PerformanceTechnique::growl && usesSwamBreathGrowl()))
-                nativeTechniqueRoutes[static_cast<size_t>(name.second)].store((route.channel << 8) | (route.controller + 1));
+                nativeTechniqueRoutes[static_cast<size_t>(name.second)].store(route.encoded);
     }
     if (! result.found)
     {
@@ -868,6 +872,7 @@ bool PluginHostEngine::applyStandardSwamExpressionCurve(bool initialiseNewInstru
     // destination, so changing the curve never rewrites the user's mapping.
     if (result.controller >= 0 && result.controller <= 127)
         swamExpressionController.store(result.controller, std::memory_order_relaxed);
+    swamExpressionRoute.store(result.expressionRoute, std::memory_order_relaxed);
     lastBreathMidiValue.store(-1, std::memory_order_relaxed);
     if(key=="violin" || key=="cello")stringTremolo.prepare(*plugin);
     else stringTremolo.clear();
@@ -1194,6 +1199,7 @@ bool PluginHostEngine::configureDjSource(const DjSourceProfile& profile)
     const int expression=DjMidiRoute::find(*root,"expression");
     if(!expression){djSourceActive.store(false);return false;}
     djBreathRoute.store(expression);
+    swamExpressionRoute.store(expression);
     swamExpressionController.store(DjMidiRoute::coarse(expression));swamExpressionChannel.store(DjMidiRoute::channel(expression));
     for(auto& r:nativeTechniqueRoutes)r.store(0);
     const std::pair<const char*,PerformanceTechnique> names[]{
@@ -1328,8 +1334,9 @@ void PluginHostEngine::noteOff(int noteNumber, double timestampSeconds) noexcept
 void PluginHostEngine::breathChanged(float value, double timestampSeconds) noexcept
 {
     const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
-    if(usesDjSource()) {
-        const int route=djBreathRoute.load();
+    if (!std::isfinite(value)) return;
+    if(!kongExpressionMode.load() && !kontaktStandardControls.load()) {
+        const int route=swamExpressionRoute.load();
         const int raw=juce::roundToInt(juce::jlimit(0.f,1.f,value)*(DjMidiRoute::fine(route)>=0?16383.f:127.f));
         if(lastBreathMidiValue.load()!=raw && sendDjController(route,value,timestampSeconds))lastBreathMidiValue.store(raw);
         return;
@@ -1458,9 +1465,13 @@ void PluginHostEngine::routeTechnique(PerformanceTechnique technique, float valu
         && !hasIndependentTechniqueRoute(technique)) return;
     if (const int route = nativeTechniqueRoutes[index].load(std::memory_order_relaxed))
     {
-        bool unique = route != ((swamExpressionChannel.load() << 8) | (swamExpressionController.load() + 1));
-        for (size_t other = 0; other < nativeTechniqueRoutes.size(); ++other)
-            if (other != index && nativeTechniqueRoutes[other].load() == route) unique = false;
+        const bool unique = hasIndependentTechniqueRoute(technique);
+        if (DjMidiRoute::fine(route) >= 0) {
+            // The legacy 7-bit dedup token cannot represent a 14-bit route/value.
+            // Atomic paired delivery uses the same bounded queue as DJ routes.
+            if (unique) sendDjController(route,safeValue,0.0);
+            return;
+        }
         const auto value = juce::roundToInt(safeValue * 127.0f);
         sendTechniqueController(lastNativeTechniqueMessages[index], route, value, unique, [&] {
             return queue(juce::MidiMessage::controllerEvent(route >> 8, (route & 255) - 1, value), 0.0);
@@ -1544,7 +1555,7 @@ void PluginHostEngine::resetPerformance() noexcept
         {
             if(usesDjSource()) { if(hasIndependentTechniqueRoute(static_cast<PerformanceTechnique>(index)))sendDjController(nativeTechniqueRoutes[index].load(),0,0); }
             else if (const int route = nativeTechniqueRoutes[index].load())
-                queue(juce::MidiMessage::controllerEvent(route >> 8, (route & 255) - 1, 0), 0.0);
+                sendDjController(route,0.0f,0.0);
             else techniqueDirty[index].store(true, std::memory_order_release);
         }
     }

@@ -12,6 +12,7 @@
 #include <cmath>
 #include <iostream>
 #include <thread>
+#include <set>
 
 class TestEffect final : public juce::AudioProcessor
 {
@@ -355,11 +356,12 @@ int main()
     }
     const auto bundled=juce::File(juce::String::fromUTF8(__FILE__)).getParentDirectory().getParentDirectory().getChildFile("assets/tone-packages");
     const auto files=bundled.findChildFiles(juce::File::findFiles,false,"*.fytonepack");
-    // 44 published packages plus seven retained historical package fixtures.
+    // All 80 current and historical packages must remain import/export compatible.
     assert(files.size()==80);
     const auto gainAudit=juce::JSON::parse(bundled.getChildFile("kong-headroom-134-audit.json"));
     assert(gainAudit["targets"].isArray() && gainAudit["targets"].size()==13);
     int routedFolkPackages=0, breathGrowlPackages=0, freshAirPackages=0;
+    std::set<std::string_view> freshAirIds;
     for(const auto& file:files){
         juce::String error;const auto imported=fengyin::TonePackage::read(file,error);
         if(!imported){std::cerr<<file.getFileName()<<": "<<error<<std::endl;return 1;}
@@ -375,7 +377,7 @@ int main()
                     if (const auto description = juce::parseXML(effect.descriptionXml);
                         description && description->getStringAttribute("name") == "Fresh Air")
                     {
-                        ++freshAirPackages;
+                        ++freshAirPackages;freshAirIds.insert(tone.id);
                         assert(tone.id == "tenor-air-pocket" || tone.id.starts_with("dj-source-"));
                     }
         // Every package must preserve all tuning fields and full state on export/import.
@@ -409,6 +411,8 @@ int main()
         }
     }
     assert(routedFolkPackages==13);
-    assert(breathGrowlPackages==2 && freshAirPackages==9);
+    assert(breathGrowlPackages==2 && freshAirPackages==6);
+    const std::set<std::string_view> expectedAir{"tenor-air-pocket","dj-source-16","dj-source-18","dj-source-19","dj-source-20","dj-source-35"};
+    assert(freshAirIds==expectedAir);
     assert(directory.deleteRecursively());
 }

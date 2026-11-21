@@ -19,7 +19,7 @@ MidiInputService::MidiInputService(bool persistSettings)
     juce::PropertiesFile::Options options;
     options.applicationName = "FengYinMidi";
     options.filenameSuffix = ".settings";
-    options.folderName = "FengYinDJ";
+    options.folderName = "FengYin";
     options.osxLibrarySubFolder = "Application Support";
     properties.setStorageParameters(options);
     if (auto* settingsFile = properties.getUserSettings()) {

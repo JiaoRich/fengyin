@@ -684,7 +684,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v5
         with:
-          name: 风吟·音色测试版-Windows-x64-安装包
+          name: 风吟-Windows-x64-安装包
           path: dist/installer/*.exe
           if-no-files-found: error
           retention-days: 14

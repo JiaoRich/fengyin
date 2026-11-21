@@ -554,11 +554,6 @@ window.FENGYIN_TONE_MEDIA = {
     "artwork": "instrument_alto_sax.png",
     "voiceId": "NEW_TONE_GENERIC"
   },
-  "dj-source-04": {
-    "name": "#原声中萨",
-    "artwork": "instrument_alto_sax.png",
-    "voiceId": "TONE_TEST_04"
-  },
   "dj-source-05": {
     "name": "#明亮中萨",
     "artwork": "instrument_alto_sax.png",
@@ -574,16 +569,6 @@ window.FENGYIN_TONE_MEDIA = {
     "artwork": "instrument_alto_sax.png",
     "voiceId": "TONE_TEST_07"
   },
-  "dj-source-08": {
-    "name": "#都市中萨",
-    "artwork": "instrument_alto_sax.png",
-    "voiceId": "TONE_TEST_08"
-  },
-  "dj-source-09": {
-    "name": "#摇摆中萨",
-    "artwork": "instrument_alto_sax.png",
-    "voiceId": "TONE_TEST_09"
-  },
   "tenor-mellow": {
     "name": "醇厚次中萨",
     "artwork": "instrument_tenor_sax.png",
@@ -593,11 +578,6 @@ window.FENGYIN_TONE_MEDIA = {
     "name": "温暖次中萨",
     "artwork": "instrument_tenor_sax.png",
     "voiceId": "V014_07"
-  },
-  "tenor-air-pocket": {
-    "name": "气包音次中萨",
-    "artwork": "instrument_tenor_sax.png",
-    "voiceId": "V014_08"
   },
   "tenor-silky": {
     "name": "浪漫次中萨",
@@ -614,16 +594,6 @@ window.FENGYIN_TONE_MEDIA = {
     "artwork": "instrument_tenor_sax.png",
     "voiceId": "TONE_TEST_10"
   },
-  "dj-source-11": {
-    "name": "#明亮次中萨",
-    "artwork": "instrument_tenor_sax.png",
-    "voiceId": "TONE_TEST_11"
-  },
-  "dj-source-12": {
-    "name": "#柔暖次中萨",
-    "artwork": "instrument_tenor_sax.png",
-    "voiceId": "TONE_TEST_12"
-  },
   "dj-source-13": {
     "name": "#丝滑次中萨",
     "artwork": "instrument_tenor_sax.png",
@@ -639,15 +609,15 @@ window.FENGYIN_TONE_MEDIA = {
     "artwork": "instrument_tenor_sax.png",
     "voiceId": "TONE_TEST_15"
   },
+  "tenor-air-pocket": {
+    "name": "经典气包次中萨",
+    "artwork": "instrument_tenor_sax.png",
+    "voiceId": "TONE_147_TENOR_AIR"
+  },
   "dj-source-16": {
     "name": "#柔和气包次中萨",
     "artwork": "instrument_tenor_sax.png",
     "voiceId": "TONE_TEST_16"
-  },
-  "dj-source-17": {
-    "name": "#明亮气包次中萨",
-    "artwork": "instrument_tenor_sax.png",
-    "voiceId": "TONE_TEST_17"
   },
   "dj-source-18": {
     "name": "#浓郁气包次中萨",
@@ -674,11 +644,6 @@ window.FENGYIN_TONE_MEDIA = {
     "artwork": "instrument_trumpet.png",
     "voiceId": "TONE_140_TRUMPET_2"
   },
-  "dj-source-24": {
-    "name": "#明亮小号",
-    "artwork": "instrument_trumpet.png",
-    "voiceId": "TONE_TEST_24"
-  },
   "piccolo-trumpet": {
     "name": "高音小号",
     "artwork": "instrument_piccolo_trumpet.png",
@@ -699,11 +664,6 @@ window.FENGYIN_TONE_MEDIA = {
     "artwork": "instrument_flute.png",
     "voiceId": "V014_15"
   },
-  "dj-source-23": {
-    "name": "#清亮长笛",
-    "artwork": "instrument_flute.png",
-    "voiceId": "TONE_TEST_23"
-  },
   "piccolo": {
     "name": "短笛",
     "artwork": "instrument_piccolo.png",
@@ -713,11 +673,6 @@ window.FENGYIN_TONE_MEDIA = {
     "name": "单簧管1",
     "artwork": "instrument_clarinet.png",
     "voiceId": "TONE_140_CLARINET"
-  },
-  "dj-source-22": {
-    "name": "#柔和单簧管",
-    "artwork": "instrument_clarinet.png",
-    "voiceId": "TONE_TEST_22"
   },
   "kong-clarinet-2": {
     "name": "单簧管2",
@@ -729,11 +684,6 @@ window.FENGYIN_TONE_MEDIA = {
     "artwork": "instrument_oboe.png",
     "voiceId": "TONE_140_OBOE"
   },
-  "dj-source-21": {
-    "name": "#田园双簧管",
-    "artwork": "instrument_oboe.png",
-    "voiceId": "TONE_TEST_21"
-  },
   "kong-oboe-2": {
     "name": "双簧管2",
     "artwork": "instrument_oboe.png",
@@ -744,35 +694,30 @@ window.FENGYIN_TONE_MEDIA = {
     "artwork": "instrument_violin.png",
     "voiceId": "TONE_140_VIOLIN_SOFT"
   },
-  "dj-source-26": {
-    "name": "#抒情小提琴",
-    "artwork": "instrument_violin.png",
-    "voiceId": "TONE_TEST_26"
-  },
-  "dj-source-27": {
-    "name": "#环绕小提琴",
-    "artwork": "instrument_violin.png",
-    "voiceId": "TONE_TEST_27"
-  },
   "kong-violin-2": {
     "name": "小提琴2",
     "artwork": "instrument_violin.png",
     "voiceId": "TONE_140_KONG_VIOLIN_2"
   },
+  "dj-source-27": {
+    "name": "#小提琴3",
+    "artwork": "instrument_violin.png",
+    "voiceId": "TONE_147_VIOLIN3"
+  },
   "cello": {
-    "name": "大提琴",
+    "name": "大提琴1",
     "artwork": "instrument_cello.png",
-    "voiceId": "V014_22"
+    "voiceId": "TONE_147_CELLO1"
   },
   "dj-source-28": {
-    "name": "#深沉大提琴",
+    "name": "#大提琴2",
     "artwork": "instrument_cello.png",
-    "voiceId": "TONE_TEST_28"
+    "voiceId": "TONE_147_CELLO2"
   },
   "dj-source-35": {
-    "name": "#草原马头琴",
+    "name": "#马头琴",
     "artwork": "instrument_cello.png",
-    "voiceId": "TONE_TEST_35"
+    "voiceId": "TONE_147_MATOUQIN"
   },
   "kong-erhu": {
     "name": "二胡1",
@@ -823,16 +768,6 @@ window.FENGYIN_TONE_MEDIA = {
     "name": "洞箫",
     "artwork": "instrument_kong_xiao.png",
     "voiceId": "TONE_DONGXIAO"
-  },
-  "dj-source-33": {
-    "name": "#清韵箫",
-    "artwork": "instrument_kong_xiao.png",
-    "voiceId": "TONE_TEST_33"
-  },
-  "dj-source-34": {
-    "name": "#幽谷箫",
-    "artwork": "instrument_kong_xiao.png",
-    "voiceId": "TONE_TEST_34"
   },
   "kong-xun": {
     "name": "埙",
@@ -1322,7 +1257,7 @@ $('#confirm-preset-name')?.addEventListener('click', () => {
 });
 renderToneStyleSwitcher();
 
-const toneCardOrderKey = 'fengyin-dj-card-order-swam';
+const toneCardOrderKey = 'fengyin-card-order-swam';
 let toneCardDrag = null;
 
 function readToneCardOrder() {
@@ -3144,7 +3079,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟·音色测试版 1.0.2 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.47 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

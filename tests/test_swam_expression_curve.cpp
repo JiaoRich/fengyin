@@ -82,6 +82,18 @@ int main(int argc, char** argv)
     expression->setAttribute("lsb", 0);
     assert(fengyin::SwamExpressionCurve::applyToXml(*xml).controller == 2);
 
+    // Valid high-resolution input retains the entire curve; malformed pairs
+    // are rejected instead of silently degrading to the wrong controller.
+    {
+        auto paired=juce::parseXML(source);auto* t=fengyin::SwamTechniqueRouting::findTable(*paired);assert(t);
+        auto* e=t->getFirstChildElement();e->setAttribute("messageType",2);e->setAttribute("lsb",34);
+        const auto exact=paired->toString();const auto r=fengyin::SwamExpressionCurve::applyToXml(*paired);
+        assert(r.found && !r.changed && fengyin::DjMidiRoute::fine(r.expressionRoute)==34 && paired->toString()==exact);
+        assert(fengyin::DjMidiRoute::overlaps(r.expressionRoute,(1<<8)|35));
+        assert(!fengyin::DjMidiRoute::overlaps(r.expressionRoute,(2<<8)|35));
+        for(int bad:{-1,0,33,35,127}){e->setAttribute("lsb",bad);assert(!fengyin::SwamExpressionCurve::applyToXml(*paired).found);}
+        e->setAttribute("lsb",34);e->setAttribute("msb",34);assert(!fengyin::SwamExpressionCurve::applyToXml(*paired).found);
+    }
     // Missing curves get a linear default, existing curves remain byte-for-byte.
     expression->removeChildElement(curve, true);
     const auto missing = fengyin::SwamExpressionCurve::applyToXml(*xml);
@@ -107,7 +119,7 @@ int main(int argc, char** argv)
         assert(savedState.fromBase64Encoding(saved->getAllSubText()));
         const auto before = savedState;
         const auto native = fengyin::SwamExpressionCurve::applyToState(savedState);
-        assert(native.found && native.controller == 11 && !native.changed);
+        assert(native.found && native.controller == 2 && fengyin::DjMidiRoute::fine(native.expressionRoute) == 34 && !native.changed);
         assert(before == savedState);
         assert(!native.routes.empty());
         auto prepared=before;
@@ -199,9 +211,9 @@ int main(int argc, char** argv)
         if (breathGrowl)
         {
             ++breathGrowls;
-            assert(after == before && result.growl == -1 && routes.controller == 11);
+            assert(after == before && result.growl == -1 && routes.controller == 2);
             assert(std::count_if(routes.routes.begin(), routes.routes.end(), [](const auto& route)
-                { return route.parameter.equalsIgnoreCase("growl") && route.controller == 11 && route.channel == 1; }) == 1);
+                { return route.parameter.equalsIgnoreCase("growl") && route.controller == 2 && fengyin::DjMidiRoute::fine(route.encoded) == 34 && route.channel == 1; }) == 1);
             auto legacy = before;
             const auto managed = fengyin::SwamTechniqueRouting::prepare(legacy, wantVibrato, wantGrowl, false, false, false, true);
             assert(managed.changed && !managed.breathGrowl && managed.growl != 11);
@@ -282,6 +294,58 @@ int main(int argc, char** argv)
         juce::MemoryBlock state;
         plugin->getStateInformation(state);
         const auto before = state;
+        if(argc>=3 && juce::String(argv[2])=="--hires") {
+            // An installed-plugin probe uses its own compatible state. It does
+            // not claim that a different-version released patch was auditioned.
+            auto native=fengyin::SwamStateCompatibility::read(state);assert(native);
+            auto* table=fengyin::SwamTechniqueRouting::findTable(*native);assert(table);
+            auto* expressionEntry=static_cast<juce::XmlElement*>(nullptr);
+            for(auto* e:table->getChildIterator()) {
+                const auto id=e->getStringAttribute("parameterId");
+                if(id=="expression")expressionEntry=e;
+                if(id=="mainVolume")e->setAttribute("enabled",0);
+            }
+            const auto setVolume=[](auto&& self,juce::XmlElement& e)->void {
+                if(e.hasTagName("PARAM") && e.getStringAttribute("id")=="mainVolume")e.setAttribute("value",0.0);
+                for(auto* c:e.getChildIterator())self(self,*c);
+            };setVolume(setVolume,*native);
+            assert(expressionEntry);expressionEntry->setAttribute("enabled",1);expressionEntry->setAttribute("messageType",2);
+            expressionEntry->setAttribute("msb",2);expressionEntry->setAttribute("lsb",34);expressionEntry->setAttribute("channel",17);
+            auto outer=juce::AudioProcessor::getXmlFromBinary(state.getData(),int(state.getSize()));auto* comp=outer->getChildByName("IComponent");juce::MemoryBlock body,chunk;
+            assert(body.fromBase64Encoding(comp->getAllSubText()));juce::AudioProcessor::copyXmlToBinary(*native,chunk);
+            body.setSize(176);body.append(chunk.getData(),chunk.getSize());auto* bytes=static_cast<unsigned char*>(body.getData());
+            const auto put=[&](size_t offset,size_t n){for(int i=0;i<4;++i)bytes[offset+size_t(i)]=static_cast<unsigned char>(n>>(24-8*i));};
+            put(20,body.getSize()-24);put(172,chunk.getSize());comp->deleteAllTextElements();comp->addTextElement(body.toBase64Encoding());
+            juce::MemoryBlock changed;juce::AudioProcessor::copyXmlToBinary(*outer,changed);
+            plugin->setStateInformation(changed.getData(),int(changed.getSize()));
+            bool volumeFound=false;
+            for(auto* param:plugin->getParameters())if(param->getName(100)=="Main Volume"){
+                param->setValueNotifyingHost(1.f);volumeFound=true;std::cout<<"Main Volume normalized=1 text="<<param->getText(1.f,100)<<std::endl;
+            }
+            assert(volumeFound);
+            juce::AudioBuffer<float> settle(2,256);juce::MidiBuffer empty;
+            for(int n=0;n<16;++n){settle.clear();plugin->processBlock(settle,empty);}
+            plugin->getStateInformation(state);auto decoded=fengyin::SwamStateCompatibility::read(state);assert(decoded);
+            const int route=fengyin::DjMidiRoute::find(*decoded,"expression");assert(fengyin::DjMidiRoute::coarse(route)==2&&fengyin::DjMidiRoute::fine(route)==34);
+            std::map<juce::String,double> values;fengyin::SwamStateCompatibility::params(*decoded,values);std::cout<<"Restored Main Volume native="<<juce::String(values.at("mainVolume"),12)<<std::endl;assert(std::abs(values.at("mainVolume"))<1e-5);
+            juce::AudioBuffer<float> audio(2,256);juce::MidiBuffer midi;double globalPeak=0;
+            for(float level:{.1f,.3f,.5f,.5001f,.8f,1.f}){
+                double sum=0,peak=0;size_t count=0;
+                for(int block=0;block<400;++block){
+                    audio.clear();midi.clear();
+                    const int raw=juce::roundToInt(level*16383.f);
+                    midi.addEvent(juce::MidiMessage::controllerEvent(1,2,raw>>7),0);midi.addEvent(juce::MidiMessage::controllerEvent(1,34,raw&127),0);
+                    if(block==0)midi.addEvent(juce::MidiMessage::noteOn(1,60,juce::uint8(80)),0);
+                    plugin->processBlock(audio,midi);
+                    for(int c=0;c<audio.getNumChannels();++c)for(int n=0;n<256;++n){const double v=audio.getSample(c,n);assert(std::isfinite(v));if(block>100){peak=std::max(peak,std::abs(v));sum+=v*v;++count;}}
+                }
+                assert(sum>1e-12);globalPeak=std::max(globalPeak,peak);
+                std::cout<<"HIRES level="<<level<<" peak="<<peak<<" rms="<<std::sqrt(sum/count)<<std::endl;
+                audio.clear();midi.clear();midi.addEvent(juce::MidiMessage::noteOff(1,60),0);plugin->processBlock(audio,midi);
+            }
+            std::cout<<"HIRES installed own-state peak="<<globalPeak<<" clippingRisk="<<(globalPeak>1)<<std::endl;
+            plugin->releaseResources();return 0;
+        }
         if(argc>=3 && (juce::String(argv[2])=="--routing" || juce::String(argv[2])=="--routing-preserve"))
         {
             const bool preserve=juce::String(argv[2])=="--routing-preserve";

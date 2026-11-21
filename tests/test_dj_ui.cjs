@@ -1,5 +1,5 @@
 const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url');
-const rows=JSON.parse(fs.readFileSync('assets/tone-packages/dj-source-audit.json','utf8'));
+const rows=JSON.parse(fs.readFileSync('assets/tone-packages/release-147-audit.json','utf8')).rows.filter(r=>r.id.startsWith('dj-source-'));
 (async()=>{
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
 try{
@@ -7,9 +7,9 @@ try{
  await page.addInitScript(()=>{localStorage.setItem('fy-guide-seen','yes');window.listeners={};window.__JUCE__={backend:{addEventListener:(n,f)=>{const old=window.listeners[n];window.listeners[n]=x=>{old?.(x);f(x)}},emitEvent:(n,p)=>{(window.emitted??=[]).push([n,p])}}}});
  await page.goto(pathToFileURL(path.resolve('prototype/index.html')).href);
  const tones=rows.map(r=>({id:r.id,name:r.name,instrumentKey:r.instrumentKey,styleId:'dj-source',kind:'package'}));
- const base={activated:true,featuresUnlocked:true,deviceConnected:true,deviceMatched:true,pluginLoaded:true,publishedTones:[{id:'alto-jazz',name:'爵士中萨',instrumentKey:'alto-sax',kind:'package'},...tones],presets:[{id:'copy',name:'DJ自存',published:true,pluginId:'a',djSourceChain:true}],instruments:rows.map(r=>({instrumentKey:r.instrumentKey,pluginId:'a',brand:'swam'})),activeToneVariantId:'builtin:dj-source-04',instrumentKey:'alto-sax',djSourceChain:true};
+ const base={activated:true,featuresUnlocked:true,deviceConnected:true,deviceMatched:true,pluginLoaded:true,publishedTones:[{id:'alto-jazz',name:'爵士中萨',instrumentKey:'alto-sax',kind:'package'},...tones],presets:[{id:'copy',name:'DJ自存',published:true,pluginId:'a',djSourceChain:true}],instruments:rows.map(r=>({instrumentKey:r.instrumentKey,pluginId:'a',brand:'swam'})),activeToneVariantId:'builtin:dj-source-05',instrumentKey:'alto-sax',djSourceChain:true};
  await page.evaluate(s=>window.listeners.backendState(s),base);await page.locator('[data-page="sounds"]').click();
- assert.equal(await page.locator('.dj-source-card').count(),30);assert.equal(await page.locator('.instrument-preset-card:not(.dj-source-card)').count(),1);
+ assert.equal(await page.locator('.dj-source-card').count(),17);assert.equal(await page.locator('.instrument-preset-card:not(.dj-source-card)').count(),1);
  await page.addStyleTag({content:'*,*::before,*::after{transition:none!important}'});
  const style=selector=>page.locator(selector).evaluate(n=>{
   const s=getComputedStyle(n),h=getComputedStyle(n.querySelector('h3'));
@@ -27,7 +27,7 @@ try{
   assert.deepEqual(await style('[data-card-key="builtin:dj-source-02"]'),selected,theme+' active DJ');
  }
  for(const external of [false,true])for(const dj of [true,false,true,false])for(const busy of [false,true]){
-  await page.evaluate(s=>{window.listeners.backendState(s);renderExpertControls()}, {...base,djSourceChain:dj,externalReverb:external,reverbAvailable:true,pluginLoading:busy,reverbMix:.2,activeToneVariantId:dj?'builtin:dj-source-04':'builtin:alto-jazz'});
+  await page.evaluate(s=>{window.listeners.backendState(s);renderExpertControls()}, {...base,djSourceChain:dj,externalReverb:external,reverbAvailable:true,pluginLoading:busy,reverbMix:.2,activeToneVariantId:dj?'builtin:dj-source-05':'builtin:alto-jazz'});
   assert.equal(await page.locator('#performance-reverb').isDisabled(),external?busy:dj);
   const controls=await page.locator('[data-expert]').evaluateAll(ns=>ns.map(n=>[n.dataset.expert,n.disabled]));
   for(const [kind,disabled] of controls)assert.equal(disabled,busy || (kind==='reverb'&&external?false:dj||(external&&['room','damping','width'].includes(kind))));

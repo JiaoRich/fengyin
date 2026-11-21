@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.0.2",
+    [string]$Version = "1.1.47",
     [switch]$SkipInstaller
 )
 
@@ -164,7 +164,7 @@ $FabFilterEvidence = Join-Path $ProjectRoot "fabfilter-install-test\first.json"
 if (-not (Test-Path -LiteralPath $FabFilterEvidence)) { throw "Missing actual FabFilter installation evidence" }
 $FabFilterPlugin = (Get-Content -LiteralPath $FabFilterEvidence -Raw | ConvertFrom-Json).plugin
 if (-not (Test-Path -LiteralPath $FabFilterPlugin)) { throw "Installed Pro-R 2 plugin is missing" }
-Invoke-Checked "73 exact package Pro-R2 Mix and full state restore" {
+Invoke-Checked "60 exact package Pro-R2 Mix and full state restore" {
     & (Join-Path $BuildDir "Release\FengYinDjHostTests.exe") --reverb-plugin $FabFilterPlugin (Join-Path $BuildDir "evidence\performance-reverb")
 }
 

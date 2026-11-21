@@ -1,0 +1,127 @@
+[
+  {
+    "id": "TONE_147_VIOLIN3",
+    "text": "小提琴三。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "c6e012c3c03de26f46e64bc3c9af37ca2f6b7610b1cff6da3727b583146c61d5",
+    "sha256": "0fb056d9dc853876bbacb76165aa8a18d1202a03650c38d6e3493e1f2704cfa2",
+    "seconds": 1.68
+  },
+  {
+    "id": "TONE_147_CELLO1",
+    "text": "大提琴一。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "343d75da82e30baef5dcec7ff977730d80af927b9ace8db4a0ee75bdb1ace428",
+    "sha256": "95fc3b115edbd1e03bcbd3d8915addc16e851f80930701d2f034c9a9e778e61a",
+    "seconds": 1.8
+  },
+  {
+    "id": "TONE_147_CELLO2",
+    "text": "大提琴二。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "f983409660f45c8789ba0bc23ee39aaef92daf53ffeee6ff7213ba5b1d42444b",
+    "sha256": "eeb3e3901997fb8666995276ca8f3af51c441f2c5a355f9f24a9d44a781aa593",
+    "seconds": 1.6
+  },
+  {
+    "id": "TONE_147_MATOUQIN",
+    "text": "马头琴。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "f6d44f13df48d4ddca849c7c722ae2d5a7f9dda33b4ee124be84f4252331f3c9",
+    "sha256": "77024b0841765e02b4cccb6477bedd57855101c136133045a8c36e380713c43b",
+    "seconds": 1.64
+  },
+  {
+    "id": "TONE_147_TENOR_AIR",
+    "text": "经典气包次中萨。",
+    "voice": "x6_lingyuyan_pro",
+    "settings": {
+      "vcn": "x6_lingyuyan_pro",
+      "speed": 50,
+      "volume": 50,
+      "pitch": 50,
+      "bgs": 0,
+      "reg": 0,
+      "rdn": 0,
+      "rhy": 0,
+      "audio": {
+        "encoding": "raw",
+        "sample_rate": 24000,
+        "channels": 1,
+        "bit_depth": 16,
+        "frame_size": 0
+      }
+    },
+    "requestHash": "f6b6c2669147e4054c328662d7652834923c402df811f6c651e9fb752e0a61ee",
+    "sha256": "6d2ef808dd5aab7b20e6308d86d0d34fd20b228032f629137743fb3bd4c0d198",
+    "seconds": 2.56
+  }
+]

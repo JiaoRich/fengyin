@@ -10,6 +10,8 @@ class Release115(unittest.TestCase):
         self.assertEqual(len(audit),152 if audit_file.name in ('release-116-audit.json','release-140-audit.json') else 122)
         added=json.loads((ROOT/'assets/voice/test-edition-audit.json').read_text(encoding='utf-8'));self.assertEqual(len(added),29)
         audit+=added
+        renamed=json.loads((ROOT/'assets/voice/release-147-audit.json').read_text(encoding='utf-8'));self.assertEqual(len(renamed),5)
+        audit+=renamed
         self.assertEqual({x['id'] for x in audit},{x['id'] for x in catalog['items']})
         self.assertEqual(catalog['voice'],'x6_lingyuyan_pro')
         for row in audit:

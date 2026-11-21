@@ -16,9 +16,10 @@ class ToneRelease137(unittest.TestCase):
         rows = audit['tones']
         self.assertEqual(len(rows), 44)
         self.assertEqual(len({r['name'] for r in rows}), 44)
+        current = json.loads((ROOT/'assets/tone-packages/release-147-audit.json').read_text(encoding='utf-8'))['rows']
         source = (ROOT/'native/Source/PublishedToneCatalog.h').read_text(encoding='utf-8')
         actual = re.findall(r'\{ "([^"]+)",\s*"([^"]+)",\s*"([^"]+)",\s*"[^"]+",\s*PublishedToneKind::\w+,\s*"([^"]+)"', source)
-        self.assertEqual([r for r in actual if not r[0].startswith('dj-source-')], [(r['id'], r['name'], r['instrumentKey'], r['asset']) for r in rows])
+        self.assertEqual([r for r in actual if not r[0].startswith('dj-source-')], [(r['id'], r['name'], r['instrumentKey'], r['asset']) for r in current if not r['id'].startswith('dj-source-')])
         cmake = (ROOT/'CMakeLists.txt').read_text(encoding='utf-8')
         embedded = re.findall(r'assets/tone-packages/([^\s]+\.fytonepack)',cmake)
         self.assertEqual({p for p in embedded if not p.startswith('dj-source-')}, {r['asset'] for r in rows})
@@ -28,7 +29,9 @@ class ToneRelease137(unittest.TestCase):
                 changed=next(r for r in changes if r['asset']==row['asset'])
                 self.assertEqual(changed['oldSHA'],row['sha256'])
                 raw=(ROOT/'assets/tone-packages'/row['asset']).read_bytes()
-                self.assertEqual(hashlib.sha256(raw).hexdigest(),changed['sha256'])
+                updated=next(r for r in current if r['id']==row['id'])
+                self.assertEqual(updated['sourceSHA'],changed['sha256'])
+                self.assertEqual(hashlib.sha256(raw).hexdigest(),updated['resultSHA'])
         names={r['name'] for r in rows}
         self.assertTrue({'梆笛*','曲笛2*','唢呐2*','小号1','小号2','浪漫中萨','浪漫次中萨','嘶吼中萨','嘶吼次中萨','气声中萨'} <= names)
         self.assertTrue({'小提琴-明亮','马头琴','葫芦丝'}.isdisjoint(names))

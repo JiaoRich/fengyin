@@ -22,10 +22,10 @@ const tones=JSON.parse(fs.readFileSync('assets/tone-packages/release-139-audit.j
    const labels=await cards.locator('h3').evaluateAll(ns=>ns.map(n=>({font:getComputedStyle(n).fontSize,align:getComputedStyle(n).textAlign})));assert(labels.every(x=>x.font==='20px'&&x.align==='center'));
    assert.equal(await page.locator('[data-card-key="builtin:kontakt-kensa-2"]').count(),0);
    const custom=['builtin:kong-pipa','builtin:kontakt-kensa-2','builtin:trumpet'];
-   await page.evaluate(o=>localStorage.setItem('fengyin-dj-card-order-swam',JSON.stringify(o)),custom);
+   await page.evaluate(o=>localStorage.setItem('fengyin-card-order-swam',JSON.stringify(o)),custom);
    await page.reload();await page.evaluate(s=>window.listeners.backendState(s),state);await page.locator('[data-page="sounds"]').click();
    assert.deepEqual(await cards.evaluateAll(ns=>ns.slice(0,2).map(n=>n.dataset.cardKey)),['builtin:kong-pipa','builtin:trumpet']);
-   assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('fengyin-dj-card-order-swam'))),custom,'removing a built-in must not rewrite user order');
+   assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('fengyin-card-order-swam'))),custom,'removing a built-in must not rewrite user order');
    await page.locator('[data-page="play"]').click();
    for(const [width,height] of [[1280,720],[1280,800],[1366,768],[1920,1080],[1024,600],[800,600]]){
     await page.setViewportSize({width,height});await page.evaluate(s=>window.listeners.backendState(s),state);await page.waitForTimeout(150);

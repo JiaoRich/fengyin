@@ -4,6 +4,7 @@
 #include "PublishedToneCatalog.h"
 #include "PerformanceReverb.h"
 #include "SwamPerformanceState.h"
+#include "SwamTechniqueRouting.h"
 #include <cassert>
 #include <iostream>
 
@@ -23,12 +24,12 @@ private:float value=0;
 };
 class SourceInstrument final : public juce::AudioPluginInstance {
 public:
-    explicit SourceInstrument(juce::MemoryBlock bytes):AudioPluginInstance(BusesProperties().withOutput("Out",juce::AudioChannelSet::stereo(),true)),state(std::move(bytes)) {
+    explicit SourceInstrument(juce::MemoryBlock bytes,juce::String name="SWAM Alto Sax"):AudioPluginInstance(BusesProperties().withOutput("Out",juce::AudioChannelSet::stereo(),true)),state(std::move(bytes)),pluginName(std::move(name)) {
         auto parameter=std::make_unique<AttackParameter>();attack=parameter.get();addHostedParameter(std::move(parameter));
     }
-    AttackParameter* attack;juce::MemoryBlock state;
-    void fillInPluginDescription(juce::PluginDescription& d) const override {d.name="SWAM Alto Sax";d.isInstrument=true;}
-    const juce::String getName()const override{return "SWAM Alto Sax";}
+    AttackParameter* attack;juce::MemoryBlock state;juce::String pluginName;
+    void fillInPluginDescription(juce::PluginDescription& d) const override {d.name=pluginName;d.isInstrument=true;}
+    const juce::String getName()const override{return pluginName;}
     void prepareToPlay(double,int)override{} void releaseResources()override{}
     void processBlock(juce::AudioBuffer<float>& b,juce::MidiBuffer&)override{for(int c=0;c<b.getNumChannels();++c)for(int n=0;n<b.getNumSamples();++n)b.setSample(c,n,.1f);}
     bool acceptsMidi()const override{return true;} bool producesMidi()const override{return false;}
@@ -91,7 +92,8 @@ struct DjHostTestAccess {
     }
     static SourceInstrument& install(PluginHostEngine& h,const SoundPreset& preset) {
         h.graph=std::make_unique<juce::AudioProcessorGraph>();h.graph->setPlayConfigDetails(0,2,48000,128);
-        auto source=std::make_unique<SourceInstrument>(preset.instrumentState);auto* raw=source.get();
+        auto desc=juce::parseXML(preset.instrumentDescriptionXml);
+        auto source=std::make_unique<SourceInstrument>(preset.instrumentState,desc?desc->getStringAttribute("name"):"SWAM Alto Sax");auto* raw=source.get();
         h.instrumentNode=h.graph->addNode(std::move(source));
         h.audioOutputNode=h.graph->addNode(std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(juce::AudioProcessorGraph::AudioGraphIOProcessor::audioOutputNode));
         h.midiInputNode=h.graph->addNode(std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(juce::AudioProcessorGraph::AudioGraphIOProcessor::midiInputNode));
@@ -173,6 +175,63 @@ struct DjHostTestAccess {
         assert(!host->removeEffectAt(0));host->unloadEffect();assert(host->performanceReverbAvailable());
         host->graph->releaseResources();host->setMasterOutputService(nullptr);
     }
+    static void checkStandardHighResolution(const SoundPreset& preset) {
+        auto host=std::make_unique<PluginHostEngine>();auto& fake=install(*host,preset);
+        assert(host->configureDjSource(preset.djSource));assert(!host->usesDjSource());
+        assert(host->applyStandardSwamExpressionCurve(false,preset.swamBreathGrowl));
+        assert(host->usesSwamBreathGrowl()==preset.swamBreathGrowl);
+        const auto state=host->captureInstrumentState();
+        auto before=SwamStateCompatibility::read(preset.instrumentState),after=SwamStateCompatibility::read(state);assert(before&&after);
+        std::map<juce::String,double> a,b;SwamStateCompatibility::params(*before,a);SwamStateCompatibility::params(*after,b);assert(a==b && a.at("mainVolume")==0);
+        auto* original=SwamStateCompatibility::table(*before);auto* actual=SwamStateCompatibility::table(*after);assert(original&&actual);
+        for(auto* e:original->getChildIterator())for(auto* n:actual->getChildIterator())
+            if(e->getStringAttribute("parameterId")==n->getStringAttribute("parameterId"))assert(e->getChildByName("MIDIRemappingCurve")->isEquivalentTo(n->getChildByName("MIDIRemappingCurve"),false));
+        const int expression=DjMidiRoute::find(*after,"expression");assert(DjMidiRoute::coarse(expression)==2&&DjMidiRoute::fine(expression)==34);
+        drain(*host);
+        for(float value:{0.f,1.f/127.f,.5f,.5001f,1.f,0.f}){
+            host->breathChanged(value,10);auto events=drain(*host);assert(events.size()==1);const auto& e=events[0];int raw=juce::roundToInt(value*16383.f);
+            assert(e.size==6&&e.bytes[0]==0xb0&&e.bytes[1]==2&&e.bytes[2]==(raw>>7)&&e.bytes[3]==0xb0&&e.bytes[4]==34&&e.bytes[5]==(raw&127));
+            host->breathChanged(value,11);assert(drain(*host).empty());
+        }
+        host->breathChanged(std::numeric_limits<float>::quiet_NaN(),12);assert(drain(*host).empty());
+        // Preserve OFF and source-owned growl; native global routes never touch
+        // expression's coarse or fine controller (including fine-only changes).
+        for(auto role:{PerformanceTechnique::vibrato,PerformanceTechnique::growl}) {
+            for(float v:{.15f,.8f,0.f}){
+                host->techniqueChanged(role,v);auto ev=drain(*host);
+                if(role==PerformanceTechnique::growl&&preset.swamBreathGrowl)assert(ev.empty());
+                for(const auto& e:ev){assert(e.bytes[1]!=2&&e.bytes[1]!=34);}
+            }
+        }
+        // Paired breath remains one indivisible queue item; failed push must not
+        // consume the latest value, so the identical next callback retries it.
+        while(host->player.enqueueControllerPair(expression,0,0)){}
+        host->breathChanged(.7345f,13);drain(*host);host->breathChanged(.7345f,14);auto retry=drain(*host);assert(retry.size()==1&&retry[0].size==6);
+        assert(host->captureInstrumentState()==state);
+        // A tuner-saved legacy single CC remains single CC; reactivating the
+        // new full preset restores high resolution without a stale fine route.
+        auto old=SwamStateCompatibility::read(state);auto* table=SwamTechniqueRouting::findTable(*old);
+        for(auto* e:table->getChildIterator())if(e->getStringAttribute("parameterId")=="expression"){
+            e->setAttribute("messageType",1);e->setAttribute("msb",11);e->setAttribute("lsb",-1);
+        }
+        auto outer=juce::AudioProcessor::getXmlFromBinary(state.getData(),int(state.getSize()));auto* comp=outer->getChildByName("IComponent");juce::MemoryBlock body,chunk;
+        assert(body.fromBase64Encoding(comp->getAllSubText()));juce::AudioProcessor::copyXmlToBinary(*old,chunk);
+        body.setSize(176);body.append(chunk.getData(),chunk.getSize());auto* bytes=static_cast<unsigned char*>(body.getData());
+        const auto put=[&](size_t offset,size_t n){for(int i=0;i<4;++i)bytes[offset+size_t(i)]=static_cast<unsigned char>(n>>(24-8*i));};
+        put(20,body.getSize()-24);put(172,chunk.getSize());comp->deleteAllTextElements();comp->addTextElement(body.toBase64Encoding());
+        juce::MemoryBlock legacy;juce::AudioProcessor::copyXmlToBinary(*outer,legacy);assert(SwamStateCompatibility::read(legacy));
+        fake.setStateInformation(legacy.getData(),int(legacy.getSize()));
+        assert(host->applyStandardSwamExpressionCurve(false,false));drain(*host);host->breathChanged(.5f,15);auto oldEvents=drain(*host);assert(oldEvents.size()==1&&oldEvents[0].size==3&&oldEvents[0].bytes[1]==11&&oldEvents[0].bytes[2]==64);
+        fake.setStateInformation(state.getData(),int(state.getSize()));assert(host->applyStandardSwamExpressionCurve(false,preset.swamBreathGrowl));drain(*host);host->breathChanged(.5f,16);auto newEvents=drain(*host);assert(newEvents.size()==1&&newEvents[0].size==6);
+        host->resetPerformance();drain(*host);host->breathChanged(.5f,17);assert(drain(*host).size()==1);
+        checkOrdinary(*host); // Existing native DSP is still active for original tones.
+        // Fresh activation no longer creates the retired volume/breath binding.
+        fake.setStateInformation(state.getData(),int(state.getSize()));assert(host->applyStandardSwamExpressionCurve(true));
+        auto fresh=SwamStateCompatibility::read(host->captureInstrumentState());assert(fresh);
+        for(auto* e:SwamStateCompatibility::table(*fresh)->getChildIterator())if(e->getStringAttribute("parameterId")=="mainVolume"){
+            const int route=DjMidiRoute::encode(*e);assert(!DjMidiRoute::overlaps(route,DjMidiRoute::find(*fresh,"expression")));
+        }
+    }
     static std::vector<RealtimeMidiEvent> drain(PluginHostEngine& h){
         std::vector<RealtimeMidiEvent> out;RealtimeMidiEvent e;while(h.player.midiQueue.pop(e))out.push_back(e);return out;
     }
@@ -207,9 +266,13 @@ int main(int argc,char** argv){
      assert(!fengyin::djEffectVersionCompatible(a,b));b.version=a.version;assert(fengyin::djEffectVersionCompatible(a,b));}
     testPerformanceResetDelivery();
     const auto root=juce::File(juce::String::fromUTF8(__FILE__)).getParentDirectory().getParentDirectory();
-    int count=0;
+    int count=0,standardCount=0;
     for(const auto& tone:fengyin::publishedToneCatalog){
-        if(!juce::String(tone.id.data()).startsWith("dj-source-"))continue;
+        if(tone.kind!=fengyin::PublishedToneKind::swamPackage)continue;
+        if(!juce::String(tone.id.data()).startsWith("dj-source-")){
+            juce::String error;auto p=fengyin::TonePackage::read(root.getChildFile("assets/tone-packages/"+juce::String(tone.assetName.data())),error);assert(p);
+            fengyin::DjHostTestAccess::checkStandardHighResolution(*p);++standardCount;continue;
+        }
         juce::String error;
         auto p=fengyin::TonePackage::read(root.getChildFile("assets/tone-packages/"+juce::String(tone.assetName.data())),error);
         assert(p);auto host=std::make_unique<fengyin::PluginHostEngine>();
@@ -248,5 +311,5 @@ int main(int argc,char** argv){
     }
     { fengyin::SoundPreset plain;auto ordinary=std::make_unique<fengyin::PluginHostEngine>();
       fengyin::DjHostTestAccess::install(*ordinary,plain);fengyin::DjHostTestAccess::checkOrdinary(*ordinary); }
-    assert(count==29);std::cout<<"29 source states: production host routing, 7/14-bit delivery, legacy normalizers blocked, bus protection, capture passed\n";
+    assert(count==16 && standardCount==24);std::cout<<"24 original states: high resolution breath, queue retry, legacy reload, techniques and original DSP passed\n";std::cout<<"16 retained source states: production host routing, 7/14-bit delivery, legacy normalizers blocked, bus protection, capture passed\n";
 }

@@ -142,7 +142,7 @@ WindowsLowLatencyOptimizer::~WindowsLowLatencyOptimizer()
 juce::File WindowsLowLatencyOptimizer::getWorkDirectory()
 {
     return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-        .getChildFile("FengYinDJ").getChildFile("SystemAudioOptimisation");
+        .getChildFile("FengYin").getChildFile("SystemAudioOptimisation");
 }
 
 juce::File WindowsLowLatencyOptimizer::getScriptFile() { return getWorkDirectory().getChildFile("optimise-audio.ps1"); }

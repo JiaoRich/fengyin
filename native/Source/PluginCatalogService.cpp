@@ -316,7 +316,7 @@ juce::MemoryBlock PluginCatalogService::createKongProjectForInstrument(const juc
 juce::File PluginCatalogService::getCatalogFile() const
 {
     return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-        .getChildFile("FengYinDJ").getChildFile("plugins.xml");
+        .getChildFile("FengYin").getChildFile("plugins.xml");
 }
 
 juce::File PluginCatalogService::getDeadMansPedalFile() const

@@ -1,6 +1,6 @@
 param([Parameter(Mandatory=$true)][string]$PackageDirectory,[string]$EvidenceFile)
 $ErrorActionPreference='Stop'
-$LogDir=Join-Path $env:ProgramData 'FengYinDJ/InstallLogs'
+$LogDir=Join-Path $env:ProgramData 'FengYin/InstallLogs'
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $Log=Join-Path $LogDir 'FabFilter-Pro-R-2.txt'
 function Test-ProRVersion([version]$Version) {

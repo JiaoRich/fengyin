@@ -5,26 +5,26 @@
   #define OutputDir "."
 #endif
 #ifndef AppVersion
-  #define AppVersion "1.0.2"
+  #define AppVersion "1.1.47"
 #endif
 #ifndef ChineseMessages
   #define ChineseMessages "compiler:Languages\ChineseSimplified.isl"
 #endif
 
 [Setup]
-AppId={{EE1A5E76-B5BA-44F0-9D05-57710440258B}
-AppName=风吟·音色测试版
+AppId={{BA041761-FF1B-4F84-B055-AE70EC8C883B}
+AppName=风吟
 AppVersion={#AppVersion}
 VersionInfoVersion={#AppVersion}.0
 AppPublisher=风吟
-DefaultDirName={autopf}\风吟·音色测试版
-DefaultGroupName=风吟·音色测试版
+DefaultDirName={autopf}\风吟
+DefaultGroupName=风吟
 DisableProgramGroupPage=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 OutputDir={#OutputDir}
-OutputBaseFilename=风吟·音色测试版-{#AppVersion}-Windows-x64
+OutputBaseFilename=风吟-{#AppVersion}-Windows-x64
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
@@ -33,7 +33,7 @@ InfoBeforeFile={#SourceDir}\InstallNotice.txt
 CloseApplications=yes
 RestartApplications=no
 AlwaysRestart=yes
-UninstallDisplayName=风吟·音色测试版
+UninstallDisplayName=风吟
 
 [Languages]
 Name: "chinesesimp"; MessagesFile: "{#ChineseMessages}"
@@ -49,11 +49,11 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "MicrosoftEdgeWebView2Runt
 Source: "{#SourceDir}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Icons]
-Name: "{group}\风吟·音色测试版"; Filename: "{app}\FengYin.exe"
+Name: "{group}\风吟"; Filename: "{app}\FengYin.exe"
 Name: "{group}\安装 ASIO4ALL 低延迟组件"; Filename: "{app}\components\ASIO4ALL\ASIO4ALL_2_22.exe"
 Name: "{group}\安装 VB-CABLE 网页声音组件"; Filename: "{app}\components\VB-CABLE\VBCABLE_Setup_x64.exe"
 Name: "{group}\安装 Fresh Air 音色效果器"; Filename: "{app}\components\Fresh Air\Setup Fresh Air v1.0.8.exe"
-Name: "{autodesktop}\风吟·音色测试版"; Filename: "{app}\FengYin.exe"; Tasks: desktopicon
+Name: "{autodesktop}\风吟"; Filename: "{app}\FengYin.exe"; Tasks: desktopicon
 
 [InstallDelete]
 ; Remove only withdrawn application components on upgrade, never recordings.
@@ -71,7 +71,7 @@ Type: files; Name: "{app}\components\Recording\FengYinCapturePacketCopy.h"
 Filename: "{tmp}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; Parameters: "/silent /install"; StatusMsg: "正在安装视频与精美界面离线运行组件…"; Flags: waituntilterminated
 
 [Registry]
-Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "FengYinDJAudioRecovery"; ValueData: """{app}\FengYinAudioWatchdog.exe"" --login-recovery"; Flags: uninsdeletevalue
+Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "FengYinAudioRecovery"; ValueData: """{app}\FengYinAudioWatchdog.exe"" --login-recovery"; Flags: uninsdeletevalue
 
 [Code]
 
@@ -110,8 +110,8 @@ begin
   repeat
     Code := -1;
     if Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Args, '', SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0) then Exit;
-    Choice := MsgBox(ExpandConstant('FabFilter Pro-R 2 未安装完成。请查看 {commonappdata}\FengYinDJ\InstallLogs 中的记录，处理后重试。'), mbError, MB_RETRYCANCEL);
-    if Choice = IDCANCEL then RaiseException('DJ 音色依赖尚未准备完成，安装已停止。');
+    Choice := MsgBox(ExpandConstant('FabFilter Pro-R 2 未安装完成。请查看 {commonappdata}\FengYin\InstallLogs 中的记录，处理后重试。'), mbError, MB_RETRYCANCEL);
+    if Choice = IDCANCEL then RaiseException('音色效果器尚未准备完成，安装已停止。');
   until False;
 end;
 

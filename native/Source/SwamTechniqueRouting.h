@@ -2,6 +2,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <set>
 #include <cstring>
+#include "DjSourceRouting.h"
 namespace fengyin {
 // Standard Steinberg VstW/CcnK/FBCh envelope (VST3 SDK vst2persistence.cpp),
 // containing a verified JUCE XML chunk. No guessed vendor checksum fields.
@@ -28,34 +29,21 @@ struct SwamTechniqueRouting {
         auto xml=juce::AudioProcessor::getXmlFromBinary(bytes+176,static_cast<int>(chunkSize));
         if(!xml||!xml->hasTagName("swam"))return result;
         auto* table=findTable(*xml);if(!table)return result;
-        // Only an explicit full preset with verified shared CC11 may own Growl.
+        // A named breath-growl preset owns the shared expression route. Accept
+        // the approved high-resolution equivalent without changing either curve.
         if (preferBreathGrowl && wantGrowl && preserveUnrequested)
         {
-            const auto isBreathRoute = [](const juce::XmlElement& entry)
-            {
-                const auto channel = entry.getIntAttribute("channel");
-                return entry.getIntAttribute("enabled") == 1 && entry.getIntAttribute("messageType") == 1
-                    && entry.getIntAttribute("msb") == 11 && entry.getIntAttribute("lsb", -1) <= 0
-                    && (channel == 1 || channel == 17);
-            };
-            int expressionCount = 0, growlCount = 0;
-            bool expressionOnBreath = false, growlOnBreath = false;
-            for (auto* entry : table->getChildIterator())
-            {
-                const auto id = entry->getStringAttribute("parameterId");
-                if (id.equalsIgnoreCase("expression"))
-                {
-                    ++expressionCount;
-                    expressionOnBreath = isBreathRoute(*entry);
-                }
-                if (id.equalsIgnoreCase("growl"))
-                {
-                    ++growlCount;
-                    growlOnBreath = isBreathRoute(*entry);
-                }
+            int expressionCount=0,growlCount=0,expressionRoute=0,growlRoute=0;
+            for(auto* entry:table->getChildIterator()) {
+                const auto id=entry->getStringAttribute("parameterId");
+                if(id.equalsIgnoreCase("expression")){++expressionCount;expressionRoute=DjMidiRoute::encode(*entry);}
+                if(id.equalsIgnoreCase("growl")){++growlCount;growlRoute=DjMidiRoute::encode(*entry);}
             }
-            result.breathGrowl = expressionCount == 1 && growlCount == 1 && expressionOnBreath && growlOnBreath;
-            if (result.breathGrowl) wantGrowl = false;
+            const bool approved = (DjMidiRoute::coarse(expressionRoute)==11 && DjMidiRoute::fine(expressionRoute)<0)
+                || (DjMidiRoute::coarse(expressionRoute)==2 && DjMidiRoute::fine(expressionRoute)==34);
+            result.breathGrowl=expressionCount==1 && growlCount==1 && expressionRoute!=0
+                && expressionRoute==growlRoute && DjMidiRoute::channel(expressionRoute)==1 && approved;
+            if(result.breathGrowl)wantGrowl=false;
         }
         // String bow tremolo belongs exclusively to the hardware technique key.
         // A saved breath mapping would otherwise overwrite OFF (and the held
@@ -70,14 +58,17 @@ struct SwamTechniqueRouting {
             for(auto* entry:table->getChildIterator())if(entry->getStringAttribute("parameterId").equalsIgnoreCase("expression")){
                 if(expression)return result;expression=entry;
             }
-            if(!expression || expression->getIntAttribute("enabled")!=1 || expression->getIntAttribute("messageType",-1)!=1
+            if(!expression || expression->getIntAttribute("enabled")!=1 || DjMidiRoute::encode(*expression)==0
                 || expression->getIntAttribute("msb",-1)<0 || expression->getIntAttribute("msb",-1)>119)return result;
         }
         std::set<int> used;
         for(auto* entry:table->getChildIterator()){
             const auto id=entry->getStringAttribute("parameterId");
             if((wantVibrato&&id.equalsIgnoreCase("vibratoDepth"))||(wantGrowl&&id.equalsIgnoreCase("growl"))||(wantFlutter&&id.equalsIgnoreCase("flutter")))continue;
-            if(entry->getIntAttribute("enabled")==1&&entry->getIntAttribute("messageType",-1)==1)used.insert(entry->getIntAttribute("msb",-1));
+            if(const int route=DjMidiRoute::encode(*entry)){
+                used.insert(DjMidiRoute::coarse(route));
+                if(DjMidiRoute::fine(route)>=0)used.insert(DjMidiRoute::fine(route));
+            }
         }
         const auto configure=[&](const char* id,int preferred,bool wanted,int& selected,bool shared=false)->bool {
             juce::XmlElement* target=nullptr;
@@ -105,10 +96,10 @@ struct SwamTechniqueRouting {
             if(!shared && !free(selected)){selected=free(preferred)?preferred:-1;for(int i=1;selected<0&&i<120;++i)if(free(i))selected=i;}
             if(selected<0)return false;
             const auto set=[&](const char* name,int value){if(target->getIntAttribute(name,-999)!=value){target->setAttribute(name,value);result.changed=true;}};
-            set("enabled",1);set("messageType",1);set("msb",selected);
-            if(target->getIntAttribute("lsb",-1)>0)set("lsb",-1);
+            set("enabled",1);set("messageType",shared?expression->getIntAttribute("messageType",1):1);set("msb",selected);
+            if(!shared && target->getIntAttribute("lsb",-1)>0)set("lsb",-1);
             const int channel=target->getIntAttribute("channel",-1);if(channel<1||channel>17)set("channel",17);
-            if(shared){set("channel",expression->getIntAttribute("channel",17));set("lsb",expression->getIntAttribute("lsb",-1));}
+            if(shared){set("messageType",expression->getIntAttribute("messageType",1));set("channel",expression->getIntAttribute("channel",17));set("lsb",expression->getIntAttribute("lsb",-1));}
             used.insert(selected);return true;
         };
         if(!configure("vibratoDepth",1,wantVibrato,result.vibrato)||!configure("growl",21,wantGrowl,result.growl)||!configure("flutter",22,wantFlutter,result.flutter)||!configure("mainVolume",0,shareVolume,result.volume,true))return Result{};

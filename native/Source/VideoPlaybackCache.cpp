@@ -130,7 +130,7 @@ void VideoPlaybackCache::interrupt(){pool.removeAllJobs(true,0);}
 bool VideoPlaybackCache::prepare(const juce::File& ffmpeg,const juce::File& source,Completion done) {
     if(busy()||!ffmpeg.existsAsFile()||!source.existsAsFile())return false;
     const auto root=cacheDirectory==juce::File()?juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-        .getChildFile("FengYinDJ").getChildFile("video-cache"):cacheDirectory;
+        .getChildFile("FengYin").getChildFile("video-cache"):cacheDirectory;
     pool.addJob(new PrepareJob(ffmpeg,source,cacheFileFor(source,root),std::move(done)),true);return true;
 }
 juce::File VideoPlaybackCache::cacheFileFor(const juce::File& source,const juce::File& directory) {
