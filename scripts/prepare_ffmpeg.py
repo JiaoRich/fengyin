@@ -4,18 +4,18 @@ import json
 import os
 from pathlib import Path
 import shutil
-import tempfile
 import urllib.request
 import zipfile
 
 
-# The 1.1.44 installer used the November 6 build. Upstream's "latest"
-# ZIP repacks these same files with a different root folder name.
+# Pin the same FFmpeg 8.1.3-34 source revision used before 1.1.47.
+# The November 6 daily archive expired under upstream retention policy.
+# A verified content-addressed CI cache avoids requiring that tag on every build.
 REPOSITORY = "FFmpeg-Builds/FFmpeg-Builds"
-RELEASE_TAG = "autobuild-2026-11-06-12-50"
+RELEASE_TAG = "autobuild-2026-11-10-12-39"
 API = f"https://api.github.com/repos/{REPOSITORY}/releases/tags/{RELEASE_TAG}"
 ASSET = "ffmpeg-n8.1.3-34-ga35157abb9-win64-lgpl-shared-8.1.zip"
-ARCHIVE_SHA256 = "08897c3d53909d8fde6bd5eb9324e7ca41324890d2b03e22c2f9f31025789ee2"
+ARCHIVE_SHA256 = "3045c2213ed8cbb05edf0d5a631b4490061de3b7567ec145644156e7c98da2c6"
 
 
 def github_api_headers():
@@ -50,34 +50,54 @@ def verify_archive(path, expected):
         raise ValueError("FFmpeg SHA256 mismatch; refusing to package")
 
 
+def resolve_archive(cache):
+    cache.mkdir(parents=True, exist_ok=True)
+    archive = cache / (ARCHIVE_SHA256 + ".zip")
+    if archive.is_file():
+        try:
+            verify_archive(archive, ARCHIVE_SHA256)
+            return archive
+        except ValueError:
+            archive.unlink()
+    request = urllib.request.Request(API, headers=github_api_headers())
+    with urllib.request.urlopen(request, timeout=60) as response:
+        release = json.load(response)
+    url, expected = select_asset(release)
+    partial = archive.with_suffix(".part")
+    try:
+        with urllib.request.urlopen(url, timeout=120) as response, partial.open("wb") as out:
+            shutil.copyfileobj(response, out)
+        verify_archive(partial, expected)
+        partial.replace(archive)
+    finally:
+        partial.unlink(missing_ok=True)
+    return archive
+
+
 def prepare(destination):
-    # Verify the retained release metadata and archive before extracting files.
+    cache = Path(os.environ.get("FENGYIN_FFMPEG_CACHE", Path(__file__).resolve().parents[1] / ".cache/fengyin-ffmpeg"))
     for attempt in range(3):
         try:
-            request = urllib.request.Request(API, headers=github_api_headers())
-            with urllib.request.urlopen(request, timeout=60) as response:
-                release = json.load(response)
-            url, expected = select_asset(release)
-            with tempfile.TemporaryDirectory(prefix="fengyin-ffmpeg-") as temp:
-                archive = Path(temp) / ASSET
-                with urllib.request.urlopen(url, timeout=120) as response, archive.open("wb") as out:
-                    shutil.copyfileobj(response, out)
-                verify_archive(archive, expected)
-                destination.mkdir(parents=True, exist_ok=True)
-                with zipfile.ZipFile(archive) as package:
-                    # Copy flat binary and notice files only, never extract arbitrary paths.
-                    files = [i for i in package.infolist() if not i.is_dir()]
-                    if not any(i.filename.endswith("/bin/ffmpeg.exe") for i in files):
-                        raise ValueError("FFmpeg executable missing from archive")
-                    if not any(i.filename.endswith("/bin/ffprobe.exe") for i in files):
-                        raise ValueError("FFprobe metadata reader missing from archive")
-                    for item in files:
-                        path = Path(item.filename)
-                        if path.parent.name == "bin" or path.name.upper().startswith(("LICENSE", "COPYING", "README")):
-                            with package.open(item) as src, (destination / path.name).open("wb") as out:
-                                shutil.copyfileobj(src, out)
-                (destination / "build-source.json").write_text(json.dumps({"url": url, "sha256": expected}, indent=2))
-            print("FFmpeg verified:", expected)
+            archive = resolve_archive(cache)
+            destination.mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(archive) as package:
+                files = [i for i in package.infolist() if not i.is_dir()]
+                if not any(i.filename.endswith("/bin/ffmpeg.exe") for i in files):
+                    raise ValueError("FFmpeg executable missing from archive")
+                if not any(i.filename.endswith("/bin/ffprobe.exe") for i in files):
+                    raise ValueError("FFprobe metadata reader missing from archive")
+                names = set()
+                for item in files:
+                    path = Path(item.filename)
+                    if path.parent.name == "bin" or path.name.upper().startswith(("LICENSE", "COPYING", "README")):
+                        if path.name.lower() in names:
+                            raise ValueError("Duplicate flat FFmpeg archive entry")
+                        names.add(path.name.lower())
+                        with package.open(item) as src, (destination / path.name).open("wb") as out:
+                            shutil.copyfileobj(src, out)
+            url = f"https://github.com/{REPOSITORY}/releases/download/{RELEASE_TAG}/{ASSET}"
+            (destination / "build-source.json").write_text(json.dumps({"url": url, "sha256": ARCHIVE_SHA256}, indent=2))
+            print("FFmpeg verified:", ARCHIVE_SHA256)
             return
         except Exception:
             if attempt == 2:

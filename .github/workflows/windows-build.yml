@@ -637,6 +637,11 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      - name: Restore verified FFmpeg dependency archive
+        uses: actions/cache@v4
+        with:
+          path: .cache/fengyin-ffmpeg
+          key: ffmpeg-3045c2213ed8cbb05edf0d5a631b4490061de3b7567ec145644156e7c98da2c6
       - name: 编译、测试并生成安装包
         shell: powershell
         env:

@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 spec = importlib.util.spec_from_file_location("prepare_ffmpeg", Path(__file__).resolve().parents[1] / "scripts/prepare_ffmpeg.py")
 ffmpeg = importlib.util.module_from_spec(spec)
@@ -47,3 +48,17 @@ class FfmpegReleaseTests(unittest.TestCase):
         script = (Path(__file__).resolve().parents[1] / "scripts/build-windows.ps1").read_text(encoding="utf-8-sig")
         self.assertLess(script.index('prepare_ffmpeg.py'), script.index('cmake -S'))
         self.assertNotIn('autobuild-2026-09-15', script)
+
+    def test_verified_cache_survives_expired_upstream_tag(self):
+        with tempfile.TemporaryDirectory() as temp:
+            cache=Path(temp); content=b"known archive"; digest=hashlib.sha256(content).hexdigest()
+            (cache/(digest+".zip")).write_bytes(content)
+            with mock.patch.object(ffmpeg,"ARCHIVE_SHA256",digest), mock.patch.object(ffmpeg.urllib.request,"urlopen",side_effect=AssertionError("must not use network")):
+                self.assertEqual(ffmpeg.resolve_archive(cache).read_bytes(),content)
+
+    def test_corrupt_cache_not_accepted(self):
+        with tempfile.TemporaryDirectory() as temp:
+            cache=Path(temp); archive=cache/(ffmpeg.ARCHIVE_SHA256+".zip");archive.write_bytes(b"corrupt")
+            with mock.patch.object(ffmpeg.urllib.request,"urlopen",side_effect=OSError("offline")):
+                with self.assertRaises(OSError):ffmpeg.resolve_archive(cache)
+            self.assertFalse(archive.exists())
