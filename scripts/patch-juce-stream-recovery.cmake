@@ -255,7 +255,7 @@ replace_exact("${wasapi}"
     void fengyinSessionDisconnected (AudioSessionDisconnectReason reason) override
     {
         fengyinDisconnect.store ((int) reason);
-        fengyinStreamFailed (AUDCLNT_E_DEVICE_INVALIDATED, 6);
+        fengyinStreamFailed (MAKE_HRESULT (1, 0x889, 0x4), 6); // AUDCLNT_E_DEVICE_INVALIDATED
         if (inputDevice != nullptr || isExclusiveMode (deviceMode))
             flags.fetch_or (reason == DisconnectReasonFormatChanged ? flagOutputSampleRateDidChange : flagShutdown);
     }
@@ -389,3 +389,9 @@ replace_exact("${wasapi}"
 
 file(APPEND "${wasapi}" "\n// FENGYIN_STREAM_RECOVERY_REV_1\n")
 endif()
+
+# JUCE declares its WASAPI interfaces locally; not every SDK error macro is
+# imported. Match JUCE's own HRESULT construction, including cached v1 trees.
+replace_exact("${wasapi}"
+[[        fengyinStreamFailed (AUDCLNT_E_DEVICE_INVALIDATED, 6);]]
+[[        fengyinStreamFailed (MAKE_HRESULT (1, 0x889, 0x4), 6); // AUDCLNT_E_DEVICE_INVALIDATED]])

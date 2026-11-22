@@ -20,6 +20,8 @@ bool FAILED(int h){return h<0;}bool SUCCEEDED(int h){return h>=0;}
 int HRESULT_FROM_WIN32(int code){return -code;}
 constexpr int S_OK=0, WAIT_OBJECT_0=0, WAIT_TIMEOUT=258;
 constexpr int AUDCLNT_E_DEVICE_INVALIDATED=-2004287484;
+constexpr int MAKE_HRESULT(unsigned severity,unsigned facility,unsigned code){return static_cast<int>((severity<<31)|(facility<<16)|code);}
+static_assert(MAKE_HRESULT(1,0x889,4)==AUDCLNT_E_DEVICE_INVALIDATED);
 static unsigned long waitCalls=0;
 int WaitForSingleObject(int,unsigned) { ++waitCalls; clockMs+=10; return WAIT_OBJECT_0; }
 bool check(int value) { return value>=0; }
