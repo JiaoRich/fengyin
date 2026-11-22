@@ -10,7 +10,7 @@ public static class FengYinAudioSnapshot {
         [PreserveSig] int EnumAudioEndpoints(int flow,uint mask,out Collection devices);
         [PreserveSig] int GetDefaultAudioEndpoint(int flow,int role,out Device device);
     }
-    [ComImport, Guid("0BD7A1BE-7A1A-44DB-8397-C0A2D2C223B1"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)] interface Collection {
+    [ComImport, Guid("0BD7A1BE-7A1A-44DB-8397-CC5392387B5E"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)] interface Collection {
         [PreserveSig] int GetCount(out uint count);
         [PreserveSig] int Item(uint index,out Device device);
     }

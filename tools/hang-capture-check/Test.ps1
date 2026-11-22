@@ -147,7 +147,7 @@ try {
     if($audioFolder.Count -ne 1){throw 'Missing no-sound output folder'}
     $ns=$audioFolder[0].FullName
     $audioSummary=Get-Content -LiteralPath (Join-Path $ns 'result.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-    if($audioSummary.AudioObservations -ne 4 -or $audioSummary.AppCount -ne 1){throw 'No-sound observations incomplete'}
+    if($audioSummary.AudioObservations -ne 4 -or $audioSummary.AppCount -ne 1 -or $audioSummary.AudioQueryErrors -ne 0){throw 'No-sound observations incomplete'}
     $observations=@(Get-ChildItem -LiteralPath $ns -Filter 'audio-*.json')
     $endpointCount=0
     foreach($sample in $observations){$v=Get-Content -LiteralPath $sample.FullName -Raw -Encoding UTF8 | ConvertFrom-Json;if(-not $v.Time -or -not $v.MeterLimit){throw 'Invalid audio observation'};$endpointCount+=@($v.Endpoints).Count}
