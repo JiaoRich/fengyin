@@ -1,0 +1,29 @@
+name: Hang collector isolated Windows check
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test shipped collector against synthetic hung processes
+        shell: powershell
+        run: |
+          & ./tools/hang-capture-check/Test.ps1 *>&1 | Tee-Object -FilePath hang-collector-test.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload synthetic verification only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hang-collector-verification
+          path: |
+            hang-collector-test.log
+            hang-collector-verification.json
+            hang-test-*/FengYin-Hang-*/errors.jsonl
+            hang-test-*/FengYin-Hang-*/result.json
+            hang-test-*/FengYin-Hang-*/*-stderr.txt
+          if-no-files-found: error
+          retention-days: 7
