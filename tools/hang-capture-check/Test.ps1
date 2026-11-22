@@ -99,7 +99,10 @@ try {
     foreach($d in $dumps){if(-not [FengYin.HangCapture.DumpNative]::HasRequiredStreams($d.FullName)){throw 'Invalid actual dump streams'}}
     $windows=Get-Content -LiteralPath (Join-Path $out ('round1-pid'+$main.Id+'-windows.json')) -Raw -Encoding UTF8 | ConvertFrom-Json
     if(-not @($windows.Items | Where-Object {$_.Visible -and $_.Hung}).Count){throw 'Actual hung window not detected'}
-    $tree=@(Get-Content -LiteralPath (Join-Path $out 'fengyin-webview-tree.json') -Raw -Encoding UTF8 | ConvertFrom-Json)
+    # Windows PowerShell 5.1 emits a JSON array as a single pipeline object;
+    # assign it first so the subsequent pipeline enumerates its rows, not a nested array.
+    $tree=Get-Content -LiteralPath (Join-Path $out 'fengyin-webview-tree.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+    Write-Host ('Isolated process IDs: actual='+(@($tree | ForEach-Object {$_.ProcessId}) -join ',')+' owned='+$ownedChild.Id+' unrelated='+$unrelated.Id)
     if(@($tree | Where-Object ProcessId -eq $unrelated.Id).Count -or -not @($tree | Where-Object ProcessId -eq $ownedChild.Id).Count){throw 'Actual unrelated webview isolation failure'}
     $capturedLog=Get-Content -LiteralPath (Join-Path $out 'roaming-FengYin-plugin-host.log.txt') -Raw -Encoding UTF8
     if($capturedLog -match 'SECRET_[ABC]' -or $capturedLog -notmatch 'plugin load done'){throw 'Actual log filter failure'}
