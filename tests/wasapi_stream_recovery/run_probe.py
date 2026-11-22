@@ -21,6 +21,46 @@ def extract(start,scope=0):
 d=s.index('class WASAPIAudioIODevice final');o=s.index('class WASAPIOutputDevice')
 methods='\n'.join(extract(x,d).replace(' override','') for x in ('void run() override','bool isOpen() override','bool isPlaying() override','void deviceSessionBecameInactive','void deviceSessionBecameActive','void deviceSessionExpired','void fengyinStreamFailed','void fengyinSessionDisconnected'))
 render='\n'.join(extract(x,o) for x in ('int getNumSamplesAvailableToCopy() const','void copyBuffers (const float* const*'))
+base=s.index('class WASAPIDeviceBase')
+lifecycle='''
+struct LifecycleProbe {
+ WASAPIDeviceMode deviceMode=WASAPIDeviceMode::sharedLowLatency;
+ int numChannels=2,clientEvent=1;UINT32 actualBufferSize=128,nextFrames=128;
+ IMMDevice identity=1;IMMDevice*device=&identity;
+ OwnedPtr<ClientSubstitute> client{new ClientSubstitute},fengyinOriginalClient;
+ OwnedPtr<SessionSubstitute> audioSessionControl{new SessionSubstitute},fengyinOriginalSession;
+ OwnedPtr<CallbackSubstitute> sessionEventCallback{new CallbackSubstitute};
+ OwnedPtr<RenderSubstitute> renderClient{new RenderSubstitute},fengyinOriginalRender;
+ bool fengyinWorkerClient=false,fengyinWorkerRender=false,initOK=true,createOK=true;
+ int eventError=0,serviceError=0,startError=0,initialisations=0,periodSeen=0,formatSeen=0,active=0;
+ std::optional<int>fengyinOpenedFormat{48000};int fengyinOpenedPeriod=128;
+ struct D{int hr=0,op=0;void fengyinStreamFailed(int h,int o){hr=h;op=o;}
+ int active=0;void deviceSessionBecameActive(IMMDevice*){++active;}} delegateStorage;D&delegate=delegateStorage;
+ OwnedPtr<ClientSubstitute> createClient(){if(!createOK)return {};auto*p=new ClientSubstitute;
+ p->frames=nextFrames;p->eventError=eventError;p->serviceError=serviceError;p->startError=startError;return {p};}
+ bool initialiseLowLatencyClient(int period,int format){++initialisations;periodSeen=period;formatSeen=format;return initOK;}
+ bool initialiseStandardClient(int p,int f){return initialiseLowLatencyClient(p,f);}
+ void deleteSessionEventCallback(){audioSessionControl=nullptr;sessionEventCallback=nullptr;}
+ void createSessionEventCallback(){deleteSessionEventCallback();audioSessionControl=OwnedPtr<SessionSubstitute>{new SessionSubstitute};sessionEventCallback=OwnedPtr<CallbackSubstitute>{new CallbackSubstitute};}
+'''+ '\n'.join(extract(x,base) for x in ('bool fengyinReopenSameClient()', 'void fengyinReleaseOriginalClient()', 'void closeClient()')) + '\n'.join(extract(x,o) for x in ('bool fengyinRecoverOutput()', 'bool start()', 'int getNumSamplesAvailableToCopy() const', 'void fengyinFinishWorkerRecovery()', 'void close()')) + '''
+};
+void checkLifecycle(){
+ ownerThread=0;uiReleases=workerReleases=wrongRelease=0;
+ {LifecycleProbe p;assert(ownedLive==3);ownerThread=1;
+ assert(p.fengyinRecoverOutput());assert(uiReleases==0&&ownedLive==6);
+ assert(p.periodSeen==128&&p.formatSeen==48000&&p.actualBufferSize==128);
+ assert(p.fengyinRecoverOutput());assert(uiReleases==0&&ownedLive==6&&workerReleases==3);
+ p.fengyinFinishWorkerRecovery();assert(ownedLive==3&&uiReleases==0);
+ ownerThread=0;p.close();assert(ownedLive==0&&uiReleases==3&&wrongRelease==0);}
+ for(int fail=0;fail<6;++fail){ownerThread=0;LifecycleProbe p;ownerThread=1;
+ if(fail==0)p.createOK=false;if(fail==1)p.initOK=false;if(fail==2)p.nextFrames=480;
+ if(fail==3)p.eventError=E_FAIL;if(fail==4)p.serviceError=E_FAIL;if(fail==5)p.startError=E_FAIL;
+ assert(!p.fengyinRecoverOutput());assert(p.actualBufferSize==128);
+ p.createOK=p.initOK=true;p.nextFrames=128;p.eventError=p.serviceError=p.startError=0;
+ assert(p.fengyinRecoverOutput());p.fengyinFinishWorkerRecovery();ownerThread=0;p.close();
+ assert(ownedLive==0&&wrongRelease==0);}
+}
+'''
 cpp='''#include "wasapi_shims.h"
 '''+extract('enum AudioSessionDisconnectReason')+''';
 struct Backend:Thread,IOBase {
@@ -47,8 +87,10 @@ struct RendererProbe {
  struct D {int hr=0,op=0;void fengyinStreamFailed(int h,int o){hr=h;op=o;}} storage; D& delegate=storage;
 '''+render+'''
 };
+'''+lifecycle+'''
 void run(Backend& b,double duration=5000){clockMs=0;waitCalls=0;b.deadline=duration;b.run();assert(b.polls<20000);}
 int main(){
+ checkLifecycle();
  Backend healthy;run(healthy);assert(healthy.sink.calls>4000&&healthy.fengyinAttempts==0&&waitCalls==0);
  Backend transient;transient.deviceSessionBecameInactive(transient.outputDevice->device);
  transient.pollAction=[&](auto){if(clockMs>=500)transient.deviceSessionBecameActive(transient.outputDevice->device);};
@@ -75,7 +117,7 @@ int main(){
  RendererProbe full;full.client->padding=128;clockMs=0;full.copyBuffers(src,2,128,nullptr,t);
  assert(full.delegate.op==4&&clockMs>=1000&&clockMs<1100);
  RendererProbe ok;ok.copyBuffers(src,2,128,nullptr,t);assert(ok.delegate.op==0&&ok.renderClient->releases==1);
- std::cout<<"Extracted production WASAPI: healthy output, transient Inactive, same-client recovery, retry limit, manual stop, logoff, expired, all disconnect reasons, HRESULT errors and non-progress timeout passed. NOT a Windows driver test.\\n";
+ std::cout<<"Extracted production WASAPI: COM ownership/exact format/rebuild failure cleanup, healthy output, transient Inactive, same-client recovery, retry limit, manual stop, logoff, expired, all disconnect reasons, HRESULT errors and non-progress timeout passed. NOT a Windows driver test.\\n";
 }
 '''
 (out/'wasapi_probe.cpp').write_text(cpp)

@@ -35,6 +35,7 @@ struct Thread {
  bool threadShouldExit(){++polls;if(pollAction)pollAction(polls);return polls>20000||clockMs>=deadline;}
  bool isThreadRunning(){return running;}
  void wait(int ms){++waitCalls;clockMs+=ms;}
+ static void sleep(int ms){clockMs+=ms;}
 };
 struct IOBase{virtual ~IOBase()=default;virtual bool isOpen(){return false;}virtual bool isPlaying(){return false;}};
 struct Bits{int n=0;int countNumberOfSetBits()const{return n;}};
@@ -65,3 +66,39 @@ struct FakeRenderer{
 struct FakeConverter{unsigned calls=0;void convertSamples(uint8*,int,const float*,int,int){++calls;}};
 struct Maps{int size(){return 2;}int getUnchecked(int x){return x;}};
 struct WASAPIInputDevice{int clientEvent=1;void handleDeviceBuffer(){}};
+
+// Explicit ownership/format substitutes for the extracted COM recovery methods.
+// Thread ids are deterministic (0=UI, 1=worker); no COM driver is simulated.
+#include <optional>
+#include <utility>
+static int ownerThread=0,wrongRelease=0,ownedLive=0,uiReleases=0,workerReleases=0;
+struct OwnedInterface {
+ int creator=ownerThread;
+ OwnedInterface(){++ownedLive;}
+ virtual ~OwnedInterface(){--ownedLive;if(creator!=ownerThread)++wrongRelease;
+   if(ownerThread==0)++uiReleases;else ++workerReleases;}
+};
+template<class T> struct OwnedPtr {
+ T* value=nullptr;
+ OwnedPtr()=default;OwnedPtr(T* p):value(p){}
+ OwnedPtr(OwnedPtr&& p)noexcept:value(std::exchange(p.value,nullptr)){}
+ OwnedPtr& operator=(OwnedPtr&& p)noexcept{delete value;value=std::exchange(p.value,nullptr);return *this;}
+ OwnedPtr& operator=(std::nullptr_t){delete value;value=nullptr;return *this;}
+ ~OwnedPtr(){delete value;}
+ T* operator->()const{return value;}operator T*()const{return value;}
+ T** resetAndGetPointerAddress(){*this=nullptr;return &value;}
+};
+struct SessionSubstitute:OwnedInterface{void UnregisterAudioSessionNotification(void*){}};
+struct CallbackSubstitute{std::atomic<bool>enabled{true};};
+struct RenderSubstitute:OwnedInterface,FakeRenderer{};
+struct ClientSubstitute:OwnedInterface,FakeClient {
+ UINT32 frames=128;int eventError=0,serviceError=0,startError=0;
+ int GetBufferSize(UINT32*p){*p=frames;return S_OK;}
+ int SetEventHandle(int){return eventError;}
+ void Stop(){}int Start(){return startError;}
+ int GetService(int,void**p){if(serviceError)return serviceError;*p=new RenderSubstitute;return S_OK;}
+};
+constexpr int AUDCLNT_BUFFERFLAGS_SILENT=2;
+void ResetEvent(int){}
+bool isLowLatencyMode(WASAPIDeviceMode m){return m==WASAPIDeviceMode::sharedLowLatency;}
+#define __uuidof(x) 1
