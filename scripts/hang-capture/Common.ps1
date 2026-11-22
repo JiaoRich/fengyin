@@ -12,7 +12,7 @@ function Invoke-CaptureWorker([string]$Script,[string]$Spec,[string]$Folder,[str
     $encoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
     $child=New-Object Diagnostics.Process
     $child.StartInfo.FileName=$ps
-    $child.StartInfo.Arguments='-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand '+$encoded
+    $child.StartInfo.Arguments='-NoLogo -NoProfile -NonInteractive -MTA -ExecutionPolicy Bypass -EncodedCommand '+$encoded
     $child.StartInfo.UseShellExecute=$false;$child.StartInfo.CreateNoWindow=$true
     $child.StartInfo.RedirectStandardOutput=$true;$child.StartInfo.RedirectStandardError=$true
     try {
@@ -58,4 +58,22 @@ function Select-RelatedWebViews($Rows,$Roots) {
         }
     }
     @($Rows | Where-Object {$_.Name -ieq 'msedgewebview2.exe' -and $found.ContainsKey([int]$_.ProcessId)})
+}
+function Read-AudioPreferences([string]$File) {
+    $options=New-Object Xml.XmlReaderSettings
+    $options.DtdProcessing=[Xml.DtdProcessing]::Prohibit;$options.XmlResolver=$null
+    $options.MaxCharactersInDocument=8388608
+    $reader=[Xml.XmlReader]::Create($File,$options)
+    try {
+        $doc=New-Object Xml.XmlDocument;$doc.XmlResolver=$null;$doc.Load($reader)
+        $allowed=@('audioEngineEnabled','audioEngineBuffer','audioModeExplicitChoice','audioSetupMode','physicalEndpoint','audioDevice','automaticAudioDevice','preferredDevice','performanceKeyV3','musicTempoV1')
+        foreach($v in $doc.SelectNodes('/PROPERTIES/VALUE')) {
+            $key=$v.GetAttribute('name')
+            if($allowed -contains $key -or $key -match '^(breathCC\.[0-9a-f]+(\.(sensitivityV1|pitch|growlSensitivity|matched))?|technique\.(roles\.v2|model\.v3)\.[0-9a-f]+)$') {
+                $value=$v.GetAttribute('val')
+                if($value.Length -gt 4096){$value=$value.Substring(0,4096)+' [truncated]'}
+                [pscustomobject]@{Key=$key;Value=$value}
+            }
+        }
+    } finally {$reader.Dispose()}
 }

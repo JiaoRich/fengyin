@@ -28,6 +28,11 @@ jobs:
           path: |
             hang-collector-test.log
             hang-collector-verification.json
+            no-sound-collector-verification.json
+            hang-test-*/FengYin-NoSound-*/errors.jsonl
+            hang-test-*/FengYin-NoSound-*/result.json
+            hang-test-*/FengYin-NoSound-*/audio-*.json
+            hang-test-*/FengYin-NoSound-*/*-stderr.txt
             hang-test-*/FengYin-Hang-*/errors.jsonl
             hang-test-*/FengYin-Hang-*/result.json
             hang-test-*/FengYin-Hang-*/fengyin-webview-tree.json

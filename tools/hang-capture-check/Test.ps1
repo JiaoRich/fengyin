@@ -13,6 +13,7 @@ foreach($file in Get-ChildItem -LiteralPath $source -Filter '*.ps1') {
 }
 Add-Type -Path (Join-Path $source 'DumpNative.cs')
 Add-Type -Path (Join-Path $source 'WindowSnapshot.cs')
+Add-Type -Path (Join-Path $source 'AudioSnapshot.cs')
 if([Runtime.InteropServices.Marshal]::OffsetOf([type][FengYin.HangCapture.DumpNative+CallbackHeader],'Type').ToInt32() -ne (4+[IntPtr]::Size)){throw 'SDK pack4 ABI mismatch'}
 . (Join-Path $source 'Common.ps1')
 $work=Join-Path $pwd ('hang-test-'+[guid]::NewGuid().ToString('N').Substring(0,6))
@@ -32,6 +33,15 @@ $selected=@(Select-RelatedWebViews $rows $roots)
 if(($selected.ProcessId -join ',') -ne '11,12'){throw 'Descendant/parent-PID-reuse isolation regression'}
 $invalid=Join-Path $work 'invalid.dmp';[IO.File]::WriteAllBytes($invalid,[byte[]](1,2,3))
 if([FengYin.HangCapture.DumpNative]::HasRequiredStreams($invalid)){throw 'Invalid dump accepted'}
+$pref=Join-Path $work 'preferences.xml'
+'<PROPERTIES><VALUE name="breathCC.abcdef" val="2"/><VALUE name="breathCC.abcdef.sensitivityV1" val="50"/><VALUE name="licenseKey" val="SECRET_VALUE"/><VALUE name="audioDevice" val="saved-device"/></PROPERTIES>' | Set-Content -LiteralPath $pref -Encoding UTF8
+$prefs=@(Read-AudioPreferences $pref)
+if($prefs.Count -ne 3 -or ($prefs | ConvertTo-Json -Compress) -match 'SECRET_VALUE'){throw 'Preference whitelist failed'}
+$xxe=Join-Path $work 'xxe.xml'
+'<!DOCTYPE PROPERTIES [<!ENTITY secret SYSTEM "file:///never-read">]><PROPERTIES>&secret;</PROPERTIES>' | Set-Content -LiteralPath $xxe -Encoding UTF8
+$rejected=$false;try{$null=Read-AudioPreferences $xxe}catch{$rejected=$true};if(-not $rejected){throw 'DTD not rejected'}
+$audioCode=Get-Content -LiteralPath (Join-Path $source 'AudioSnapshot.cs') -Raw
+if($audioCode -match '\.(SetMasterVolume|SetMute|SetChannelVolume|RegisterAudioSessionNotification)\('){throw 'Audio metadata collector calls a mutation method'}
 Write-Host 'PASS PowerShell parser, C# compilation, SDK pack4 ABI, log filter, descendant/PID-reuse isolation, invalid dump rejection'
 if($LocalOnly){exit 0}
 if([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT){throw 'Windows actual API verification required'}
@@ -125,6 +135,34 @@ try {
     $missing=$folders | Where-Object FullName -ne $out
     $partial=Get-Content -LiteralPath (Join-Path $missing.FullName 'result.json') -Raw -Encoding UTF8 | ConvertFrom-Json
     if($partial.DumpCount -ne 0 -or $partial.Status -ne 'partial-no-complete-hang-pair'){throw 'Missing target mislabeled'}
+    # User clarified that breath/GUI still work but both instrument and prompts go silent.
+    # Run the separate low-impact no-sound entry; no MIDI open, no memory dumps.
+    Copy-Item -LiteralPath $pref -Destination (Join-Path $fake 'FengYinMidi.settings')
+    'sourcePeak=0.0 callbacks=100 rawBreath=0.5 effectiveBreath=0.5' | Set-Content -LiteralPath (Join-Path $fake 'audio-source-diagnostic.log') -Encoding UTF8
+    $prefHash=(Get-FileHash -LiteralPath (Join-Path $fake 'FengYinMidi.settings')).Hash
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $copy 'Collect-NoSound.ps1') -OutputRoot $work
+    $audioExit=$LASTEXITCODE
+    if($audioExit -notin @(0,2)){throw 'No-sound entry failed'}
+    $audioFolder=@(Get-ChildItem -LiteralPath $work -Directory -Filter 'FengYin-NoSound-*')
+    if($audioFolder.Count -ne 1){throw 'Missing no-sound output folder'}
+    $ns=$audioFolder[0].FullName
+    $audioSummary=Get-Content -LiteralPath (Join-Path $ns 'result.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+    if($audioSummary.AudioObservations -ne 4 -or $audioSummary.AppCount -ne 1){throw 'No-sound observations incomplete'}
+    $observations=@(Get-ChildItem -LiteralPath $ns -Filter 'audio-*.json')
+    $endpointCount=0
+    foreach($sample in $observations){$v=Get-Content -LiteralPath $sample.FullName -Raw -Encoding UTF8 | ConvertFrom-Json;if(-not $v.Time -or -not $v.MeterLimit){throw 'Invalid audio observation'};$endpointCount+=@($v.Endpoints).Count}
+    if(Get-ChildItem -LiteralPath $ns -Filter '*.dmp'){throw 'No-sound mode captured memory'}
+    foreach($label in @('before','after')) {
+        $p=Get-Content -LiteralPath (Join-Path $ns ($label+'-roaming-FengYin-FengYinMidi.settings.txt')) -Raw -Encoding UTF8
+        if($p -notmatch 'breathCC.abcdef' -or $p -match 'SECRET_VALUE'){throw 'No-sound preference scope failed'}
+        if(-not (Test-Path -LiteralPath (Join-Path $ns ($label+'-roaming-FengYin-audio-source-diagnostic.log.txt')))){throw 'No-sound before/after logs missing'}
+    }
+    if((Get-FileHash -LiteralPath (Join-Path $fake 'FengYinMidi.settings')).Hash -ne $prefHash){throw 'Customer settings were modified'}
+    $main.Refresh();if($main.HasExited){throw 'No-sound collector ended target'}
+    Expand-Archive -LiteralPath ($ns+'.zip') -DestinationPath (Join-Path $work 'expanded-audio')
+    if(-not (Test-Path -LiteralPath (Join-Path $work 'expanded-audio/result.json'))){throw 'No-sound ZIP roundtrip failed'}
+    [pscustomobject]@{Passed=$true;ExactShippedNoSoundEntry=$true;Samples=4;ObservedEndpoints=$endpointCount;ApiErrors=$audioSummary.AudioQueryErrors;BeforeAfterLogs=$true;PreferenceWhitelist=$true;SettingsUnchanged=$true;TargetSurvives=$true;NoMemoryDump=$true;ZipRoundtrip=$true;Limit='Windows synthetic fixture. No customer Yamaha USB or real audio output audition.'} |
+        ConvertTo-Json | Set-Content -LiteralPath 'no-sound-collector-verification.json' -Encoding UTF8
     [pscustomobject]@{Passed=$true;NativeTwoDumps=$true;HungWindow=$true;DescendantOnly=$true;TargetSurvives=$true;WrongIdentityRejected=$true;NoTargetPartial=$true;DuplicateLaunchRejected=$true;ContextDeadline=$true;ChineseSpaceAmpersandQuotePath=$true;ZipRoundtrip=$true;Limits='Synthetic Windows fixture, not customer FengYin or actual deadlock root cause'} |
         ConvertTo-Json | Set-Content -LiteralPath 'hang-collector-verification.json' -Encoding UTF8
     Write-Host 'PASS exact Windows collector, actual two native dumps, hung window, child isolation, target survival, mismatch rejection, no-target partial, Unicode path and ZIP roundtrip'
