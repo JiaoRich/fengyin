@@ -1,6 +1,12 @@
 name: Hang collector isolated Windows check
 on:
   workflow_dispatch:
+  push:
+    branches: [codex/hang-collector-20261122]
+    paths:
+      - scripts/hang-capture/**
+      - tools/hang-capture-check/**
+      - .github/workflows/hang-collector-check.yml
 permissions:
   contents: read
 jobs:
