@@ -193,6 +193,7 @@ replace_exact("${wasapi}"
     "        if (mode == WASAPIDeviceMode::sharedLowLatency)  return \"Windows Audio (Low Latency Mode)\";\n        if (mode == WASAPIDeviceMode::sharedLowLatencyRaw) return \"Windows Audio (RAW Test Mode)\";")
 
 include("${CMAKE_CURRENT_LIST_DIR}/patch-juce-audio-trace.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/patch-juce-stream-recovery.cmake")
 
 # Retain the selected audio period when a removed endpoint causes JUCE's
 # XML restore to fall back to a new default output. The unpatched fallback

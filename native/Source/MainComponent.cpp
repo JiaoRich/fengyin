@@ -1607,6 +1607,13 @@ void MainComponent::logAudioDiagnostic(const fengyin::AudioDeviceStatus& status)
         +" effectiveBreath="+juce::String(snapshot.breath,4)
         +" breathSensitivity="+juce::String(midi.getBreathSensitivity())
         +" droppedMidi="+juce::String(pluginHost.getDroppedMidiEventCount())
+        +" lateMidiDelivered="+juce::String(pluginHost.getLateMidiEventCount())
+        +" midiMessages="+juce::String(snapshot.messageCount)
+        +" midiAgeMs="+juce::String(snapshot.lastMessageAgeMs,1)
+        +" midiNotesOn="+juce::String(snapshot.noteOnCount)+" midiNotesOff="+juce::String(snapshot.noteOffCount)
+        +" midiControllers="+juce::String(snapshot.controllerCount)
+        +" sensingTimeouts="+juce::String(snapshot.sensingTimeouts)
+        +" stream["+status.streamDiagnostic+"]"
         +" invalidInput="+juce::String(masterOutput.getInvalidInputSamples())
         +" invalidOutput="+juce::String(masterOutput.getInvalidOutputSamples())
         +" signalRecoveries="+juce::String(masterOutput.getSignalRecoveries())
@@ -1831,7 +1838,7 @@ void MainComponent::timerCallback()
     const auto currentAudio = audio.getStatus();
     // Diagnostic capture must continue while the web presentation is hidden.
     // Disk IO remains on the message timer, never on the audio callback.
-    if(pluginHost.isStageTimingEnabled())logAudioDiagnostic(currentAudio);
+    logAudioDiagnostic(currentAudio);
     const auto scanProgress = pluginCatalog.getProgress();
     simulatedPhase += 0.09f;
     displayedLeftPeak = juce::jmax(displayedLeftPeak * 0.88f, juce::jlimit(0.0f, 1.0f, masterOutput.getLeftPeak()));
@@ -1913,7 +1920,6 @@ void MainComponent::timerCallback()
         state->setProperty("latency", currentAudio.estimatedBufferLatencyMs + pluginLatencyMs);
         state->setProperty("pluginLatency", pluginLatencyMs);
         state->setProperty("audioCpu", currentAudio.cpuUsage);
-        if(!pluginHost.isStageTimingEnabled())logAudioDiagnostic(currentAudio);
         state->setProperty("audioXruns", currentAudio.xRunCount);
         state->setProperty("callbackOverruns", static_cast<juce::int64>(pluginHost.getCallbackOverruns()));
         state->setProperty("overloadSamples", static_cast<juce::int64>(masterOutput.getOverloadSamples()));

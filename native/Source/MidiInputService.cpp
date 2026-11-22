@@ -43,6 +43,7 @@ std::vector<juce::MidiDeviceInfo> MidiInputService::getAvailableDevices() const
 bool MidiInputService::connect(const juce::String& identifier)
 {
     disconnect();
+    failedPortIdentifier.clear(); portRecoveryAttempts = 0; nextPortRecoveryMs = 0;
     for (const auto& device : juce::MidiInput::getAvailableDevices())
     {
         if (device.identifier != identifier)
@@ -53,9 +54,9 @@ bool MidiInputService::connect(const juce::String& identifier)
             return false;
 
         prepareDevice(device.name, device.identifier);
-        input->start();
         if (auto* sink = performanceSink.load(std::memory_order_acquire))
             sink->resetPerformance();
+        input->start(); // A fresh note must never precede the connection reset.
         savePreferences();
         return true;
     }
@@ -109,6 +110,9 @@ void MidiInputService::disconnect()
         input->stop();
     input.reset();
     externalConnected = false;
+    const juce::SpinLock::ScopedLockType incomingLock(incomingMessageLock);
+    activeSensingSeen = false;
+    lastMessageAtMs.store(-1);
     if (ewiSolo.exchange(false))
     {
         cancelTechniqueLearn();
@@ -123,6 +127,7 @@ void MidiInputService::disconnect()
             for (auto& outputNote : activeOutputNotes)
                 if (outputNote >= 0) sink->noteOff(outputNote);
         activeOutputNotes.fill(-1);
+        activeSourceChannels.fill(0);
     }
     if (auto* sink = performanceSink.load(std::memory_order_acquire))
         sink->resetPerformance();
@@ -162,15 +167,46 @@ void MidiInputService::pollConnection()
     availableDeviceCache.assign(devices.begin(), devices.end());
     // Refresh the selectable USB list even while BLE owns the active input.
     if (externalConnected) return;
+    const auto now = juce::Time::getMillisecondCounterHiRes();
     if (input != nullptr)
     {
+        // An enumerated device can have a dead backend connection. This is an
+        // explicit lifetime signal, never a timeout based on unchanged breath.
+        if (! input->isFengYinConnectionAlive())
+        {
+            const auto id = connectedIdentifier;
+            if (failedPortIdentifier != id) portRecoveryAttempts = 0;
+            failedPortIdentifier = id;
+            disconnect();
+            juce::Logger::writeToLog("MIDI backend disconnected; releasing performance, retry=" + juce::String(portRecoveryAttempts));
+        }
+        else
+        {
+            if (lastMessageAtMs.load() >= 0 && now - lastMessageAtMs.load() < 1000)
+                { failedPortIdentifier.clear(); portRecoveryAttempts = 0; }
         for (const auto& device : devices)
             if (device.identifier == connectedIdentifier)
                 return;
         disconnect();
+        }
     }
 
     if (automaticConnectionSuspended) return;
+    if (failedPortIdentifier.isNotEmpty())
+    {
+        const auto id = failedPortIdentifier;
+        const bool present = std::any_of(devices.begin(), devices.end(), [&](const auto& d) { return d.identifier == id; });
+        if (! present) { failedPortIdentifier.clear(); portRecoveryAttempts = 0; }
+        else
+        {
+            if (now < nextPortRecoveryMs || portRecoveryAttempts >= 3) return;
+            const auto attempt = portRecoveryAttempts + 1;
+            connect(id);
+            failedPortIdentifier = id; portRecoveryAttempts = attempt;
+            nextPortRecoveryMs = now + 1000.0 * attempt;
+            return;
+        }
+    }
     const auto preferred = properties.getUserSettings() != nullptr
         ? properties.getUserSettings()->getValue("preferredDevice") : juce::String();
     if (preferred.isNotEmpty())
@@ -197,7 +233,9 @@ MidiSnapshot MidiInputService::getSnapshot() const noexcept
         BreathSensitivity::apply(raw, getBreathSensitivity()),
         pitchBend.load(std::memory_order_relaxed),
         messageCount.load(std::memory_order_relaxed),
-        raw
+        raw,
+        lastMessageAtMs.load() < 0 ? -1 : juce::jmax(0.0, juce::Time::getMillisecondCounterHiRes() - lastMessageAtMs.load()),
+        noteOnCount.load(), noteOffCount.load(), controllerCount.load(), sensingTimeouts.load()
     };
 }
 
@@ -857,15 +895,83 @@ void MidiInputService::updateBreathDrivenTechniques(float mappedBreath, MidiPerf
     }
 }
 
+void MidiInputService::releaseChannelNotes(int channel, bool immediately, double timestampSeconds)
+{
+    auto* sink = performanceSink.load(std::memory_order_acquire);
+    int remaining = -1, count = 0;
+    {
+        const juce::SpinLock::ScopedLockType lock(noteMapLock);
+        const auto mask = uint16_t(1u << (channel - 1));
+        for (size_t i = 0; i < activeOutputNotes.size(); ++i)
+        {
+            if ((activeSourceChannels[i] & mask) != 0)
+            {
+                activeSourceChannels[i] &= uint16_t(~mask);
+                if (activeSourceChannels[i] == 0 && activeOutputNotes[i] >= 0)
+                {
+                    if (sink) sink->noteOff(activeOutputNotes[i], timestampSeconds);
+                    activeOutputNotes[i] = -1;
+                }
+            }
+            if (activeOutputNotes[i] >= 0) { remaining = activeOutputNotes[i]; ++count; }
+        }
+    }
+    lastNote.store(remaining); activeNoteCount = count;
+    if (remaining < 0)
+    {
+        velocity.store(0); intelligentTechniques.noteEnded();
+        // Folded input channels share the instrument: don't silence a note
+        // still held by a different channel. CC123 keeps its normal release.
+        if (immediately && sink) sink->allSoundOff(timestampSeconds);
+    }
+}
+
+void MidiInputService::clearStalledPerformance()
+{
+    { const juce::SpinLock::ScopedLockType lock(noteMapLock);
+      activeOutputNotes.fill(-1); activeSourceChannels.fill(0); }
+    { const juce::SpinLock::ScopedLockType lock(techniqueLock);
+      intelligentTechniques.reset(); activeNoteCount = 0;
+      techniquePreviousInput.fill(0); techniqueToggleState.fill(false);
+      techniqueHardwareInput.fill(0); techniqueBreathInput.fill(0);
+      refreshEwiSoloGlideGate(); }
+    { const juce::SpinLock::ScopedLockType lock(breathFamilyLock); breathFamily.reset(getBreathController()); }
+    { const juce::SpinLock::ScopedLockType lock(breathEventLock);
+      breath.store(0); velocity.store(0); lastNote.store(-1); pitchBend.store(0);
+      latestNoteStartedMs.store(-1);
+      if (auto* sink = performanceSink.load(std::memory_order_acquire)) sink->resetPerformance(); }
+}
+
+bool MidiInputService::checkActiveSensing(double nowMs)
+{
+    const juce::SpinLock::ScopedTryLockType lock(incomingMessageLock);
+    if (! lock.isLocked() || ! activeSensingSeen || nowMs - lastMessageAtMs.load() < 350.0) return false;
+    activeSensingSeen = false; // One release per lost heartbeat, not repeated panic.
+    clearStalledPerformance();
+    sensingTimeouts.fetch_add(1);
+    return true;
+}
+
 void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::MidiMessage& message)
 {
+    const juce::SpinLock::ScopedLockType incomingLock(incomingMessageLock);
+    lastMessageAtMs.store(juce::Time::getMillisecondCounterHiRes());
     messageCount.fetch_add(1, std::memory_order_relaxed);
+    if (message.isActiveSense()) { activeSensingSeen = true; return; }
+    if (message.isNoteOn()) noteOnCount.fetch_add(1);
+    if (message.isNoteOff()) noteOffCount.fetch_add(1);
+    if (message.isController()) controllerCount.fetch_add(1);
     auto* sink = performanceSink.load(std::memory_order_acquire);
     // JUCE MIDI backends provide a monotonic arrival timestamp. Preserve it all the
     // way to the audio callback so the collector can place the event at the correct
     // sample offset instead of quantising every event to the next block boundary.
     const auto timestampSeconds = message.getTimeStamp() > 0.0
         ? message.getTimeStamp() : juce::Time::getMillisecondCounterHiRes() * 0.001;
+    if (message.isAllNotesOff() || message.isAllSoundOff())
+    {
+        releaseChannelNotes(message.getChannel(), message.isAllSoundOff(), timestampSeconds);
+        return; // Channel mode messages must not be learned as a technique.
+    }
     onsetTrace.record(message, timestampSeconds);
     BreathControllerFamily::Result familyBreath;
     if (message.isController())
@@ -900,7 +1006,10 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
     {
         const auto sourceNote = message.getNoteNumber();
         const auto outputNote = juce::jlimit(0, 127, sourceNote + transposeSemitones.load(std::memory_order_relaxed));
-        { const juce::SpinLock::ScopedLockType lock(noteMapLock); activeOutputNotes[static_cast<size_t>(sourceNote)] = outputNote; }
+        { const juce::SpinLock::ScopedLockType lock(noteMapLock);
+          if (activeOutputNotes[static_cast<size_t>(sourceNote)] < 0) ++activeNoteCount;
+          activeOutputNotes[static_cast<size_t>(sourceNote)] = outputNote;
+          activeSourceChannels[static_cast<size_t>(sourceNote)] |= uint16_t(1u << (message.getChannel()-1)); }
         lastNote.store(outputNote, std::memory_order_relaxed);
         const auto currentBreath = breath.load(std::memory_order_relaxed);
         auto safeVelocity = message.getFloatVelocity();
@@ -910,7 +1019,6 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
             sink->breathChanged(BreathSensitivity::apply(currentBreath, getBreathSensitivity()), timestampSeconds);
         }
         velocity.store(safeVelocity, std::memory_order_relaxed);
-        ++activeNoteCount;
         latestNoteStartedMs.store(juce::Time::getMillisecondCounterHiRes(), std::memory_order_relaxed);
         intelligentTechniques.noteStarted(juce::Time::getMillisecondCounterHiRes());
         if (sink != nullptr) sink->noteOn(outputNote, safeVelocity, timestampSeconds);
@@ -920,6 +1028,8 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
         auto outputNote = juce::jlimit(0, 127, message.getNoteNumber() + transposeSemitones.load(std::memory_order_relaxed));
         { const juce::SpinLock::ScopedLockType lock(noteMapLock);
           const auto sourceNote = static_cast<size_t>(message.getNoteNumber());
+          activeSourceChannels[sourceNote] &= uint16_t(~(1u << (message.getChannel()-1)));
+          if (activeSourceChannels[sourceNote] != 0) return;
           if (activeOutputNotes[sourceNote] >= 0) outputNote = activeOutputNotes[sourceNote];
           activeOutputNotes[sourceNote] = -1;
           if (lastNote.load(std::memory_order_relaxed) == outputNote)
@@ -963,6 +1073,9 @@ void MidiInputService::handleIncomingMidiMessage(juce::MidiInput*, const juce::M
 }
 void MidiInputService::tickTechniqueAutomation()
 {
+    // GATT owns BLE lifetime/recovery; no USB watchdog is applied to BLE.
+    if (input != nullptr && checkActiveSensing(juce::Time::getMillisecondCounterHiRes()))
+        juce::Logger::writeToLog("MIDI Active Sensing timeout; performance released, waiting for input");
     auto* sink = performanceSink.load(std::memory_order_acquire);
     if (!sink) return;
     const juce::SpinLock::ScopedTryLockType lock(techniqueLock);

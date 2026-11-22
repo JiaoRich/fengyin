@@ -30,6 +30,8 @@ struct MidiSnapshot
     float pitchBend = 0.0f;
     uint64_t messageCount = 0;
     float rawBreath = 0.0f;
+    double lastMessageAgeMs = -1;
+    uint64_t noteOnCount = 0, noteOffCount = 0, controllerCount = 0, sensingTimeouts = 0;
 };
 
 struct ExpressionSettings
@@ -116,6 +118,18 @@ private:
     [[nodiscard]] PerformanceTechnique targetForRole(PerformanceTechnique role) const noexcept;
     static float techniqueMessageValue(const juce::MidiMessage& message) noexcept;
     void updateEffectiveTranspose();
+    void releaseChannelNotes(int channel, bool immediately, double timestampSeconds);
+    bool checkActiveSensing(double nowMs);
+    void clearStalledPerformance();
+    // Serialises actual delivery with a timer-triggered safety release. No I/O
+    // or device close while held; the timer must never wait for a stuck callback.
+    juce::SpinLock incomingMessageLock;
+    std::atomic<double> lastMessageAtMs { -1 };
+    bool activeSensingSeen = false;
+    std::atomic<uint64_t> noteOnCount {0}, noteOffCount {0}, controllerCount {0}, sensingTimeouts {0};
+    double nextPortRecoveryMs = 0;
+    int portRecoveryAttempts = 0;
+    juce::String failedPortIdentifier;
 
     std::vector<juce::MidiDeviceInfo> availableDeviceCache;
     std::unique_ptr<juce::MidiInput> input;
@@ -148,6 +162,7 @@ private:
     std::atomic<int> growlSensitivity { 1 };
     mutable juce::SpinLock noteMapLock;
     std::array<int, 128> activeOutputNotes {};
+    std::array<uint16_t, 128> activeSourceChannels {};
     mutable juce::SpinLock techniqueLock;
     juce::Array<TechniqueMapping> techniqueMappings;
     std::array<std::atomic<uint64_t>, 2> techniqueNoteMasks {};

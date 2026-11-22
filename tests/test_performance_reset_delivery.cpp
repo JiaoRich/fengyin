@@ -1,6 +1,9 @@
 #include "PluginHostEngine.h"
 #include "TechniqueProcessingGraph.h"
 #include "ScopedGraphPause.h"
+#include "MidiInputService.h"
+#include "AudioStreamRecovery.h"
+#include <set>
 #include <cassert>
 #include <future>
 #include <iostream>
@@ -73,6 +76,105 @@ struct PluginHostEngineTestAccess {
 };
 }
 
+namespace fengyin {
+struct MidiInputServiceTestAccess {
+    static void send(MidiInputService& s, juce::MidiMessage message) {
+        message.setTimeStamp(juce::Time::getMillisecondCounterHiRes()*.001);
+        s.handleIncomingMidiMessage(nullptr,message);
+    }
+    static bool timeout(MidiInputService& s, double elapsed) {
+        return s.checkActiveSensing(s.lastMessageAtMs.load()+elapsed);
+    }
+    static bool timeoutWhileReceiving(MidiInputService& s) {
+        const juce::SpinLock::ScopedLockType lock(s.incomingMessageLock);
+        return timeout(s,10000);
+    }
+};
+}
+void testInputStreamRecovery() {
+    using H=fengyin::PluginHostEngineTestAccess;
+    using I=fengyin::MidiInputServiceTestAccess;
+    reset_delivery_test::Device device;
+    auto host=std::make_unique<fengyin::PluginHostEngine>();
+    auto& observer=H::install(*host,device);
+    auto input=std::make_unique<fengyin::MidiInputService>(false);
+    input->setPerformanceSink(host.get());
+    auto send=[&](const auto& m){I::send(*input,m);};
+    auto block=[&]{H::block(*host);};
+    auto held=[&]{std::set<int> notes;for(auto& m:observer.received){
+        if(m.isNoteOn())notes.insert(m.getNoteNumber());
+        if(m.isNoteOff())notes.erase(m.getNoteNumber());
+        if(m.isAllSoundOff()||m.isAllNotesOff())notes.clear();}return notes;};
+    auto reset=[&]{input->disconnect();block();observer.received.clear();};
+    auto note=[&](int channel,int pitch){send(juce::MidiMessage::noteOn(channel,pitch,juce::uint8(100)));};
+    auto breath=[&]{send(juce::MidiMessage::controllerEvent(1,2,90));};
+    reset();breath();note(1,60);block();
+    // A controller which sends only on change may hold a legal note for hours.
+    assert(!I::timeout(*input,3600000));block();assert(held()==std::set<int>{60});
+    send(juce::MidiMessage(0xfe));assert(!I::timeout(*input,349));
+    assert(!I::timeoutWhileReceiving(*input));assert(!I::timeout(*input,349));
+    // Any actual MIDI traffic, not only FE, keeps Active Sensing alive.
+    for(int i=0;i<1000;++i){breath();assert(!I::timeout(*input,200));block();}
+    assert(I::timeout(*input,351));block();assert(held().empty());
+    assert(input->getSnapshot().breath==0&&input->getSnapshot().lastNote==-1);
+    assert(input->getSnapshot().sensingTimeouts==1);assert(!I::timeout(*input,10000));
+    breath();note(1,62);block();assert(held()==std::set<int>{62});
+    send(juce::MidiMessage::noteOff(1,62));block();assert(held().empty());
+    // BLE lifetime remains the GATT service's responsibility, including idle FE.
+    input->attachExternal("test-ble","YDS-150 MIDI");breath();note(1,60);send(juce::MidiMessage(0xfe));block();
+    juce::Thread::sleep(400);input->tickTechniqueAutomation();block();
+    assert(input->isExternalConnected()&&held()==std::set<int>{60});
+    reset();
+    for(int cc:{120,123}) {
+        breath();note(1,60);note(2,62);block();
+        send(juce::MidiMessage::controllerEvent(1,cc,0));block();
+        assert(held()==std::set<int>{62});assert(input->getSnapshot().lastNote==62);
+        observer.received.clear();
+        send(juce::MidiMessage::controllerEvent(2,cc,0));block();
+        assert(input->getSnapshot().lastNote==-1);
+        const auto hard=std::count_if(observer.received.begin(),observer.received.end(),[](auto& m){return m.isAllSoundOff();});
+        assert((hard>0)==(cc==120)); // CC123 must not truncate normal release tails.
+        reset();
+    }
+    // Repeated same pitch, transpose and overlapping channels don't release
+    // the other channel's current note on a channel-mode message.
+    note(1,60);note(2,60);block();send(juce::MidiMessage::allNotesOff(1));block();
+    assert(held()==std::set<int>{60});send(juce::MidiMessage::noteOff(2,60));block();assert(held().empty());
+    for(int delay:{5,180,250,1200}) {
+        reset();breath();note(1,60);block();
+        {fengyin::ScopedGraphPause pause(&H::graph(*host));
+         note(1,62);send(juce::MidiMessage::noteOff(1,60));send(juce::MidiMessage::noteOff(1,62));
+         block();juce::Thread::sleep(delay);block();}
+        breath();note(1,64);block();
+        assert(held()==std::set<int>{64});
+        std::vector<int> notes;for(auto& m:observer.received)
+            if(m.isNoteOnOrOff())notes.push_back((m.isNoteOn()?1:-1)*(m.getNoteNumber()+1));
+        assert((notes==std::vector<int>{61,63,-61,-63,65}));
+        send(juce::MidiMessage::noteOff(1,64));block();assert(held().empty());
+    }
+    assert(host->getLateMidiEventCount()>0&&host->getDroppedMidiEventCount()==0);
+    reset();for(int n=0;n<2000;++n){note(1,60);block();send(juce::MidiMessage::noteOn(1,60,juce::uint8(0)));block();}
+    assert(held().empty());input->setPerformanceSink(nullptr);H::stop(*host);
+    std::cout<<"Production input/host/collector/graph recovery: held notes, heartbeat, CC120/123, BLE, delayed legato and 2000 normal phrases passed\n";
+}
+void testAudioStreamRecoveryPolicy() {
+    using P=fengyin::AudioStreamRecovery;using A=P::Action;
+    P p;assert(p.poll(0,false,false,true)==A::wait);
+    for(int n=0;n<10000;++n)assert(p.poll(n,true,true,true)==A::render);
+    assert(p.retryCount()==0);
+    assert(p.poll(11000,true,false,true)==A::wait);assert(p.poll(11500,true,true,true)==A::render);
+    assert(p.retryCount()==0);assert(p.poll(12000,true,false,true)==A::wait);
+    assert(p.poll(13000,true,false,true)==A::retry);
+    assert(p.poll(13999,true,false,true)==A::wait);assert(p.poll(14000,true,false,true)==A::retry);
+    assert(p.poll(15999,true,false,true)==A::wait);assert(p.poll(16000,true,false,true)==A::retry);
+    assert(p.poll(20000,true,false,true)==A::exhausted);
+    assert(p.poll(20001,false,false,true)==A::wait);
+    p.reset();assert(p.poll(0,true,false,false)==A::exhausted);assert(p.retryCount()==0);
+    p.reset();assert(p.poll(0,true,false,true)==A::wait);assert(p.poll(1000,true,false,true)==A::retry);
+    assert(p.poll(1001,true,true,true)==A::render);assert(p.poll(31001,true,true,true)==A::render);assert(p.retryCount()==0);
+    std::cout<<"Audio stream policy: healthy silence, startup/transient grace, bounded retry, stop/logoff and stable rearm passed\n";
+}
+
 // Optional local/Windows verification with a licensed SWAM installation. Build
 // a fresh state using that installed version; never cross-load a newer tone.
 void testRealPluginResetDelivery(const juce::String& pluginPath){
@@ -133,6 +235,7 @@ void testRealPluginResetDelivery(const juce::String& pluginPath){
              <<"; fresh physical bend retained="<<physical<<"; release/center passed"<<std::endl;
 }
 void testPerformanceResetDelivery(){
+    testInputStreamRecovery(); testAudioStreamRecoveryPolicy();
     using Access=fengyin::PluginHostEngineTestAccess;
     reset_delivery_test::Device device;
     for(int round=0;round<10;++round){

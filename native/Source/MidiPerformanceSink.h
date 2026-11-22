@@ -101,5 +101,6 @@ public:
     virtual void techniqueChanged(PerformanceTechnique, float) noexcept {}
     virtual void automaticVibratoChanged(float input, float fade) noexcept { techniqueChanged(PerformanceTechnique::vibrato,input*fade); }
     virtual void resetPerformance() noexcept {}
+    virtual void allSoundOff(double = 0.0) noexcept { resetPerformance(); }
 };
 }

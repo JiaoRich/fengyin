@@ -1529,6 +1529,15 @@ void PluginHostEngine::configureKongTechniqueProfile(const juce::String& key,con
         + juce::String(dual ? "enabled" : "requires CH1/CH2 scheme") + " instrument=" + key);
 }
 
+void PluginHostEngine::allSoundOff(double timestampSeconds) noexcept
+{
+    const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
+    kongDualSlot.reset([this, timestampSeconds](const auto& message) { queue(message, timestampSeconds); });
+    queue(juce::MidiMessage::allSoundOff(1), timestampSeconds);
+    if (kongExpressionMode.load()) queue(juce::MidiMessage::allSoundOff(2), timestampSeconds);
+    for (auto& note : activeNotes) note.store(false, std::memory_order_relaxed);
+}
+
 void PluginHostEngine::resetPerformance() noexcept
 {
     stringTremolo.request(false);

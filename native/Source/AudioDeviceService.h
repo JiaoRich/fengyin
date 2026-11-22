@@ -20,6 +20,7 @@ struct AudioDeviceStatus
     double cpuUsage = 0.0;
     int xRunCount = 0;
     juce::String error;
+    juce::String streamDiagnostic;
 };
 
 class AudioDeviceService final : private juce::Timer

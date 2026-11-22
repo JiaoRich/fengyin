@@ -25,6 +25,11 @@ FetchContent_Declare(
         -P ${CMAKE_SOURCE_DIR}/scripts/patch-juce-wasapi-raw.cmake
 )
 FetchContent_MakeAvailable(JUCE)
+# Cached or explicitly supplied JUCE trees must receive the same checked,
+# idempotent patches as a fresh FetchContent download.
+execute_process(COMMAND ${CMAKE_COMMAND} -DJUCE_SOURCE_DIR=${juce_SOURCE_DIR}
+    -P ${CMAKE_SOURCE_DIR}/scripts/patch-juce-wasapi-raw.cmake
+    COMMAND_ERROR_IS_FATAL ANY)
 
 juce_add_gui_app(FengYin
     PRODUCT_NAME "FengYin"
@@ -601,7 +606,7 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME bluetooth_midi_lifecycle COMMAND FengYinBluetoothMidiTests)
     set_tests_properties(bluetooth_midi_lifecycle PROPERTIES TIMEOUT 20)
-    add_executable(FengYinDjHostTests tests/test_dj_host.cpp tests/test_performance_reset_delivery.cpp tests/test_performance_reverb_runtime.cpp
+    add_executable(FengYinDjHostTests tests/test_dj_host.cpp tests/test_performance_reset_delivery.cpp native/Source/MidiInputService.cpp tests/test_performance_reverb_runtime.cpp
         native/Source/PluginHostEngine.cpp native/Source/SwamExpressionCurve.cpp
         native/Source/RecordingService.cpp native/Source/AccompanimentAudioService.cpp
         native/Source/MasterOutputService.cpp native/Source/SoundPresetStore.cpp)

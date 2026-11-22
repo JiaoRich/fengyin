@@ -279,7 +279,10 @@ AudioDeviceStatus AudioDeviceService::getStatus()
     status.error = lastError;
     if (auto* device = manager.getCurrentAudioDevice())
     {
-        status.ready = device->isOpen();
+        status.ready = device->isOpen() && device->isFengYinStreamHealthy();
+        status.streamDiagnostic = device->getFengYinStreamDiagnostic();
+        if (! device->isFengYinStreamHealthy())
+            status.error = juce::String::fromUTF8("音频输出暂时中断；若未恢复，请重新选择声音输出。") + " " + status.streamDiagnostic;
         status.deviceType = device->getTypeName();
         status.deviceName = device->getName();
         if (engineProcess.isRunning())

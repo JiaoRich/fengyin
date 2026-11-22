@@ -26,8 +26,10 @@ class AudioLockTrace(unittest.TestCase):
     def test_diagnostics_survive_hidden_window_and_name_wall_time(self):
         main=(ROOT/'native/Source/MainComponent.cpp').read_text(encoding='utf-8')
         timer=main.split('void MainComponent::timerCallback()',1)[1]
-        self.assertLess(timer.index('if(pluginHost.isStageTimingEnabled())logAudioDiagnostic(currentAudio)'),
+        self.assertLess(timer.index('    logAudioDiagnostic(currentAudio);'),
                         timer.index('if (webPresentationVisible && webInterface'))
+        self.assertEqual(timer.count('logAudioDiagnostic(currentAudio)'), 1)
+        self.assertNotIn('if(pluginHost.isStageTimingEnabled())logAudioDiagnostic', timer)
         self.assertIn('audio-timing-diagnostic.log',main)
         host=(ROOT/'native/Source/PluginHostEngine.cpp').read_text(encoding='utf-8')
         self.assertIn('pluginCallWall',host)

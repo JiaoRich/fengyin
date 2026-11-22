@@ -39,7 +39,13 @@ class RecordingAudioProcessorPlayer final : public juce::AudioProcessorPlayer
     friend struct DjHostTestAccess;
     friend struct PluginHostEngineTestAccess;
 public:
-    RecordingAudioProcessorPlayer() { resetMidi.ensureSize(256 * 1024); }
+    RecordingAudioProcessorPlayer() {
+        resetMidi.ensureSize(256 * 1024);
+        // Our upstream queue is bounded and drained only when the graph can run.
+        // Never discard its older NoteOff/CC messages after a UI/driver pause.
+        getMidiMessageCollector().ensureStorageAllocated(256 * 1024);
+        getMidiMessageCollector().setFengYinRetainMessages(true);
+    }
     // Preparing/releasing a third-party processor may take hundreds of ms.
     // Let the callback skip only the changing instrument, not accompaniment.
     void setProcessor(juce::AudioProcessor* processor) {
@@ -92,6 +98,7 @@ class PluginHostEngine final : public MidiPerformanceSink
     friend struct DjHostTestAccess;
     friend struct PluginHostEngineTestAccess;
 public:
+    void allSoundOff(double timestampSeconds = 0.0) noexcept override;
     using LoadCallback = std::function<void(bool success, const juce::String& message)>;
 
     PluginHostEngine();
@@ -154,6 +161,7 @@ public:
     void setAccompanimentService(AccompanimentAudioService* service) noexcept { player.setAccompanimentService(service); }
     void setMasterOutputService(MasterOutputService* service) noexcept { masterOutputService=service; player.setMasterOutputService(service); }
     [[nodiscard]] uint64_t getDroppedMidiEventCount() const noexcept { return player.getDroppedMidiEventCount(); }
+    [[nodiscard]] uint64_t getLateMidiEventCount() noexcept { return player.getMidiMessageCollector().getFengYinLateMessages(); }
     [[nodiscard]] uint64_t getCallbackCount() const noexcept { return player.callbackCount.load(); }
     [[nodiscard]] uint64_t getCallbackOverruns() const noexcept { return player.callbackOverruns.load(); }
     [[nodiscard]] uint64_t getSignalBlocks() const noexcept { return player.signalBlocks.load(); }
