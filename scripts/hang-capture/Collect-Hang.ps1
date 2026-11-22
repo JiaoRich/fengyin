@@ -72,6 +72,7 @@ Write-JsonFile ([pscustomobject]@{Started=$started;Finished=(Get-Date).ToString(
 Microsoft MiniDumpWriteDump: https://learn.microsoft.com/en-us/windows/win32/api/minidumpapiset/nf-minidumpapiset-minidumpwritedump
 '@ | Set-Content -LiteralPath (Join-Path $out '说明.txt') -Encoding UTF8
 try {
+    Add-Type -AssemblyName System.IO.Compression
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $zip=$out+'.zip'
     $files=@(Get-ChildItem -LiteralPath $out -File | Where-Object {$_.Name -notlike '*.partial' -and $_.Name -notlike '*-request.json'})

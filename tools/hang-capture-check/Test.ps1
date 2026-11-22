@@ -93,7 +93,7 @@ try {
     if($bundle.Count -ne 1){throw 'Expected one evidence folder'}
     $out=$bundle[0].FullName
     $summary=Get-Content -LiteralPath (Join-Path $out 'result.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-    if($summary.Status -ne 'captured-two-main-snapshots' -or $summary.MainRound1 -ne 1 -or $summary.MainRound2 -ne 1){throw 'Missing two snapshots'}
+    if($summary.Status -ne 'captured-two-main-snapshots' -or $summary.MainRound1 -ne 1 -or $summary.MainRound2 -ne 1 -or @($summary.PairedTargetIds).Count -ne 1 -or $summary.PairedTargetIds[0] -ne $main.Id){throw 'Missing two snapshots'}
     $dumps=@(Get-ChildItem -LiteralPath $out -Filter '*.dmp')
     if($dumps.Count -ne 3){throw ('Expected 2 main + 1 descendant dumps, found '+$dumps.Count)}
     foreach($d in $dumps){if(-not [FengYin.HangCapture.DumpNative]::HasRequiredStreams($d.FullName)){throw 'Invalid actual dump streams'}}
@@ -130,3 +130,5 @@ try {
     # Test-only cleanup of held synthetic fixture Process objects, never production processes by name.
     foreach($p in @($ownedChild,$unrelated,$main)){if($p){try{if(-not $p.HasExited){$p.Kill();$null=$p.WaitForExit(5000)}}catch{};$p.Dispose()}}
 }
+
+exit 0

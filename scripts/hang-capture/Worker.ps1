@@ -1,5 +1,6 @@
 ﻿param([Parameter(Mandatory=$true)][string]$SpecPath)
 $ErrorActionPreference='Stop'
+$ProgressPreference='SilentlyContinue'
 . (Join-Path $PSScriptRoot 'Common.ps1')
 $spec=Get-Content -LiteralPath $SpecPath -Encoding UTF8 -Raw | ConvertFrom-Json
 $out=$spec.Output
@@ -36,7 +37,11 @@ function Capture-Target($Target,[string]$Label) {
 }
 function Context-Part([string]$Name,[scriptblock]$Action) {
     try {& $Action | Out-String -Width 260 | Set-Content -LiteralPath (Join-Path $out ($Name+'.txt')) -Encoding UTF8}
-    catch {Add-CaptureError $out $Name $_.Exception.Message}
+    catch {
+        if($_.FullyQualifiedErrorId -like 'NoMatchingEventsFound*') {
+            'No matching events in the requested time window.' | Set-Content -LiteralPath (Join-Path $out ($Name+'.txt')) -Encoding UTF8
+        } else {Add-CaptureError $out $Name $_.Exception.Message}
+    }
 }
 try {
     if($spec.Mode -in @('Round','WebView')) {
