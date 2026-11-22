@@ -18,6 +18,8 @@ jobs:
         run: |
           nuget install Microsoft.Web.WebView2 -Version 1.0.3485.44 -OutputDirectory third_party/nuget-packages -NonInteractive
           if ($LASTEXITCODE) { throw 'WebView2 SDK preparation failed' }
+          python scripts/prepare_vlc.py third_party/vlc
+          if ($LASTEXITCODE) { throw 'Pinned VLC SDK preparation failed' }
       - name: Configure production sources and pinned JUCE
         shell: pwsh
         run: |
