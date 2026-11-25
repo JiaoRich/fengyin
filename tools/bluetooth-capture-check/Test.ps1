@@ -76,6 +76,16 @@ foreach($mode in @('system','drivers','services','pnp','paired-endpoints','event
 # Actual WinForms window + UI Automation button invokes run its Click handlers; no engine command shortcut.
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+Add-Type -TypeDefinition @'
+using System;using System.Runtime.InteropServices;
+public static class TestMouse {
+ [StructLayout(LayoutKind.Sequential)] public struct Point { public int X,Y; public Point(int x,int y){X=x;Y=y;} }
+ [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr w);
+ [DllImport("user32.dll")] public static extern bool SetCursorPos(int x,int y);
+ [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(Point p);
+ [DllImport("user32.dll")] public static extern void mouse_event(uint flags,uint x,uint y,uint data,UIntPtr extra);
+}
+'@
 $oldApp=$env:APPDATA;$oldLocal=$env:LOCALAPPDATA;$env:APPDATA=$roaming;$env:LOCALAPPDATA=Join-Path $work 'local'
 $guiRoot=Join-Path $work 'gui';$null=New-Item -ItemType Directory -Path $guiRoot
 $launch="& '"+(Join-Path $copy 'Start.ps1').Replace("'","''")+"' -NoElevation -OutputRoot '"+$guiRoot.Replace("'","''")+"' -MaxSeconds 60"
@@ -90,6 +100,8 @@ try {
         $ui=[Windows.Automation.AutomationElement]::RootElement.FindFirst([Windows.Automation.TreeScope]::Children,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ProcessIdProperty,$p.Id))
     }
     if(-not $ui){throw 'No actual diagnostic UI'}
+    $texts=@($ui.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition) | ForEach-Object {$_.Current.Name}) -join ' '
+    if($texts -notmatch '最多记录20分钟' -or $texts -notmatch '重新打开'){throw 'Full multi-step UI instructions missing'}
     Add-Type -AssemblyName System.Drawing
     $r=$ui.Current.BoundingRectangle;$bmp=[Drawing.Bitmap]::new([int]$r.Width,[int]$r.Height);$g=[Drawing.Graphics]::FromImage($bmp)
     try {$g.CopyFromScreen([int]$r.X,[int]$r.Y,0,0,$bmp.Size);$bmp.Save((Join-Path $pwd 'bluetooth-collector-ui.png'))}finally{$g.Dispose();$bmp.Dispose()}
@@ -99,7 +111,10 @@ try {
     foreach($name in @('标记连接失败','标记连接成功','标记自行断连','标记已删除配对','结束并打包')){
         $button=$ui.FindFirst([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,$name))
         if(-not $button -or -not $button.Current.IsEnabled -or $button.Current.IsOffscreen){throw "Button not visible/enabled: $name"}
-        ([Windows.Automation.InvokePattern]$button.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern)).Invoke()
+        $null=[TestMouse]::SetForegroundWindow([IntPtr]$ui.Current.NativeWindowHandle);Start-Sleep -Milliseconds 150
+        $rect=$button.Current.BoundingRectangle;$x=[int]($rect.X+$rect.Width/2);$y=[int]($rect.Y+$rect.Height/2)
+        if([TestMouse]::WindowFromPoint([TestMouse+Point]::new($x,$y)) -ne [IntPtr]$button.Current.NativeWindowHandle){throw "Button is occluded: $name"}
+        $null=[TestMouse]::SetCursorPos($x,$y);[TestMouse]::mouse_event(2,0,0,0,[UIntPtr]::Zero);[TestMouse]::mouse_event(4,0,0,0,[UIntPtr]::Zero)
         Start-Sleep -Milliseconds 700
     }
     $deadline.Restart();$zip=$null

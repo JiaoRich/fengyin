@@ -36,7 +36,12 @@ foreach($height in @(48,130,78,55,75,50,65)){$null=$layout.RowStyles.Add([Window
 $form.Controls.Add($layout)
 function Label([string]$Text){$l=[Windows.Forms.Label]::new();$l.Text=$Text;$l.Dock='Fill';$l.AutoSize=$false;return $l}
 $title=Label '正在记录蓝牙连接过程';$title.Font=[Drawing.Font]::new('Microsoft YaHei UI',16,[Drawing.FontStyle]::Bold);$layout.Controls.Add($title,0,0)
-$help=Label "1. 若现在已连接失败，先点“标记连接失败”，暂时不要删除配对。`r`n2. 在风吟中重试一次；若能连接，正常退出风吟、重新打开，再连接一次。`r`n3. 如果仍失败，先标记；确有需要时再自行删除 Windows 配对，点“标记已删除配对”后重连。`r`n4. 点击“结束并打包”。不用反复试吹，最多记录20分钟。"
+$help=Label @'
+1. 若现在已失败，先点“标记连接失败”，保留约20秒，暂时不要删除配对。
+2. 在风吟中重试一次；若能连接，正常退出风吟、重新打开，再连接一次。
+3. 若仍失败，先标记。确有需要时再自行删除Windows配对，标记后重连。
+4. 点击“结束并打包”。不用反复试吹，最多记录20分钟。
+'@
 $help.AutoSize=$true;$layout.RowStyles[1].SizeType=[Windows.Forms.SizeType]::AutoSize
 $layout.Controls.Add($help,0,1)
 $panel=[Windows.Forms.FlowLayoutPanel]::new();$panel.Dock='Fill';$panel.WrapContents=$true
