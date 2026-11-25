@@ -49,7 +49,7 @@ $dupSpec=Join-Path $dup 'session-input.json';Save-Json @{Output=$dup;MaxSeconds=
 try {
     $dj=Start-OwnedProcess (Join-Path $source 'Engine.ps1') $dupSpec $dup 'duplicate' 10
     while(-not (Poll-OwnedProcess $dj)){Start-Sleep -Milliseconds 100}
-    if($dj.ExitCode -ne 3 -or (Test-Path -LiteralPath (Join-Path $dup 'session.json'))){throw 'Duplicate collector guard failed'}
+    if($dj.ExitCode -ne 3 -or (Test-Path -LiteralPath (Join-Path $dup 'session.json'))){Get-ChildItem -LiteralPath $dup -File | ForEach-Object {Write-Host $_.Name;Get-Content -LiteralPath $_.FullName -Raw | Write-Host};throw ('Duplicate collector guard failed exit='+$dj.ExitCode)}
 }finally{$gate.ReleaseMutex();$gate.Dispose()}
 $slow=Join-Path $work 'slow.ps1';'param([string]$SpecPath);Start-Sleep -Seconds 120' | Set-Content -LiteralPath $slow -Encoding UTF8
 $j=Start-OwnedProcess $slow (Join-Path $work 'x.json') $work 'timeout' 1

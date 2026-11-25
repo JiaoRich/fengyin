@@ -92,6 +92,9 @@ switch($spec.Mode) {
             foreach($event in $rows){
                 $xml=$event.ToXml();$message=$event.Message
                 if($channel -eq 'Application' -and ($xml+' '+$message) -notmatch '(?i)FengYin|Bluetooth|BTH|YDS'){continue}
+                if(($xml+' '+$message) -match '(?i)passkey|pin.?code|password|link.?key|long.?term.?key|identity.?resolving.?key|access.?token|密钥|配对码'){
+                    $xml='[Event payload omitted: may contain authentication material]';$message=$xml
+                }
                 [pscustomobject]@{Time=$event.TimeCreated.ToString('o');Id=$event.Id;Provider=$event.ProviderName;Level=$event.LevelDisplayName;RecordId=$event.RecordId;
                     Message=$message;Xml=$xml}
             }
