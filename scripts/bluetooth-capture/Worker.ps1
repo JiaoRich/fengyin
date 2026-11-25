@@ -1,10 +1,12 @@
 ﻿param([Parameter(Mandatory=$true)][string]$SpecPath)
 $ErrorActionPreference='Stop'
+$ProgressPreference='SilentlyContinue'
 . (Join-Path $PSScriptRoot 'Common.ps1')
 $spec=Get-Content -LiteralPath $SpecPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $out=$spec.Output;$label=$spec.Label
 function Capture([string]$Part,[scriptblock]$Read) {
     $clock=[Diagnostics.Stopwatch]::StartNew()
+    Save-Json ([ordered]@{At=(Get-Date).ToString('o');Status='started-not-completed';Note='If this remains, the bounded worker did not complete this query.'}) (Join-Path $out ($label+'-'+$Part+'.json'))
     try {$items=@(& $Read);Save-Json ([ordered]@{At=(Get-Date).ToString('o');Status='read';Items=$items;Milliseconds=$clock.ElapsedMilliseconds}) (Join-Path $out ($label+'-'+$Part+'.json'))}
     catch {Save-Json ([ordered]@{At=(Get-Date).ToString('o');Status='unavailable';Error=$_.Exception.Message}) (Join-Path $out ($label+'-'+$Part+'.json'));Record-Error $out ($label+'-'+$Part) $_.Exception.Message}
 }

@@ -17,6 +17,7 @@ function Record-Error([string]$Folder,[string]$Stage,$ErrorValue) {
 function Start-OwnedProcess([string]$Script,[string]$Spec,[string]$Folder,[string]$Label,[int]$Deadline) {
     $exe=Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
     $command="& '"+$Script.Replace("'","''")+"' -SpecPath '"+$Spec.Replace("'","''")+"'"
+    $command+='; if($null -ne $LASTEXITCODE){exit $LASTEXITCODE}'
     $p=New-Object Diagnostics.Process
     $p.StartInfo.FileName=$exe
     $p.StartInfo.Arguments='-NoLogo -NoProfile -NonInteractive -MTA -ExecutionPolicy Bypass -EncodedCommand '+[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))

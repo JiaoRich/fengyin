@@ -1,5 +1,6 @@
 ﻿param([Parameter(Mandatory=$true)][string]$SpecPath)
 $ErrorActionPreference='Stop'
+$ProgressPreference='SilentlyContinue'
 . (Join-Path $PSScriptRoot 'Common.ps1')
 $spec=Get-Content -LiteralPath $SpecPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $out=$spec.Output;$clock=[Diagnostics.Stopwatch]::StartNew();$states=@{};$lastProcesses='';$job=$null;$seq=0;$lastSnapshot=-30.0;$lastLogInventory=-10.0;$files=@();$pending='initial';$doneCommands=@{}
