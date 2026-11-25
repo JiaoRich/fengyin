@@ -73,7 +73,7 @@ $extracted=Join-Path $work 'expanded';Expand-Archive -LiteralPath ($out+'.zip') 
 $manifest=Get-Content -LiteralPath (Join-Path $extracted 'manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 foreach($f in $manifest){if((Get-FileHash -LiteralPath (Join-Path $extracted $f.Name)).Hash -ne $f.SHA256){throw 'ZIP hash mismatch'}}
 foreach($mode in @('system','drivers','services','pnp','paired-endpoints','event-channels')){if(-not @(Get-ChildItem -LiteralPath $out -Filter ('*-'+$mode+'.json')).Count){throw "No report for $mode"}}
-# Actual WinForms window + UI Automation button invokes run its Click handlers; no engine command shortcut.
+# Actual WinForms window + real mouse clicks run Click handlers; no engine command shortcut.
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 Add-Type -TypeDefinition @'
@@ -108,6 +108,8 @@ try {
     $fake=[Diagnostics.Process]::Start($fixture);$id1=$fake.Id;Start-Sleep -Seconds 3
     $fake.Kill();$fake.WaitForExit();$fake.Dispose();$fake=$null;Start-Sleep -Seconds 2
     $fake=[Diagnostics.Process]::Start($fixture);$id2=$fake.Id;Start-Sleep -Seconds 3
+    $liveNames=@($ui.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition) | ForEach-Object {$_.Current.Name}) -join ' '
+    if($liveNames -match '（0秒）'){throw 'Visible capture timer did not advance'}
     foreach($name in @('标记连接失败','标记连接成功','标记自行断连','标记已删除配对','结束并打包')){
         $button=$ui.FindFirst([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,$name))
         if(-not $button -or -not $button.Current.IsEnabled -or $button.Current.IsOffscreen){throw "Button not visible/enabled: $name"}

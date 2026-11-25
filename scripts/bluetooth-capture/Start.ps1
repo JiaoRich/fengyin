@@ -75,12 +75,13 @@ $finish.Add_Click({Finish-Capture})
 $open.Add_Click({$p=[Diagnostics.ProcessStartInfo]::new('explorer.exe');$p.Arguments='"'+$launch.OutputRoot+'"';$p.UseShellExecute=$true;$null=[Diagnostics.Process]::Start($p)})
 $form.Add_FormClosing({param($sender,$eventArgs)if(-not $script:finished){$eventArgs.Cancel=$true;Finish-Capture}})
 $timer=[Windows.Forms.Timer]::new();$timer.Interval=500
+$uiClock=[Diagnostics.Stopwatch]::StartNew()
 $timer.Add_Tick({
     try {
         $statePath=Join-Path $out 'status.json'
         if(Test-Path -LiteralPath $statePath){
             try {$s=Get-Content -LiteralPath $statePath -Raw -Encoding UTF8 | ConvertFrom-Json}catch {return}
-            $status.Text=$s.Message+'  （'+[int]$s.Elapsed+'秒）'
+            $status.Text=$s.Message+'  （'+[int]$uiClock.Elapsed.TotalSeconds+'秒）'
             if($s.Phase -in @('done','error','duplicate')){
                 $script:finished=$true;$finish.Enabled=$false;$open.Enabled=($s.Phase -ne 'duplicate');foreach($b in $buttons.Values){$b.Enabled=$false}
                 $title.Text=if($s.Phase -eq 'done'){'完成，请发送桌面的诊断ZIP'}else{$s.Message}
