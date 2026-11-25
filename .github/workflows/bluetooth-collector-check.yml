@@ -1,0 +1,40 @@
+name: Bluetooth collector isolated Windows check
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/ble-collector-20261125]
+    paths:
+      - scripts/bluetooth-capture/**
+      - tools/bluetooth-capture-check/**
+      - .github/workflows/bluetooth-collector-check.yml
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: windows-2022
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/bluetooth-capture
+            tools/bluetooth-capture-check
+      - name: Exact shipped scripts with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          & ./tools/bluetooth-capture-check/Test.ps1 *>&1 | Tee-Object bluetooth-collector-test.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bluetooth-collector-verification
+          path: |
+            bluetooth-collector-test.log
+            bluetooth-collector-verification.json
+            ble-test-*/FengYin-BLE-test/*.json
+            ble-test-*/FengYin-BLE-test/*.jsonl
+            ble-test-*/FengYin-BLE-test/*stderr.txt
+            ble-test-*/gui/FengYin-BLE-*/*.json
+            ble-test-*/gui/FengYin-BLE-*/*.jsonl
+            ble-test-*/gui/FengYin-BLE-*/*stderr.txt
+          retention-days: 7
