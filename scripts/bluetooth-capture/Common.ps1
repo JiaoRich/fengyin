@@ -111,6 +111,7 @@ function Read-BluetoothHistory([string]$File) {
     } finally {$reader.Dispose()}
 }
 function Write-EvidenceZip([string]$Folder) {
+    Add-Type -AssemblyName System.IO.Compression
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $zip=$Folder+'.zip';$archive=[IO.Compression.ZipFile]::Open($zip,[IO.Compression.ZipArchiveMode]::Create)
     try {

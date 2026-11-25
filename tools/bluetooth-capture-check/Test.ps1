@@ -90,6 +90,9 @@ try {
         $ui=[Windows.Automation.AutomationElement]::RootElement.FindFirst([Windows.Automation.TreeScope]::Children,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ProcessIdProperty,$p.Id))
     }
     if(-not $ui){throw 'No actual diagnostic UI'}
+    Add-Type -AssemblyName System.Drawing
+    $r=$ui.Current.BoundingRectangle;$bmp=[Drawing.Bitmap]::new([int]$r.Width,[int]$r.Height);$g=[Drawing.Graphics]::FromImage($bmp)
+    try {$g.CopyFromScreen([int]$r.X,[int]$r.Y,0,0,$bmp.Size);$bmp.Save((Join-Path $pwd 'bluetooth-collector-ui.png'))}finally{$g.Dispose();$bmp.Dispose()}
     $fake=[Diagnostics.Process]::Start($fixture);$id1=$fake.Id;Start-Sleep -Seconds 3
     $fake.Kill();$fake.WaitForExit();$fake.Dispose();$fake=$null;Start-Sleep -Seconds 2
     $fake=[Diagnostics.Process]::Start($fixture);$id2=$fake.Id;Start-Sleep -Seconds 3

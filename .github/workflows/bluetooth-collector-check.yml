@@ -31,6 +31,7 @@ jobs:
           path: |
             bluetooth-collector-test.log
             bluetooth-collector-verification.json
+            bluetooth-collector-ui.png
             ble-test-*/duplicate/*
             ble-test-*/FengYin-BLE-test/*.json
             ble-test-*/FengYin-BLE-test/*.jsonl
