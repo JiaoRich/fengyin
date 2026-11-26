@@ -40,7 +40,8 @@ New-Item -ItemType Directory -Force -Path $isolated | Out-Null
 Copy-Item "$built/*" $isolated -Recurse -Force
 $fixture=Join-Path $work '音源 中文测试.sf2'
 Checked {python "$root/tests/create_sf2_fixture.py" $fixture}
-$exe=Join-Path $isolated 'FengYinSf2InstalledTest.exe'
+$exe=Join-Path $isolated 'FengYin.exe'
+if(!(Test-Path -LiteralPath $exe)){throw 'Built regression executable missing'}
 $plugin=Join-Path $isolated 'components/SF2/FengYin SF2.vst3'
 $neutral=Join-Path $work 'neutral-working-directory'
 New-Item -ItemType Directory -Force -Path $neutral | Out-Null

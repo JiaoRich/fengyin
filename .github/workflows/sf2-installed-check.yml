@@ -14,6 +14,12 @@ jobs:
         with:
           fetch-depth: 2
           lfs: false
+      - uses: actions/cache/restore@v4
+        id: native-cache
+        with:
+          path: build-sf2-installed/build
+          key: sf2-installed-msvc-1-${{ github.run_id }}
+          restore-keys: sf2-installed-msvc-1-
       - name: Released DLL failure and repaired DLL end-to-end checks
         shell: pwsh
         env:
@@ -26,6 +32,11 @@ jobs:
           name: SF2-1.1.48-verified-component
           path: build-sf2-installed/verified-component/
           retention-days: 7
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: build-sf2-installed/build
+          key: sf2-installed-msvc-1-${{ github.run_id }}
       - uses: actions/upload-artifact@v5
         if: always()
         with:
