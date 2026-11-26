@@ -6,7 +6,10 @@ namespace fengyin::sf2
 class Editor final : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
-    explicit Editor(Processor& p) : AudioProcessorEditor(p), processor(p), picker(*this, {}, true)
+    explicit Editor(Processor& p) : AudioProcessorEditor(p), processor(p),
+        // In a Windows VST3, currentExecutableFile is the plug-in DLL, not
+        // FengYin.exe. The isolated native picker must run the host's entry.
+        picker(*this, juce::File::getSpecialLocation(juce::File::hostApplicationPath), true)
     {
         title.setText(juce::String::fromUTF8("sf2格式音源"), juce::dontSendNotification);
         title.setFont(juce::FontOptions(22.f));

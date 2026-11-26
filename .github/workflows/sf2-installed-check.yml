@@ -1,0 +1,37 @@
+name: Windows SF2 installed component regression
+on: workflow_dispatch
+permissions:
+  contents: read
+  actions: read
+jobs:
+  sf2-installed:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+          lfs: false
+      - name: Released DLL failure and repaired DLL end-to-end checks
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ./scripts/test-sf2-installed.ps1 *>&1 | Tee-Object sf2-installed-check.log
+      - uses: actions/upload-artifact@v5
+        if: success()
+        with:
+          name: SF2-1.1.48-verified-component
+          path: build-sf2-installed/verified-component/
+          retention-days: 7
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: SF2-installed-regression-evidence
+          path: |
+            sf2-installed-check.log
+            build-sf2-installed/neutral-working-directory/*.png
+            build-sf2-installed/neutral-working-directory/*.bmp
+            build-sf2-installed/production-entry/*.xml
+            build-sf2-installed/component-hashes.json
+          retention-days: 7

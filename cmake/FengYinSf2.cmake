@@ -78,6 +78,12 @@ add_custom_command(TARGET FengYin POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:FengYin>/components/SF2"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "$<GENEX_EVAL:$<TARGET_PROPERTY:FengYinSF2_VST3,JUCE_PLUGIN_ARTEFACT_FILE>>"
         "$<TARGET_FILE_DIR:FengYin>/components/SF2/FengYin SF2.vst3")
+if(WIN32)
+    # JUCE's VST3 LoadLibrary resolves imports from the application directory,
+    # not from the loaded plug-in directory. Also retain the Probe's local copy.
+    add_custom_command(TARGET FengYin POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:libfluidsynth> $<TARGET_FILE_DIR:FengYin>)
+endif()
 
 if(BUILD_TESTING)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)

@@ -207,6 +207,9 @@ $Sf2Source = Join-Path (Split-Path $BuiltExe) 'components\SF2'
 if (-not (Test-Path (Join-Path $Sf2Source 'FengYin SF2.vst3\Contents\x86_64-win\FengYinSF2Probe.exe'))) { throw 'Private SF2 component incomplete' }
 New-Item -ItemType Directory -Force -Path (Join-Path $PackageDir 'components') | Out-Null
 Copy-Item -LiteralPath $Sf2Source -Destination (Join-Path $PackageDir 'components\SF2') -Recurse -Force
+$Sf2Dependency = Join-Path (Split-Path $BuiltExe) 'libfluidsynth-3.dll'
+if (-not (Test-Path -LiteralPath $Sf2Dependency)) { throw 'Private SF2 host dependency missing' }
+Copy-Item -LiteralPath $Sf2Dependency -Destination (Join-Path $PackageDir 'libfluidsynth-3.dll') -Force
 
 $AudioEngineExe = Join-Path $BuildDir "Release\FengYinAudioEngine.exe"
 $AudioWatchdogExe = Join-Path $BuildDir "Release\FengYinAudioWatchdog.exe"
