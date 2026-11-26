@@ -1,5 +1,45 @@
 #include "SwamTechniqueParameterPolicy.h"
 #include "PluginHostEngine.h"
+#include "../Sf2/Sf2State.h"
+
+namespace {
+class Sf2CandidateWait final : private juce::Timer, public std::enable_shared_from_this<Sf2CandidateWait>
+{
+public:
+    using Finish=std::function<void(const juce::String&)>;
+    Sf2CandidateWait(juce::AudioPluginInstance* p, std::function<bool()> valid,
+        std::function<bool()> silent, Finish done, std::optional<fengyin::sf2::State> expected)
+        : instance(p), valid(std::move(valid)), silent(std::move(silent)), done(std::move(done)), expected(std::move(expected)) {}
+    void start() { keepAlive=shared_from_this(); startTimer(40); }
+private:
+    void timerCallback() override {
+        if(!valid()) { finish("",false); return; }
+        juce::MemoryBlock bytes; instance->getStateInformation(bytes);
+        auto state=fengyin::sf2::State::decode(bytes.getData(),int(bytes.getSize()));
+        if(!state) {finish(juce::String::fromUTF8("SF2 组件返回的状态无效"));return;}
+        if(state->error.isNotEmpty()) {finish(state->error);return;}
+        if(state->prepared) {
+            if(expected && (state->hash!=expected->hash || state->bytes!=expected->bytes
+                || state->bank!=expected->bank || state->program!=expected->program
+                || state->bend!=expected->bend || std::abs(state->gain-expected->gain)>.0001f)) {
+                finish(juce::String::fromUTF8("SF2 完整状态回读不一致，原音色保留"));return;
+            }
+            if(silent()) {finish({});return;}
+        }
+        if(juce::Time::getMillisecondCounterHiRes()>deadline)finish(juce::String::fromUTF8("SF2 尚未就绪或仍在吹奏，原音色保持不变，请停吹后重试"));
+    }
+    void finish(const juce::String& error, bool notify=true) {
+        stopTimer(); auto lifetime=std::move(keepAlive); auto callback=std::move(done);
+        if(notify) callback(error);
+    }
+    juce::AudioPluginInstance* instance;
+    std::function<bool()> valid,silent;
+    Finish done;
+    std::optional<fengyin::sf2::State> expected;
+    double deadline=juce::Time::getMillisecondCounterHiRes()+60000.;
+    std::shared_ptr<Sf2CandidateWait> keepAlive;
+};
+}
 #include "PerformanceReverb.h"
 #include "KensaVibratoRange.h"
 #include "KensaBendRange.h"
@@ -382,8 +422,14 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
                                  double sampleRate,
                                  int bufferSize,
                                  const juce::MemoryBlock& initialState,
-                                 LoadCallback callback, bool verifyStateRoundtrip, bool centreSavedSwamBend)
+                                 LoadCallback callback, bool verifyStateRoundtrip, bool centreSavedSwamBend,
+                                 std::optional<Sf2LoadOptions> sf2Options)
 {
+    const bool isSf2=SupportedInstrumentClassifier::classify(description.name,description.manufacturerName,description.fileOrIdentifier)
+        ==SupportedInstrumentClassifier::Brand::sf2;
+    if(isSf2) {
+        loadSf2Async(description,sampleRate,bufferSize,initialState,std::move(callback),sf2Options.value_or(Sf2LoadOptions{}));return;
+    }
     auto stateToRestore=initialState;
     if(centreSavedSwamBend) {
         const auto brand=SupportedInstrumentClassifier::classify(description.name,
@@ -493,6 +539,8 @@ void PluginHostEngine::loadAsync(const juce::PluginDescription& description,
             instrumentNode = graph->addNode(std::move(instance));
             }
             currentDescription = description;
+            sf2Mode.store(SupportedInstrumentClassifier::classify(description.name,description.manufacturerName,description.fileOrIdentifier)
+                == SupportedInstrumentClassifier::Brand::sf2);
             player.detailedTiming.instrument.store(instrumentNode->getProcessor());
             resolveTechniqueParameters();
             resolveInstrumentModelParameter();
@@ -559,6 +607,107 @@ void PluginHostEngine::parkCurrentContainer()
     if (!containerCache.contains(key) && containerCache.size() >= 2)
         containerCache.erase(containerCache.begin());
     containerCache[key] = std::move(entry);
+}
+
+void PluginHostEngine::loadSf2Async(const juce::PluginDescription& description,double sampleRate,int bufferSize,
+    const juce::MemoryBlock& initialState,LoadCallback callback,const Sf2LoadOptions& options)
+{
+    const auto expected=sf2::State::decode(initialState.getData(),int(initialState.getSize()));
+    if((initialState.getSize() && (!expected || !expected->hasResource())) || options.effects.size()>16) {
+        if(callback)callback(false,juce::String::fromUTF8("SF2 方案状态无效，原音色保留"));return;
+    }
+    struct Prepared {
+        std::unique_ptr<TechniqueProcessingGraph> graph=std::make_unique<TechniqueProcessingGraph>();
+        juce::AudioProcessorGraph::Node::Ptr instrument,output,midi,tone;
+        std::vector<EffectSlot> effects;
+        std::vector<juce::PluginDescription> descriptions;
+        juce::AudioProcessorParameter* mix=nullptr;
+        LoadCallback done;
+    };
+    auto prepared=std::make_shared<Prepared>();prepared->done=std::move(callback);
+    for(const auto& effect:options.effects) {
+        juce::PluginDescription d;auto xml=juce::parseXML(effect.descriptionXml);
+        if(!xml || !d.loadFromXml(*xml) || effect.state.getSize()>64u*1024u*1024u) {
+            if(prepared->done)prepared->done(false,juce::String::fromUTF8("SF2 效果器状态损坏，原音色保留"));return;
+        }
+        prepared->descriptions.push_back(d);
+    }
+    const auto ticket=++loadGeneration;
+    auto valid=[this,guard=lifetime,ticket]{return guard->load() && ticket==loadGeneration;};
+    auto fail=[prepared](const juce::String& error){auto done=std::move(prepared->done);if(done)done(false,error);};
+    prepared->graph->setPlayConfigDetails(0,2,sampleRate,bufferSize);
+    prepared->output=prepared->graph->addNode(std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(juce::AudioProcessorGraph::AudioGraphIOProcessor::audioOutputNode));
+    prepared->midi=prepared->graph->addNode(std::make_unique<juce::AudioProcessorGraph::AudioGraphIOProcessor>(juce::AudioProcessorGraph::AudioGraphIOProcessor::midiInputNode));
+    auto step=std::make_shared<std::function<void()>>();std::weak_ptr<std::function<void()>> weak=step;
+    *step=[this,prepared,description,sampleRate,bufferSize,options,expected,valid,fail,weak] {
+        if(!valid())return;
+        const auto index=prepared->effects.size();
+        if(index<options.effects.size()) {
+            auto next=weak.lock();
+            formatManager.createPluginInstanceAsync(prepared->descriptions[index],sampleRate,bufferSize,
+                [prepared,valid,fail,next,index,options](std::unique_ptr<juce::AudioPluginInstance> effect,const juce::String& error){
+                    if(!valid())return;
+                    if(!effect){fail(juce::String::fromUTF8("SF2 效果器无法加载，原音色保留：")+error);return;}
+                    const auto& state=options.effects[index].state;
+                    if(state.getSize())effect->setStateInformation(state.getData(),int(state.getSize()));
+                    if(effect->getTotalNumInputChannels()<1 || effect->getTotalNumOutputChannels()<1){fail(juce::String::fromUTF8("SF2 效果器通道不兼容，原音色保留"));return;}
+                    auto node=prepared->graph->addNode(std::move(effect));node->setBypassed(options.effects[index].bypassed);
+                    prepared->effects.push_back({node,prepared->descriptions[index]});
+                    if(next)(*next)();
+                });return;
+        }
+        if(options.performanceReverb) {
+            if(prepared->effects.empty() || !masterOutputService
+                || prepared->effects.back().description.manufacturerName!="FabFilter"
+                || !prepared->effects.back().description.name.containsIgnoreCase("Pro-R 2")
+                || !(prepared->mix=proR2MixParameter(*prepared->effects.back().node->getProcessor()))) {
+                fail(juce::String::fromUTF8("SF2 混响依赖未完整恢复，原音色保留"));return;
+            }
+            prepared->tone=prepared->graph->addNode(std::make_unique<InstrumentToneProcessor>(*masterOutputService));
+            prepared->mix->setValueNotifyingHost(juce::jlimit(0.f,1.f,options.reverbMix));
+        }
+        std::vector<juce::AudioProcessorGraph::Node::Ptr> chain;
+        for(const auto& effect:prepared->effects){if(options.performanceReverb && &effect==&prepared->effects.back())chain.push_back(prepared->tone);chain.push_back(effect.node);}
+        if(!prepared->graph->addConnection({{prepared->midi->nodeID,juce::AudioProcessorGraph::midiChannelIndex},
+             {prepared->instrument->nodeID,juce::AudioProcessorGraph::midiChannelIndex}})
+             || !connectSerialEffects(*prepared->graph,prepared->instrument,chain,prepared->output)) {
+            fail(juce::String::fromUTF8("SF2 声音通道不能完整连接，原音色保留"));return;
+        }
+        // Graph, samples and every required effect are ready before touching
+        // the current player. Candidate callbacks are bound only at commit.
+        prepared->graph->prepareToPlay(sampleRate,bufferSize);
+        auto wait=std::make_shared<Sf2CandidateWait>(
+            dynamic_cast<juce::AudioPluginInstance*>(prepared->instrument->getProcessor()),valid,[this]{
+                if(lastBreathMidiValue.load()>0)return false;
+                for(const auto& note:activeNotes)if(note.load())return false;
+                return true;
+            },[this,prepared,description,options,fail,guard=lifetime](const juce::String& error){
+                if(error.isNotEmpty()){fail(error);return;}
+                parkCurrentContainer();unload();const auto generation=loadGeneration;
+                prepared->graph->preparePerformanceMidi=[this](juce::MidiBuffer& midi){player.preparePerformanceMidi(midi);};
+                prepared->graph->transformPerformanceMidi=[this](juce::MidiBuffer& midi,int,double rate){
+                    const double now=juce::Time::getMillisecondCounterHiRes()*.001;
+                    for(const auto event:midi)destinationTrace.record(event.getMessage(),now+event.samplePosition/juce::jmax(1.,rate));
+                };
+                graph=std::move(prepared->graph);instrumentNode=prepared->instrument;audioOutputNode=prepared->output;midiInputNode=prepared->midi;
+                effectNodes=std::move(prepared->effects);instrumentToneNode=prepared->tone;
+                performanceReverbEnabled=options.performanceReverb;performanceReverbMix=prepared->mix;
+                currentDescription=description;sf2Mode.store(true);setKongExpressionMode(false);
+                player.instrumentEffectsInGraph.store(options.performanceReverb);player.detailedTiming.instrument.store(instrumentNode->getProcessor());
+                resolveTechniqueParameters();resolveInstrumentModelParameter();releaseBaseline=captureToneParameters();previousReleaseParameters.clear();
+                graph->suspendProcessing(true);player.setProcessor(graph.get());resetPerformance();
+                auto done=std::move(prepared->done);if(done)done(true,description.name);
+                if(guard->load() && generation==loadGeneration && graph)graph->suspendProcessing(false);
+            },expected);
+        wait->start();
+    };
+    formatManager.createPluginInstanceAsync(description,sampleRate,bufferSize,
+        [prepared,valid,fail,step,initialState,sampleRate,bufferSize](std::unique_ptr<juce::AudioPluginInstance> instrument,const juce::String& error){
+            if(!valid())return;if(!instrument){fail(error);return;}
+            instrument->setPlayConfigDetails(0,2,sampleRate,bufferSize);instrument->prepareToPlay(sampleRate,bufferSize);
+            if(initialState.getSize())instrument->setStateInformation(initialState.getData(),int(initialState.getSize()));
+            prepared->instrument=prepared->graph->addNode(std::move(instrument));(*step)();
+        });
 }
 
 void PluginHostEngine::prewarmContainers(const juce::Array<juce::PluginDescription>& descriptions,
@@ -634,6 +783,7 @@ void PluginHostEngine::unload()
         kongDualSlot.configure(false);
     }
     kontaktStandardControls.store(false);
+    sf2Mode.store(false);
     nativePressureEnabled.store(false);
     nativePortamentoInput.store(false);
     stringTremolo.clear();
@@ -1335,6 +1485,11 @@ void PluginHostEngine::breathChanged(float value, double timestampSeconds) noexc
 {
     const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
     if (!std::isfinite(value)) return;
+    if(sf2Mode.load()) {
+        const auto raw=juce::jlimit(0,127,juce::roundToInt(value*127.f));
+        if(lastBreathMidiValue.load()!=raw && queue(juce::MidiMessage::controllerEvent(1,11,raw),timestampSeconds))lastBreathMidiValue.store(raw);
+        return;
+    }
     if(!kongExpressionMode.load() && !kontaktStandardControls.load()) {
         const int route=swamExpressionRoute.load();
         const int raw=juce::roundToInt(juce::jlimit(0.f,1.f,value)*(DjMidiRoute::fine(route)>=0?16383.f:127.f));
@@ -1403,6 +1558,7 @@ void PluginHostEngine::automaticVibratoChanged(float input,float fade) noexcept
 
 void PluginHostEngine::routeTechnique(PerformanceTechnique technique, float value) noexcept
 {
+    if(sf2Mode.load())return;
     const juce::SpinLock::ScopedLockType eventLock(performanceEventLock);
     const auto index = static_cast<size_t>(technique);
     if (index >= techniqueValues.size()) return;

@@ -14,11 +14,11 @@
 class VideoFileChooser final : public juce::Component, private juce::Timer
 {
 public:
-    explicit VideoFileChooser(juce::Component& parent, juce::File helper = {})
+    explicit VideoFileChooser(juce::Component& parent, juce::File helper = {}, bool sf2 = false)
        #if JUCE_WINDOWS
-        : native(std::move(helper)), owner(&parent) {}
+        : native(std::move(helper)), owner(&parent), sf2Mode(sf2) {}
        #else
-        : owner(&parent) { juce::ignoreUnused(helper); }
+        : owner(&parent), sf2Mode(sf2) { juce::ignoreUnused(helper); }
        #endif
     ~VideoFileChooser() override { stopTimer(); }
     bool isPending() const noexcept { return pending; }
@@ -41,15 +41,15 @@ public:
             safe->terminalAt = 0;
             RECT bounds {};
             if (auto* peer = safe->owner->getPeer()) GetWindowRect(static_cast<HWND>(peer->getNativeHandle()), &bounds);
-            if (!safe->native.start(bounds)) { safe->finish({}, true); return; }
+            if (!safe->native.start(bounds, safe->sf2Mode)) { safe->finish({}, true); return; }
             safe->startTimer(50);
            #else
             juce::ignoreUnused(error);
             // A non-null JUCE parent makes FileChooserDialogBox a painted
             // child with no desktop peer. WebView2's native child HWND then
             // covers the modal UI. Use a separate window, not IFileDialog.
-            safe->chooser = std::make_unique<juce::FileChooser>(juce::String::fromUTF8("选择伴奏视频"),
-                safe->lastFolder, "*.mp4;*.mov;*.m4v;*.avi;*.mkv;*.webm", false, false, nullptr);
+            safe->chooser = std::make_unique<juce::FileChooser>(juce::String::fromUTF8(safe->sf2Mode ? "选择 SF2 音源文件" : "选择伴奏视频"),
+                safe->lastFolder, safe->sf2Mode ? "*.sf2" : "*.mp4;*.mov;*.m4v;*.avi;*.mkv;*.webm", false, false, nullptr);
             safe->chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                 [safe, completion = std::move(completion)](const juce::FileChooser& picker) mutable
                 {
@@ -117,7 +117,7 @@ private:
             if (!safe || !safe->owner) return;
             if (failed) {
                 juce::Logger::writeToLog("Native video selector failed; existing video retained");
-                if (error) error(juce::String::fromUTF8("无法打开视频选择窗口，请重试。原视频保持不变。"));
+                if (error) error(juce::String::fromUTF8(safe->sf2Mode ? "无法打开音源选择窗口，请重试。原音源保持不变。" : "无法打开视频选择窗口，请重试。原视频保持不变。"));
             } else if (callback) callback(file);
         });
     }
@@ -126,4 +126,5 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
     juce::File lastFolder;
     bool pending = false;
+    bool sf2Mode = false;
 };

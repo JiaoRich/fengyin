@@ -8,6 +8,7 @@ struct Test final : juce::Component, juce::Timer
     std::unique_ptr<VideoFileChooser> picker;
     juce::File folder, fixture;
     juce::File helperExecutable;
+    bool sf2Mode=false;
     int phase = 0, completed = 0, errors = 0, heartbeats = 0;
     bool failed = false, clicked = false;
     double seenAt = 0;
@@ -15,12 +16,12 @@ struct Test final : juce::Component, juce::Timer
     bool hostClickSent = false, foregroundRequested = false;
     const double deadline = juce::Time::getMillisecondCounterHiRes() + 60000;
     HANDLE destroyedProcess = nullptr;
-    explicit Test(juce::File executable = {}) : helperExecutable(std::move(executable))
+    explicit Test(juce::File executable = {},bool sf2=false) : helperExecutable(std::move(executable)),sf2Mode(sf2)
     {
         setOpaque(true); setBounds(20,20,800,600); addToDesktop(0); setVisible(true); toFront(true);
         folder = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile(juce::String::fromUTF8("风吟 中文😀选择器 ") + juce::Uuid().toString());
-        folder.createDirectory(); fixture = folder.getChildFile(juce::String::fromUTF8("伴奏 测试.mp4")); fixture.replaceWithText("fixture");
-        picker = std::make_unique<VideoFileChooser>(*this,helperExecutable); open(); startTimer(20);
+        folder.createDirectory(); fixture = folder.getChildFile(juce::String::fromUTF8(sf2Mode?"音源 测试.sf2":"伴奏 测试.mp4")); fixture.replaceWithText("fixture");
+        picker = std::make_unique<VideoFileChooser>(*this,helperExecutable,sf2Mode); open(); startTimer(20);
     }
     ~Test() override { stopTimer(); picker.reset(); if(destroyedProcess)CloseHandle(destroyedProcess); folder.deleteRecursively(); }
     void fail(const char* message) {
@@ -46,7 +47,7 @@ struct Test final : juce::Component, juce::Timer
             if(phase==3)setBounds(juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->userBounds.toNearestInt());
             if(phase<4)open();
             else if(phase==4) { // queue destruction: no callback, no helper leak
-                auto temporary=std::make_unique<VideoFileChooser>(*this,helperExecutable);
+                auto temporary=std::make_unique<VideoFileChooser>(*this,helperExecutable,sf2Mode);
                 temporary->open([this](juce::File){fail("destroyed queued chooser callback");});temporary.reset();
                 clicked=false;seenAt=0;
                 picker->open([this](juce::File){fail("destroyed active chooser callback");});phase=5;
@@ -61,7 +62,7 @@ struct Test final : juce::Component, juce::Timer
         if(phase==6) {
             if(WaitForSingleObject(destroyedProcess,0)==WAIT_TIMEOUT)return;
             CloseHandle(destroyedProcess);destroyedProcess=nullptr;
-            picker=std::make_unique<VideoFileChooser>(*this,helperExecutable);
+            picker=std::make_unique<VideoFileChooser>(*this,helperExecutable,sf2Mode);
             phase=7;open();return;
         }
         if(phase==9) {
@@ -71,6 +72,8 @@ struct Test final : juce::Component, juce::Timer
         }
         const auto hwnd=picker->nativeWindow();
         if(!hwnd||clicked)return;
+        if(sf2Mode){wchar_t title[128]{};GetWindowTextW(hwnd,title,128);
+            if(juce::String(title)!=juce::String::fromUTF8("选择 SF2 音源文件")){fail("wrong SF2 native dialog title");return;}}
         DWORD pid=0;GetWindowThreadProcessId(hwnd,&pid);
         wchar_t name[64]{};GetClassNameW(hwnd,name,64);
         if(pid==GetCurrentProcessId()||pid!=picker->nativeProcessId()||juce::String(name)!="#32770"
@@ -264,11 +267,12 @@ int main() {
    #if JUCE_WINDOWS
     const auto args=juce::StringArray::fromTokens(juce::String(GetCommandLineW()),true);
     if(args.size()==3&&args[1]=="--select-video")return fengyin::runNativeVideoFileDialog(juce::File(args[2].unquoted()));
-    const auto helper=args.size()==3&&args[1]=="--production-picker"?juce::File(args[2].unquoted()):juce::File();
+    const auto sf2=args.size()==3&&args[1]=="--production-sf2-picker";
+    const auto helper=args.size()==3&&(args[1]=="--production-picker"||sf2)?juce::File(args[2].unquoted()):juce::File();
    #endif
     juce::ScopedJuceInitialiser_GUI gui;
    #if JUCE_WINDOWS
-    Test test(helper);
+    Test test(helper,sf2);
    #else
     Test test;
    #endif

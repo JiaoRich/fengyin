@@ -495,7 +495,17 @@ function inferInstrumentKey(name = '') {
 function isSupportedInstrument(item = {}) {
   if (item.supported === false) return false;
   return /swam|kong|qin|kontakt/i.test(`${item.name || ''} ${item.label || ''} ${item.brand || ''}`)
-    || item.isSwam === true || item.brand === 'kong';
+    || item.isSwam === true || item.brand === 'kong' || item.brand === 'sf2';
+}
+
+function instrumentDisplayName(item = {}) {
+  if (item.brand === 'sf2') return 'sf2格式音源';
+  if (item.brand === 'kong' || /qin|kong/i.test(item.name || '')) return '民乐引擎';
+  if (item.brand === 'swam' || item.isSwam === true || /swam/i.test(item.name || '')) {
+    const translated = item.chineseName || presets.find(row => row[1] === item.name)?.[0];
+    return translated && !/swam/i.test(translated) ? translated : '西洋乐器';
+  }
+  return item.label || item.chineseName || item.name || '音源';
 }
 
 window.FENGYIN_TONE_MEDIA = {
@@ -2815,9 +2825,10 @@ window.__JUCE__?.backend?.addEventListener('backendState', state => {
         .filter(({item}) => isSupportedInstrument(item));
       const swam = supported.filter(({item}) => item.brand === 'swam' || item.isSwam === true);
       const kong = supported.filter(({item}) => item.brand === 'kong');
+      const sf2 = supported.filter(({item}) => item.brand === 'sf2');
       const kontakt = supported.filter(({item}) => item.brand === 'kontakt' || /kontakt/i.test(item.name || item.label || ''));
       const unsupported = availableInstruments.map((item,index) => ({item,index})).filter(({item}) => !isSupportedInstrument(item));
-      $('#instrument-select').innerHTML = `<option value="">请选择音源</option>${swam.length ? `<optgroup label="西洋乐器 · SWAM">${swam.map(({item,index}) => `<option value="${index}">${escapeHtml(item.label || item.name)}</option>`).join('')}</optgroup>` : ''}${kong.length ? `<optgroup label="中国民乐 · 空音">${kong.map(({item,index}) => `<option value="${index}">${escapeHtml(item.label || item.name)}</option>`).join('')}</optgroup>` : ''}${unsupported.length ? `<optgroup label="暂未支持">${unsupported.map(({item,index}) => `<option class="unsupported-plugin" value="${index}">${escapeHtml(item.label || item.name)}（暂未支持）</option>`).join('')}</optgroup>` : ''}`;
+      $('#instrument-select').innerHTML = `<option value="">请选择音源</option>${swam.length ? `<optgroup label="西洋乐器">${swam.map(({item,index}) => `<option value="${index}">${escapeHtml(instrumentDisplayName(item))}</option>`).join('')}</optgroup>` : ''}${kong.length ? `<optgroup label="民乐引擎">${kong.map(({item,index}) => `<option value="${index}">${escapeHtml(instrumentDisplayName(item))}</option>`).join('')}</optgroup>` : ''}${sf2.length ? `<optgroup label="其他音源">${sf2.map(({item,index}) => `<option value="${index}">${escapeHtml(instrumentDisplayName(item))}</option>`).join('')}</optgroup>` : ''}${unsupported.length ? `<optgroup label="暂未支持">${unsupported.map(({item,index}) => `<option class="unsupported-plugin" value="${index}">${escapeHtml(instrumentDisplayName(item))}（暂未支持）</option>`).join('')}</optgroup>` : ''}`;
       if (kontakt.length) {
         const group = document.createElement('optgroup'); group.label = '采样音源 · Kontakt';
         for (const {item,index} of kontakt) {
@@ -3079,7 +3090,7 @@ nativeEvent('requestSuperLowLatencyStatus');
 renderSmartAdapter({});
 renderTechniqueMappings();
 clearInstrumentArtwork();
-$('.prototype-note').textContent = '风吟 1.1.47 · 本地运行，不会上传个人资料。';
+$('.prototype-note').textContent = '风吟 1.1.48 · 本地运行，不会上传个人资料。';
 if (!window.__JUCE__?.backend?.emitEvent) {
   availableInstruments = [
     {name:'SWAM Violin',label:'SWAM Violin',chineseName:'小提琴',instrumentKey:'violin',brand:'swam',isSwam:true},

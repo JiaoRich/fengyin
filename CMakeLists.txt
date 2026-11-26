@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FengYin VERSION 1.1.47 LANGUAGES C CXX)
+project(FengYin VERSION 1.1.48 LANGUAGES C CXX)
 option(FENGYIN_ARCHIVED_VIDEO_RECORDING "Build archived video-recording diagnostics, never for release" OFF)
 add_compile_definitions(FENGYIN_RELEASE_VERSION="${PROJECT_VERSION}")
 
@@ -457,6 +457,8 @@ if(BUILD_TESTING)
             target_link_libraries(FengYinVideoChooserTests PRIVATE ole32 oleaut32 shell32 uuid uiautomationcore)
             add_test(NAME production_native_video_selector COMMAND FengYinVideoChooserTests --production-picker $<TARGET_FILE:FengYin>)
             set_tests_properties(production_native_video_selector PROPERTIES TIMEOUT 90)
+            add_test(NAME production_native_sf2_selector COMMAND FengYinVideoChooserTests --production-sf2-picker $<TARGET_FILE:FengYin>)
+            set_tests_properties(production_native_sf2_selector PROPERTIES TIMEOUT 90)
         endif()
     endif()
     if(WIN32)
@@ -698,4 +700,14 @@ if(BUILD_TESTING)
         set_tests_properties(compact_glow_windows_desktop PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 30)
     endif()
 
+endif()
+
+include(cmake/FengYinSf2.cmake)
+if(BUILD_TESTING)
+    # FluidSynth exposes its separate `check` suite, whose executables are
+    # EXCLUDE_FROM_ALL. Label every application test (including SF2), so the
+    # release gate runs our complete suite without pretending upstream tests
+    # were built. The upstream `check` target remains available separately.
+    get_property(FENGYIN_APPLICATION_TESTS DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" PROPERTY TESTS)
+    set_tests_properties(${FENGYIN_APPLICATION_TESTS} PROPERTIES LABELS fengyin)
 endif()

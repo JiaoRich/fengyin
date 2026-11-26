@@ -55,11 +55,16 @@ private:
     static juce::File prepareLocalWebInterface();
     void chooseVideoForWebInterface();
     void exportStudioDraft(const juce::String& id);
+    void exportStudioDraftFile(const juce::String& id, bool withResource);
+    void resolveSf2Resource(const fengyin::SoundPreset&,const juce::File&,std::function<void(bool,const juce::String&)>);
+    std::unique_ptr<VideoFileChooser> sf2ResourceChooser;
+    bool sf2ResourceResolving = false;
     void importStudioPackage();
     std::unique_ptr<juce::FileChooser> studioImportChooser;
     bool studioUnlocked = false;
     juce::String studioInstrumentName;
     std::unique_ptr<juce::FileChooser> studioExportChooser;
+    bool studioExportWriting = false;
     void loadVideoForWebInterface(const juce::File& file);
     void emitVideoAudioState(bool ready, const juce::String& message);
     void updateIdleVideoPreparation();

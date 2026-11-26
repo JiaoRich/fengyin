@@ -2,6 +2,7 @@
 #include "BleMidiConnectionPolicy.h"
 #include "BleMidiInputDecoder.h"
 #include "BleDiscoveryQueue.h"
+#include "BlePairingPolicy.h"
 #include <deque>
 #include <mutex>
 #include <map>
@@ -439,7 +440,8 @@ struct BluetoothMidiService::Impl : juce::Thread
     {
         using namespace winrt::Windows::Devices::Enumeration;
         checkRequest(command.generation,command.deadline);
-        auto pairing=freshPairingInfo(command).Pairing();
+        auto pairingInfo=freshPairingInfo(command);
+        auto pairing=pairingInfo.Pairing();
         if(pairing.IsPaired())throw BleMidiRepairRequired(cause.what());
         if(command.action=="reconnect" || !pairing.CanPair())throw BleMidiAuthenticationRequired(cause.what());
         juce::Logger::writeToLog("Bluetooth MIDI: pairing requested at "+connectionStage+" ("+juce::String(cause.what())+")");
@@ -447,10 +449,50 @@ struct BluetoothMidiService::Impl : juce::Thread
         setConnectionStage(command,juce::String::fromUTF8("Windows 配对"),
             juce::String::fromUTF8("等待 Windows 配对，请留意系统提示…"));
         const auto deadline=bleMidiStageDeadline(juce::Time::getMillisecondCounterHiRes(),command.deadline,bleMidiConnectionTimeoutMs);
-        auto result=await(beginOnUi([pairing]{return pairing.PairAsync();},command.generation,deadline),
-            command.generation,bleMidiConnectionTimeoutMs,deadline);
+        juce::String deviceName;
+        { std::lock_guard lock(mutex); deviceName=devices[command.id].name; }
+        const bool customYds=useYdsCustomPairing(deviceName,command.action,pairing.IsPaired());
+        auto result = [&]() {
+            if (!customYds) return await(beginOnUi([pairing]{return pairing.PairAsync();},command.generation,deadline),
+                command.generation,bleMidiConnectionTimeoutMs,deadline);
+            auto custom=pairing.Custom();
+            auto observed=std::make_shared<std::atomic<int>>(-1);
+            auto accepting=std::make_shared<std::atomic<bool>>(true);
+            struct EndPairingAttempt { std::shared_ptr<std::atomic<bool>> active; ~EndPairingAttempt(){ active->store(false); } };
+            // Offer only the confirm-only ceremony. Windows desktop still owns
+            // consent; clicking Connect does not bypass PIN or numeric-match
+            // checks. Do not advertise ceremonies we cannot present correctly.
+            auto subscription=custom.PairingRequested(winrt::auto_revoke,
+                [accepting,deadline,observed](auto const&,auto const& args) {
+                    // This callback owns no service pointer and takes no service
+                    // lock: a ceremony may arrive while PairAsync is starting.
+                    if(!accepting->load() || juce::Time::getMillisecondCounterHiRes()>=deadline)return;
+                    observed->store(static_cast<int>(args.PairingKind()));
+                    if(args.PairingKind()==DevicePairingKinds::ConfirmOnly) {
+                        try { args.Accept(); }
+                        catch(const winrt::hresult_error& error) {
+                            juce::Logger::writeToLog("Bluetooth MIDI: pairing consent failed; hr="+juce::String::toHexString(uint32_t(error.code().value)));
+                        }
+                    }
+                });
+            EndPairingAttempt endAttempt { accepting };
+            juce::Logger::writeToLog("Bluetooth MIDI: YDS custom pairing start; protection=Encryption; ceremony=ConfirmOnly");
+            auto paired=await(beginOnUi([custom] {
+                return custom.PairAsync(DevicePairingKinds::ConfirmOnly,DevicePairingProtectionLevel::Encryption);
+            },command.generation,deadline),command.generation,bleMidiConnectionTimeoutMs,deadline);
+            juce::Logger::writeToLog("Bluetooth MIDI: YDS custom pairing ceremony="+juce::String(observed->load())
+                +" status="+juce::String(static_cast<int>(paired.Status()))
+                +" protection="+juce::String(static_cast<int>(paired.ProtectionLevelUsed())));
+            return paired;
+        }();
         const auto status=result.Status();
         juce::Logger::writeToLog("Bluetooth MIDI: pairing result="+juce::String(static_cast<int>(status)));
+        if(customYds && (status==DevicePairingResultStatus::PairingCanceled || status==DevicePairingResultStatus::AuthenticationTimeout))
+            throw winrt::hresult_error(status==DevicePairingResultStatus::PairingCanceled ? HRESULT_FROM_WIN32(ERROR_CANCELLED) : HRESULT_FROM_WIN32(ERROR_TIMEOUT),
+                L"Bluetooth pairing cancelled or authentication timed out");
+        if(customYds && (status==DevicePairingResultStatus::AuthenticationFailure || status==DevicePairingResultStatus::AuthenticationNotAllowed
+            || status==DevicePairingResultStatus::AccessDenied))
+            throw winrt::hresult_error(E_ACCESSDENIED,L"Bluetooth authentication was refused");
         if(status!=DevicePairingResultStatus::Paired && status!=DevicePairingResultStatus::AlreadyPaired)
             throw winrt::hresult_error(E_FAIL,wide("Pairing did not complete; status="+juce::String(static_cast<int>(status))));
     }

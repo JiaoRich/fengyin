@@ -241,8 +241,10 @@ void testActualReverbHost(const juce::PluginDescription& d,const juce::MemoryBlo
 void testPerformanceResetDelivery();
 void testRealPluginResetDelivery(const juce::String& pluginPath);
 void testPerformanceReverbPlugin(const juce::String&,const juce::String&);
+void testSf2Host(const juce::String&,const juce::File&);
 int main(int argc,char** argv){
     juce::ScopedJuceInitialiser_GUI init;
+    if(argc==4 && juce::String(argv[1])=="--sf2"){testSf2Host(juce::String::fromUTF8(argv[2]),juce::File(juce::SystemStats::getEnvironmentVariable("FENGYIN_SF2_TEST_SOURCE",juce::String::fromUTF8(argv[3]))));return 0;}
     if(argc==4 && juce::String(argv[1])=="--reverb-plugin"){testPerformanceReverbPlugin(juce::String::fromUTF8(argv[2]),juce::String::fromUTF8(argv[3]));return 0;}
     if(argc==3 && juce::String(argv[1])=="--plugin-reset"){
         testRealPluginResetDelivery(juce::String::fromUTF8(argv[2]));return 0;

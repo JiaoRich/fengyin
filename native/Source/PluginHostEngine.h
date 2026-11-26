@@ -37,6 +37,7 @@ namespace fengyin
 class RecordingAudioProcessorPlayer final : public juce::AudioProcessorPlayer
 {
     friend struct DjHostTestAccess;
+    friend struct Sf2HostTestAccess;
     friend struct PluginHostEngineTestAccess;
 public:
     RecordingAudioProcessorPlayer() {
@@ -96,6 +97,7 @@ private:
 class PluginHostEngine final : public MidiPerformanceSink
 {
     friend struct DjHostTestAccess;
+    friend struct Sf2HostTestAccess;
     friend struct PluginHostEngineTestAccess;
 public:
     void allSoundOff(double timestampSeconds = 0.0) noexcept override;
@@ -116,6 +118,7 @@ public:
     void detach();
     [[nodiscard]] bool hasIndependentTechniqueRoute(PerformanceTechnique technique) const noexcept
     {
+        if (sf2Mode.load()) return false; // capabilities are explicit, never guessed from a bank
         if(technique==PerformanceTechnique::tremolo && stringTremolo.available())return true;
         if (kontaktStandardControls.load()) return technique==PerformanceTechnique::vibrato;
         if (technique == PerformanceTechnique::growl && usesSwamBreathGrowl()) return false;
@@ -136,6 +139,7 @@ public:
             if(i!=index && DjMidiRoute::overlaps(nativeTechniqueRoutes[i].load(),route))return false;
         return true;
     }
+    struct Sf2LoadOptions { EffectChainStates effects; bool performanceReverb=false; float reverbMix=0; };
     void loadAsync(const juce::PluginDescription& description,
                    double sampleRate,
                    int bufferSize,
@@ -145,7 +149,8 @@ public:
                    int bufferSize,
                    const juce::MemoryBlock& initialState,
                    LoadCallback callback, bool verifyStateRoundtrip = false,
-                   bool centreSavedSwamBend = false);
+                   bool centreSavedSwamBend = false,
+                   std::optional<Sf2LoadOptions> sf2Options = {});
     void unload();
     void prewarmContainers(const juce::Array<juce::PluginDescription>& descriptions,
                            double sampleRate, int bufferSize);
@@ -233,6 +238,7 @@ public:
     [[nodiscard]] int getProcessingLatencySamples() const noexcept;
 
 private:
+    void loadSf2Async(const juce::PluginDescription&,double,int,const juce::MemoryBlock&,LoadCallback,const Sf2LoadOptions&);
     void routeTechnique(PerformanceTechnique technique,float value) noexcept;
     void prepareTempoVibrato(juce::AudioPluginInstance& plugin);
     std::atomic<int> musicTempoMode {1};
@@ -311,6 +317,7 @@ private:
     KongDualSlotRouter kongDualSlot;
     std::atomic<bool> nativePressureEnabled { false }, nativePortamentoInput { false };
     std::atomic<bool> kontaktStandardControls{false};
+    std::atomic<bool> sf2Mode{false};
 public:
     void configureKontaktControls(bool enabled) noexcept {
         kontaktStandardControls.store(enabled);

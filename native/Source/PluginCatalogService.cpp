@@ -189,6 +189,7 @@ juce::Array<juce::var> PluginCatalogService::getKongInstruments() const
 juce::FileSearchPath PluginCatalogService::getRecommendedVst3Paths() const
 {
     juce::FileSearchPath paths;
+    paths.add(juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory().getChildFile("components/SF2"));
    #if JUCE_WINDOWS
     paths.add(juce::File("C:\\Program Files\\Common Files\\VST3"));
     const auto local = juce::SystemStats::getEnvironmentVariable("LOCALAPPDATA", {});

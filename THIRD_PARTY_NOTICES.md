@@ -55,3 +55,8 @@ supported install/repair mechanism and preserves newer installed versions.
 Uninstalling FengYin does not remove the shared Microsoft runtime.
 
 https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files
+
+SF2 support uses dynamically linked FluidSynth 2.6.3 (LGPL-2.1-or-later) and GCEM (Apache-2.0).
+The installer includes their unmodified corresponding sources, licenses and rebuild directions
+under components/SF2/licenses. Compatible replacement FluidSynth libraries are permitted.
+No third-party SF2 content is included. See third_party/sf2/README.txt.

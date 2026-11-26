@@ -5,7 +5,7 @@
   #define OutputDir "."
 #endif
 #ifndef AppVersion
-  #define AppVersion "1.1.47"
+  #define AppVersion "1.1.48"
 #endif
 #ifndef ChineseMessages
   #define ChineseMessages "compiler:Languages\ChineseSimplified.isl"
@@ -43,6 +43,9 @@ FinishedRestartMessage=风吟已安装完成。音频驱动需要重启电脑后
 
 [Tasks]
 Name: "desktopicon"; Description: "在桌面创建快捷方式"; GroupDescription: "快捷方式："; Flags: unchecked
+
+[Dirs]
+Name: "C:\fengyin\SF2"; Permissions: users-modify; Flags: uninsneveruninstall
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; Flags: ignoreversion recursesubdirs createallsubdirs

@@ -1,5 +1,6 @@
 #pragma once
 #include "SoundPresetStore.h"
+#include "../Sf2/Sf2State.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_cryptography/juce_cryptography.h>
 #include <cmath>
@@ -50,7 +51,7 @@ struct TonePackage
             return fail("方案包缺少清单或音色数据");
         const auto manifest = juce::JSON::parse(manifestBytes.toString());
         const int packageVersion=static_cast<int>(manifest["version"]);
-        if (manifest["format"].toString() != "fengyin-tone-package" || (packageVersion!=1 && packageVersion!=2 && packageVersion!=3 && packageVersion!=4)
+        if (manifest["format"].toString() != "fengyin-tone-package" || (packageVersion!=1 && packageVersion!=2 && packageVersion!=3 && packageVersion!=4 && packageVersion!=5)
             || static_cast<bool>(manifest["pluginBinariesIncluded"])) return fail("方案包版本或格式不支持");
         const auto* files = manifest["files"].getArray();
         if (! files || files->size() != zip.getNumEntries() - 1) return fail("方案包清单不完整");
@@ -78,8 +79,8 @@ struct TonePackage
         const auto presets = SoundPresetStore::fromXml(*xml);
         if (presets.size() != 1 || presets[0].instrumentChineseName.isEmpty()) return fail("音色数据不完整");
         auto preset = presets[0];
-        if ((packageVersion==4)!=preset.performanceReverb) return fail("测试版混响方案元数据不完整");
-        if (packageVersion!=4 && (packageVersion==3)!=preset.djSource.enabled) return fail("DJ方案需要风吟DJ版，不能丢弃原始效果链信息");
+        if (packageVersion!=5 && (packageVersion==4)!=preset.performanceReverb) return fail("测试版混响方案元数据不完整");
+        if (packageVersion!=5 && packageVersion!=4 && (packageVersion==3)!=preset.djSource.enabled) return fail("DJ方案需要风吟DJ版，不能丢弃原始效果链信息");
         if (preset.performanceReverb && (preset.effects.empty() || preset.reverbMix<0 || preset.reverbMix>1))
             return fail("测试版混响方案缺少效果器或强度异常");
         if(packageVersion==2 && (preset.pluginBrand!="kong" || !preset.kongTechniques.enabled))
@@ -112,6 +113,19 @@ struct TonePackage
             if (! effectXml || ! description.loadFromXml(*effectXml) || description.pluginFormatName != "VST3")
                 return fail("效果器依赖信息不完整");
         }
+        if ((packageVersion==5)!=(preset.pluginBrand=="sf2")) return fail("SF2 方案版本不匹配");
+        if (packageVersion==5) {
+            const auto state=sf2::State::decode(preset.instrumentState.getData(),int(preset.instrumentState.getSize()));
+            const auto resource=manifest["resource"];
+            if (!state || !state->hasResource() || state->bytes<=0 || preset.containerInstrument || preset.djSource.enabled
+                || preset.containerProjectState.getSize() || zip.getNumEntries()!=2
+                || resource["sha256"].toString()!=state->hash || juce::int64(resource["bytes"])!=state->bytes
+                || resource["file"].toString()!=state->hash+".sf2") return fail("SF2 资源清单与完整状态不一致");
+            juce::PluginDescription sf2Description;
+            sf2Description.loadFromXml(*instrumentXml);
+            if (sf2Description.name!="FengYin SF2" || sf2Description.manufacturerName!="FengYin")
+                return fail("SF2 播放组件身份不一致");
+        }
         if (preset.pluginBrand == "kontakt" && preset.containerInstrument)
         {
             if(preset.containerAdapter!="kontakt" || preset.samplerState.getSize()==0)
@@ -136,6 +150,8 @@ struct TonePackage
     {
         if (draft.name.isEmpty() || draft.instrumentChineseName.isEmpty()
             || (draft.pluginBrand == "kong" && draft.samplerState.getSize() == 0)) return false;
+        const auto sf2State=sf2::State::decode(draft.instrumentState.getData(),int(draft.instrumentState.getSize()));
+        if(draft.pluginBrand=="sf2" && (!sf2State || !sf2State->hasResource() || sf2State->bytes<=0)) return false;
         auto preset = draft;
         preset.studioDraft = false;
         juce::Array<SoundPreset> presets;
@@ -175,7 +191,12 @@ struct TonePackage
         auto* root = new juce::DynamicObject();
         juce::var manifest(root);
         root->setProperty("format", "fengyin-tone-package");
-        root->setProperty("version", preset.performanceReverb ? 4 : (preset.djSource.enabled ? 3 : (preset.kongTechniques.enabled ? 2 : 1)));
+        root->setProperty("version", preset.pluginBrand=="sf2" ? 5 : preset.performanceReverb ? 4 : (preset.djSource.enabled ? 3 : (preset.kongTechniques.enabled ? 2 : 1)));
+        if(preset.pluginBrand=="sf2") {
+            auto* resource=new juce::DynamicObject(); resource->setProperty("file",sf2State->hash+".sf2");
+            resource->setProperty("sha256",sf2State->hash);resource->setProperty("bytes",sf2State->bytes);
+            resource->setProperty("originalName",sf2State->name);root->setProperty("resource",juce::var(resource));
+        }
         root->setProperty("instrument", preset.instrumentChineseName);
         root->setProperty("style", preset.name);
         root->setProperty("dependencies", dependencies);
@@ -192,5 +213,26 @@ struct TonePackage
         output.reset();
         return temporary.overwriteTargetFileWithTemporary();
     }
+    // A delivery ZIP is explicitly requested by the tuner. It is not accepted
+    // as a tone package: recipients unpack it before importing the .fytonepack.
+    static bool writeWithSf2(const SoundPreset& preset,const juce::File& target)
+    {
+        const auto state=sf2::State::decode(preset.instrumentState.getData(),int(preset.instrumentState.getSize()));
+        if(preset.pluginBrand!="sf2" || !state || !state->hasResource())return false;
+        const auto resource=sf2::resourceFile(state->hash);
+        if(resource.getSize()!=state->bytes || juce::SHA256(resource).toHexString()!=state->hash)return false;
+        juce::TemporaryFile temporary(target), package(target.getSiblingFile(juce::Uuid().toString()+".fytonepack"));
+        if(!write(preset,package.getFile()))return false;
+        juce::ZipFile::Builder zip;
+        zip.addFile(package.getFile(),6,juce::String::fromUTF8("音色方案.fytonepack"));
+        zip.addFile(resource,0,state->hash+".sf2");
+        const auto instructions=juce::String::fromUTF8("请解压全部文件到同一文件夹，再在风吟调音师中导入音色方案.fytonepack。导入后SF2将托管到C:\\fengyin\\SF2。请确保拥有音源转移或分发权限。\n");
+        zip.addEntry(std::make_unique<juce::MemoryInputStream>(instructions.toRawUTF8(),instructions.getNumBytesAsUTF8(),true),6,juce::String::fromUTF8("使用说明.txt"),juce::Time::getCurrentTime());
+        auto out=temporary.getFile().createOutputStream();
+        if(!out || !zip.writeToStream(*out,nullptr))return false;
+        out->flush();if(out->getStatus().failed())return false;out.reset();
+        return temporary.overwriteTargetFileWithTemporary();
+    }
+
 };
 }

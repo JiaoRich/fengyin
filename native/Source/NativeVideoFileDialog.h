@@ -151,15 +151,18 @@ inline int runNativeVideoFileDialog(const juce::File& folder)
         FILEOPENDIALOGOPTIONS options {};
         if (FAILED(hr = dialog->GetOptions(&options))) return hr;
         if (FAILED(hr = dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST | FOS_NOCHANGEDIR))) return hr;
-        const COMDLG_FILTERSPEC filters[] {{L"视频文件", L"*.mp4;*.mov;*.m4v;*.avi;*.mkv;*.webm"}, {L"所有文件", L"*.*"}};
-        if (FAILED(hr = dialog->SetFileTypes(2, filters))) return hr;
-        dialog->SetTitle(L"选择伴奏视频");
+        const bool sf2 = request["kind"].toString() == "sf2";
+        const COMDLG_FILTERSPEC videoFilters[] {{L"视频文件", L"*.mp4;*.mov;*.m4v;*.avi;*.mkv;*.webm"}, {L"所有文件", L"*.*"}};
+        const COMDLG_FILTERSPEC sf2Filters[] {{L"SF2 音源文件", L"*.sf2"}};
+        if (FAILED(hr = dialog->SetFileTypes(sf2 ? 1 : 2, sf2 ? sf2Filters : videoFilters))) return hr;
+        dialog->SetTitle(sf2 ? L"选择 SF2 音源文件" : L"选择伴奏视频");
         // A stable client GUID lets Windows remember the actual last visited
         // place across releases, including its localized Known Folder names.
         const GUID client {0x24dc16ba, 0xa5b8, 0x4c8b, {0xba,0xac,0x01,0x85,0x60,0x67,0x24,0x9f}};
-        dialog->SetClientGuid(client);
+        const GUID sf2Client {0x2c69b1d8, 0x4826, 0x47fd, {0xa2,0x11,0x43,0x76,0x54,0x11,0x07,0x69}};
+        dialog->SetClientGuid(sf2 ? sf2Client : client);
         Microsoft::WRL::ComPtr<IShellItem> movies;
-        if (SUCCEEDED(SHCreateItemInKnownFolder(FOLDERID_Videos, 0, nullptr, IID_PPV_ARGS(&movies)))) dialog->SetDefaultFolder(movies.Get());
+        if (SUCCEEDED(SHCreateItemInKnownFolder(sf2 ? FOLDERID_Documents : FOLDERID_Videos, 0, nullptr, IID_PPV_ARGS(&movies)))) dialog->SetDefaultFolder(movies.Get());
         RECT bounds {int(request["left"]), int(request["top"]), int(request["right"]), int(request["bottom"])};
         Microsoft::WRL::ComPtr<videoDialog::Events> events;
         events.Attach(new videoDialog::Events(folder, bounds, static_cast<DWORD>(static_cast<juce::int64>(request["hostPid"]))));
@@ -183,7 +186,7 @@ class NativeVideoDialogSession final
 public:
     explicit NativeVideoDialogSession(juce::File helper = {}) : helperExecutable(std::move(helper)) {}
     ~NativeVideoDialogSession() { close(); }
-    bool start(RECT bounds)
+    bool start(RECT bounds, bool sf2 = false)
     {
         close();
         directory = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("FengYin-video-picker-" + juce::Uuid().toString());
@@ -192,6 +195,7 @@ public:
         request->setProperty("left", int(bounds.left)); request->setProperty("top", int(bounds.top));
         request->setProperty("right", int(bounds.right)); request->setProperty("bottom", int(bounds.bottom));
         request->setProperty("hostPid", static_cast<juce::int64>(GetCurrentProcessId()));
+        if (sf2) request->setProperty("kind", "sf2");
         if (!videoDialog::writePacket(directory.getChildFile("request.json"), juce::var(request.release()))) { close(); return false; }
         job = CreateJobObjectW(nullptr, nullptr);
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits {};

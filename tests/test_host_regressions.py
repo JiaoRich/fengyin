@@ -315,7 +315,7 @@ class HostRegressionTests(unittest.TestCase):
         self.assertIn("targetForRole", MIDI)
 
     def test_kong_and_swam_are_supported_while_other_plugins_are_blocked(self):
-        self.assertIn('item->setProperty("supported", isSwam || isKong || isKontakt)', MAIN)
+        self.assertIn('item->setProperty("supported", isSwam || isKong || isKontakt || isSf2)', MAIN)
         self.assertIn('withEventListener("loadKongInstrument"', MAIN)
         self.assertIn('pluginHost.selectProgramByAliases', MAIN)
         self.assertIn("当前版本尚未支持所选音源", MAIN)

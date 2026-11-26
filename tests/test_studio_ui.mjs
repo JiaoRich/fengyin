@@ -13,7 +13,8 @@ try {
   await page.goto(new URL('../prototype/index.html',import.meta.url).href);
   const instrument={name:'SWAM Soprano Sax 3',chineseName:'高音萨克斯',instrumentKey:'soprano-sax',brand:'swam',isSwam:true,isSupported:true,pluginId:'sax'};
   const state={pluginLoaded:true,pluginLoading:false,pluginBrand:'swam',pluginName:instrument.name,instrumentKey:instrument.instrumentKey,instrumentChineseName:instrument.chineseName,
-   toneStyleId:'natural',activated:true,toneSettings:{air:0},instruments:[instrument],effects:['Test EQ','Test Compressor'],presets:[{id:'draft',name:'秘密草稿',studioDraft:true,instrumentKey:instrument.instrumentKey,brand:'swam',instrumentChineseName:instrument.chineseName}],effectChain:[]};
+   toneStyleId:'natural',activated:true,featuresUnlocked:true,toneSettings:{air:0},instruments:[instrument],effects:['Test EQ','Test Compressor'],publishedTones:[{id:'soprano-test',name:'公开高萨',kind:'package',instrumentKey:instrument.instrumentKey,styleId:'natural'}],presets:[{id:'draft',name:'秘密草稿',studioDraft:true,instrumentKey:instrument.instrumentKey,brand:'swam',instrumentChineseName:instrument.chineseName}],effectChain:[]};
+  state.presets[0].customTone=true;
   const emit=async(name,payload)=>page.evaluate(({name,payload})=>window.dispatchNative(name,payload),{name,payload});
   await emit('backendState',state);
   await page.locator('.nav-item[data-page="sounds"]').click();

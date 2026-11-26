@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Version = "1.1.47",
+    [string]$Version = "1.1.48",
     [switch]$SkipInstaller
 )
 
@@ -159,13 +159,24 @@ Invoke-Checked "主程序编译" { cmake --build $BuildDir --config Release --pa
 Invoke-Checked "激活工具编译" { cmake --build $BuildDir --config Release --target FengYinActivator --parallel }
 
 Write-Host "[3/5] 运行自动测试..." -ForegroundColor Cyan
-Invoke-Checked "自动测试" { ctest --test-dir $BuildDir -C Release --output-on-failure }
+Invoke-Checked "自动测试（完整风吟测试集）" { ctest --test-dir $BuildDir -C Release -L '^fengyin$' --output-on-failure }
 $FabFilterEvidence = Join-Path $ProjectRoot "fabfilter-install-test\first.json"
 if (-not (Test-Path -LiteralPath $FabFilterEvidence)) { throw "Missing actual FabFilter installation evidence" }
 $FabFilterPlugin = (Get-Content -LiteralPath $FabFilterEvidence -Raw | ConvertFrom-Json).plugin
 if (-not (Test-Path -LiteralPath $FabFilterPlugin)) { throw "Installed Pro-R 2 plugin is missing" }
 Invoke-Checked "60 exact package Pro-R2 Mix and full state restore" {
     & (Join-Path $BuildDir "Release\FengYinDjHostTests.exe") --reverb-plugin $FabFilterPlugin (Join-Path $BuildDir "evidence\performance-reverb")
+}
+$Sf2TestSource = Join-Path $BuildDir '音源 中文😀测试.sf2'
+Copy-Item (Join-Path $BuildDir 'sf2-fixture.sf2') $Sf2TestSource -Force
+try {
+    $env:FENGYIN_SF2_TEST_REVERB = $FabFilterPlugin
+    $env:FENGYIN_SF2_TEST_SOURCE = (Resolve-Path -LiteralPath $Sf2TestSource).Path
+    Invoke-Checked "SF2 actual private VST3, Unicode resource and Pro-R2 complete-chain restore" {
+        & (Join-Path $BuildDir 'Release\FengYinDjHostTests.exe') --sf2 (Join-Path $BuildDir 'FengYinSF2_artefacts\Release\VST3\FengYin SF2.vst3') (Join-Path $BuildDir 'sf2-fixture.sf2')
+    }
+} finally {
+    Remove-Item Env:FENGYIN_SF2_TEST_REVERB,Env:FENGYIN_SF2_TEST_SOURCE -ErrorAction SilentlyContinue
 }
 
 $ProxyInput = Join-Path $BuildDir "video-proxy-input.mp4"
@@ -192,6 +203,11 @@ New-Item -ItemType Directory -Force -Path $PackageDir | Out-Null
 $BuiltExe = Join-Path $BuildDir "FengYin_artefacts\Release\FengYin.exe"
 if (-not (Test-Path $BuiltExe)) { throw "未找到主程序编译结果：$BuiltExe" }
 Copy-Item $BuiltExe (Join-Path $PackageDir "FengYin.exe") -Force
+$Sf2Source = Join-Path (Split-Path $BuiltExe) 'components\SF2'
+if (-not (Test-Path (Join-Path $Sf2Source 'FengYin SF2.vst3\Contents\x86_64-win\FengYinSF2Probe.exe'))) { throw 'Private SF2 component incomplete' }
+New-Item -ItemType Directory -Force -Path (Join-Path $PackageDir 'components') | Out-Null
+Copy-Item -LiteralPath $Sf2Source -Destination (Join-Path $PackageDir 'components\SF2') -Recurse -Force
+
 $AudioEngineExe = Join-Path $BuildDir "Release\FengYinAudioEngine.exe"
 $AudioWatchdogExe = Join-Path $BuildDir "Release\FengYinAudioWatchdog.exe"
 if (-not (Test-Path $AudioEngineExe)) { throw "未找到独立音频引擎：$AudioEngineExe" }

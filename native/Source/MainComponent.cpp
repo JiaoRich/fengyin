@@ -1,3 +1,4 @@
+#include "../Sf2/Sf2State.h"
 #include "MainComponent.h"
 #include "RecordingPaths.h"
 #include "SimpleTechniquePolicy.h"
@@ -5,6 +6,7 @@
 #include "BinaryData.h"
 #include "KongProjectFile.h"
 #include "KongReleaseStates.h"
+#include "InstrumentDisplayName.h"
 #include <algorithm>
 #include <cstring>
 #if JUCE_WINDOWS
@@ -2109,21 +2111,18 @@ void MainComponent::timerCallback()
             const auto isSwam = brand == fengyin::SupportedInstrumentClassifier::Brand::swam;
             const auto isKong = brand == fengyin::SupportedInstrumentClassifier::Brand::kong;
             const auto isKontakt = brand == fengyin::SupportedInstrumentClassifier::Brand::kontakt;
+            const auto isSf2 = brand == fengyin::SupportedInstrumentClassifier::Brand::sf2;
             auto item = std::make_unique<juce::DynamicObject>();
             item->setProperty("name", plugin.name);
             item->setProperty("pluginId", plugin.createIdentifierString());
             item->setProperty("isSwam", isSwam);
-            item->setProperty("brand", isKong ? "kong" : isSwam ? "swam" : isKontakt ? "kontakt" : "unsupported");
-            item->setProperty("supported", isSwam || isKong || isKontakt);
-            item->setProperty("chineseName", isSwam
-                ? utf8(fengyin::SwamPluginClassifier::instrumentChineseName(plugin.name.toStdString()))
-                : isKong ? utf8("空音 Qin Engine") : plugin.name);
+            item->setProperty("brand", isKong ? "kong" : isSwam ? "swam" : isKontakt ? "kontakt" : isSf2 ? "sf2" : "unsupported");
+            item->setProperty("supported", isSwam || isKong || isKontakt || isSf2);
+            item->setProperty("chineseName", fengyin::instrumentDisplayName(plugin));
             item->setProperty("instrumentKey", isSwam
                 ? utf8(fengyin::SwamPluginClassifier::instrumentKey(plugin.name.toStdString()))
-                : isKong ? "kong-engine" : isKontakt ? "kontakt-engine" : juce::String());
-            item->setProperty("label", isSwam
-                ? utf8(fengyin::SwamPluginClassifier::instrumentChineseName(plugin.name.toStdString())) + utf8(" · ") + plugin.name
-                : isKong ? utf8("中国民乐 · ") + plugin.name : isKontakt ? plugin.name : plugin.name + utf8("（暂未支持）"));
+                : isKong ? "kong-engine" : isKontakt ? "kontakt-engine" : isSf2 ? "sf2-engine" : juce::String());
+            item->setProperty("label", fengyin::instrumentDisplayName(plugin));
             instruments.add(juce::var(item.release()));
         }
         juce::Array<juce::var> effects;
@@ -2387,8 +2386,7 @@ void MainComponent::refreshPluginChoices()
                     headingAdded = true;
                 }
                 cachedInstrumentPlugins.add(plugin);
-                pluginSelector.addItem(utf8(fengyin::SwamPluginClassifier::instrumentChineseName(plugin.name.toStdString()))
-                                       + utf8(" · ") + plugin.name, itemId++);
+                pluginSelector.addItem(fengyin::instrumentDisplayName(plugin), itemId++);
             }
     }
     bool kongHeadingAdded = false, otherHeadingAdded = false;
@@ -2406,7 +2404,7 @@ void MainComponent::refreshPluginChoices()
         {
             if (isKong && ! kongHeadingAdded)
             {
-                pluginSelector.addSectionHeading(utf8("中国民乐 · 空音"));
+                pluginSelector.addSectionHeading(utf8("民乐引擎"));
                 kongHeadingAdded = true;
             }
             else if (! isKong && ! otherHeadingAdded)
@@ -2415,8 +2413,8 @@ void MainComponent::refreshPluginChoices()
                 otherHeadingAdded = true;
             }
             cachedInstrumentPlugins.add(plugin);
-            pluginSelector.addItem(isKong ? utf8("空音 Qin Engine · ") + plugin.name
-                                          : isKontakt ? plugin.name : plugin.name + utf8("（当前版本暂未支持）"), itemId++);
+            pluginSelector.addItem(isKong || isKontakt || fengyin::SupportedInstrumentClassifier::classify(plugin.name,plugin.manufacturerName,plugin.fileOrIdentifier)==fengyin::SupportedInstrumentClassifier::Brand::sf2 ? fengyin::instrumentDisplayName(plugin)
+                                          : plugin.name + utf8("（当前版本暂未支持）"), itemId++);
         }
         if (! plugin.isInstrument && ! isKong)
         {
@@ -2432,6 +2430,7 @@ void MainComponent::refreshPluginChoices()
 
 void MainComponent::loadSelectedPlugin()
 {
+    if (sf2ResourceResolving) return;
     interruptIdleVideoPreparation();
     const auto selectedIndex = pluginSelector.getSelectedId() - 1;
     if (! juce::isPositiveAndBelow(selectedIndex, cachedInstrumentPlugins.size()))
@@ -2456,6 +2455,33 @@ void MainComponent::loadSelectedPlugin()
     }
 
     const auto brand = fengyin::SupportedInstrumentClassifier::classify(chosen.name, chosen.manufacturerName, chosen.fileOrIdentifier);
+    if (brand == fengyin::SupportedInstrumentClassifier::Brand::sf2)
+    {
+        if (pluginLoading) return;
+        pluginLoading = true;
+        const auto audioStatus = audio.getStatus();
+        pluginStatus.setText(utf8("正在准备 sf2格式音源，原音色保持可用…"), juce::dontSendNotification);
+        auto safe = juce::Component::SafePointer<MainComponent>(this);
+        pluginHost.loadAsync(chosen, audioStatus.sampleRate > 0 ? audioStatus.sampleRate : 48000,
+            audioStatus.bufferSize > 0 ? audioStatus.bufferSize : 128,
+            [safe](bool success, const juce::String& message)
+            {
+                if (!safe) return;
+                safe->pluginLoading = false;
+                if (success) {
+                    safe->currentPresetDisplayName.clear(); safe->currentPresetId.clear(); safe->currentPresetIsCustom = false;
+                    safe->currentPluginBrand = "sf2"; safe->currentInstrumentKey = "sf2-engine";
+                    safe->currentInstrumentChineseName = utf8("sf2格式音源");
+                    safe->activatePluginOutput(message);
+                } else safe->pluginStatus.setText(utf8("加载失败，原音色保留：") + message, juce::dontSendNotification);
+                if (safe->webInterface) {
+                    auto* result = new juce::DynamicObject(); result->setProperty("success", success);
+                    result->setProperty("message", success ? utf8("sf2格式音源已就绪，请打开界面选择文件") : message);
+                    safe->webInterface->emitEventIfBrowserIsVisible("pluginLoadResult", juce::var(result));
+                }
+            });
+        return;
+    }
     currentPresetDisplayName.clear();
     currentPresetId.clear();
     currentPresetIsCustom = false;
@@ -3057,6 +3083,14 @@ void MainComponent::commitCurrentPreset(const juce::String& name)
     preset.pluginIdentifier = pluginHost.getPluginIdentifier();
     preset.instrumentDescriptionXml = pluginHost.getInstrumentDescriptionXml();
     preset.instrumentState = currentPluginBrand == "kong" ? juce::MemoryBlock() : pluginHost.captureInstrumentState();
+    if (currentPluginBrand == "sf2") {
+        const auto state=fengyin::sf2::State::decode(preset.instrumentState.getData(),int(preset.instrumentState.getSize()));
+        if(!state || !state->hasResource() || !state->ready || state->error.isNotEmpty()) {
+            pluginStatus.setText(utf8("SF2 尚未就绪，请选好音源并停吹完成加载后再保存"),juce::dontSendNotification);
+            if(webInterface)webInterface->emitEventIfBrowserIsVisible("studioSaveResult",juce::String());
+            return;
+        }
+    }
     preset.effects = pluginHost.captureEffectChain();
     preset.djSource = pluginHost.getDjSource();
     preset.performanceReverb=pluginHost.usesPerformanceReverb();
@@ -3168,6 +3202,14 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
     preset.studioDraft = !publish;
     preset.instrumentDescriptionXml = pluginHost.getInstrumentDescriptionXml();
     preset.instrumentState = currentPluginBrand == "kong" ? juce::MemoryBlock() : pluginHost.captureInstrumentState();
+    if (currentPluginBrand == "sf2") {
+        const auto state=fengyin::sf2::State::decode(preset.instrumentState.getData(),int(preset.instrumentState.getSize()));
+        if(!state || !state->hasResource() || !state->ready || state->error.isNotEmpty()) {
+            pluginStatus.setText(utf8("SF2 尚未就绪，请选好音源并停吹完成加载后再保存"),juce::dontSendNotification);
+            if(webInterface)webInterface->emitEventIfBrowserIsVisible("studioSaveResult",juce::String());
+            return;
+        }
+    }
     preset.effects = pluginHost.captureEffectChain();
     preset.djSource = pluginHost.getDjSource();
     preset.performanceReverb=pluginHost.usesPerformanceReverb();
@@ -3258,9 +3300,44 @@ void MainComponent::commitCustomPreset(const juce::String& name, const juce::Str
     }
 }
 
+void MainComponent::resolveSf2Resource(const fengyin::SoundPreset& preset,const juce::File& adjacent,
+    std::function<void(bool,const juce::String&)> completion)
+{
+    const auto state=fengyin::sf2::State::decode(preset.instrumentState.getData(),int(preset.instrumentState.getSize()));
+    if(!state || !state->hasResource() || sf2ResourceResolving) {completion(false,utf8("SF2 资源无效或正在处理"));return;}
+    sf2ResourceResolving=true;
+    auto safe=juce::Component::SafePointer<MainComponent>(this);
+    const auto done=[safe,completion](bool ok,const juce::String& error) {
+        if(!safe)return;safe->sf2ResourceResolving=false;
+        juce::MessageManager::callAsync([safe]{if(safe)safe->sf2ResourceChooser.reset();});
+        completion(ok,error);
+    };
+    const auto copy=[safe,state=*state,done](juce::File source) {
+        juce::Thread::launch([safe,state,done,source] {
+            juce::String error,hash;
+            if(source.getSize()!=state.bytes || juce::SHA256(source).toHexString()!=state.hash)
+                error=utf8("所选 SF2 与原方案不一致，未替换原音源");
+            else { const auto result=fengyin::sf2::importResource(source,hash);if(result.failed())error=result.getErrorMessage(); }
+            juce::MessageManager::callAsync([safe,done,error]{if(safe)done(error.isEmpty(),error);});
+        });
+    };
+    auto source=fengyin::sf2::resourceFile(state->hash);
+    if(!source.existsAsFile() && adjacent.isDirectory())source=adjacent.getChildFile(state->hash+".sf2");
+    if(source.existsAsFile()){copy(source);return;}
+    juce::AlertWindow::showOkCancelBox(juce::MessageBoxIconType::WarningIcon,utf8("缺少 SF2 音源"),
+        utf8("此方案需要：")+state->name+utf8("。请选择原 SF2 文件，风吟将校验并复制到音源目录。原音色保持可用。"),
+        utf8("定位文件"),utf8("取消"),this,juce::ModalCallbackFunction::create([safe,copy,done](int result) {
+            if(!safe)return;if(!result){done(false,utf8("已取消，原音色保留"));return;}
+            safe->sf2ResourceChooser=std::make_unique<VideoFileChooser>(*safe,juce::File(),true);
+            safe->sf2ResourceChooser->open([copy,done](const juce::File& file) {
+                if(file.existsAsFile())copy(file);else done(false,utf8("已取消，原音色保留"));
+            },[done](const juce::String& error){done(false,error);});
+        }));
+}
+
 void MainComponent::importStudioPackage()
 {
-    if (! isActivated || ! studioUnlocked || studioImportChooser || pluginLoading || effectLoading) return;
+    if (! isActivated || ! studioUnlocked || studioImportChooser || pluginLoading || effectLoading || sf2ResourceResolving) return;
     studioImportChooser = std::make_unique<juce::FileChooser>(utf8("导入整套音色方案包"), juce::File(), "*.fytonepack");
     auto safe = juce::Component::SafePointer<MainComponent>(this);
     studioImportChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
@@ -3285,54 +3362,96 @@ void MainComponent::importStudioPackage()
             juce::String error;
             auto imported = fengyin::TonePackage::read(file, error);
             if (! imported) { reply(false, false, error, {}); return; }
+            auto finish=[safe,reply,draft=*imported](bool ready,const juce::String& error) mutable {
+                if(!safe)return;
+                if(!ready){reply(false,false,error,{});return;}
+                if(draft.pluginBrand=="sf2") {
+                    const auto base=draft.name;int suffix=1;
+                    const auto exists=[&]{for(const auto& p:safe->cachedPresets)
+                        if(p.studioDraft && p.instrumentChineseName==draft.instrumentChineseName && p.name==draft.name)return true;return false;};
+                    while(exists())draft.name=base+utf8("（导入 ")+juce::String(suffix++)+utf8("）");
+                    safe->captureToneBeforePresetEdit();
+                    safe->loadPreset(draft,[safe,draft,reply](bool loaded,const juce::String& message){
+                        if(!safe)return;
+                        if(!loaded){reply(false,false,message,{});return;}
+                        if(!safe->presetStore.save(draft)){
+                            reply(false,true,utf8("音源已就绪，但草稿写入失败；请检查磁盘空间后另存方案"),draft);return;
+                        }
+                        safe->editingPresetId=draft.id;safe->refreshPresetChoices();
+                        for(int i=0;i<safe->cachedPresets.size();++i)if(safe->cachedPresets[i].id==draft.id)
+                            safe->presetSelector.setSelectedId(i+1,juce::dontSendNotification);
+                        reply(true,true,utf8("SF2 方案包已完整导入：")+message,draft);
+                    });return;
+                }
             // Always a new draft, even when the package originated on this PC.
-            const auto originalName = imported->name;
+            const auto originalName = draft.name;
             int suffix = 1;
-            const auto exists = [&safe, &imported]
+            const auto exists = [&safe, &draft]
             {
                 for (const auto& existing : safe->cachedPresets)
-                    if (existing.studioDraft && existing.instrumentChineseName == imported->instrumentChineseName
-                        && existing.name == imported->name) return true;
+                    if (existing.studioDraft && existing.instrumentChineseName == draft.instrumentChineseName
+                        && existing.name == draft.name) return true;
                 return false;
             };
-            while (exists()) imported->name = originalName + utf8("（导入 ") + juce::String(suffix++) + utf8("）");
-            if (! safe->presetStore.save(*imported)) { reply(false, false, utf8("无法保存导入草稿，请检查磁盘空间"), {}); return; }
+            while (exists()) draft.name = originalName + utf8("（导入 ") + juce::String(suffix++) + utf8("）");
+            if (! safe->presetStore.save(draft)) { reply(false, false, utf8("无法保存导入草稿，请检查磁盘空间"), {}); return; }
             safe->refreshPresetChoices();
             safe->captureToneBeforePresetEdit();
-            safe->editingPresetId = imported->id;
+            safe->editingPresetId = draft.id;
             for (int i = 0; i < safe->cachedPresets.size(); ++i)
-                if (safe->cachedPresets.getReference(i).id == imported->id)
+                if (safe->cachedPresets.getReference(i).id == draft.id)
                     safe->presetSelector.setSelectedId(i + 1, juce::dontSendNotification);
-            safe->loadSelectedPreset([safe, preset = *imported, reply](bool loaded, const juce::String& message)
+            safe->loadSelectedPreset([safe, preset = draft, reply](bool loaded, const juce::String& message)
             {
                 if (! safe) return;
                 if (! loaded) safe->editingPresetId.clear();
                 reply(true, loaded, loaded ? utf8("方案包已导入：") + message
                     : utf8("方案已保存到草稿箱，但尚未完整加载：") + message, preset);
             });
+            };
+            if(imported->pluginBrand=="sf2")safe->resolveSf2Resource(*imported,file.getParentDirectory(),std::move(finish));
+            else finish(true,{});
         });
 }
 
 void MainComponent::exportStudioDraft(const juce::String& id)
 {
+    const auto preset=presetStore.findById(id);
+    if(!preset || !studioUnlocked || studioExportChooser || studioExportWriting)return;
+    if(preset->pluginBrand!="sf2"){exportStudioDraftFile(id,false);return;}
+    auto safe=juce::Component::SafePointer<MainComponent>(this);
+    juce::AlertWindow::showYesNoCancelBox(juce::MessageBoxIconType::QuestionIcon,utf8("导出 SF2 方案"),
+        utf8("是否连同 SF2 音源文件一起导出？请确保拥有该音源的转移或分发权限。"),
+        utf8("连同音源"),utf8("仅导出方案"),utf8("取消"),this,
+        juce::ModalCallbackFunction::create([safe,id](int result){if(safe && result) safe->exportStudioDraftFile(id,result==1);}));
+}
+
+void MainComponent::exportStudioDraftFile(const juce::String& id,bool withResource)
+{
     auto preset = presetStore.findById(id);
-    if (! preset || ! studioUnlocked || studioExportChooser) return;
+    if (! preset || ! studioUnlocked || studioExportChooser || studioExportWriting) return;
     studioExportChooser = std::make_unique<juce::FileChooser>(utf8("导出方案包（插件安装文件另行分发）"),
         juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
-            .getChildFile(juce::File::createLegalFileName(preset->instrumentChineseName + "-" + preset->name) + ".fytonepack"),
-        "*.fytonepack", true, false, this);
+            .getChildFile(juce::File::createLegalFileName(preset->instrumentChineseName + "-" + preset->name) + (withResource ? ".zip" : ".fytonepack")),
+        withResource ? "*.zip" : "*.fytonepack", true, false, this);
     auto safe = juce::Component::SafePointer<MainComponent>(this);
     studioExportChooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
         | juce::FileBrowserComponent::warnAboutOverwriting,
-        [safe, preset = *preset](const juce::FileChooser& chooser)
+        [safe, preset = *preset,withResource](const juce::FileChooser& chooser)
         {
             if (! safe) return;
             const auto file = chooser.getResult();
             if (file != juce::File())
             {
-                const bool ok = fengyin::TonePackage::write(preset, file);
-                if (safe->webInterface) safe->webInterface->emitEventIfBrowserIsVisible("studioExportResult",
-                    ok ? utf8("方案包已导出，含完整状态、效果链和插件依赖清单；插件安装文件单独收集") : utf8("导出失败，原文件未覆盖"));
+                safe->studioExportWriting=true;
+                juce::Thread::launch([safe,preset,file,withResource] {
+                    const bool ok=withResource ? fengyin::TonePackage::writeWithSf2(preset,file) : fengyin::TonePackage::write(preset,file);
+                    juce::MessageManager::callAsync([safe,ok,withResource] {
+                        if(safe)safe->studioExportWriting=false;
+                        if(safe && safe->webInterface)safe->webInterface->emitEventIfBrowserIsVisible("studioExportResult",
+                            ok ? (withResource ? utf8("方案和音源已导出；解压后导入其中的方案包") : utf8("方案包已导出，目标电脑需有对应音源")) : utf8("导出失败，原文件未覆盖"));
+                    });
+                });
             }
             juce::MessageManager::callAsync([safe] { if (safe) safe->studioExportChooser.reset(); });
         });
@@ -3643,7 +3762,7 @@ void MainComponent::restoreToneBeforePresetEdit()
 
 void MainComponent::loadSelectedPreset(std::function<void(bool, const juce::String&)> completion)
 {
-    if (pluginLoading)
+    if (pluginLoading || sf2ResourceResolving)
     {
         if (completion) completion(false, utf8("音源正在加载，请稍候，不要重复点击"));
         return;
@@ -3662,7 +3781,7 @@ void MainComponent::loadPreset(fengyin::SoundPreset preset,
                               std::function<void(bool, const juce::String&)> completion)
 {
     interruptIdleVideoPreparation();
-    if (pluginLoading)
+    if (pluginLoading || sf2ResourceResolving)
     {
         if (completion) completion(false, utf8("音源正在加载，请稍候，不要重复点击"));
         return;
@@ -3792,6 +3911,37 @@ void MainComponent::loadPreset(fengyin::SoundPreset preset,
         if (completion) completion(false, error);
         return;
     }
+    if (preset.pluginBrand == "sf2")
+    {
+        const auto state = fengyin::sf2::State::decode(initialContainerState.getData(), int(initialContainerState.getSize()));
+        if (!state || !state->hasResource()) { if (completion) completion(false, utf8("SF2 方案缺少完整音源状态")); return; }
+        if(!fengyin::sf2::resourceFile(state->hash).existsAsFile()) {
+            auto safe=juce::Component::SafePointer<MainComponent>(this);
+            resolveSf2Resource(preset,{},[safe,preset,completion](bool ready,const juce::String& error) {
+                if(!safe)return;
+                if(!ready){if(completion)completion(false,error);return;}
+                safe->loadPreset(preset,completion);
+            });return;
+        }
+        pluginLoading = true;
+        pluginStatus.setText(utf8("正在准备 SF2 方案，停吹后切换…"), juce::dontSendNotification);
+        auto safe = juce::Component::SafePointer<MainComponent>(this);
+        pluginHost.loadAsync(chosen, status.sampleRate > 0 ? status.sampleRate : 48000,
+            status.bufferSize > 0 ? status.bufferSize : 128, initialContainerState,
+            [safe,preset,completion=reportCompletion](bool success,const juce::String& message) {
+                if (!safe) return;
+                safe->pluginLoading=false;
+                if (!success) {
+                    safe->pluginStatus.setText(utf8("SF2 加载失败，原音色保留：")+message,juce::dontSendNotification);
+                    if(completion)completion(false,message);return;
+                }
+                safe->currentPluginBrand="sf2";safe->currentInstrumentKey=preset.instrumentKey;
+                safe->currentInstrumentChineseName=preset.instrumentChineseName;
+                safe->activatePluginOutput(message,false,false);
+                safe->completeLoadedPreset(preset,completion);
+            },false,false,fengyin::PluginHostEngine::Sf2LoadOptions{preset.effects,preset.performanceReverb,preset.reverbMix});
+        return;
+    }
     currentPluginBrand = preset.pluginBrand;
     currentInstrumentKey = preset.instrumentKey;
     currentInstrumentChineseName = preset.instrumentChineseName;
@@ -3878,6 +4028,13 @@ void MainComponent::completeLoadedPreset(const fengyin::SoundPreset& preset,
     }
     if(currentPluginBrand=="swam" && !preset.djSource.enabled) pluginHost.applyStandardSwamExpressionCurve(false, preset.swamBreathGrowl);
     pluginStatus.setText(utf8("已恢复音色：") + preset.name, juce::dontSendNotification);
+    if(currentPluginBrand=="sf2") {
+        // The SF2 transaction already prepared and committed the exact chain.
+        // Do not reload effects after replacing the previously audible graph.
+        pluginLoading=false;
+        if(completion)completion(true,utf8("SF2 完整方案已恢复"));
+        return;
+    }
     juce::Logger::writeToLog("Preset parameters restored; restoring effect chain");
     pluginLoading = true;
     if(preset.performanceReverb)midi.setPerformanceSink(nullptr);
@@ -3914,13 +4071,14 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName, bool ap
     if (brand == fengyin::SupportedInstrumentClassifier::Brand::kong) currentPluginBrand = "kong";
     else if (brand == fengyin::SupportedInstrumentClassifier::Brand::swam) currentPluginBrand = "swam";
     else if (brand == fengyin::SupportedInstrumentClassifier::Brand::kontakt) currentPluginBrand = "kontakt";
+    else if (brand == fengyin::SupportedInstrumentClassifier::Brand::sf2) currentPluginBrand = "sf2";
     else if (currentPluginBrand.isEmpty()) currentPluginBrand = "swam";
     const auto hasContainerInstrumentIdentity = currentInstrumentKey.startsWith("container:");
     if (currentPluginBrand == "kontakt") {
         if (!currentInstrumentKey.startsWith("kontakt") && !currentInstrumentKey.startsWith("container:kontakt:")) currentInstrumentKey="kontakt-engine";
         currentInstrumentChineseName=currentInstrumentKey=="kontakt-kensa"?utf8("肯萨"):utf8("Kontakt音源");
     }
-    if (currentPluginBrand != "kontakt" && (currentPluginBrand == "swam" || currentInstrumentKey.isEmpty()
+    if (currentPluginBrand != "sf2" && currentPluginBrand != "kontakt" && (currentPluginBrand == "swam" || currentInstrumentKey.isEmpty()
         || (! currentInstrumentKey.startsWith("kong-") && ! hasContainerInstrumentIdentity
             && currentInstrumentKey != "container-draft")))
     {
@@ -3958,7 +4116,13 @@ void MainComponent::activatePluginOutput(const juce::String& pluginName, bool ap
         case fengyin::SwamFamily::notSwam:
         case fengyin::SwamFamily::other:     masterOutput.setInstrumentProfile(fengyin::InstrumentMixProfile::generic); break;
     }
-    const auto defaultStyle = fengyin::ToneStyleCatalog::find(currentInstrumentKey, "natural");
+    auto defaultStyle = fengyin::ToneStyleCatalog::find(currentInstrumentKey, "natural");
+    if (currentPluginBrand == "sf2") {
+        defaultStyle.settings = {};
+        defaultStyle.settings.warmth=0;defaultStyle.settings.reverbMix=0;
+        defaultStyle.settings.compressionThreshold=1;defaultStyle.settings.compressionRatio=1;
+        defaultStyle.settings.saturation=0;defaultStyle.settings.harshControl=0;
+    }
     currentToneStyleId = defaultStyle.id;
     currentBaseToneSettings = defaultStyle.settings;
     masterOutput.setToneStyle(defaultStyle.settings);
@@ -4010,8 +4174,16 @@ void MainComponent::applyInstrumentBendRange(bool preservePluginState)
     if (currentPluginBrand == "swam") pluginHost.applyExpressionAttackControl();
     bendRangeApplied = false;
     bendRangeRemembered = false;
-    bendRange = currentPluginBrand == "kong" ? 3 : 1;
+    bendRange = currentPluginBrand == "kong" ? 3 : currentPluginBrand == "sf2" ? 2 : 1;
     if (! pluginHost.hasPlugin() || currentInstrumentKey.isEmpty()) return;
+    if(currentPluginBrand=="sf2") {
+        // SF2 range belongs to the saved preset, not a shared player preference.
+        const auto bytes=pluginHost.captureInstrumentState();
+        if(const auto state=fengyin::sf2::State::decode(bytes.getData(),int(bytes.getSize()))) {
+            bendRange=state->bend;bendRangeApplied=bendRange>=1 && bendRange<=4;
+        }
+        return;
+    }
     if (preservePluginState)
     {
         const auto savedRange = pluginHost.getBendRange();
@@ -4038,11 +4210,15 @@ void MainComponent::changeInstrumentBendRange(const juce::var& payload)
     if (! pluginHost.hasPlugin() || payload.getProperty("key", {}).toString() != bendPreferenceKey())
     { reply(false, utf8("当前乐器已切换，请重新设置。")); return; }
     const bool reset = static_cast<bool>(payload.getProperty("reset", false));
-    const auto desired = reset ? (currentPluginBrand == "kong" ? 3 : 1)
+    const auto desired = reset ? (currentPluginBrand == "kong" ? 3 : currentPluginBrand == "sf2" ? 2 : 1)
                               : static_cast<int>(payload.getProperty("value", 0));
     if (desired < 1 || desired > 4) return;
     if (! pluginHost.setBendRange(desired))
     { reply(false, utf8("当前音源未提供可验证的弯音范围参数，未保存修改；请在原厂界面设置。")); return; }
+    if(currentPluginBrand=="sf2") {
+        bendRange=desired;bendRangeApplied=true;bendRangeRemembered=false;
+        reply(true,utf8("已调整弯音范围，请保存音色方案以保留修改"));return;
+    }
     auto values = readBendPreferences();
     if (reset) values.getDynamicObject()->removeProperty(bendPreferenceKey());
     else values.getDynamicObject()->setProperty(bendPreferenceKey(), desired);
