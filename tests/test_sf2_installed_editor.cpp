@@ -90,7 +90,7 @@ int main() {
         juce::String error;auto plugin=manager.createPluginInstance(*descriptions[0],48000,128,error);
         require(plugin!=nullptr,error.toRawUTF8());plugin->prepareToPlay(48000,128);render(*plugin,{},2);
         juce::DocumentWindow window("Installed SF2 regression",juce::Colours::black,juce::DocumentWindow::allButtons);
-        window.setUsingNativeTitleBar(true);window.setContentOwned(plugin->createEditor(),true);window.centreWithSize(650,450);window.setVisible(true);window.toFront(true);pump(600);
+        window.setUsingNativeTitleBar(true);window.setContentOwned(plugin->createEditorIfNeeded(),true);window.centreWithSize(650,450);window.setVisible(true);window.toFront(true);pump(600);
         if(args.contains("--expect-picker-failure")) {
             clickChoose(window);
             const auto hwnd=static_cast<HWND>(window.getPeer()->getNativeHandle());
