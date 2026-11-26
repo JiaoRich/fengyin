@@ -28,6 +28,7 @@ target_link_libraries(FengYin PRIVATE juce::juce_audio_utils juce::juce_cryptogr
 include(cmake/FengYinSf2.cmake)
 '@ | Set-Content "$src/CMakeLists.txt" -Encoding utf8
 # Compile the exact released editor in the real DLL, not an equivalent test stub.
+Checked {git fetch --depth=1 origin afa674127fc90edc2356724d6f5048c58b9741bb}
 $released=git show 'afa674127fc90edc2356724d6f5048c58b9741bb:native/Sf2/Sf2Editor.cpp'
 if($LASTEXITCODE){throw 'Cannot read released editor baseline'}
 $released | Set-Content "$src/native/Sf2/Sf2Editor.cpp" -Encoding utf8
