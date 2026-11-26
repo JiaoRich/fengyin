@@ -1,9 +1,13 @@
 name: Windows 编译与安装包
-run-name: ${{ inputs.bluetooth_midi_test && 'Windows Bluetooth MIDI regression check' || inputs.midi_input_test && 'Windows MIDI receive regression check' || inputs.vc_runtime_test && 'Windows VC runtime prerequisite check' || inputs.native_video_picker_test && 'Windows native video picker check' || inputs.screen_capture_probe && 'Windows isolated GPU recording candidate' || inputs.diagnostic_only && 'Windows diagnostic collectors only' || inputs.media_runtime_test && 'Windows media performance runtime (no installer)' || inputs.vlc_webview_test && 'Windows VLC WebView interaction diagnostic' || inputs.media_integration_test && 'Windows media integration diagnostic' || inputs.native_window_test && 'Windows native input diagnostic' || 'Windows build and installer' }}
+run-name: ${{ inputs.sf2_installed_test && 'Windows SF2 installed component regression' || inputs.bluetooth_midi_test && 'Windows Bluetooth MIDI regression check' || inputs.midi_input_test && 'Windows MIDI receive regression check' || inputs.vc_runtime_test && 'Windows VC runtime prerequisite check' || inputs.native_video_picker_test && 'Windows native video picker check' || inputs.screen_capture_probe && 'Windows isolated GPU recording candidate' || inputs.diagnostic_only && 'Windows diagnostic collectors only' || inputs.media_runtime_test && 'Windows media performance runtime (no installer)' || inputs.vlc_webview_test && 'Windows VLC WebView interaction diagnostic' || inputs.media_integration_test && 'Windows media integration diagnostic' || inputs.native_window_test && 'Windows native input diagnostic' || 'Windows build and installer' }}
 
 on:
   workflow_dispatch:
     inputs:
+      sf2_installed_test:
+        description: Test the installed SF2 DLL editor and actual release scan entry
+        type: boolean
+        default: false
       midi_input_test:
         description: Compare prior/current MIDI test fixtures at the default Windows stack size
         type: boolean
@@ -65,6 +69,12 @@ permissions:
   contents: read
 
 jobs:
+  sf2-installed-check:
+    if: ${{ inputs.sf2_installed_test }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/sf2-installed-check.yml
   midi-input-check:
     if: ${{ inputs.midi_input_test }}
     runs-on: windows-2022
@@ -562,7 +572,7 @@ jobs:
           name: FengYin-Crash-Capture
           path: diagnostic/FengYin-Crash-Capture.zip
   windows-release:
-    if: ${{ !inputs.midi_input_test && !inputs.vc_runtime_test && !inputs.native_video_picker_test && !inputs.bluetooth_midi_test && !inputs.screen_capture_probe && !inputs.media_runtime_test && !inputs.vlc_webview_test && !inputs.media_integration_test && !inputs.diagnostic_only && !inputs.startup_comparison && !inputs.kong_test && !inputs.native_window_test }}
+    if: ${{ !inputs.sf2_installed_test && !inputs.midi_input_test && !inputs.vc_runtime_test && !inputs.native_video_picker_test && !inputs.bluetooth_midi_test && !inputs.screen_capture_probe && !inputs.media_runtime_test && !inputs.vlc_webview_test && !inputs.media_integration_test && !inputs.diagnostic_only && !inputs.startup_comparison && !inputs.kong_test && !inputs.native_window_test }}
     name: Windows x64 Release
     runs-on: windows-2022
     timeout-minutes: 60
