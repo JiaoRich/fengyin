@@ -43,15 +43,21 @@ Checked {python "$root/tests/create_sf2_fixture.py" $fixture}
 $exe=Join-Path $isolated 'FengYin.exe'
 if(!(Test-Path -LiteralPath $exe)){throw 'Built regression executable missing'}
 $plugin=Join-Path $isolated 'components/SF2/FengYin SF2.vst3'
+$oldHash=(Get-FileHash "$plugin/Contents/x86_64-win/FengYin SF2.vst3" -Algorithm SHA256).Hash
 $neutral=Join-Path $work 'neutral-working-directory'
 New-Item -ItemType Directory -Force -Path $neutral | Out-Null
 Push-Location $neutral
 try {
     Checked {& $exe $plugin $fixture --expect-picker-failure}
 } finally {Pop-Location}
-Copy-Item "$root/native/Sf2/Sf2Editor.cpp" "$src/native/Sf2/Sf2Editor.cpp" -Force
+Get-Content "$root/native/Sf2/Sf2Editor.cpp" -Raw | Set-Content "$src/native/Sf2/Sf2Editor.cpp" -Encoding utf8
 Checked {cmake --build "$work/build" --config Release --target FengYin --parallel 4}
 Copy-Item "$built/*" $isolated -Recurse -Force
+# The host EXE may be up to date, so its POST_BUILD copy need not rerun.
+$freshBundle=Join-Path $work 'build/FengYinSF2_artefacts/Release/VST3/FengYin SF2.vst3'
+Copy-Item "$freshBundle/*" $plugin -Recurse -Force
+$newHash=(Get-FileHash "$plugin/Contents/x86_64-win/FengYin SF2.vst3" -Algorithm SHA256).Hash
+if($newHash -eq $oldHash){throw 'Repaired DLL was not rebuilt; refusing stale payload'}
 Push-Location $neutral
 try { Checked {& $exe $plugin $fixture} } finally {Pop-Location}
 # Test the shipped application's scan entry, outside the build tree/CWD.
