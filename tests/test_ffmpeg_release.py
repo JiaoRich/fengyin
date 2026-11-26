@@ -12,6 +12,33 @@ spec.loader.exec_module(ffmpeg)
 
 
 class FfmpegReleaseTests(unittest.TestCase):
+    def setUp(self):
+        # Cache/network tests isolate the checked-in archive path.
+        patch = mock.patch.object(ffmpeg, "PINNED_PARTS", ())
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def test_clean_build_uses_exact_archive_without_network(self):
+        parts=tuple(Path(__file__).resolve().parents[1]/"third_party/ffmpeg/pinned"/f"ffmpeg-8.1.3-34-lgpl-shared.zip.{i:03}" for i in range(1,11))
+        with tempfile.TemporaryDirectory() as temp, mock.patch.object(ffmpeg,"PINNED_PARTS",parts), mock.patch.object(ffmpeg.urllib.request,"urlopen",side_effect=AssertionError("must not use network")):
+            archive=ffmpeg.resolve_archive(Path(temp))
+            ffmpeg.verify_archive(archive,ffmpeg.ARCHIVE_SHA256)
+            self.assertFalse(archive.with_suffix(".part").exists())
+
+    def test_corrupt_pinned_archive_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            part=Path(temp)/"bad.part";part.write_bytes(b"corrupt")
+            with mock.patch.object(ffmpeg,"PINNED_PARTS",(part,)), mock.patch.object(ffmpeg.urllib.request,"urlopen",side_effect=AssertionError("must not use network")):
+                with self.assertRaises(ValueError):ffmpeg.resolve_archive(Path(temp)/"cache")
+            self.assertFalse(list((Path(temp)/"cache").glob("*.part")))
+
+    def test_missing_pinned_chunk_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            part=Path(temp)/"valid.part";part.write_bytes(b"x"*(8*1024*1024))
+            with mock.patch.object(ffmpeg,"PINNED_PARTS",(part,Path(temp)/"absent.part")), mock.patch.object(ffmpeg.urllib.request,"urlopen",side_effect=AssertionError("must not use network")):
+                with self.assertRaises(OSError):ffmpeg.resolve_archive(Path(temp)/"cache")
+            self.assertFalse(list((Path(temp)/"cache").glob("*.part")))
+
     def test_api_request_uses_github_token_when_available(self):
         previous = os.environ.get("GITHUB_TOKEN")
         try:

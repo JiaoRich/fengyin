@@ -9,13 +9,14 @@ import zipfile
 
 
 # Pin the same FFmpeg 8.1.3-34 source revision used before 1.1.47.
-# The November 6 daily archive expired under upstream retention policy.
-# A verified content-addressed CI cache avoids requiring that tag on every build.
+# Upstream daily archives expire and CI caches are scoped to branches.
+# Keep the exact verified release archive available for clean/offline builds.
 REPOSITORY = "FFmpeg-Builds/FFmpeg-Builds"
 RELEASE_TAG = "autobuild-2026-11-10-12-39"
 API = f"https://api.github.com/repos/{REPOSITORY}/releases/tags/{RELEASE_TAG}"
 ASSET = "ffmpeg-n8.1.3-34-ga35157abb9-win64-lgpl-shared-8.1.zip"
 ARCHIVE_SHA256 = "3045c2213ed8cbb05edf0d5a631b4490061de3b7567ec145644156e7c98da2c6"
+PINNED_PARTS = tuple((Path(__file__).resolve().parents[1] / "third_party/ffmpeg/pinned" / f"ffmpeg-8.1.3-34-lgpl-shared.zip.{i:03}") for i in range(1, 11))
 
 
 def github_api_headers():
@@ -59,6 +60,21 @@ def resolve_archive(cache):
             return archive
         except ValueError:
             archive.unlink()
+    if any(part.exists() for part in PINNED_PARTS):
+        partial = archive.with_suffix(".part")
+        try:
+            with partial.open("wb") as output:
+                for index, part in enumerate(PINNED_PARTS):
+                    size = part.stat().st_size
+                    if size <= 0 or size > 8 * 1024 * 1024 or (index < len(PINNED_PARTS)-1 and size != 8*1024*1024):
+                        raise ValueError("Pinned FFmpeg archive chunk is incomplete")
+                    with part.open("rb") as source:
+                        shutil.copyfileobj(source, output, 1024 * 1024)
+            verify_archive(partial, ARCHIVE_SHA256)
+            partial.replace(archive)
+            return archive
+        finally:
+            partial.unlink(missing_ok=True)
     request = urllib.request.Request(API, headers=github_api_headers())
     with urllib.request.urlopen(request, timeout=60) as response:
         release = json.load(response)
