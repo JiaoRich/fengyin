@@ -91,10 +91,14 @@ if(BUILD_TESTING)
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/create_sf2_fixture.py" "${CMAKE_BINARY_DIR}/sf2-fixture.sf2"
         DEPENDS tests/create_sf2_fixture.py)
     add_custom_target(FengYinSf2Fixture DEPENDS "${CMAKE_BINARY_DIR}/sf2-fixture.sf2")
-    add_dependencies(FengYinSf2VoiceTests FengYinSf2Fixture)
+    add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/sf2-fast-attack.sf2"
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/create_sf2_fixture.py" "${CMAKE_BINARY_DIR}/sf2-fast-attack.sf2" --fast-attack
+        DEPENDS tests/create_sf2_fixture.py)
+    add_custom_target(FengYinSf2FastAttackFixture DEPENDS "${CMAKE_BINARY_DIR}/sf2-fast-attack.sf2")
+    add_dependencies(FengYinSf2VoiceTests FengYinSf2Fixture FengYinSf2FastAttackFixture)
     target_sources(FengYinDjHostTests PRIVATE tests/test_sf2_host.cpp)
     add_dependencies(FengYinDjHostTests FengYinSF2_VST3 FengYinSf2Fixture)
-    add_test(NAME sf2_voice_pcm COMMAND FengYinSf2VoiceTests "${CMAKE_BINARY_DIR}/sf2-fixture.sf2")
+    add_test(NAME sf2_voice_pcm COMMAND FengYinSf2VoiceTests "${CMAKE_BINARY_DIR}/sf2-fixture.sf2" "${CMAKE_BINARY_DIR}/sf2-fast-attack.sf2")
     add_test(NAME sf2_production_host COMMAND FengYinDjHostTests --sf2
         "$<GENEX_EVAL:$<TARGET_PROPERTY:FengYinSF2_VST3,JUCE_PLUGIN_ARTEFACT_FILE>>" "${CMAKE_BINARY_DIR}/sf2-fixture.sf2")
     set_tests_properties(sf2_production_host PROPERTIES TIMEOUT 120)

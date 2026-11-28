@@ -14,7 +14,7 @@ public:
         title.setText(juce::String::fromUTF8("sf2格式音源"), juce::dontSendNotification);
         title.setFont(juce::FontOptions(22.f));
         status.setJustificationType(juce::Justification::centredLeft);
-        detail.setText(juce::String::fromUTF8("气息：CC11 · MIDI 通道：1\n混响与其他效果可在调音师效果链中添加。"), juce::dontSendNotification);
+        detail.setText(juce::String::fromUTF8("气息连续控制强弱 · 柔和起音\nCC11 · 通道 1 · 混响可在调音师效果链中添加。"), juce::dontSendNotification);
         choose.setButtonText(juce::String::fromUTF8("选择 SF2 文件"));
         cancel.setButtonText(juce::String::fromUTF8("取消加载"));
         presetBox.setTextWhenNothingSelected(juce::String::fromUTF8("请选择音色预设"));

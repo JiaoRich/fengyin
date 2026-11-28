@@ -4,7 +4,7 @@
 
 int main(int argc, char** argv)
 {
-    if (argc != 2) return 2;
+    if (argc != 2 && argc != 3) return 2;
     int failures = 0;
     auto check = [&](bool ok, const char* reason) { if (!ok) { ++failures; std::cerr << reason << '\n'; } };
     for (double rate : {44100., 48000., 96000.}) for (int block : {64, 128, 480, 512})
@@ -53,6 +53,35 @@ int main(int argc, char** argv)
         send(0xb0,64,127);send(0x90,69,90);send(0x80,69,0);
         check(level()>.001,"Sustain preserves released note");
         send(0xb0,64,0);check(level()<.00001,"Sustain release stops note");
+        // Each phrase can begin at velocity 1; changing breath later must
+        // recover full expression without requiring another note.
+        double reference = 0;
+        for (int velocity : {100,1,5,20,64,127,1}) {
+            voice.reset(); send(0x90,69,velocity);
+            check(level()==0,"No breath means exact silence");
+            send(0xb0,11,100); const auto full=level();
+            if (!reference) reference=full;
+            check(std::abs(full-reference)<reference*.02,"Attack velocity cannot lock wind amplitude");
+            send(0xb0,11,50); const auto half=level();
+            check(std::abs(half/full-.5)<.02,"Single linear breath amplitude, no double attenuation");
+            send(0xb0,11,1);check(level()>0,"No positive breath threshold gate");
+            send(0xb0,11,0);check(level()==0,"Held phrase reaches exact silence");
+            send(0x80,69,0);check(level()==0,"Stopped phrase remains silent");
+        }
+    }
+    if (argc == 3) for (double rate : {44100.,48000.,96000.}) {
+        fengyin::sf2::Voice v(rate);v.load(argv[2]);check(v.select(0,0),"Fast attack fixture");
+        auto send=[&](int s,int a,int b){unsigned char d[]{(unsigned char)s,(unsigned char)a,(unsigned char)b};v.midi(d,3);};
+        std::vector<float> l(size_t(rate/10)),r(l.size());
+        send(0xb0,11,127);v.render(l.data(),r.data(),int(l.size())); // settled breath before note
+        send(0x90,69,127);v.render(l.data(),r.data(),int(l.size()));
+        auto rms=[&](int a,int b){double e=0;for(int i=a;i<b;++i)e+=l[size_t(i)]*l[size_t(i)];return std::sqrt(e/(b-a));};
+        const auto onset=rms(0,int(rate*.002)),steady=rms(int(rate*.05),int(rate*.09));
+        std::cout<<"SF2 softened onset rate="<<rate<<" first2ms/steady="<<onset/steady<<'\n';
+        check(onset<steady*.4 && steady>.001,"Fast sample gets bounded soft onset, no missing note");
+        // A new legato note does not reapply a phrase-wide attack to the old voice.
+        send(0x90,71,100);v.render(l.data(),r.data(),int(l.size()));
+        check(rms(0,int(rate*.002))>steady*.5,"Legato does not dip the existing voice");
     }
     std::cout << "SF2 PCM tests failures=" << failures << '\n';
     return failures ? 1 : 0;

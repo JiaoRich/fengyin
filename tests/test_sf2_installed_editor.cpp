@@ -109,6 +109,27 @@ int main() {
         const auto zeroRms=std::sqrt(zero/(119.0*2.0*128.0));
         std::cout<<"PCM measured strong="<<strong<<" weak="<<weak<<" zero="<<zero<<" zeroRMS="<<zeroRms<<std::endl;
         require(strong>0.001 && weak>0 && weak<strong*.8 && zeroRms<1e-6 && zero<strong*1e-8,"real selected SF2 CC11 PCM response wrong");
+        double reference=0;
+        for (int velocity : {100,1,2,5,20,64,127,1}) {
+            juce::MidiBuffer release;
+            release.addEvent(juce::MidiMessage::controllerEvent(1,11,0),0);
+            release.addEvent(juce::MidiMessage::controllerEvent(1,120,0),0);
+            render(*plugin,release,40);
+            juce::MidiBuffer first;
+            first.addEvent(juce::MidiMessage::noteOn(1,69,juce::uint8(velocity)),0);
+            require(render(*plugin,first,40)==0,"first note without breath leaks");
+            const auto rising=render(*plugin,cc(100),240);
+            if(!reference)reference=rising;
+            require(rising>reference*.98 && rising<reference*1.02,"low attack velocity locked first-note volume");
+            const auto half=render(*plugin,cc(50),240);
+            require(half>rising*.23 && half<rising*.27,"SF2 breath is double attenuated");
+            juce::MidiBuffer legato;
+            legato.addEvent(juce::MidiMessage::noteOn(1,71,juce::uint8(1)),0);
+            legato.addEvent(juce::MidiMessage::noteOff(1,69),0);
+            require(render(*plugin,legato,240)>half*.5,"low-velocity legato silent");
+            require(render(*plugin,cc(0),240)==0,"phrase fails to reach silence");
+        }
+        std::cout<<"PASS dynamic Windows SF2 every-phrase low-velocity first note / late breath / legato / linear response / exact zero\n";
         juce::MemoryBlock saved;plugin->getStateInformation(saved);
         selectFile(window,source,true);require(stateOf(*plugin)->hash==selected->hash,"cancel lost loaded resource");
         if(auto stream=juce::File::getCurrentWorkingDirectory().getChildFile("sf2-installed-editor.png").createOutputStream())

@@ -1,6 +1,7 @@
 #include "PluginHostEngine.h"
 #include "TonePackage.h"
 #include "InstrumentDisplayName.h"
+#include "MidiInputService.h"
 #include "../native/Sf2/Sf2State.h"
 #include <cassert>
 #include <iostream>
@@ -112,6 +113,35 @@ void testSf2Host(const juce::String& pluginPath,const juce::File& source)
  host->noteOn(71,.8f,stamp());host->noteOff(69,stamp());host->breathChanged(.3f,stamp());
  const auto soft=Sf2HostTestAccess::render(*host);assert(soft<loud*.5 && soft>0);
  host->breathChanged(0,stamp());host->noteOff(71,stamp());assert(Sf2HostTestAccess::render(*host)<loud*.00001);
+ // A wind controller can send a very low attack velocity before breath rises.
+ // Exercise the real input service, collector, graph and dynamically loaded
+ // VST3: the first note of EVERY phrase must follow later breath, not retain
+ // the near-zero attack volume for its entire lifetime.
+ {
+    auto input=std::make_unique<MidiInputService>(false);
+    input->attachExternal("sf2-response-test","Test wind controller");
+    input->setBreathController(2);input->setPerformanceSink(host.get());
+    auto send=[&](juce::MidiMessage m){m.setTimeStamp(stamp());input->acceptExternalMessage(m);};
+    double reference=0;
+    for(int velocity : {100,1,2,5,20,64,127,1}) {
+        send(juce::MidiMessage::controllerEvent(1,2,0));
+        send(juce::MidiMessage::noteOn(1,69,juce::uint8(velocity)));
+        assert(Sf2HostTestAccess::render(*host,20)<1e-8);
+        send(juce::MidiMessage::controllerEvent(1,2,100));
+        const auto first=Sf2HostTestAccess::render(*host);
+        if(!reference)reference=first;
+        std::cout<<"SF2 full input first note: velocity="<<velocity<<" energy="<<first<<" ratio="<<first/reference<<std::endl;
+        assert(first>reference*.95 && first<reference*1.05);
+        send(juce::MidiMessage::noteOn(1,71,juce::uint8(100)));
+        send(juce::MidiMessage::noteOff(1,69));
+        send(juce::MidiMessage::controllerEvent(1,2,25));
+        const auto weaker=Sf2HostTestAccess::render(*host);assert(weaker>0 && weaker<first*.5);
+        send(juce::MidiMessage::controllerEvent(1,2,0));
+        send(juce::MidiMessage::noteOff(1,71));
+        assert(Sf2HostTestAccess::render(*host)<first*1e-8);
+    }
+    input->setPerformanceSink(nullptr);
+ }
  captured=host->captureInstrumentState();decoded=sf2::State::decode(captured.getData(),int(captured.getSize()));assert(decoded&&decoded->ready);
  SoundPreset preset;preset.id=juce::Uuid().toString();preset.name="SF2 roundtrip";preset.pluginBrand="sf2";preset.instrumentKey="sf2-engine";
  preset.instrumentChineseName=juce::String::fromUTF8("测试笛");preset.pluginIdentifier=description.createIdentifierString();

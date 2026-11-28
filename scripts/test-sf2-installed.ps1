@@ -8,7 +8,7 @@ foreach($name in @('native','tests','cmake','third_party')) { New-Item -ItemType
 Copy-Item "$root/native/Sf2" "$src/native/Sf2" -Recurse -Force
 New-Item -ItemType Directory -Force -Path "$src/native/Source" | Out-Null
 foreach($name in @('VideoFileChooser.h','NativeVideoFileDialog.h','VideoHostRendering.h')) {Copy-Item "$root/native/Source/$name" "$src/native/Source/$name" -Force}
-foreach($name in @('test_sf2_installed_editor.cpp','NativeVideoDialogInput.h')) {Copy-Item "$root/tests/$name" "$src/tests/$name" -Force}
+foreach($name in @('test_sf2_installed_editor.cpp','NativeVideoDialogInput.h','test_sf2_voice.cpp')) {Copy-Item "$root/tests/$name" "$src/tests/$name" -Force}
 Copy-Item "$root/cmake/FengYinSf2.cmake" "$src/cmake/FengYinSf2.cmake" -Force
 Copy-Item "$root/third_party/sf2" "$src/third_party/sf2" -Recurse -Force
 @'
@@ -26,6 +26,11 @@ target_sources(FengYin PRIVATE tests/test_sf2_installed_editor.cpp)
 target_compile_definitions(FengYin PRIVATE JUCE_MODAL_LOOPS_PERMITTED=1 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_PLUGINHOST_VST3=1)
 target_link_libraries(FengYin PRIVATE juce::juce_audio_utils juce::juce_cryptography ole32 oleaut32 shell32 uuid uiautomationcore)
 include(cmake/FengYinSf2.cmake)
+add_executable(Sf2WindResponse tests/test_sf2_voice.cpp)
+target_include_directories(Sf2WindResponse PRIVATE native/Sf2)
+target_link_libraries(Sf2WindResponse PRIVATE libfluidsynth)
+add_custom_command(TARGET Sf2WindResponse POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    $<TARGET_FILE:libfluidsynth> $<TARGET_FILE_DIR:Sf2WindResponse>)
 '@ | Set-Content "$src/CMakeLists.txt" -Encoding utf8
 # Compile the exact released editor in the real DLL, not an equivalent test stub.
 Checked {git fetch --depth=1 origin afa674127fc90edc2356724d6f5048c58b9741bb}
@@ -51,7 +56,10 @@ try {
     Checked {& $exe $plugin $fixture --expect-picker-failure}
 } finally {Pop-Location}
 Get-Content "$root/native/Sf2/Sf2Editor.cpp" -Raw | Set-Content "$src/native/Sf2/Sf2Editor.cpp" -Encoding utf8
-Checked {cmake --build "$work/build" --config Release --target FengYin --parallel 4}
+Checked {cmake --build "$work/build" --config Release --target FengYin Sf2WindResponse --parallel 4}
+$fastFixture=Join-Path $work 'fast-attack.sf2'
+Checked {python "$root/tests/create_sf2_fixture.py" $fastFixture --fast-attack}
+Checked {& "$work/build/Release/Sf2WindResponse.exe" $fixture $fastFixture}
 Copy-Item "$built/*" $isolated -Recurse -Force
 # The host EXE may be up to date, so its POST_BUILD copy need not rerun.
 $freshBundle=Join-Path $work 'build/FengYinSF2_artefacts/Release/VST3/FengYin SF2.vst3'

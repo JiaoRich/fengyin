@@ -12,7 +12,7 @@ def name(text):
     return text.encode('ascii')[:19].ljust(20, b'\0')
 
 
-def create(path, multiple=False):
+def create(path, multiple=False, fast_attack=False):
     rate, count = 44100, 44100
     samples = [round(12000 * math.sin(2 * math.pi * 440 * n / rate)) for n in range(count)] + [0] * 46
     info = chunk('LIST', b'INFO' + chunk('ifil', struct.pack('<HH', 2, 1))
@@ -24,7 +24,7 @@ def create(path, multiple=False):
     pbag = b''.join(struct.pack('<HH', i, 0) for i in range(n + 1))
     pgen = b''.join(struct.pack('<HH', 41, 0) for _ in range(n)) + struct.pack('<HH', 0, 0)
     inst = name('Sine instrument') + struct.pack('<H', 0) + name('EOI') + struct.pack('<H', 1)
-    generators = [(34, -6000), (38, -3600), (54, 1), (58, 69), (53, 0)]
+    generators = [(34, -12000 if fast_attack else -6000), (38, -3600), (54, 1), (58, 69), (53, 0)]
     igen = b''.join(struct.pack('<Hh', k, v) for k, v in generators) + b'\0' * 4
     ibag = struct.pack('<HHHH', 0, 0, len(generators), 0)
     shdr = name('Sine') + struct.pack('<IIIIIBbHH', 0, count, 0, count, rate, 69, 0, 0, 1)
@@ -37,4 +37,4 @@ def create(path, multiple=False):
 
 if __name__ == '__main__':
     import sys
-    create(sys.argv[1], '--multiple' in sys.argv[2:])
+    create(sys.argv[1], '--multiple' in sys.argv[2:], '--fast-attack' in sys.argv[2:])
