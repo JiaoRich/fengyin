@@ -58,8 +58,12 @@ try {
 Get-Content "$root/native/Sf2/Sf2Editor.cpp" -Raw | Set-Content "$src/native/Sf2/Sf2Editor.cpp" -Encoding utf8
 Checked {cmake --build "$work/build" --config Release --target FengYin Sf2WindResponse --parallel 4}
 $fastFixture=Join-Path $work 'fast-attack.sf2'
+$windFixture=Join-Path $work 'wind-sine.sf2'
+Checked {python "$root/tests/create_sf2_fixture.py" $windFixture}
 Checked {python "$root/tests/create_sf2_fixture.py" $fastFixture --fast-attack}
-Checked {& "$work/build/Release/Sf2WindResponse.exe" $fixture $fastFixture}
+# The standalone C++ DSP harness uses narrow argv on Windows. Its fixture has
+# an ASCII name; the real DLL UI/loader still MUST use the Unicode path below.
+Checked {& "$work/build/Release/Sf2WindResponse.exe" $windFixture $fastFixture}
 Copy-Item "$built/*" $isolated -Recurse -Force
 # The host EXE may be up to date, so its POST_BUILD copy need not rerun.
 $freshBundle=Join-Path $work 'build/FengYinSF2_artefacts/Release/VST3/FengYin SF2.vst3'
